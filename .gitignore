@@ -4,3 +4,8 @@ build/
 *.db
 dataset-export/
 .venv/
+web/node_modules/
+web/dist/
+openapi.json
+playwright-report/
+test-results/

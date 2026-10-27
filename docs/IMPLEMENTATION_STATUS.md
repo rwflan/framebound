@@ -40,7 +40,7 @@ Acceptance gate: complete valid examples, invalid-input tests, stale-write prote
   PIL still missing — WP2 pins Pillow+NumPy raster. MCP SDK still missing — WP3 pins official SDK + real client handshake.
 - Next: WP2 canonical media + verification framework (registration, integer timeline, coverage matrix, evidence IDs, overlays, original faults).
 
-## Current package: WP3 — tools, providers and bounded loop (done on branch `codex/wp3-tools-providers-loop`, 2026-10-27)
+## Prior: WP3 — tools, providers and bounded loop (merged as PR #6) — tools, providers and bounded loop (done on branch `codex/wp3-tools-providers-loop`, 2026-10-27)
 
 Acceptance gate: real client MCP handshake; references reach image model; outputs stored; masks decoded if available;
 bounded repair and no-regression policy work. All pass.
@@ -88,7 +88,51 @@ bounded repair and no-regression policy work. All pass.
 - Next: WP4 review desk + human round-trip (FastAPI routes, React desk, packet renderer, ROI/range issues, correction leases,
   before/after, restart journey).
 
-## Prior: WP2 — canonical media and verification (merged as PR #5) — canonical media and verification (done on branch `codex/wp2-media-checks`, 2026-10-27)
+## Current package: WP4 — review desk and human round-trip (done on branch `codex/wp4-review-desk`, 2026-10-27)
+
+Acceptance gate: full browser restart journey passes; human decisions cannot be written by model tools;
+subjective correction supported. All pass.
+
+### Delivered
+
+- `framebound/v2/api/app.py` — FastAPI review API (12 routes) over the same services: project/packets/packet
+  (frozen revision+evaluation+frames+contract), asset-by-ID PNG (no path traversal; 410 on missing blob),
+  corrections queue (model-readable), reviewer-only issue/decision/resolve writes (403 for orchestrator via service
+  authz), claim/submit (orchestrator OK; submit builds child revision + evaluation + comparison packet and moves the
+  task to `awaiting_comparison`), SSE `/api/events`. 409 `stale_revision` on outdated decision views; 404 unknown IDs.
+  Static mount serves `web/dist` last so `/` never shadows `/api`. CLI: `serve --project DIR [--host 127.0.0.1]`
+  (v1 `--contract` path untouched).
+- `web/` — React 18 + TS + Vite desk: inbox (packets, blockers, coverage gaps), packet view (intent strip, 288px stage,
+  true-speed rAF playback from integer holds with paint counter, frame strip/timeline, findings + coverage, ROI drag →
+  native px, frame-range issues, Approve/Reject/Needs-work bound to the exact revision), compare view (side/blink/diff
+  at identical timing), corrections queue. OpenAPI generated client types (`src/api-types.ts` via openapi-typescript 7;
+  `npm run typecheck` + `npm run build` green).
+- Playback honesty: presentation speed never rewrites holds; tick-step on exact integers; dropped paints observable via counter.
+- `tests/test_v2_desk.py` (2 tests): reviewer marks ROI issue 3–5 → open task in model queue; orchestrator decision → 403;
+  stale `expected_revision_id` → 409; NEW app instance over same dir (restart) preserves issue/task/media byte-identical;
+  claim → submit replacement → comparison packet with passing evaluation; unrelated approval leaves task open;
+  explicit `resolve_issue` closes it; clean-baseline subjective issue path.
+- `web/e2e/journey.mjs` + Playwright chromium headless shell: inbox → packet → paints advance 24→46 → ROI drag →
+  issue submit → correction task → reload → packet+desk reloaded. Exit 0, 4 screenshots in `/tmp/fb-e2e-shots` (outside repo).
+
+### Actual commands/results (2026-10-27, Dublin)
+
+- `python -m pytest tests/ -q` → `54 passed` (13 v1 + 11 WP1 + 14 WP2 + 14 WP3 + 2 WP4).
+- `npm run typecheck` → clean; `npm run build` → `dist/` 156K.
+- Browser E2E (chromium headless shell, API+desk on :8766): `{"inbox": 1, "paints_advance": "paints 24 → 46",
+  "issue": "correction task task-evt-…", "after_reload": "packet + desk reloaded"}`. Screenshots inspected: stage,
+  findings, strip, decisions render without overlap.
+
+### Artifacts / limitations / next
+
+- Artifacts: API + desk + e2e script in-repo; screenshots + server log + seeded projects in `/tmp` (not committed).
+  `package-lock.json` intentionally committed for pinned frontend deps.
+- Limitations: single local reviewer identity (`X-Actor-Type` header; no real auth — local-only, hosted demo must be
+  read-only replay per plan); compare view loads revision IDs without packet media cross-check (WP5 export hardening);
+  no export button yet (WP5); no video/contact-sheet preview derivatives yet (WP6 demo needs).
+- Next: WP5 portable training snapshots (exports, loaders, split/rights policies, dataset card, loader smoke tests).
+
+## Prior: WP2 — canonical media and verification (merged as PR #5) — canonical media and verification (merged as PR #5) — canonical media and verification (done on branch `codex/wp2-media-checks`, 2026-10-27)
 
 Acceptance gate: clean and negative fixtures behave correctly; per-tick sliding and loop/one-shot cases tested; stale evidence rejected. All pass.
 
