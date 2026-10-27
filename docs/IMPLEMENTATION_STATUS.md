@@ -5,6 +5,78 @@ Baseline: `b680d84` (audited main, 2026-10-27). `main` has not advanced since th
 Prior ledger entries below are historical. The earlier "64 passing tests" and "engineering complete except
 for entrant actions" claims are NOT accepted as proof; each remediation package re-proves its gate.
 
+## Current package: R1 — real authority and transaction layer (done on branch `codex/r1-authority-transactions`, 2026-10-27)
+
+Acceptance gate: session-backed reviewers, stored approval authority, relationship validation, atomic
+multi-record writes, payload-bound idempotency, exercised migration. All demonstrated (see commands/results).
+
+### Changed capability
+
+- Reviewer sessions (`services/sessions.py`): localhost pairing ceremony (`reviewer-pair` mints a single-use
+  code, `reviewer-open` exchanges it for a token; only token hashes stored). API writes resolve
+  `X-Session-Token` to a live session; `X-Actor-Type` is ignored entirely (self-assertion → 403, bad token →
+  401). Orchestrator identity stays a label with no reviewer powers. Documented threat boundary: transport
+  checks cannot restrain direct filesystem access to the owner's database.
+- Stored reference authority (`services/approvals.py` + `services/briefs.py`): draft motion guides via
+  orchestrator tools; reviewer-only `approve_reference` binds exact identity/style/phase asset hashes in an
+  immutable `ReferenceApproval` (supersession, never edits). CLI/MCP `brief-compile` now resolve this stored
+  authority and fail without a current human approval — the fabricated `approved=True/imported` and
+  `guide:<id>` adapters are deleted from both transports.
+- Relationship validation (`services/packets.py`): packet→revision→contract→character, evaluation→revision,
+  frame→revision, ROI inside the contract canvas, frame_range inside contract ticks, decisions require stored
+  evaluation for the exact revision, packet must address the decided revision, staleness resolved against
+  server state (`expected_evaluation_id` vs current). Job submit resolves reference bytes from the blob store
+  hash-verified; caller bytes are cross-checked, never trusted.
+- Transactions (`storage.atomic` + `stage`/`stage_update`): issue+task, frame-set+revision, resolution+task
+  commit as one unit; injected mid-write faults leave zero partial rows (pinned by test).
+- Frozen entities expanded to assets, character/annotation revisions, frame instances, attempts, review
+  events, export snapshots; mutable remain projects, correction_tasks, jobs. Migration v1→v2 exercised on a
+  legacy-shaped database (data intact, version bumped).
+- Idempotency: same event/packet/job id + same content returns the stored result with `deduped`; same id +
+  different content is a 409 `ConflictError` (jobs compare full payload fingerprints). Process-random `hash()`
+  event ids replaced with server `uuid4` ids. Typed 4xx surfaces: 403/404/409/422 + `frozen_revision`.
+- Strict domain: `StrictInt` holds/ticks/dims/slots/ROI/range (audit's `['4',True,2.0]` now rejected),
+  finite-float guards, hex-shape hashes, `frame_range` shape, `ReviewEvent.category` preserved end to end,
+  `CorrectionTask` carries `claim_holder` + token hash (submit-time enforcement lands in R4).
+- Claim binds the authenticated caller; re-claim and stale versions conflict. New `current_state` reducer
+  (latest decision wins; open issues from unresolved tasks) is served on `GET /api/packet`.
+- Demo note: `demo_wp6`'s scripted in-process approval still exists and is relabeled honestly only in R7; it
+  passes the new validation because its packet/evaluation/revision are self-consistent, not because the
+  demo is a human.
+
+### Failing repros fixed (reproduced before fixing)
+
+- Header `X-Actor-Type: reviewer` recorded approvals → now 403 without a session token (pinned).
+- `brief-compile` with unapproved references succeeded on all transports → now `InvalidInput` on CLI/MCP
+  service and MCP tool error until a human approval is stored (pinned over real MCP stdio).
+- Decision naming another revision's packet accepted → now 422 (pinned; desk journey updated to the
+  correct packet).
+- ROI/range `[0,9000]` on a 64px canvas accepted → now 422 (pinned); category discarded → now stored and
+  asserted on the open task scope.
+- 7-asset/1-phase and phase-swapped revisions stored → now rejected at the boundary; failed writes leave
+  zero partial rows (pinned).
+- Same idempotency key + different generation payload silently reused → now 409 (pinned).
+- `verify-local`'s export round-trip no longer imports test helpers (`devseed` is production code).
+
+### Actual commands/results (2026-10-27, Dublin; python 3.11.4, node v22.23.4)
+
+- `python -m pytest tests/ -q` → `88 passed` (76 R0 + 12 new R1).
+- `sh scripts/verify-local` → `ALL LOCAL CHECKS PASSED`, exit 0 (unchanged gate, R1 code underneath).
+- CLI ceremony: `reviewer-pair` → code; `reviewer-open` → token; reuse → `reviewer-open refused` exit 1.
+- `test_v2_desk` journeys now pair over HTTP, assert holder binding, category preservation, mismatched-packet
+  422, and explicit resolve/reopen visibility.
+
+### Artifacts / limitations / next
+
+- Limitations (carried forward): approval/event/brief authority is enforced; provider wire format (R3),
+  fail-closed evaluation (R2), bounded-repair lease/scope gating (R4), export semantics (R5), desk media
+  experience (R6), and demo relabeling (R7) are untouched. `AnnotationRevision` still cannot store point
+  geometry (R2). `migrate-v1` remains a dry-run report. `CharacterRevision.reference_approval` is legacy and
+  unread (approvals table is authoritative). In-process direct `Actor(type="reviewer")` calls still bypass
+  sessions by design (filesystem access owns the database).
+- Next: R2 — fail-closed evaluation and reproducible evidence (expected-scope matrix, evidence closure,
+  verify hardening, movement-measurement fixes).
+
 ## Current package: R0 — safe outputs, reliable verification, install coherence (done on branch `codex/r0-safety-verify-install`, 2026-10-27)
 
 Acceptance gate: sentinel-preserving refusal, per-child failure exits, fresh-venv locked install, offline neutrality
