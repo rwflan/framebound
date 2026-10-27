@@ -87,6 +87,12 @@ def main(argv=None):
         ("orchestrator-send", "v2: claimed-send-complete for one job", [("--project", True), ("--run-id", True), ("--job-id", True), ("--brief", True), ("--worker-id", True)]),
         ("capabilities", "v2: audited transport x operation table", [("--project", True)]),
         ("candidate-register", "v2: register replacements as a child revision", [("--baseline", True), ("--new-id", True), ("--project", True), ("--slots", True), ("--recipe", True)]),
+        ("correction-submit", "v2: gated repair submit (holder+token+lease+scope+matrix)", [("--project", True), ("--task-id", True), ("--claim-token", True), ("--new-id", True), ("--slots", True), ("--recipe", True), ("--baseline-evaluation", True), ("--idempotency-key", True)]),
+        ("correction-get", "v2: explicit correction task status", [("--project", True), ("--task-id", True)]),
+        ("corrections-list-open", "v2: list open correction tasks", [("--project", True)]),
+        ("mask-approve", "v2: reviewer-approve an edit mask (needs session token)", [("--project", True), ("--issue", True), ("--mask-asset", True), ("--slots", True), ("--session-token", False)]),
+        ("issue-reopen", "v2: reviewer-reopen a resolved issue (needs session token)", [("--project", True), ("--issue", True), ("--session-token", False)]),
+        ("eligibility", "v2: release eligibility for a revision", [("--project", True), ("--revision-id", True)]),
         ("packet-create", "v2: curate a review packet", [("--packet-id", True), ("--revision-id", True), ("--evaluation-id", True), ("--project", True), ("--intent", False)]),
         ("corrections-list", "v2: list open correction tasks", [("--project", True)]),
     ]:
@@ -102,6 +108,11 @@ def main(argv=None):
             c.add_argument("--max-attempts", default="3")
         if name == "orchestrator-send":
             c.add_argument("--offline", action="store_true", default=False)
+        if name == "correction-submit":
+            c.add_argument("--transform", default=None)
+            c.add_argument("--expected-version", default="1")
+        if name == "issue-reopen":
+            c.add_argument("--note", default="")
 
     sub.add_parser("mcp", help="Serve the same tools over MCP (stdio)")
 
@@ -178,7 +189,9 @@ def main(argv=None):
     if args.cmd in ("asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
-                    "orchestrator-send", "capabilities", "candidate-register",
+                    "orchestrator-send", "capabilities", "correction-submit",
+                    "correction-get", "corrections-list-open", "mask-approve",
+                    "issue-reopen", "eligibility", "candidate-register",
                     "packet-create", "corrections-list", "reviewer-pair", "reviewer-open",
                     "guide-propose", "reference-approve"):
         from .v2 import cli_commands as _v2c

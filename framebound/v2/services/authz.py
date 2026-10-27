@@ -12,7 +12,7 @@ from .errors import AuthorizationError
 
 REVIEWER_ONLY_OPS = frozenset({
     "approve_reference", "approve", "approve_art", "reject", "reject_art", "needs_changes",
-    "mark_issue", "resolve_issue", "reopen_issue", "release_publication", "freeze_approval",
+    "mark_issue", "resolve_issue", "reopen_issue", "approve_mask", "release_publication", "freeze_approval",
 })
 
 
