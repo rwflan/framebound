@@ -54,6 +54,23 @@ def main(argv=None):
     bm = sub.add_parser("benchmark", help="v2: run the procedural stress fixture and report timing")
     bm.add_argument("--fixture", default="stress-200", choices=["stress-200"])
     bm.add_argument("--report", help="Write the benchmark report JSON here")
+    mc = sub.add_parser("v2-mcp", help="v2: serve application services over MCP (stdio)")
+    mc.add_argument("--project", required=True)
+    for name, helps, args in [
+        ("asset-import", "v2: import an image asset", [("--src", True), ("--asset-id", True), ("--project", True)]),
+        ("contract-propose", "v2: validate + store a clip contract", [("--contract", True), ("--project", True)]),
+        ("clip-create", "v2: create a clip revision", [("--contract-id", True), ("--revision-id", True), ("--project", True), ("--frames", True), ("--phases", True)]),
+        ("clip-evaluate", "v2: evaluate a stored clip revision", [("--revision-id", True), ("--project", True)]),
+        ("brief-compile", "v2: compile a conditioning bundle", [("--contract-id", True), ("--slot", True), ("--project", True)]),
+        ("job-submit", "v2: submit a generation job (idempotent)", [("--brief", True), ("--project", True), ("--idempotency-key", True)]),
+        ("job-get", "v2: read a persisted job", [("--job-id", True), ("--project", True)]),
+        ("candidate-register", "v2: register replacements as a child revision", [("--baseline", True), ("--new-id", True), ("--project", True), ("--slots", True), ("--recipe", True)]),
+        ("packet-create", "v2: curate a review packet", [("--packet-id", True), ("--revision-id", True), ("--evaluation-id", True), ("--project", True), ("--intent", False)]),
+        ("corrections-list", "v2: list open correction tasks", [("--project", True)]),
+    ]:
+        c = sub.add_parser(name, help=helps)
+        for flag, req in args:
+            c.add_argument(flag, required=req)
 
     sub.add_parser("mcp", help="Serve the same tools over MCP (stdio)")
 
@@ -91,6 +108,18 @@ def main(argv=None):
     if args.cmd == "demo" and getattr(args, "profile", "v1") == "v2":
         from .v2.demo import run_demo
         _print(run_demo(args.out))
+        return 0
+    if args.cmd == "v2-mcp":
+        import asyncio as _aio
+        from .v2.mcp import build_server as _bs
+        _s = _bs(args.project)
+        _aio.run(_s.run_stdio_async())
+        return 0
+    if args.cmd in ("asset-import", "contract-propose", "clip-create", "clip-evaluate",
+                    "brief-compile", "job-submit", "job-get", "candidate-register",
+                    "packet-create", "corrections-list"):
+        from .v2 import cli_commands as _v2c
+        _print(_v2c.dispatch(args))
         return 0
     if args.cmd == "benchmark":
         from .v2.demo import run_benchmark
