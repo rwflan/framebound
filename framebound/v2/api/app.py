@@ -66,6 +66,21 @@ class SubmitBody(D.Strict):
     slot_assets: dict[str, str] = Field(default_factory=dict)
     recipe: str = Field(default="repair:bounded-patch", min_length=1, max_length=500)
     new_revision_id: str | None = Field(default=None, min_length=1, max_length=128)
+    claim_token: str | None = Field(default=None, min_length=1, max_length=256)
+    transform: dict | None = None
+    baseline_evaluation_id: str | None = Field(default=None, min_length=1, max_length=128)
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=256)
+    expected_version: D.StrictInt = 1
+
+
+class MaskBody(D.Strict):
+    issue_event_id: str = Field(min_length=1, max_length=128)
+    mask_asset_id: str = Field(min_length=1, max_length=128)
+    covered_slots: list[D.StrictInt] = Field(min_length=1)
+
+
+class ReopenBody(D.Strict):
+    note: str = Field(default="", max_length=2000)
 
 
 class PairBody(D.Strict):
@@ -296,45 +311,65 @@ def create_app(project_dir: str) -> FastAPI:
     def submit(task_id: str, body: SubmitBody,
                x_session_token: str | None = Header(default=None),
                x_actor_id: str | None = Header(default=None)):
-        """Orchestrator submits a replacement: child revision + evaluation + comparison packet."""
-        actor(x_session_token, x_actor_id)  # authenticated principal; lease checks land in R4
-        from ..services import clips
-        con = S.connect(project_dir)
-        try:
-            tdata, tver = S.get(con, "correction_tasks", task_id)
-            task = D.CorrectionTask.model_validate_json(json.dumps(tdata))
-        except KeyError:
-            raise HTTPException(404, "unknown correction task")
-        finally:
-            con.close()
+        """Gated repair submit: holder + token + lease + baseline + scope + matrix.
+
+        Unclaimed, foreign-holder, expired-lease and stale-baseline submits are
+        refused with 422 and write nothing. Out-of-scope pixels and matrix
+        regressions are refused. Failures land as failed attempts (200-class
+        envelope with ok:false), never orphaned revisions.
+        """
+        from ..services import corrections as C
+        act = actor(x_session_token, x_actor_id)  # authenticated principal
         try:
             slot_assets = {int(k): v for k, v in (body.slot_assets or {}).items()}
         except ValueError:
             raise HTTPException(422, "slot_assets keys must be integer slot ids")
-        recipe = body.recipe
-        new_id = body.new_revision_id or f"{task.baseline_revision_id}-r1"
         try:
-            out = clips.register_candidate(project_dir, task.baseline_revision_id, new_id,
-                                           slot_assets, recipe)
+            out = C.submit_correction(
+                project_dir, act, task_id, claim_token=body.claim_token or "",
+                expected_version=int(body.expected_version),
+                new_revision_id=body.new_revision_id or f"{task_id}-r1",
+                slot_asset_ids=slot_assets, recipe=body.recipe,
+                transform=body.transform,
+                baseline_evaluation_id=body.baseline_evaluation_id or "",
+                idempotency_key=body.idempotency_key or "")
         except S.ConflictError as e:
             raise HTTPException(409, str(e))
-        ev_out = clips.evaluate(project_dir, new_id)
-        from ..services import packets as P
-        pkt = P.create_packet(project_dir, f"pkt-{new_id}", new_id,
-                              ev_out.artifacts[0]["id"] if ev_out.artifacts else new_id,
-                              f"correction for {task_id}", comparison_revision_id=task.baseline_revision_id)
-        con = S.connect(project_dir)
-        try:
-            data, ver = S.get(con, "correction_tasks", task_id)
-            t2 = D.CorrectionTask.model_validate_json(json.dumps(data))
-            t2.status = D.CorrectionStatus.AWAITING_COMPARISON
-            t2.attempt_ids = [*t2.attempt_ids, new_id]
-            with S.atomic(con):
-                S.stage_update(con, "correction_tasks", t2, ver)
-        finally:
-            con.close()
-        publish({"type": "comparison_ready", "task_id": task_id, "revision_id": new_id})
-        return {"revision": out.model_dump(), "evaluation": ev_out.model_dump(), "packet": pkt.model_dump()}
+        if out.get("ok"):
+            publish({"type": "comparison_ready", "task_id": task_id,
+                     "revision_id": out.get("revision_id")})
+            return out
+        return JSONResponse(status_code=200, content=out)
+
+    @app.get("/api/corrections/{task_id}")
+    def correction_get(task_id: str):
+        from ..services import corrections as C
+        return C.get_task(project_dir, task_id)
+
+    @app.post("/api/masks", status_code=201)
+    def mask_approve(body: MaskBody,
+                     x_session_token: str | None = Header(default=None),
+                     x_actor_id: str | None = Header(default=None)):
+        """Reviewer approves an edit mask for an issue. Orchestrators are refused."""
+        from ..services import masks as M
+        act = actor(x_session_token, x_actor_id)
+        mask = M.approve_mask(project_dir, act, body.issue_event_id,
+                              body.mask_asset_id, [int(s) for s in body.covered_slots])
+        return json.loads(mask.model_dump_json())
+
+    @app.post("/api/issues/{event_id}/reopen", status_code=200)
+    def reopen(event_id: str, body: ReopenBody,
+               x_session_token: str | None = Header(default=None),
+               x_actor_id: str | None = Header(default=None)):
+        """Reviewer reopens a resolved issue; the task returns to the queue visibly."""
+        from ..services import corrections as C
+        return C.reopen_issue(project_dir, actor(x_session_token, x_actor_id),
+                              event_id, body.note)
+
+    @app.get("/api/eligibility/{revision_id}")
+    def eligibility(revision_id: str):
+        from ..services import eligibility as E
+        return E.release_eligibility(project_dir, revision_id)
 
     @app.post("/api/jobs", status_code=201)
     def jobs_submit(body: dict):

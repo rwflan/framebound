@@ -410,7 +410,7 @@ class ReviewEvent(Strict):
     id: str = Field(min_length=1, max_length=128)
     actor_type: Literal["reviewer", "orchestrator", "system"] = "reviewer"
     actor_id: str = Field(min_length=1, max_length=200)
-    action: Literal["approve_reference", "approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue"] = "mark_issue"
+    action: Literal["approve_reference", "approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue", "approve_mask"] = "mark_issue"
     packet_id: str | None = None
     clip_revision_id: str = Field(min_length=1)
     frame_instance_id: str | None = None
@@ -434,7 +434,9 @@ class CorrectionTask(Strict):
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
     source_issue_event_id: str = Field(min_length=1)
-    baseline_revision_id: str = Field(min_length=1)
+    baseline_revision_id: str = Field(min_length=1, max_length=128)
+    baseline_evaluation_id: str | None = None
+    edit_mask_id: str | None = None
     desired_outcome: str = Field(min_length=1, max_length=1000)
     scope: str = Field(min_length=1, max_length=500)
     status: CorrectionStatus = CorrectionStatus.OPEN
@@ -443,6 +445,25 @@ class CorrectionTask(Strict):
     claim_lease: str | None = None
     attempt_ids: list[str] = Field(default_factory=list)
     resolution_event_id: str | None = None
+    last_error: str | None = Field(default=None, max_length=2000)
+    created_at: str = Field(default_factory=utcnow)
+
+
+class EditMask(Strict):
+    """Reviewer-approved edit support: exactly which pixels a repair may touch.
+
+    An issue ROI suggests scope but never authorizes pixels by itself. Changed
+    candidate pixels must lie inside the ROI and/or this approved mask.
+    """
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    issue_event_id: str = Field(min_length=1)
+    task_id: str = Field(min_length=1)
+    mask_asset_id: str = Field(min_length=1)
+    mask_byte_sha256: str = Field(**HEX64)
+    covered_slots: list[StrictInt] = Field(min_length=1)
+    approved_by: str = Field(min_length=1, max_length=200)
+    approval_event_id: str = Field(min_length=1)
     created_at: str = Field(default_factory=utcnow)
 
 

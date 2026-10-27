@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 from PIL import Image
+from PIL import Image as _Image
 
 from framebound.v2.api.app import create_app
 from framebound.v2.checks import fixtures as F
@@ -52,6 +53,8 @@ class DeskJourney(unittest.TestCase):
         clips.create_revision(td, "contract-desk-01", "clip-bad-01", aids, [f"p{i}" for i in range(8)])
         # introduce one faulty slot via a second revision
         assets.import_asset(td, str(src / meta["faults"]["phase"]), "f-wrong", source_kind="procedural")
+        _Image.new("L", (64, 64), 255).save(src / "mask-full.png")
+        assets.import_asset(td, str(src / "mask-full.png"), "m-full-01", source_kind="original")
         faulty = [f"f-clean-{i}" for i in range(8)]
         faulty[3] = "f-wrong"
         clips.create_revision(td, "contract-desk-01", "clip-bad-02", faulty, [f"p{i}" for i in range(8)])
@@ -103,14 +106,30 @@ class DeskJourney(unittest.TestCase):
             self.assertEqual(a1.content, a2.content)
             self.assertTrue(len(a1.content) > 100)
 
+            # reviewer authorizes the repair pixels: a full-frame edit mask for
+            # slot 3 (the ROI alone could never authorize a whole-frame swap)
+            from PIL import Image as _Image
+            mask_path = Path(td) / "mask-full.png"
+            r2 = c2.post("/api/masks", json={
+                "issue_event_id": r.json()["event"]["operation_id"].replace("op-event-", ""),
+                "mask_asset_id": "m-full-01", "covered_slots": [3]}, headers=REV)
+            self.assertEqual(r2.status_code, 201, r2.text)
+
             # tool client claims the task, submits a passing replacement
+            # (mask approval already advanced the task version: read it first)
+            g = c2.get(f"/api/corrections/{task_id}")
+            self.assertEqual(g.status_code, 200, g.text)
             cl = c2.post(f"/api/corrections/{task_id}/claim",
-                         json={"expected_version": 1}, headers=MOD)
+                         json={"expected_version": g.json()["version"]}, headers=MOD)
             self.assertEqual(cl.status_code, 200, cl.text)
             self.assertEqual(cl.json()["holder"], "spark-1")
             sub = c2.post(f"/api/corrections/{task_id}/submit",
                           json={"slot_assets": {"3": "f-clean-3"}, "recipe": "repair:restore-phase-guide",
-                                "new_revision_id": "clip-fix-01"}, headers=MOD)
+                                "new_revision_id": "clip-fix-01",
+                                "claim_token": cl.json()["claim_token"],
+                                "expected_version": cl.json()["version"],
+                                "baseline_evaluation_id": info["ev_id"],
+                                "idempotency_key": "desk-fix-01"}, headers=MOD)
             self.assertEqual(sub.status_code, 201, sub.text)
             sj = sub.json()
             self.assertEqual(sj["evaluation"]["technical_status"], "pass")
