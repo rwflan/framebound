@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS reviewer_sessions(token_sha TEXT PRIMARY KEY, data TE
 CREATE TABLE IF NOT EXISTS motion_guides(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS reference_approvals(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS registrations(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 """
 
 # Evidence-bearing entities are append-only: corrections arrive as superseding
@@ -117,7 +118,7 @@ def _table_for(model: D.Strict) -> str:
         "Evaluation": "evaluations", "Attempt": "attempts", "ReviewPacket": "review_packets",
         "ReviewEvent": "review_events", "CorrectionTask": "correction_tasks",
         "Job": "jobs", "ExportSnapshot": "export_snapshots",
-        "MotionGuide": "motion_guides", "ReferenceApproval": "reference_approvals",
+        "MotionGuide": "motion_guides", "ReferenceApproval": "reference_approvals", "Run": "runs",
         "Registration": "registrations",
     }
     return mapping[type(model).__name__]

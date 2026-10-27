@@ -26,10 +26,39 @@ def dispatch(args) -> dict:
         from .services import jobs
         brief = json.loads(open(args.brief).read())
         refs = brief.get("_reference_blobs", [])
-        return jobs.submit_generation(args.project, brief, refs, args.idempotency_key).model_dump()
+        return jobs.submit_generation(
+            args.project, brief, refs, args.idempotency_key,
+            offline=bool(getattr(args, "offline", False)),
+            max_attempts=int(getattr(args, "max_attempts", 3))).model_dump()
     if cmd == "job-get":
         from .services import jobs
         return jobs.job_get(args.project, args.job_id)
+    if cmd == "job-claim":
+        from .services import jobs
+        return jobs.job_claim(args.project, args.job_id,
+                              getattr(args, "worker_id", "cli"),
+                              expected_version=int(args.expected_version))
+    if cmd == "job-cancel":
+        from .services import jobs
+        return jobs.job_cancel(args.project, args.job_id, int(args.expected_version))
+    if cmd == "job-reconcile":
+        from .services import jobs
+        return jobs.job_reconcile(args.project)
+    if cmd == "orchestrator-run":
+        from .services import orchestrator as O
+        return O.start_run(args.project, (args.jobs or "").split(",") if args.jobs else [],
+                           max_attempts=int(getattr(args, "max_attempts", 3)))
+    if cmd == "orchestrator-send":
+        from .services import orchestrator as O
+        brief = json.loads(open(args.brief).read())
+        refs = brief.get("_reference_blobs", [])
+        _ = refs  # bytes always re-resolve server-side; caller blobs never trusted
+        return O.orchestrator_send(args.project, args.run_id, args.job_id, brief,
+                                   worker_id=getattr(args, "worker_id", "cli"),
+                                   offline=bool(getattr(args, "offline", False)))
+    if cmd == "capabilities":
+        from .services import capabilities as C
+        return C.table()
     if cmd == "candidate-register":
         from .services import clips
         slot_assets = {int(k): v for k, v in

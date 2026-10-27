@@ -108,12 +108,25 @@ class ProviderHonesty(unittest.TestCase):
     def test_references_required_not_paths(self):
         with self.assertRaises(InvalidInput):
             img_provider.build_request({"instruction": "x"}, [])
-        # role-labeled pixels are what reach the model
+        # role-labeled pixels are what reach the model: role explanations ride
+        # as input_text, approved pixels as input_image data URLs (documented
+        # Responses wire; no asset_id/byte_sha256 keys leave this process)
+        import base64 as _b64
+        px = _b64.b64encode(bytes([1, 2, 3, 4])).decode()
         req = img_provider.build_request({"instruction": "x"}, [
-            {"role": "approved_identity", "asset_id": "a", "byte_sha256": "ab" * 32, "bytes_b64": "AAA"},
-            {"role": "approved_style", "asset_id": "b", "byte_sha256": "ab" * 32, "bytes_b64": "BBB"}])
-        roles = [c.get("role") for c in req["input"][1]["content"] if isinstance(c, dict) and "role" in c]
-        self.assertIn("approved_identity", roles)
+            {"role": "approved_identity", "asset_id": "a", "byte_sha256": "ab" * 32, "bytes_b64": px},
+            {"role": "approved_style", "asset_id": "b", "byte_sha256": "cd" * 32, "bytes_b64": px}])
+        content = req["input"][1]["content"]
+        kinds = {c.get("type") for c in content}
+        self.assertEqual(kinds, {"input_text", "input_image"})
+        text = next(c["text"] for c in content if c["type"] == "input_text")
+        self.assertIn("approved_identity", text)
+        self.assertIn("approved_style", text)
+        urls = [c["image_url"] for c in content if c["type"] == "input_image"]
+        self.assertEqual(len(urls), 2)
+        self.assertTrue(all(u.startswith("data:image/") for u in urls))
+        self.assertNotIn("asset_id", json.dumps(req))
+        self.assertNotIn("endpoint", json.dumps(req))
 
     def test_sam_decode_outcomes_explicit(self):
         self.assertEqual(sam.decode_mask({}, 8, 8)["outcome"], "no_match")
@@ -130,9 +143,15 @@ class ProviderHonesty(unittest.TestCase):
         self.assertIn("NOT a SAM mask", fb["reason"])
 
     def test_spark_offline_is_advisory(self):
+        import base64 as _b64
         with tempfile.TemporaryDirectory() as td:
-            res = spark.submit_critique("contract", ["phase"], [{"slot": 0, "asset_id": "a"}], td)
-            # ^ signature: (contract_summary, fault_codes, frame_refs, project_dir)
+            tiny = _b64.b64encode(bytes([9] * 16)).decode()
+            # frames must carry transmittable pixels, never bare asset ids
+            with self.assertRaises(InvalidInput):
+                spark.submit_critique("contract", ["phase"], [{"slot": 0, "asset_id": "a"}], td)
+            res = spark.submit_critique("contract", ["phase"],
+                                        [{"slot": 0, "asset_id": "a", "mime": "image/png",
+                                          "bytes_b64": tiny}], td)
             self.assertEqual(res["mode"], "not_configured")
 
 
