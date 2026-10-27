@@ -8,14 +8,17 @@ mismatch raises StaleRevisionError (surfaces as 409 stale_revision).
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import os
+import secrets
 import sqlite3
 from pathlib import Path
 
 from . import domain as D
 
-MIGRATION_VERSION = 1
+MIGRATION_VERSION = 2
 
 
 class StaleRevisionError(ValueError):
@@ -48,9 +51,18 @@ CREATE TABLE IF NOT EXISTS correction_tasks(id TEXT PRIMARY KEY, data TEXT NOT N
 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS export_snapshots(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE UNIQUE INDEX IF NOT EXISTS jobs_idempotency ON jobs(json_extract(data, '$.idempotency_key'));
+CREATE TABLE IF NOT EXISTS reviewer_pairings(code_sha TEXT PRIMARY KEY, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS reviewer_sessions(token_sha TEXT PRIMARY KEY, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS motion_guides(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS reference_approvals(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 """
 
-FROZEN_TABLES = {"contract_revisions", "clip_revisions", "evaluations", "review_packets"}
+# Evidence-bearing entities are append-only: corrections arrive as superseding
+# records, never in-place edits. Only projects, correction_tasks and jobs are
+# mutable, and only through expected-version transitions.
+FROZEN_TABLES = {"assets", "character_revisions", "contract_revisions", "clip_revisions",
+                 "frame_instances", "annotation_revisions", "evaluations", "attempts",
+                 "review_packets", "review_events", "export_snapshots"}
 
 
 def connect(project_dir: str | Path) -> sqlite3.Connection:
@@ -67,6 +79,11 @@ def connect(project_dir: str | Path) -> sqlite3.Connection:
     if row is None:
         con.execute("INSERT INTO meta(k, v) VALUES('migration_version', ?)", (str(MIGRATION_VERSION),))
         con.commit()
+    elif int(row["v"]) < MIGRATION_VERSION:
+        # v1 -> v2: new authority tables arrive via CREATE IF NOT EXISTS above;
+        # no existing record is rewritten. Bump the version marker only.
+        con.execute("UPDATE meta SET v=? WHERE k='migration_version'", (str(MIGRATION_VERSION),))
+        con.commit()
     return con
 
 
@@ -81,7 +98,7 @@ def store_blob(project_dir: str | Path, data: bytes) -> str:
     if dest.is_file():
         return digest
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.parent / f".tmp-{digest}"
+    tmp = dest.parent / f".tmp-{digest}-{os.getpid()}-{secrets.token_hex(4)}"
     tmp.write_bytes(data)
     tmp.rename(dest)
     return digest
@@ -99,19 +116,46 @@ def _table_for(model: D.Strict) -> str:
         "Evaluation": "evaluations", "Attempt": "attempts", "ReviewPacket": "review_packets",
         "ReviewEvent": "review_events", "CorrectionTask": "correction_tasks",
         "Job": "jobs", "ExportSnapshot": "export_snapshots",
+        "MotionGuide": "motion_guides", "ReferenceApproval": "reference_approvals",
     }
     return mapping[type(model).__name__]
 
 
-def insert(con: sqlite3.Connection, model: D.Strict) -> int:
+def table_for(model: D.Strict) -> str:
+    return _table_for(model)
+
+
+def stage(con: sqlite3.Connection, model: D.Strict) -> None:
+    """Stage an INSERT inside the caller's transaction (no commit)."""
     table = _table_for(model)
-    payload = model.model_dump_json()
     try:
-        con.execute(f"INSERT INTO {table}(id, data) VALUES(?, ?)", (model.id, payload))
+        con.execute(f"INSERT INTO {table}(id, data) VALUES(?, ?)",
+                    (model.id, model.model_dump_json()))
     except sqlite3.IntegrityError as e:
         raise ConflictError(f"duplicate id {model.id} in {table}: {e}") from e
+
+
+def insert(con: sqlite3.Connection, model: D.Strict) -> int:
+    stage(con, model)
     con.commit()
     return 1
+
+
+@contextlib.contextmanager
+def atomic(con: sqlite3.Connection):
+    """Use-case-owned transaction: all staged writes commit together.
+
+    Storage helpers commit eagerly by default for single-record convenience;
+    multi-record use cases must stage() inside this block so a mid-way failure
+    rolls back instead of leaving partial issue/task or revision rows.
+    """
+    try:
+        yield con
+    except Exception:
+        con.rollback()
+        raise
+    else:
+        con.commit()
 
 
 def get(con: sqlite3.Connection, table: str, rid: str) -> tuple[dict, int]:
@@ -121,8 +165,8 @@ def get(con: sqlite3.Connection, table: str, rid: str) -> tuple[dict, int]:
     return json.loads(row["data"]), row["version"]
 
 
-def update_mutable(con: sqlite3.Connection, table: str, model: D.Strict, expected_version: int) -> int:
-    """Optimistic concurrency: only when version matches; else StaleRevisionError (409)."""
+def stage_update(con: sqlite3.Connection, table: str, model: D.Strict, expected_version: int) -> int:
+    """Stage an expected-version UPDATE inside the caller's transaction (no commit)."""
     if table in FROZEN_TABLES:
         raise FrozenRevisionError(f"{table} is append-only; create a new revision instead of updating {model.id}")
     cur = con.execute(
@@ -136,18 +180,47 @@ def update_mutable(con: sqlite3.Connection, table: str, model: D.Strict, expecte
         raise StaleRevisionError(
             f"stale_revision: {table}/{model.id} at version {row['version']}, writer expected {expected_version}"
         )
-    con.commit()
     return expected_version + 1
 
 
+def update_mutable(con: sqlite3.Connection, table: str, model: D.Strict, expected_version: int) -> int:
+    nv = stage_update(con, table, model, expected_version)
+    con.commit()
+    return nv
+    """Optimistic concurrency: only when version matches; else StaleRevisionError (409)."""
+    nv = stage_update(con, table, model, expected_version)
+    con.commit()
+    return nv
+
+
 def create_job_idempotent(con: sqlite3.Connection, job: D.Job) -> tuple[D.Job, bool]:
-    """Returns (job, created). Repeating the same idempotency key returns the original job."""
+    """Returns (job, created). Same key + same payload returns the original job.
+
+    Same key + different payload is a conflict, never a silent reuse. A lost
+    race on the unique index re-reads the winner instead of failing the retry.
+    """
     row = con.execute(
         "SELECT data FROM jobs WHERE json_extract(data, '$.idempotency_key')=?", (job.idempotency_key,)
     ).fetchone()
     if row is not None:
-        return D.Job.model_validate_json(row["data"]), False
-    insert(con, job)
+        existing = D.Job.model_validate_json(row["data"])
+        if existing.payload_sha256 != job.payload_sha256:
+            raise ConflictError(
+                f"idempotency key {job.idempotency_key} already used with a different payload")
+        return existing, False
+    try:
+        insert(con, job)
+    except ConflictError:
+        row = con.execute(
+            "SELECT data FROM jobs WHERE json_extract(data, '$.idempotency_key')=?", (job.idempotency_key,)
+        ).fetchone()
+        if row is None:
+            raise
+        existing = D.Job.model_validate_json(row["data"])
+        if existing.payload_sha256 != job.payload_sha256:
+            raise ConflictError(
+                f"idempotency key {job.idempotency_key} already used with a different payload")
+        return existing, False
     return job, True
 
 
