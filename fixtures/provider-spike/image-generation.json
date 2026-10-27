@@ -1,0 +1,13 @@
+{
+  "mode": "offline",
+  "sent": false,
+  "key": "REDACTED",
+  "request_v1_deficient": {
+    "model": "muse-image-1.0",
+    "prompt": "<brief instruction>",
+    "size": "1024x1024"
+  },
+  "endpoint": "POST https://api.meta.ai/v1/images/generations",
+  "deficiency": "v1 sends text only; carries no bound reference pixels/IDs. P0 requires reference-conditioned Responses flow with actual approved reference bytes or provider file IDs plus role+hash ledger.",
+  "note": "Offline fixture 2026-10-27: request shape only. No output fabricated."
+}
