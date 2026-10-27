@@ -1,0 +1,16 @@
+{
+  "mode": "offline",
+  "sent": false,
+  "key": "REDACTED",
+  "intended": {
+    "endpoint": "Responses with real image/video content per https://dev.meta.ai/docs/media-segmentation",
+    "output": "special-token box/mask requiring decoding; store mask bytes, prompt, coordinate mapping, model identity, request ID, confidence"
+  },
+  "v1_deficient": {
+    "model": "sam-3.1",
+    "image": "<local path string>",
+    "prompt": "<part name>",
+    "endpoint": "POST .../chat/completions"
+  },
+  "note": "Offline fixture 2026-10-27. v1 never transmits image bytes; never decodes masks. Alpha fallback must stay labeled offline-alpha, never SAM."
+}

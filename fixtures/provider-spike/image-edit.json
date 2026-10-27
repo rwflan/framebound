@@ -1,0 +1,23 @@
+{
+  "mode": "offline",
+  "sent": false,
+  "key": "REDACTED",
+  "intended": {
+    "endpoint": "edits endpoint per https://dev.meta.ai/docs/image-generation",
+    "inputs": [
+      "source image bytes",
+      "mask bytes + frozen recipe",
+      "role-labeled references"
+    ],
+    "to_confirm_live": [
+      "output encoding",
+      "alpha",
+      "multi-image limits",
+      "timeouts",
+      "edit/mask behavior",
+      "seed/exact-dimension support"
+    ]
+  },
+  "v1_status": "unimplemented",
+  "note": "Offline fixture 2026-10-27. Confirm against docs + live spike in WP3."
+}
