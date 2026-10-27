@@ -1,0 +1,336 @@
+{
+  "$defs": {
+    "ActionIntent": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "view": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "View",
+          "type": "string"
+        },
+        "facing": {
+          "default": "right",
+          "enum": [
+            "left",
+            "right"
+          ],
+          "title": "Facing",
+          "type": "string"
+        },
+        "loop": {
+          "default": true,
+          "title": "Loop",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "view"
+      ],
+      "title": "ActionIntent",
+      "type": "object"
+    },
+    "AllowedTransforms": {
+      "additionalProperties": false,
+      "properties": {
+        "per_pose_scale": {
+          "default": false,
+          "title": "Per Pose Scale",
+          "type": "boolean"
+        },
+        "rigid_translation_budget_px": {
+          "default": 2.0,
+          "minimum": 0,
+          "title": "Rigid Translation Budget Px",
+          "type": "number"
+        }
+      },
+      "title": "AllowedTransforms",
+      "type": "object"
+    },
+    "Canvas": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 2048,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 2048,
+          "title": "Height",
+          "type": "integer"
+        },
+        "units": {
+          "const": "native_px",
+          "default": "native_px",
+          "title": "Units",
+          "type": "string"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "Canvas",
+      "type": "object"
+    },
+    "ConstraintSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "check": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Check",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "annotation_revision_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annotation Revision Id"
+        },
+        "reference_revision_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Revision Id"
+        },
+        "max_error_px": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Error Px"
+        }
+      },
+      "required": [
+        "id",
+        "check"
+      ],
+      "title": "ConstraintSpec",
+      "type": "object"
+    },
+    "PhaseEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "slot": {
+          "minimum": 0,
+          "title": "Slot",
+          "type": "integer"
+        },
+        "phase": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Phase",
+          "type": "string"
+        },
+        "motion_reference_id": {
+          "minLength": 1,
+          "title": "Motion Reference Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot",
+        "phase",
+        "motion_reference_id"
+      ],
+      "title": "PhaseEntry",
+      "type": "object"
+    },
+    "RootPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "default": "in_place",
+          "enum": [
+            "in_place",
+            "world_grounded"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "ground_y": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ground Y"
+        }
+      },
+      "title": "RootPolicy",
+      "type": "object"
+    },
+    "Timing": {
+      "additionalProperties": false,
+      "properties": {
+        "ticks_per_second": {
+          "default": 60,
+          "exclusiveMinimum": 0,
+          "maximum": 240,
+          "title": "Ticks Per Second",
+          "type": "integer"
+        },
+        "holds": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 512,
+          "minItems": 1,
+          "title": "Holds",
+          "type": "array"
+        }
+      },
+      "required": [
+        "holds"
+      ],
+      "title": "Timing",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "character_revision_id": {
+      "minLength": 1,
+      "title": "Character Revision Id",
+      "type": "string"
+    },
+    "action": {
+      "$ref": "#/$defs/ActionIntent"
+    },
+    "canvas": {
+      "$ref": "#/$defs/Canvas"
+    },
+    "timing": {
+      "$ref": "#/$defs/Timing"
+    },
+    "root_policy": {
+      "$ref": "#/$defs/RootPolicy"
+    },
+    "references": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "minProperties": 1,
+      "title": "References",
+      "type": "object"
+    },
+    "phase_schedule": {
+      "items": {
+        "$ref": "#/$defs/PhaseEntry"
+      },
+      "minItems": 1,
+      "title": "Phase Schedule",
+      "type": "array"
+    },
+    "constraints": {
+      "items": {
+        "$ref": "#/$defs/ConstraintSpec"
+      },
+      "title": "Constraints",
+      "type": "array"
+    },
+    "allowed_transforms": {
+      "$ref": "#/$defs/AllowedTransforms"
+    },
+    "transition_contract_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Transition Contract Ids",
+      "type": "array"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes"
+    },
+    "change_reason": {
+      "anyOf": [
+        {
+          "maxLength": 1000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Change Reason"
+    }
+  },
+  "required": [
+    "id",
+    "character_revision_id",
+    "action",
+    "canvas",
+    "timing",
+    "references",
+    "phase_schedule"
+  ],
+  "title": "ClipContractRevision",
+  "type": "object"
+}

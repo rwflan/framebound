@@ -1,0 +1,125 @@
+{
+  "$defs": {
+    "HumanAcceptance": {
+      "enum": [
+        "unreviewed",
+        "needs_changes",
+        "approved",
+        "rejected"
+      ],
+      "title": "HumanAcceptance",
+      "type": "string"
+    },
+    "TechnicalStatus": {
+      "enum": [
+        "pass",
+        "fail",
+        "incomplete",
+        "error"
+      ],
+      "title": "TechnicalStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "ok": {
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "operation_id": {
+      "minLength": 1,
+      "title": "Operation Id",
+      "type": "string"
+    },
+    "revision_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Revision Id"
+    },
+    "technical_status": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TechnicalStatus"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "human_acceptance": {
+      "$ref": "#/$defs/HumanAcceptance",
+      "default": "unreviewed"
+    },
+    "coverage": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Coverage"
+    },
+    "issues": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "artifacts": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "next_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Next Actions",
+      "type": "array"
+    },
+    "cursor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cursor"
+    }
+  },
+  "required": [
+    "operation_id"
+  ],
+  "title": "ResultEnvelope",
+  "type": "object"
+}

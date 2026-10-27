@@ -1,0 +1,111 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "baseline_revision_id": {
+      "minLength": 1,
+      "title": "Baseline Revision Id",
+      "type": "string"
+    },
+    "brief_id": {
+      "minLength": 1,
+      "title": "Brief Id",
+      "type": "string"
+    },
+    "provider": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "request_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Request Sha256",
+      "type": "string"
+    },
+    "response_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Response Ref"
+    },
+    "candidate_asset_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Candidate Asset Ids",
+      "type": "array"
+    },
+    "cost": {
+      "default": "unknown",
+      "maxLength": 200,
+      "title": "Cost",
+      "type": "string"
+    },
+    "repair_mask_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Repair Mask Id"
+    },
+    "targeted_issue_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Targeted Issue Ids",
+      "type": "array"
+    },
+    "result": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Result",
+      "type": "string"
+    },
+    "no_progress_signature": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "No Progress Signature"
+    }
+  },
+  "required": [
+    "id",
+    "baseline_revision_id",
+    "brief_id",
+    "provider",
+    "request_sha256",
+    "result"
+  ],
+  "title": "Attempt",
+  "type": "object"
+}

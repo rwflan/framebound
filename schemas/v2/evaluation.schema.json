@@ -1,0 +1,182 @@
+{
+  "$defs": {
+    "CheckOutcome": {
+      "enum": [
+        "pass",
+        "fail",
+        "unmeasured",
+        "not_applicable",
+        "error"
+      ],
+      "title": "CheckOutcome",
+      "type": "string"
+    },
+    "CheckResult": {
+      "additionalProperties": false,
+      "properties": {
+        "constraint_id": {
+          "minLength": 1,
+          "title": "Constraint Id",
+          "type": "string"
+        },
+        "scope": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/CheckOutcome"
+        },
+        "observed_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Value"
+        },
+        "units": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Units"
+        },
+        "expected_interval": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Interval"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "constraint_id",
+        "scope",
+        "outcome",
+        "reason"
+      ],
+      "title": "CheckResult",
+      "type": "object"
+    },
+    "CoverageStatus": {
+      "enum": [
+        "complete",
+        "partial",
+        "unsupported"
+      ],
+      "title": "CoverageStatus",
+      "type": "string"
+    },
+    "TechnicalStatus": {
+      "enum": [
+        "pass",
+        "fail",
+        "incomplete",
+        "error"
+      ],
+      "title": "TechnicalStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "clip_revision_id": {
+      "minLength": 1,
+      "title": "Clip Revision Id",
+      "type": "string"
+    },
+    "evidence_manifest_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Evidence Manifest Sha256",
+      "type": "string"
+    },
+    "analyzer_version": {
+      "minLength": 1,
+      "title": "Analyzer Version",
+      "type": "string"
+    },
+    "dependency_lock_id": {
+      "minLength": 1,
+      "title": "Dependency Lock Id",
+      "type": "string"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/CheckResult"
+      },
+      "minItems": 1,
+      "title": "Results",
+      "type": "array"
+    },
+    "technical_status": {
+      "$ref": "#/$defs/TechnicalStatus"
+    },
+    "coverage_status": {
+      "$ref": "#/$defs/CoverageStatus"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "clip_revision_id",
+    "evidence_manifest_sha256",
+    "analyzer_version",
+    "dependency_lock_id",
+    "results",
+    "technical_status",
+    "coverage_status"
+  ],
+  "title": "Evaluation",
+  "type": "object"
+}

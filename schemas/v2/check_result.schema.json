@@ -1,0 +1,95 @@
+{
+  "$defs": {
+    "CheckOutcome": {
+      "enum": [
+        "pass",
+        "fail",
+        "unmeasured",
+        "not_applicable",
+        "error"
+      ],
+      "title": "CheckOutcome",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "constraint_id": {
+      "minLength": 1,
+      "title": "Constraint Id",
+      "type": "string"
+    },
+    "scope": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Scope",
+      "type": "string"
+    },
+    "outcome": {
+      "$ref": "#/$defs/CheckOutcome"
+    },
+    "observed_value": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Observed Value"
+    },
+    "units": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Units"
+    },
+    "expected_interval": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Interval"
+    },
+    "evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Ids",
+      "type": "array"
+    },
+    "reason": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "constraint_id",
+    "scope",
+    "outcome",
+    "reason"
+  ],
+  "title": "CheckResult",
+  "type": "object"
+}
