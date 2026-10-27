@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "contract_revision_id": {
+      "minLength": 1,
+      "title": "Contract Revision Id",
+      "type": "string"
+    },
+    "frame_instance_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Frame Instance Ids",
+      "type": "array"
+    },
+    "parent_revision_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Revision Id"
+    },
+    "origin_run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Origin Run Id"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "contract_revision_id",
+    "frame_instance_ids"
+  ],
+  "title": "ClipRevision",
+  "type": "object"
+}

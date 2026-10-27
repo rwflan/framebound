@@ -3,7 +3,44 @@
 Plan authority: `Framebound-Implementation-Plan.txt` (external handoff, kept outside the repo).
 This file is the status ledger. Design intent lives in the plan; only delivered + verified behavior is recorded here.
 
-## Current package: WP0 — baseline and integration spike (in progress, branch `codex/wp0-baseline-spike`)
+## Current package: WP1 — schemas and durable domain (done on branch `codex/wp1-schemas-domain`, 2026-10-27)
+
+Acceptance gate: complete valid examples, invalid-input tests, stale-write protection, asset hashing, restart recovery, untouched originals. All pass.
+
+### Delivered
+
+- `framebound/v2/domain.py` — strict Pydantic v2 models, schema 2.0: Project, Asset, CharacterRevision, ClipContractRevision
+  (frozen timing/phase coverage, unique slots/constraints), FrameInstance, ClipRevision, AnnotationRevision, CheckResult
+  (unmeasured/not_applicable/error require explicit reason), Evaluation, Attempt, ReviewPacket, ReviewEvent (revision-bound,
+  ROI pixel-edge rect), CorrectionTask (open→claimed→attempting→awaiting_comparison→resolved + blocked/cancelled/reopened),
+  Job (idempotency key), ExportSnapshot, ResultEnvelope. Separate Technical/Coverage/HumanAcceptance/Publication/Job/Correction states.
+  Coordinate convention: native_px origin top-left, holds positive ints, half-open slot intervals, `slot_at_tick` tested at boundaries + 10k-loop wrap.
+- `framebound/v2/storage.py` — SQLite WAL (`framebound.sqlite3`) + `blobs/sha256/<2>/<rest>` (atomic tmp→hash→rename) +
+  `exports/` + `backups/`. Frozen tables (contracts, clip revisions, evaluations, packets) reject updates; mutable rows use
+  `expected_version` preconditions → `StaleRevisionError` (409 stale_revision). `create_job_idempotent` dedupes idempotency keys.
+- `framebound/v2/migration.py` — `migrate-v1` dry-run only: importable media w/ byte hashes + PNG decodability, missing refs,
+  malformed contracts, unresolved rights (v1 declares none), legacy slot-only decisions marked UNTRUSTED. Never mutates source.
+- `framebound/v2/schemas.py` + `schemas/v2/*.schema.json` (16 models) + `examples/v2-valid-{contract,character}.json` +
+  `examples/v2-negative/*.json` (7 invalid contracts: zero/empty holds, schedule gap, duplicate slot/constraint, bad facing/units).
+- `framebound/v2/doctor.py`, `verify.py` — new CLI: `doctor`, `migrate-v1 --source --dry-run [--report]`, `verify --project [--report]`.
+  v1 commands untouched; v1 suite still green.
+- `framebound/v2/__init__.py` (`2.0.0a1`), `tests/test_v2_domain.py` (11 tests).
+
+### Actual commands/results (2026-10-27, Dublin; `python` = 3.11.4, sqlite 3.54.0)
+
+- `python -m pytest tests/ -q` → `24 passed` (13 v1 + 11 v2).
+- `python -m framebound doctor` → ok; pydantic/numpy/fastapi/uvicorn present; PIL/mcp/datasets/pycocotools missing (expected pre-WP3/WP5).
+- `python -m framebound migrate-v1 --source /tmp/fb-wp0-baseline` → 8+ importable media, 0 missing, rights unresolved (expected), mutated false.
+- `python -m framebound verify --project /tmp/fb-v2-proj` → ok, empty project.
+
+### Artifacts / limitations / next
+
+- Artifacts: schemas, examples, fixtures all in-repo; baseline `/tmp/fb-wp0-baseline`, verify dir outside repo (not committed).
+- Limitations: no media/checks layer yet (WP2); no services/providers/orchestration (WP3); no API/web (WP4); no exports (WP5).
+  PIL still missing — WP2 pins Pillow+NumPy raster. MCP SDK still missing — WP3 pins official SDK + real client handshake.
+- Next: WP2 canonical media + verification framework (registration, integer timeline, coverage matrix, evidence IDs, overlays, original faults).
+
+## Prior: WP0 — baseline and integration spike (merged to `main` as PR #3) — baseline and integration spike (in progress, branch `codex/wp0-baseline-spike`)
 
 Acceptance gate: existing tests recorded; actual available endpoints/outputs established or explicit access blocker documented; no fabricated live claim.
 
