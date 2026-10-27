@@ -1,3 +1,70 @@
+# Framebound — Implementation Status (remediation pass)
+
+Remediation authority: external `Framebound-Remediation-Plan.txt` (kept outside the repo; never committed).
+Baseline: `b680d84` (audited main, 2026-10-27). `main` has not advanced since the audit; no delta to adapt to.
+Prior ledger entries below are historical. The earlier "64 passing tests" and "engineering complete except
+for entrant actions" claims are NOT accepted as proof; each remediation package re-proves its gate.
+
+## Current package: R0 — safe outputs, reliable verification, install coherence (done on branch `codex/r0-safety-verify-install`, 2026-10-27)
+
+Acceptance gate: sentinel-preserving refusal, per-child failure exits, fresh-venv locked install, offline neutrality
+with keys present. All demonstrated (see commands/results).
+
+### Changed capability
+
+- `framebound/v2/safe_output.py` (new) — `prepare_output_dir()`: refuses non-empty outputs (`OutputExistsError`,
+  byte-identical sentinel), optional replace only for framework-marked dirs with timestamped backup instead of
+  `rmtree`, refuses filesystem root/home, refuses output == project dir / project-inside-output / output already
+  holding project data. Wired into v1 `build_demo`, v2 `run_demo`, `run_wp6`, `build_snapshot`, and the
+  `demo`/`export` CLI commands (`--replace` flag; default refuses).
+- `scripts/verify-local` — rewritten: every step captures a log and checks the real exit status (no `| tail`
+  masking); unique `mktemp` work/log dirs with trap cleanup; export round-trip uses the production
+  `framebound/v2/devseed.py` builder (no test imports); runs web typecheck + production build; explicit `--live`
+  semantics (fails without a key; fails until a live spike runner exists in R3); honest SKIP lines for
+  browser journey (R6) and live spike. A final `ALL LOCAL CHECKS PASSED` prints only when every step passed.
+- `framebound/v2/devseed.py` (new) — minimal disposable desk project built from production services only.
+- Offline neutrality fix (found by the new regression test, not the audit): `run_wp6` called
+  `providers/image.submit` without an offline flag, so with ANY `MODEL_API_KEY`/`META_API_KEY` set it performed a
+  live `urlopen` to `api.meta.ai` from the "offline" demo. `image.submit` and `spark.submit_critique` now take
+  `offline=True`, and the demo/CLI pass it unconditionally (demos are offline replays; live exercise is R3 work).
+- `pyproject.toml` — `datasets>=3,<4` contradicted the installed/locked `5.1.0`; relaxed to `datasets>=3,<6`.
+- `requirements.lock` — replaced the partial freeze with a complete 65-pin lock produced in a fresh Python 3.11
+  venv (`pip install '.[test,export-validation]'`, `pip freeze`; `pip check` clean). `framebound.egg-info/`
+  build output removed from the tree.
+- `framebound/v2/doctor.py` — reports node/npm versions (tested: node v22.23.4, npm 12.2.1), refreshed stale note.
+
+### Failing repros fixed (reproduced before fixing)
+
+- Sentinel in existing out dir + `run_wp6`/`run_demo`/`build_demo`/`build_snapshot` → old code deleted it
+  (`shutil.rmtree`); new code refuses, sentinel byte-identical (pinned by 6 tests).
+- `verify-local` with a fake `python` exiting 37 for unittest/pytest → old script printed success; new script
+  exits non-zero with no success message (pinned by 2 tests + a no-masked-pipeline grep test).
+- `MODEL_API_KEY=bogus` + blocked DNS/connect + `run_wp6` → old code attempted `api.meta.ai:443`; new code
+  completes all offline paths with zero egress (pinned by test).
+- `pyproject` vs lock: `datasets` pin violated the declared range; fresh-venv install conflict reproduced by
+  declaration; fixed bound + fresh install proof below (pinned by lock-coherence test).
+
+### Actual commands/results (2026-10-27, Dublin; python 3.11.4, sqlite 3.54.0, node v22.23.4, npm 12.2.1)
+
+- `python -m pytest tests/ -q` → `76 passed` (64 pre-existing + 12 new R0 regressions).
+- `sh scripts/verify-local` → `ALL LOCAL CHECKS PASSED`, exit 0 (v1 unittest, v2 pytest, v2/wp6 offline demos with
+  bogus keys present, verify, devseed export round-trip with moved snapshot, web typecheck, web production build).
+- `sh scripts/verify-local --live` (no key) → exit 2, `FAIL: --live requires a real MODEL_API_KEY/META_API_KEY`.
+- Fresh venv: `pip install '.[test,export-validation]'` → exit 0; `pip check` → `No broken requirements found`;
+  65-pin freeze adopted as `requirements.lock`.
+- `python -m framebound doctor` → ok; node v22.23.4 / npm 12.2.1 reported.
+
+### Artifacts / limitations / next
+
+- Artifacts: `requirements.lock` (complete), `scripts/verify-local` logs are ephemeral (`mktemp`, kept only on
+  failure); no committed generated output.
+- Limitations (honest, carried forward): browser/process-restart journey still a SKIP until R6; live spike still
+  pending until R3 (blocked on participant credentials — no secret read or copied); audit findings F03–F20 are
+  untouched and scheduled in R1–R7; `run_demo`/`build_demo` take no `offline` param (they make no provider calls,
+  proven by test, but have no explicit guard — R3 may add one if they ever gain provider paths).
+- Next: R1 — real authority/transaction layer (typed commands, server-resolved approvals, reviewer sessions,
+  relationship validation, atomic multi-record writes, immutable evidence entities, idempotency, state reducer).
+
 # Framebound — Implementation Status (v2 greenfield)
 
 Plan authority: `Framebound-Implementation-Plan.txt` (external handoff, kept outside the repo).
