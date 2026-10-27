@@ -169,7 +169,8 @@ def _stage_event(con, project_dir: str, actor: Actor, event: dict) -> D.ReviewEv
     require_reviewer(actor, action)
     if action == "approve_reference":
         raise InvalidInput("reference approval requires the stored-approval flow, not a bare event")
-    if action not in ("approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue"):
+    if action not in ("approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue",
+                        "approve_mask"):
         raise InvalidInput(f"unknown review action {action!r}")
     ev = _build_event(event, actor)
     _validate_relationships(con, project_dir, ev, event)
