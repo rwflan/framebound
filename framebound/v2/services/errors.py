@@ -40,3 +40,20 @@ class Cancelled(ServiceError):
 
 class AuthorizationError(ServiceError):
     code = "forbidden"
+
+
+class ResponseInvalid(ServiceError):
+    code = "response_invalid"
+
+
+class PermissionDenied(ServiceError):
+    code = "permission_denied"
+
+
+class ModelUnavailable(ServiceError):
+    code = "model_unavailable"
+
+
+class TransportError(ServiceError):
+    code = "transport_error"
+    retryable = True

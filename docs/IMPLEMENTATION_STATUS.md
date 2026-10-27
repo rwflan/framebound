@@ -5,6 +5,92 @@ Baseline: `b680d84` (audited main, 2026-10-27). `main` has not advanced since th
 Prior ledger entries below are historical. The earlier "64 passing tests" and "engineering complete except
 for entrant actions" claims are NOT accepted as proof; each remediation package re-proves its gate.
 
+## Current package: R3 — documented provider wire + durable controller/jobs (done on branch `codex/r3-providers-jobs`, 2026-10-27)
+
+Acceptance gate: strict fake rejects legacy payloads and accepts repaired documented payloads
+with actual approved pixels transmitted; generated output becomes a registered/evaluated revision;
+crash/timeout/mismatched-idempotency/duplicate/cancel/restart deterministic; restarted runs cannot
+reset attempt/cost budgets; missing keys block only the live exercise. All demonstrated.
+
+### Changed capability
+
+- `providers/wire.py` (new): internal-vs-wire separation. Validators for image/Spark/SAM payloads
+  against the rechecked documented shapes (Responses `input_text`+`input_image` with data:/https:
+  `image_url` or `file_id`; message-wrapped content; flat function tools with `tool_choice: auto`;
+  `previous_response_id` chaining; `image_generation_call.result` extraction; `function_call` /
+  `function_call_output` call_id matching; SAM 3.1 special-token grammar `<Nf>obj<|box|><|mask|>`
+  with base85 `~`/`!` payloads decoded to row-major rasters). Legacy keys (`endpoint`, `note`,
+  `image_b64`, `asset_id`, `type: text`, `<bytes>` placeholders) are named violations.
+- `providers/image.py`: role explanations as text + approved pixels as images; `previous_response_id`
+  refine chain; `build_edit_request` bounded-patch strategy (no invented inpainting); response parsing
+  requires `status: completed` + decodable `image_generation_call.result`; output materialized
+  (MIME/dims/alpha verified) and stored as a blob; redacted versioned artifacts with request IDs.
+- `providers/spark.py`: pixel-carrying critique requests, flat allowlisted tools
+  (`get_deterministic_findings`, `get_reference_metadata`), `execute_tool_calls` with
+  `check_follow_up` (mismatched call_ids refused, mirroring HTTP 400), structured-critique schema
+  validation; critique stays advisory. `submit_critique` chains follow-ups via `previous_response_id`
+  without auto-spending.
+- `providers/sam.py`: real-bytes `build_request` (placeholders rejected), `parse_output_text` for the
+  special-token lane (`no_match`/`mask`/`empty`/`corrupt` explicit), separate PNG/COCO-RLE decoders;
+  legacy `decode_mask` kept only as an explicit raw-byte offline helper (rejects ambiguous `mask_rle`
+  as corrupt with a pointer to the correct parser); `alpha_fallback` still labeled offline-alpha.
+- `providers/base.py`: capability states `not_configured` / `unverified` / `verified` /
+  `permission_denied` / `model_unavailable` / `transport_error` / `response_invalid` — key presence
+  alone never reports support. `verify_capability` probe + `http_post` with mapped errors
+  (401/403→permission, 404/model-400→unavailable, 429→retryable, 5xx→transport, bad JSON→invalid).
+- `providers/ledger.py`: versioned envelopes (`schema_version`, provider, model, request_id,
+  timestamp) with redaction (`<bytes-redacted:N>`, secret scrubbing); `load_artifact` for tests.
+- `domain.Job`: durable fields with defaults (provider, targets, attempt_count, max_attempts,
+  budget/cost, signatures, request/response artifacts, output assets, reconciliation/cancel flags,
+  offline, updated_at); new `Run` model + `runs` table. Old rows still load.
+- `services/jobs.py`: QUEUED→RUNNING(leased claim)→SUCCEEDED|FAILED|NEEDS_ATTENTION|CANCELLED.
+  Submit only queues (no transmit inside submit); claim enforces leases; success imports provider
+  bytes as `generated` assets; retryable failures requeue within budget; ambiguous timeouts become
+  reconciliation-required (never blind retry); cancel guards terminal states; `job_reconcile`
+  recovers expired leases after crashes. Attempts staged atomically (fixed mid-transaction commit).
+- `services/orchestrator.py` (new): `start_run` + `run_once`/`orchestrator_send` over persisted
+  state — claims outside DB locks, sends outside transactions, halts at awaiting-review/blocker/
+  no-progress/budget-exhaustion, no-progress checked before any send, budgets survive restarts.
+- `services/capabilities.py` (new): one audited transport×operation table; desk compare + restart
+  journey honestly `unsupported` until R6.
+- Transports: CLI (`job-claim/cancel/reconcile`, `orchestrator-run/send`, `capabilities`,
+  `--offline`/`--max-attempts`), MCP (same + `generation_submit_offline`, `correction_claim`),
+  API (`POST/GET /api/jobs`, claim/cancel/reconcile, orchestrator runs/send, capabilities;
+  provider errors mapped to 403/429/502/503/504).
+- Demo/tests: `demo_wp6` ledger now carries real identity/style pixels (offline, untransmitted);
+  `test_v2_loop` honesty tests updated to the documented wire (roles-as-text + pixels-as-images).
+
+### Failing repros fixed (reproduced before fixing)
+
+- Legacy `endpoint`/`note`/`type: text`/`image_b64`/`asset_id` payloads → named wire violations (pinned).
+- Asset-id-only Spark frames and `<bytes>` SAM placeholders → rejected at build (pinned).
+- `mask_rle`-as-raw-pixels confusion → corrupt with parser pointer (pinned); special-token fixtures
+  round-trip pixel-exact (pinned).
+- Ambiguous timeout left jobs invisibly queued → reconciliation-required + expired-lease recovery (pinned).
+- Same key/different payload silently reused → ConflictError (pinned); budgets reset on restart →
+  persisted attempt counts + run budgets (pinned).
+- Offline with key present transmitted → never sends; artifacts redacted (pinned).
+
+### Actual commands/results (2026-10-27, Dublin; python 3.11.4, node v22.23.4)
+
+- `python -m pytest tests/ -q` → `117 passed` (100 prior + 17 new R3).
+- `sh scripts/verify-local` → `ALL LOCAL CHECKS PASSED`, exit 0 (browser journey + live spike
+  recorded as SKIP, not passes).
+
+### Artifacts / limitations / next
+
+- Limitations (carried forward): repair lease/scope gating + masks (R4); export semantics incl. COCO
+  geometry (R5); desk media experience (R6); demo relabel + transition traces (R7); public-service
+  benchmark (R8). `world_positions`/`planted` traces still unstored — sliding stays honestly UNMEASURED.
+  SAM `include_confidence` flag is provisional (parser accepts both forms). SSE fan-out still in-memory.
+  Live spike (one Spark tool call, one image request, one edit/patch, one SAM decode) needs an
+  authorized participant credential — deterministic gates above do not depend on it.
+- Docs rechecked 2026-10-27: image-generation reference steering + `image_generation_call.result`
+  + `usage`; tool-calling Responses flat tools + `function_call`/`function_call_output` + `auto`-only
+  `tool_choice`; SAM overview/segmenting/reading-segmentation (special-token line grammar, base85
+  masks, empty lane = no match, `parseImageStream`/`decodeMaskToRaster` client libraries).
+- Next: R4 — bounded repair and complete correction state.
+
 ## Current package: R2 — fail-closed evaluation and reproducible evidence (done on branch `codex/r2-failclosed-evidence`, 2026-10-27)
 
 Acceptance gate: every F03/F04/F05 probe fails-or-blocks; distinct reference pixels change evidence;

@@ -7,7 +7,9 @@ from mcp.server.mcpserver import MCPServer
 
 TOOLS = ["doctor", "project_get", "asset_import", "contract_propose",
          "clip_create_revision", "clip_evaluate", "brief_compile",
-         "generation_submit", "job_get", "candidate_register",
+         "generation_submit", "generation_submit_offline", "job_get",
+         "job_claim", "job_cancel", "job_reconcile", "orchestrator_run",
+         "capabilities", "correction_claim", "candidate_register",
          "repair_plan", "repair_evaluate", "review_packet_create", "corrections_list"]
 
 
@@ -54,14 +56,56 @@ def build_server(project_dir: str) -> MCPServer:
         return B.compile_reference_brief(project_dir, contract_id, int(slot))
 
     @server.tool(name="generation_submit", description="Submit a reference-conditioned generation job (idempotent)")
-    def generation_submit(brief: dict, references: list[dict], idempotency_key: str) -> dict:
+    def generation_submit(brief: dict, references: list[dict], idempotency_key: str,
+                          offline: bool = False) -> dict:
         from ..services import jobs
-        return jobs.submit_generation(project_dir, brief, references, idempotency_key).model_dump()
+        return jobs.submit_generation(project_dir, brief, references, idempotency_key,
+                                      offline=bool(offline)).model_dump()
 
     @server.tool(name="job_get", description="Read a persisted job by id")
     def job_get(job_id: str) -> dict:
         from ..services import jobs
         return jobs.job_get(project_dir, job_id)
+
+    @server.tool(name="job_claim", description="Claim a queued job with a worker lease")
+    def job_claim(job_id: str, worker_id: str, expected_version: int) -> dict:
+        from ..services import jobs
+        return jobs.job_claim(project_dir, job_id, worker_id,
+                              expected_version=int(expected_version))
+
+    @server.tool(name="job_cancel", description="Cancel a non-terminal job (guarded)")
+    def job_cancel(job_id: str, expected_version: int) -> dict:
+        from ..services import jobs
+        return jobs.job_cancel(project_dir, job_id, int(expected_version))
+
+    @server.tool(name="job_reconcile", description="Recover expired-lease RUNNING jobs")
+    def job_reconcile() -> dict:
+        from ..services import jobs
+        return jobs.job_reconcile(project_dir)
+
+    @server.tool(name="orchestrator_run", description="Start a durable orchestrator run")
+    def orchestrator_run(job_ids: list[str], max_attempts: int = 3) -> dict:
+        from ..services import orchestrator as O
+        return O.start_run(project_dir, list(job_ids or []), max_attempts=int(max_attempts))
+
+    @server.tool(name="capabilities", description="Audited transport x operation table")
+    def capabilities() -> dict:
+        from ..services import capabilities as C
+        return C.table()
+
+    @server.tool(name="correction_claim", description="Claim an open correction task")
+    def correction_claim(task_id: str, expected_version: int) -> dict:
+        from ..services import authz as _az, corrections as C
+        # MCP acts as the orchestrator principal; leases bind the holder id.
+        return C.claim(project_dir, _az.Actor(type="orchestrator", id="mcp-worker"),
+                       task_id, int(expected_version))
+
+    @server.tool(name="generation_submit_offline", description="Queue a generation job without transmitting")
+    def generation_submit_offline(brief: dict, references: list[dict],
+                                  idempotency_key: str) -> dict:
+        from ..services import jobs
+        return jobs.submit_generation(project_dir, brief, references,
+                                      idempotency_key, offline=True).model_dump()
 
     @server.tool(name="candidate_register", description="Register replacement assets as a child revision")
     def candidate_register(baseline_revision_id: str, new_revision_id: str,

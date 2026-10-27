@@ -447,16 +447,45 @@ class CorrectionTask(Strict):
 
 
 class Job(Strict):
+    """Durable generation job. New fields default so pre-R3 rows still load."""
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
     kind: str = Field(min_length=1, max_length=64)
     status: JobStatus = JobStatus.QUEUED
     idempotency_key: str = Field(min_length=1, max_length=256)
     payload_sha256: str = Field(**HEX64)
+    provider: str = Field(default="image", max_length=64)
+    targets: list[str] = Field(default_factory=list)
+    attempt_count: int = Field(default=0, ge=0)
+    max_attempts: int = Field(default=3, ge=1, le=10)
+    budget_reserved: str = Field(default="unbounded-note", max_length=200)
+    cost_estimate: str = Field(default="unknown", max_length=200)
+    cost_actual: str = Field(default="unknown", max_length=200)
+    no_progress_signatures: list[str] = Field(default_factory=list)
+    request_artifact: str | None = None
+    response_artifact: str | None = None
+    output_asset_ids: list[str] = Field(default_factory=list)
+    reconciliation_required: bool = False
+    cancel_requested: bool = False
+    offline: bool = False
     lease_holder: str | None = None
     lease_expires: str | None = None
     error: str | None = Field(default=None, max_length=2000)
     created_at: str = Field(default_factory=utcnow)
+    updated_at: str = Field(default_factory=utcnow)
+
+
+class Run(Strict):
+    """Durable orchestrator run: budget + halt state survive restarts."""
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    status: str = Field(default="running", max_length=64)
+    job_ids: list[str] = Field(default_factory=list)
+    attempts_used: int = Field(default=0, ge=0)
+    max_attempts: int = Field(default=3, ge=1, le=10)
+    halt_reason: str | None = Field(default=None, max_length=1000)
+    created_at: str = Field(default_factory=utcnow)
+    updated_at: str = Field(default_factory=utcnow)
 
 
 class ExportSnapshot(Strict):
