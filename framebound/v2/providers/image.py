@@ -45,8 +45,11 @@ def submit(brief: dict, reference_blobs: list[dict], project_dir: str,
     from .ledger import record_artifact
     req = build_request(brief, reference_blobs)
     if not _key():
-        redacted = json.loads(json.dumps(req).replace(
-            next((r["bytes_b64"] for r in reference_blobs if r.get("bytes_b64")), ""), "<bytes>"))
+        redacted = json.loads(json.dumps(req))
+        for item in redacted.get("input", []):
+            for part in item.get("content", []) if isinstance(item.get("content"), list) else []:
+                if isinstance(part, dict) and "image_b64" in part:
+                    part["image_b64"] = "<bytes-redacted>"
         digest = record_artifact(project_dir, "image_request",
                                  {"idempotency_key": idempotency_key, "request": redacted, "sent": False})
         return {"mode": "not_configured", "sent": False, "capability": "image-generation",

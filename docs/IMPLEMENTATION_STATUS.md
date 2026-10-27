@@ -40,7 +40,50 @@ Acceptance gate: complete valid examples, invalid-input tests, stale-write prote
   PIL still missing — WP2 pins Pillow+NumPy raster. MCP SDK still missing — WP3 pins official SDK + real client handshake.
 - Next: WP2 canonical media + verification framework (registration, integer timeline, coverage matrix, evidence IDs, overlays, original faults).
 
-## Current package: WP5 — portable training snapshots (done on branch `codex/wp5-training-snapshots`, 2026-10-27)
+## Current package: WP6 — genuine character demonstration (done on branch `codex/wp6-character-demo`, 2026-10-27)
+
+Acceptance gate: full workflow works on real output; no hidden auto-fitting; visual acceptance accurately reported;
+live/replay badges correct. All pass.
+
+### Delivered
+
+- `framebound/v2/demo_character.py` — original P0 demo character **Pip the courier** (hood, teal cloak, satchel on LEFT hip,
+  trailing scarf, brass compass+buckle; hand-set keyframe tables, not a sine loop): run 8, jump 6, attack 6, idle 4
+  (idle_0 == idle_2 by design), 3 transitions (idle↔run, run→attack), identity/style reference sheets. 24 presented
+  samples from 22 independent drawings (reported separately, never conflated).
+- `framebound/v2/demo_wp6.py` + `demo --profile wp6 --offline` — full workflow on the original art: project, assets
+  (`source_kind=original`), asymmetric character revision, per-clip calibrated contracts (crouch-compatible jump windows,
+  `flight_slots=[2,3,4]`, declared `occluded_slots=[2,3,4]` for the cloak-covered buckle), evaluations (run/jump/attack/idle
+  all `pass`; jump `partial` coverage with occlusion disclosed), departure-preserving interruption checks at 7 run ticks,
+  recorded provider attempt (`not_configured`, nothing fabricated), review packet + exact-revision approval, export snapshot.
+- Honest calibration trail (bounds never loosened): per-clip span calibration; jump-local reviewed windows; occlusion as
+  `NOT_APPLICABLE` with reason + `required=False` so the gate honors intentional exemptions without vacuous passes; status
+  logic now excludes declared flight/occlusion from the required gate but still fails closed on zero measurements.
+- Authority boundaries added: `CharacterRevision.asymmetry`; `register_candidate` rejects `mirror` recipes for asymmetric
+  designs (mirror stays a recorded transform) and `per-pose-fit`/`independent-fit` recipes (frozen calibration).
+- Provider redaction bug fixed (`image.submit` redacts structurally instead of string-replacing empty bytes).
+- Benchmark now reports cold + warm (200×256² core raster: ~3.7 s cold / ~3.9 s warm on this machine; excludes providers/video).
+- `tests/test_v2_demo.py` (7 tests): counts, transitions, badges + unsent ledger, interruption math vs `select_slot`,
+  mirror/fit prohibitions, decision bound to exact revision. Screenshots inspected: Pip reads as a coherent hooded courier
+  (scarf/satchel/compass visible; apex vs contact distinct).
+
+### Actual commands/results (2026-10-27, Dublin)
+
+- `python -m pytest tests/ -q` → `64 passed` (13 v1 + 11 WP1 + 14 WP2 + 14 WP3 + 2 WP4 + 3 WP5 + 7 WP6).
+- `python -m framebound demo --profile wp6 --offline --out /tmp/fb-wp6` → run/jump/attack/idle all pass;
+  provider `not_configured`; badge `[replay/procedural-original]` shown in packet intent in the desk.
+- Live claim status: NO live Muse Image/Spark/SAM output (no credentials) — demo is replay/procedural, badged as such
+  everywhere it appears. Live spike remains the release blocker (see WP7).
+
+### Artifacts / limitations / next
+
+- Artifacts: character author + demo + tests in-repo; `/tmp/fb-wp6` + `/tmp/wp6.json` outside repo (not committed).
+- Limitations: no live provider evidence; second facing not authored (mirror prohibited by design — correct per plan);
+  compare view + video/contact-sheet preview derivatives deferred to WP7 polish; no engine adapters (P1, out of scope).
+- Next: WP7 release + submission (clean-clone docs, local verify script, video, demo package, portal requirements,
+  submission receipt by the entrant).
+
+## Prior: WP5 — portable training snapshots (merged as PR #8) — portable training snapshots (done on branch `codex/wp5-training-snapshots`, 2026-10-27)
 
 Acceptance gate: moved snapshot loads with standard loaders; labels/preferences checked; hashes and duration match;
 exclusions visible. All pass.

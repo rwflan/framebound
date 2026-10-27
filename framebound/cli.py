@@ -52,7 +52,7 @@ def main(argv=None):
 
     dm = sub.add_parser("demo", help="Build and verify the procedural demo project end to end")
     dm.add_argument("--out", default="build/demo")
-    dm.add_argument("--profile", default="v1", choices=["v1", "v2"])
+    dm.add_argument("--profile", default="v1", choices=["v1", "v2", "wp6"])
     dm.add_argument("--offline", action="store_true", default=False)
     bm = sub.add_parser("benchmark", help="v2: run the procedural stress fixture and report timing")
     bm.add_argument("--fixture", default="stress-200", choices=["stress-200"])
@@ -127,7 +127,11 @@ def main(argv=None):
             Path(args.report).write_text(json.dumps(rep, indent=2) + "\n")
         _print({"ok": rep["ok"], "issues": rep["issues"]})
         return 0 if rep["ok"] else 1
-    if args.cmd == "demo" and getattr(args, "profile", "v1") == "v2":
+    if args.cmd == "demo" and getattr(args, "profile", "v1") in ("v2", "wp6"):
+        if getattr(args, "profile") == "wp6":
+            from .v2.demo_wp6 import run_wp6 as _w6
+            _print(_w6(args.out))
+            return 0
         from .v2.demo import run_demo
         _print(run_demo(args.out))
         return 0
