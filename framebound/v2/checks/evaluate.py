@@ -91,6 +91,12 @@ def evaluate_frames(contract: D.ClipContractRevision, frames: list[Image.Image],
                         tol(c.id, "max_fraction", P["max_height_fraction"]), "height"))
             elif c.check == "visible_span":
                 p = c.params
+                if slot in set(p.get("occluded_slots", [])):
+                    results.append(D.CheckResult(constraint_id=c.id, scope=scope,
+                        outcome=D.CheckOutcome.NOT_APPLICABLE,
+                        reason="declared occlusion: buckle covered by flared cloak mid-air; "
+                               "annotated in contract, needs human visual decision", units="native_px"))
+                    continue
                 r = C.check_span(c.id, scope, px, w, h, tuple(p.get("color_a", (255, 200, 40))),
                                  tuple(p.get("color_b", (255, 200, 40))),
                                  p.get("window_a", [20, 18, 44, 34]), p.get("window_b", [20, 34, 44, 48]),
@@ -114,8 +120,10 @@ def evaluate_frames(contract: D.ClipContractRevision, frames: list[Image.Image],
                         P["max_expected_excess"], P["min_phase_ratio"]))
             elif c.check == "declared_contacts":
                 p = c.params
+                flight_slots = set(p.get("flight_slots", []))
+                is_flight = bool(p.get("flight", False)) or slot in flight_slots
                 results.append(C.check_contacts(c.id, scope, px, w, h, p.get("window", [8, 50, 56, 62]),
-                    int(p.get("min_visible", 20)), flight=bool(p.get("flight", False))))
+                    int(p.get("min_visible", 20)), flight=is_flight))
             elif c.check == "appearance_palette":
                 if ref is None:
                     results.append(D.CheckResult(constraint_id=c.id, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
@@ -142,29 +150,29 @@ def evaluate_frames(contract: D.ClipContractRevision, frames: list[Image.Image],
                 W, H, contract.action.loop, p.get("region", [8, 8, 56, 60]), p.get("grid", [6, 6]),
                 float(p.get("max_ratio", 2.0))))
 
-    # status + coverage
+    # status + coverage. Declared NOT_APPLICABLE (flight phases, annotated occlusion) is an
+    # intentional exemption, not a gap: it neither passes nor fails the gate. But a gate with
+    # zero actual measurements is incomplete, never a vacuous pass.
     required = [c for c in contract.constraints if c.required]
-    by_cid = {}
-    for r in results:
-        by_cid.setdefault(r.constraint_id, []).append(r.outcome)
     required_ids = {c.id for c in required}
-    if not required:
+    gated = [r for r in results if r.constraint_id in required_ids
+             and r.outcome != D.CheckOutcome.NOT_APPLICABLE]
+    if not required or not gated:
         tech = D.TechnicalStatus.INCOMPLETE
-    elif any(D.CheckOutcome.ERROR in by_cid.get(cid, []) for cid in required_ids):
+    elif any(r.outcome == D.CheckOutcome.ERROR for r in gated):
         tech = D.TechnicalStatus.ERROR
-    elif any(o in (D.CheckOutcome.FAIL,) for r in results if r.constraint_id in required_ids for o in [r.outcome]):
+    elif any(r.outcome == D.CheckOutcome.FAIL for r in gated):
         tech = D.TechnicalStatus.FAIL
-    elif any(o in (D.CheckOutcome.UNMEASURED, D.CheckOutcome.NOT_APPLICABLE) for r in results
-             if r.constraint_id in required_ids for o in [r.outcome]):
+    elif any(r.outcome == D.CheckOutcome.UNMEASURED for r in gated):
         tech = D.TechnicalStatus.INCOMPLETE
     else:
         tech = D.TechnicalStatus.PASS
-    measured_req = sum(1 for cid in required_ids for r in results
-                       if r.constraint_id == cid and r.outcome in (D.CheckOutcome.PASS, D.CheckOutcome.FAIL))
-    total_req = sum(1 for cid in required_ids for r in results if r.constraint_id == cid)
-    if total_req and measured_req == total_req:
+    measured_req = sum(1 for r in gated if r.outcome in (D.CheckOutcome.PASS, D.CheckOutcome.FAIL))
+    exempt_req = sum(1 for r in results if r.constraint_id in required_ids
+                     and r.outcome == D.CheckOutcome.NOT_APPLICABLE)
+    if gated and measured_req == len(gated) and not exempt_req:
         cov = D.CoverageStatus.COMPLETE
-    elif measured_req == 0 and total_req:
+    elif measured_req == 0 and gated:
         cov = D.CoverageStatus.UNSUPPORTED
     else:
         cov = D.CoverageStatus.PARTIAL

@@ -95,6 +95,11 @@ def register_candidate(project_dir: str, baseline_revision_id: str, new_revision
         contract = D.ClipContractRevision.model_validate_json(json.dumps(cdata))
         if "per-pose-fit" in recipe or "independent-fit" in recipe:
             raise InvalidInput("candidate declares per-pose fitting; blocked by frozen calibration")
+        if "mirror" in recipe:
+            chdata, _ = S.get(con, "character_revisions", contract.character_revision_id)
+            if chdata.get("asymmetry", "symmetric") != "symmetric":
+                raise InvalidInput("exact mirror prohibited as a new drawing for this asymmetric design; "
+                                   "author the facing reference instead (mirror is a recorded transform, not new art)")
         base_aids = []
         for fid in base.frame_instance_ids:
             fdata, _ = S.get(con, "frame_instances", fid)

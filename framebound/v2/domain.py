@@ -177,6 +177,9 @@ class CharacterRevision(Strict):
     view_set: list[str] = Field(min_length=1)
     canvas: Canvas
     scale_ruler: str = Field(min_length=1, max_length=500)
+    asymmetry: str = Field(default="symmetric",
+        description="'symmetric', or a description of asymmetric costume/weapon layout; "
+                    "exact mirrors are prohibited as new drawings when asymmetric")
     reference_approval: dict[str, Any] | None = None  # explicit human approval event ref when set
 
     @field_validator("identity_asset_ids", "style_asset_ids")
