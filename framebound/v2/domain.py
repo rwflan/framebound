@@ -9,7 +9,18 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, StrictInt, field_validator, model_validator
+import math
+
+HEX64 = {"pattern": r"^[0-9a-fA-F]{64}$"}
+
+
+def _finite_float(v):
+    """Reject NaN/inf where a real measurement or bound is required."""
+    if v is not None and isinstance(v, float) and not math.isfinite(v):
+        raise ValueError("must be a finite number")
+    return v
+
 
 SCHEMA_VERSION = "2.0"
 
@@ -77,14 +88,14 @@ class Strict(BaseModel):
 
 
 class Canvas(Strict):
-    width: int = Field(gt=0, le=2048)
-    height: int = Field(gt=0, le=2048)
+    width: StrictInt = Field(gt=0, le=2048)
+    height: StrictInt = Field(gt=0, le=2048)
     units: Literal["native_px"] = "native_px"
 
 
 class Timing(Strict):
-    ticks_per_second: int = Field(default=60, gt=0, le=240)
-    holds: list[int] = Field(min_length=1, max_length=512)
+    ticks_per_second: StrictInt = Field(default=60, gt=0, le=240)
+    holds: list[StrictInt] = Field(min_length=1, max_length=512)
 
     @field_validator("holds")
     @classmethod
@@ -123,7 +134,7 @@ class RootPolicy(Strict):
 
 
 class PhaseEntry(Strict):
-    slot: int = Field(ge=0)
+    slot: StrictInt = Field(ge=0)
     phase: str = Field(min_length=1, max_length=64)
     motion_reference_id: str = Field(min_length=1)
 
@@ -135,12 +146,16 @@ class ConstraintSpec(Strict):
     annotation_revision_id: str | None = None
     reference_revision_id: str | None = None
     max_error_px: float | None = Field(default=None, ge=0)
+
+    _finite_max_error = field_validator("max_error_px")(classmethod(lambda cls, v: _finite_float(v)))
     params: dict[str, Any] = Field(default_factory=dict)
 
 
 class AllowedTransforms(Strict):
     per_pose_scale: bool = False
     rigid_translation_budget_px: float = Field(default=2.0, ge=0)
+
+    _finite_budget = field_validator("rigid_translation_budget_px")(classmethod(lambda cls, v: _finite_float(v)))
 
 
 class Project(Strict):
@@ -155,8 +170,8 @@ class Project(Strict):
 class Asset(Strict):
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
-    byte_sha256: str = Field(min_length=64, max_length=64)
-    pixel_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    byte_sha256: str = Field(**HEX64)
+    pixel_sha256: str | None = Field(default=None, **HEX64)
     mime: str = Field(min_length=1, max_length=128)
     width: int | None = Field(default=None, gt=0, le=8192)
     height: int | None = Field(default=None, gt=0, le=8192)
@@ -256,13 +271,15 @@ class AnnotationRevision(Strict):
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
     source_asset_id: str = Field(min_length=1)
-    source_pixel_sha256: str = Field(min_length=64, max_length=64)
+    source_pixel_sha256: str = Field(**HEX64)
     view: str = Field(min_length=1)
     coordinate_space: Literal["native_px"] = "native_px"
     visibility: Literal["visible", "occluded", "ambiguous"] = "visible"
     annotator_type: Literal["human_reviewed", "model_proposed", "imported"] = "model_proposed"
     reviewer: str | None = None
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    _finite_confidence = field_validator("confidence")(classmethod(lambda cls, v: _finite_float(v)))
     supersedes: str | None = None
 
 
@@ -288,7 +305,7 @@ class Evaluation(Strict):
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
     clip_revision_id: str = Field(min_length=1)
-    evidence_manifest_sha256: str = Field(min_length=64, max_length=64)
+    evidence_manifest_sha256: str = Field(**HEX64)
     analyzer_version: str = Field(min_length=1)
     dependency_lock_id: str = Field(min_length=1)
     results: list[CheckResult] = Field(min_length=1)
@@ -303,7 +320,7 @@ class Attempt(Strict):
     baseline_revision_id: str = Field(min_length=1)
     brief_id: str = Field(min_length=1)
     provider: str = Field(min_length=1, max_length=64)
-    request_sha256: str = Field(min_length=64, max_length=64)
+    request_sha256: str = Field(**HEX64)
     response_ref: str | None = None
     candidate_asset_ids: list[str] = Field(default_factory=list)
     cost: str = Field(default="unknown", max_length=200)
@@ -326,10 +343,10 @@ class ReviewPacket(Strict):
 
 
 class Roi(Strict):
-    left: int = Field(ge=0)
-    top: int = Field(ge=0)
-    right: int = Field(ge=0)
-    bottom: int = Field(ge=0)
+    left: StrictInt = Field(ge=0)
+    top: StrictInt = Field(ge=0)
+    right: StrictInt = Field(ge=0)
+    bottom: StrictInt = Field(ge=0)
 
     @model_validator(mode="after")
     def _nonempty(self) -> "Roi":
@@ -347,11 +364,20 @@ class ReviewEvent(Strict):
     packet_id: str | None = None
     clip_revision_id: str = Field(min_length=1)
     frame_instance_id: str | None = None
-    frame_range: list[int] | None = None
+    frame_range: list[StrictInt] | None = None
+    category: str = Field(default="general", min_length=1, max_length=64)
     roi: Roi | None = None
     note: str = Field(default="", max_length=2000)
     supersedes: str | None = None
     created_at: str = Field(default_factory=utcnow)
+
+    @model_validator(mode="after")
+    def _range_shape(self) -> "ReviewEvent":
+        if self.frame_range is not None:
+            if len(self.frame_range) != 2 or self.frame_range[0] < 0 \
+                    or self.frame_range[1] < self.frame_range[0]:
+                raise ValueError("frame_range must be [start_tick, end_tick] with 0 <= start <= end")
+        return self
 
 
 class CorrectionTask(Strict):
@@ -362,6 +388,8 @@ class CorrectionTask(Strict):
     desired_outcome: str = Field(min_length=1, max_length=1000)
     scope: str = Field(min_length=1, max_length=500)
     status: CorrectionStatus = CorrectionStatus.OPEN
+    claim_holder: str | None = Field(default=None, min_length=1, max_length=200)
+    claim_token_sha256: str | None = Field(default=None, **HEX64)
     claim_lease: str | None = None
     attempt_ids: list[str] = Field(default_factory=list)
     resolution_event_id: str | None = None
@@ -374,7 +402,7 @@ class Job(Strict):
     kind: str = Field(min_length=1, max_length=64)
     status: JobStatus = JobStatus.QUEUED
     idempotency_key: str = Field(min_length=1, max_length=256)
-    payload_sha256: str = Field(min_length=64, max_length=64)
+    payload_sha256: str = Field(**HEX64)
     lease_holder: str | None = None
     lease_expires: str | None = None
     error: str | None = Field(default=None, max_length=2000)
@@ -389,6 +417,51 @@ class ExportSnapshot(Strict):
     dependency_lock_id: str = Field(min_length=1)
     byte_manifest: dict[str, str] = Field(min_length=1)
     created_at: str = Field(default_factory=utcnow)
+
+
+class MotionGuideEntry(Strict):
+    phase: str = Field(min_length=1, max_length=64)
+    asset_id: str = Field(min_length=1, max_length=128)
+    byte_sha256: str = Field(**HEX64)
+
+
+class MotionGuide(Strict):
+    """Independent phase authority: reviewed reference art per phase, not candidate-derived."""
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    character_revision_id: str = Field(min_length=1)
+    entries: list[MotionGuideEntry] = Field(min_length=1)
+    supersedes: str | None = None
+    created_at: str = Field(default_factory=utcnow)
+
+
+class ReferenceApproval(Strict):
+    """Stored human approval binding a character revision's references + motion guide."""
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    character_revision_id: str = Field(min_length=1)
+    motion_guide_id: str = Field(min_length=1)
+    identity_asset_ids: list[str] = Field(min_length=1)
+    style_asset_ids: list[str] = Field(min_length=1)
+    asset_hashes: dict[str, str] = Field(min_length=1)
+    reviewer_id: str = Field(min_length=1, max_length=200)
+    event_id: str = Field(min_length=1, max_length=128)
+    supersedes: str | None = None
+    created_at: str = Field(default_factory=utcnow)
+
+
+class ReviewerPairing(Strict):
+    code_sha256: str = Field(**HEX64)
+    reviewer_id: str = Field(min_length=1, max_length=200)
+    expires_at: str = Field(min_length=1)
+    used: bool = False
+
+
+class ReviewerSession(Strict):
+    token_sha256: str = Field(**HEX64)
+    reviewer_id: str = Field(min_length=1, max_length=200)
+    created_at: str = Field(default_factory=utcnow)
+    expires_at: str = Field(min_length=1)
 
 
 class ResultEnvelope(Strict):

@@ -61,6 +61,17 @@ def main(argv=None):
     bm.add_argument("--report", help="Write the benchmark report JSON here")
     mc = sub.add_parser("v2-mcp", help="v2: serve application services over MCP (stdio)")
     mc.add_argument("--project", required=True)
+    rp = sub.add_parser("reviewer-pair", help="v2: pair a human reviewer (prints single-use code)")
+    rp.add_argument("--project", required=True); rp.add_argument("--reviewer-id", required=True)
+    ro = sub.add_parser("reviewer-open", help="v2: exchange a pairing code for a session token")
+    ro.add_argument("--project", required=True); ro.add_argument("--code", required=True)
+    gp = sub.add_parser("guide-propose", help="v2: propose a draft motion guide (orchestrator tool)")
+    gp.add_argument("--project", required=True); gp.add_argument("--guide", required=True)
+    gp.add_argument("--actor-id", required=False, default="cli")
+    ra = sub.add_parser("reference-approve", help="v2: reviewer-approves references (needs session token)")
+    ra.add_argument("--project", required=True); ra.add_argument("--character", required=True)
+    ra.add_argument("--guide", required=True); ra.add_argument("--event-id", required=False, default=None)
+    ra.add_argument("--session-token", required=False, default=None)
     for name, helps, args in [
         ("asset-import", "v2: import an image asset", [("--src", True), ("--asset-id", True), ("--project", True)]),
         ("contract-propose", "v2: validate + store a clip contract", [("--contract", True), ("--project", True)]),
@@ -151,7 +162,8 @@ def main(argv=None):
         return 0
     if args.cmd in ("asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "candidate-register",
-                    "packet-create", "corrections-list"):
+                    "packet-create", "corrections-list", "reviewer-pair", "reviewer-open",
+                    "guide-propose", "reference-approve"):
         from .v2 import cli_commands as _v2c
         _print(_v2c.dispatch(args))
         return 0

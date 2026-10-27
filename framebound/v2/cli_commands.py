@@ -20,26 +20,8 @@ def dispatch(args) -> dict:
         from .services import clips
         return clips.evaluate(args.project, args.revision_id).model_dump()
     if cmd == "brief-compile":
-        import sqlite3  # noqa: F401 (kept for future direct reads)
-        from . import domain as D
-        from . import storage as S
-        from .briefs import compile_brief
-        con = S.connect(args.project)
-        try:
-            cdata, _ = S.get(con, "contract_revisions", args.contract_id)
-            contract = D.ClipContractRevision.model_validate_json(json.dumps(cdata))
-            assets, approvals = {}, {}
-            for role in ("identity", "style"):
-                aid = contract.references[role]
-                adata, _ = S.get(con, "assets", aid)
-                assets[aid] = D.Asset.model_validate_json(json.dumps(adata))
-                approvals[aid] = {"approved": True, "event_id": "imported"}
-            b = compile_brief(contract, int(args.slot), assets, approvals,
-                              {e.motion_reference_id: f"guide:{e.motion_reference_id}"
-                               for e in contract.phase_schedule})
-        finally:
-            con.close()
-        return {"conditioning_sha256": b.conditioning_sha256, "brief": b.bundle}
+        from .services import briefs as B
+        return B.compile_reference_brief(args.project, args.contract_id, int(args.slot))
     if cmd == "job-submit":
         from .services import jobs
         brief = json.loads(open(args.brief).read())
@@ -61,4 +43,36 @@ def dispatch(args) -> dict:
     if cmd == "corrections-list":
         from .services import corrections
         return corrections.list_open(args.project)
+    if cmd == "reviewer-pair":
+        from .services import sessions as SN
+        return SN.pair_reviewer(args.project, args.reviewer_id)
+    if cmd == "reviewer-open":
+        from .services import sessions as SN
+        from .services.errors import AuthorizationError, InvalidInput
+        try:
+            return SN.open_session(args.project, args.code)
+        except (AuthorizationError, InvalidInput) as e:
+            raise SystemExit(f"reviewer-open refused: {e}")
+    if cmd == "guide-propose":
+        import json as _json
+        from .services import approvals as A
+        from .services.authz import Actor as _Actor
+        guide = _json.loads(open(args.guide).read())
+        return A.propose_motion_guide(args.project, _Actor(type="orchestrator",
+                                      id=getattr(args, "actor_id", "cli")),
+                                      guide).model_dump()
+    if cmd == "reference-approve":
+        from .services import approvals as A
+        from .services.authz import Actor as _Actor
+        from .services import sessions as SN
+        token = getattr(args, "session_token", None) or ""
+        import os as _os
+        token = token or _os.environ.get("FRAMEBOUND_REVIEWER_TOKEN", "")
+        reviewer = SN.resolve_session(args.project, token)
+        if reviewer is None:
+            raise SystemExit("reviewer session required: set --session-token or "
+                             "FRAMEBOUND_REVIEWER_TOKEN from `reviewer-open`")
+        return A.approve_reference(args.project, _Actor(type="reviewer", id=reviewer),
+                                   args.character, args.guide,
+                                   getattr(args, "event_id", None)).model_dump()
     raise ValueError(f"unknown v2 command {cmd}")

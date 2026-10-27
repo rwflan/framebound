@@ -47,27 +47,11 @@ def build_server(project_dir: str) -> MCPServer:
         from ..services import clips
         return clips.evaluate(project_dir, revision_id).model_dump()
 
-    @server.tool(name="brief_compile", description="Compile a typed conditioning bundle for one slot")
+    @server.tool(name="brief_compile", description="Compile a typed conditioning bundle for one slot "
+                        "(requires a stored human reference approval; fails without one)")
     def brief_compile(contract_id: str, slot: int) -> dict:
-        from .. import domain as D
-        from .. import storage as S
-        from ..briefs import compile_brief
-        con = S.connect(project_dir)
-        try:
-            cdata, _ = S.get(con, "contract_revisions", contract_id)
-            contract = D.ClipContractRevision.model_validate_json(json.dumps(cdata))
-            assets, approvals = {}, {}
-            for role in ("identity", "style"):
-                aid = contract.references[role]
-                adata, _ = S.get(con, "assets", aid)
-                assets[aid] = D.Asset.model_validate_json(json.dumps(adata))
-                approvals[aid] = {"approved": True, "event_id": "imported"}
-            bundle = compile_brief(contract, slot, assets, approvals,
-                                   {e.motion_reference_id: f"guide:{e.motion_reference_id}"
-                                    for e in contract.phase_schedule})
-        finally:
-            con.close()
-        return {"conditioning_sha256": bundle.conditioning_sha256, "brief": bundle.bundle}
+        from ..services import briefs as B
+        return B.compile_reference_brief(project_dir, contract_id, int(slot))
 
     @server.tool(name="generation_submit", description="Submit a reference-conditioned generation job (idempotent)")
     def generation_submit(brief: dict, references: list[dict], idempotency_key: str) -> dict:

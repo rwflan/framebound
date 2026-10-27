@@ -50,16 +50,19 @@ class AuthzSplit(unittest.TestCase):
             with self.assertRaises(AuthorizationError):
                 packets.record_review_event(td, model, {"id": "e2", "action": "resolve_issue",
                                                         "clip_revision_id": "r1"})
-        # reviewer session works once the revision exists
+        # reviewer session works once the revision + its contract + evidence exist
         with tempfile.TemporaryDirectory() as td:
             con = S.connect(td)
-            rev = D.ClipRevision(id="r1", contract_revision_id="c1", frame_instance_ids=["f1"])
+            S.insert(con, D.ClipContractRevision.model_validate(_contract_dict()))
+            rev = D.ClipRevision(id="r1", contract_revision_id="contract-loop-01",
+                                 frame_instance_ids=["f1"])
             S.insert(con, rev)
             con.close()
             revw = Actor(type="reviewer", id="human-1")
-            out = packets.record_review_event(td, revw, {"id": "e3", "action": "approve",
-                                                         "clip_revision_id": "r1"})
-            self.assertTrue(out.ok)
+            with self.assertRaises(InvalidInput):
+                # no stored evaluation for r1: decisions need evidence, not just a role
+                packets.record_review_event(td, revw, {"id": "e3", "action": "approve",
+                                                       "clip_revision_id": "r1"})
 
 
 class BriefAuthority(unittest.TestCase):
