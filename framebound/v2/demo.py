@@ -16,8 +16,9 @@ from .checks import evaluate as E
 from .checks import fixtures as F
 
 
-def run_demo(out_dir: str | Path) -> dict:
-    out = Path(out_dir)
+def run_demo(out_dir: str | Path, *, replace: bool = False) -> dict:
+    from .safe_output import prepare_output_dir
+    out = prepare_output_dir(out_dir, replace=replace, tool="framebound-demo-v2")
     fx = out / "fixtures"
     meta = F.build_cycle(fx)
 

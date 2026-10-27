@@ -71,11 +71,14 @@ def _contract(cid: str, phases: list[str], holds: list[int], char_rev: str, span
     }
 
 
-def run_wp6(out_dir: str | Path) -> dict:
-    import shutil
-    out = Path(out_dir)
-    if out.exists():
-        shutil.rmtree(out)  # demo output only; never user data (fresh --out path)
+def run_wp6(out_dir: str | Path, *, replace: bool = False, offline: bool = True) -> dict:
+    """Offline procedural replay (never live): synthetic Pip corpus + honest ledger.
+
+    ``offline`` stays True for every demo/verification caller. Live provider
+    exercise arrives through the R3 spike, not through this replay.
+    """
+    from .safe_output import prepare_output_dir
+    out = prepare_output_dir(out_dir, replace=replace, tool="framebound-demo-wp6")
     char_dir = out / "character"
     man = build_character(char_dir)
     proj = str(out / "project")
@@ -140,7 +143,7 @@ def run_wp6(out_dir: str | Path) -> dict:
     ledger = img_provider.submit({"instruction": "demo", "conditioning_sha256": "00" * 32}, [
         {"role": "approved_identity", "asset_id": "pip-identity", "byte_sha256": "00" * 64, "bytes_b64": ""},
         {"role": "approved_style", "asset_id": "pip-style", "byte_sha256": "00" * 64, "bytes_b64": ""}],
-        proj, "wp6-demo-1")
+        proj, "wp6-demo-1", offline=offline)
     # review round-trip on the run clip
     con = S.connect(proj)
     try:
