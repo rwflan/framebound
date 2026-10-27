@@ -40,7 +40,55 @@ Acceptance gate: complete valid examples, invalid-input tests, stale-write prote
   PIL still missing — WP2 pins Pillow+NumPy raster. MCP SDK still missing — WP3 pins official SDK + real client handshake.
 - Next: WP2 canonical media + verification framework (registration, integer timeline, coverage matrix, evidence IDs, overlays, original faults).
 
-## Current package: WP2 — canonical media and verification (done on branch `codex/wp2-media-checks`, 2026-10-27)
+## Current package: WP3 — tools, providers and bounded loop (done on branch `codex/wp3-tools-providers-loop`, 2026-10-27)
+
+Acceptance gate: real client MCP handshake; references reach image model; outputs stored; masks decoded if available;
+bounded repair and no-regression policy work. All pass.
+
+### Delivered
+
+- `framebound/v2/services/` — one shared application layer (CLI/MCP transports never reimplement policy):
+  projects, assets, contracts (missing-authority inventory), clips (create + persisted evaluate + candidate registration as child
+  revisions with frozen recipes; per-pose-fit blocked), repair (3-attempt budget, no-progress signatures, regression/coverage selection,
+  subjective `awaiting_human_comparison` path), packets (stale-evidence rejection), jobs (idempotent submit/get/cancel),
+  corrections (open/claim with lease expiry). `authz.require_reviewer`: ALL review writes reviewer-only (orchestrator attempts → 403-class
+  `forbidden`); `errors` carry stable codes (`invalid_input`, `stale_revision`, `unsupported`, `rate_limited`, `provider_timeout`,
+  `cancelled`, `forbidden`) with retryability.
+- `framebound/v2/briefs/compiler.py` — typed bundles with conditioning SHA-256: approved identity + style (approval records required,
+  rejected candidates forbidden), independent phase authority (frame never its own guide), neighbor context from accepted revisions only,
+  preservation rules + forbidden list. Sole-reference and rejected-input briefs raise `invalid_input`.
+- `framebound/v2/providers/` — `base.discover` (`not_configured` without key, never invents success) + bounded transient retry with backoff;
+  `image` builds reference-conditioned Responses requests carrying ACTUAL role-labeled reference bytes/hashes (v1's text-only gap closed),
+  persists redacted request artifacts, returns `not_configured` offline; `spark` advisory critique (never gates); `sam` Responses-shape builder +
+  special-token mask decoder with explicit outcomes (no_match/corrupt/misaligned/empty/full/mask); alpha fallback stays labeled
+  `offline-alpha`, never SAM. `ledger` persists every request/response artifact + cost; estimates marked.
+- `framebound/v2/orchestration/loop.py` — `BoundedLoop`: stops at `awaiting_review`, 3-attempt budget per target, no-progress signatures stop
+  blind retry, cost ceiling field, no concurrent same-revision mutation by construction.
+- `framebound/v2/mcp/server.py` — official MCP SDK 2.3.0 (`MCPServer`, `run_stdio_async`), 14 tools over the same service functions;
+  CLI `v2-mcp --project` serves stdio. `tests/test_v2_loop.py::RealMCPHandshake` runs a REAL client (`stdio_client` + `ClientSession`)
+  in-subprocess: lists tools, calls `doctor` + `project_get`.
+- CLI: `asset-import`, `contract-propose`, `clip-create`, `clip-evaluate`, `brief-compile`, `job-submit`, `job-get`,
+  `candidate-register`, `packet-create`, `corrections-list` (v2 repair flows via MCP `repair_plan`/`repair_evaluate`; v1 names untouched).
+- Pinned: `mcp==2.3.0` (exercised), `Pillow>=13,<14`, `pydantic>=2.12,<3`, `numpy`, `fastapi`, `uvicorn`; `datasets`+`pycocotools` in
+  `export-validation` extra (WP5). `dep_lock_id` still `dev-no-lock` until WP5 lockfile.
+- `tests/test_v2_loop.py` (14 tests): authz split, brief authority ×3, provider honesty ×4 (incl. SAM outcome matrix), repair budget/
+  regression/subjective/no-progress, loop stop/budget, live MCP handshake.
+
+### Actual commands/results (2026-10-27, Dublin; `python` 3.11.4)
+
+- `python -m pytest tests/ -q` → `52 passed` (13 v1 + 11 WP1 + 14 WP2 + 14 WP3).
+- Live provider evidence: still blocked (no `MODEL_API_KEY`); `generation_submit` returns persisted `not_configured` artifact —
+  recorded as capability result, not success. SAM decode paths unit-tested; live mask spike needs key (WP6).
+
+### Artifacts / limitations / next
+
+- Artifacts: service/provider/orchestration/mcp code in-repo; offline request fixtures already in `fixtures/provider-spike/`.
+- Limitations: no HTTP API + event stream yet (WP4); no review desk UI (WP4); export snapshots (WP5); no genuine character art (WP6);
+  `brief_compile` MCP/CLI approvals currently `imported` (explicit human approval events arrive with WP4 review writes).
+- Next: WP4 review desk + human round-trip (FastAPI routes, React desk, packet renderer, ROI/range issues, correction leases,
+  before/after, restart journey).
+
+## Prior: WP2 — canonical media and verification (merged as PR #5) — canonical media and verification (done on branch `codex/wp2-media-checks`, 2026-10-27)
 
 Acceptance gate: clean and negative fixtures behave correctly; per-tick sliding and loop/one-shot cases tested; stale evidence rejected. All pass.
 
