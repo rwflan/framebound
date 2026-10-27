@@ -34,3 +34,13 @@ details/rules portal was NOT accessible in this pass (details URL redirects to l
 - Preserve the honest distinction between pre-existing foundation and work completed during the event.
 - Do not infer reuse permission from a public marketing page.
 - Next check: entrant opens the authenticated submission portal, records exact fields + rules here with date + source links.
+
+## ENTRANT ACTIONS (human, before 4 Nov 18:00 Dublin)
+
+- [ ] Open the authenticated submission portal; record exact fields, rules, video limit, hosting/code
+      arrangements, reuse disclosure, and model-use minimum here with date + source links.
+- [ ] Run one live provider spike (Spark tool call + reference-conditioned image + SAM decode) with the
+      participant account; save the redacted fixtures next to `fixtures/provider-spike/` and pin versions.
+      Until then every demo stays badged `[replay/procedural-original]` — never present it as live.
+- [ ] Record the demo video following `docs/DEMO_SCRIPT.md` within the verified duration limit.
+- [ ] Submit; paste the submission receipt (ID/URL/timestamp) here. Only the entrant can verify this step.

@@ -19,13 +19,14 @@ Meta models in the loop: Muse Image generates under briefs, SAM 3.1 supplies mas
 
 ## Quick start
 
-No dependencies. Python 3.11+.
+Python 3.11+. Core: `pip install -e .` (pydantic, Pillow, numpy, mcp, fastapi, uvicorn). Export validation: `pip install -e '.[export-validation]'` (datasets, pycocotools). Desk: `cd web && npm install`.
 
 ```sh
-python -m framebound demo --out build/demo     # clean passes, 4 named faults fail, repair selected
-python -m framebound serve --project build/v2proj --port 8765  # v2 desk+API
+sh scripts/verify-local                        # offline P0 checks (live providers opt-in, skipped honestly)
+python -m framebound demo --profile wp6 --offline --out build/wip6   # Pip: 4 clips pass
+python -m framebound serve --project build/wip6/project --port 8765  # desk at http://127.0.0.1:8765
 # desk dev: cd web && npm install && npm run dev   (proxies /api to :8765)
-python -m unittest discover -s tests
+# v1 prototype still works: python -m framebound demo --out build/demo
 ```
 
 Open http://127.0.0.1:8765 for the review desk.
@@ -35,9 +36,15 @@ Open http://127.0.0.1:8765 for the review desk.
 CLI (JSON in/out) and MCP (stdio) expose the same operations: `check`, `brief`, `preflight`, `repair-plan`, `repair-evaluate`, `record-failure`, `export-dataset`. See [docs/MODEL_TOOLS.md](docs/MODEL_TOOLS.md).
 
 ```sh
-python -m framebound check --contract project/contract.json --report build/report.json
-python -m framebound brief --contract project/contract.json --slot 2 --out build/brief
-python -m framebound mcp
+python -m framebound doctor
+python -m framebound migrate-v1 --source path/to/v1demo --dry-run
+python -m framebound asset-import --project proj --src img.png --asset-id a-01
+python -m framebound clip-evaluate --project proj --revision-id clip-01
+python -m framebound brief-compile --project proj --contract-id c-01 --slot 2
+python -m framebound export --project proj --snapshot s1 --out build/s1 --revisions clip-01
+python -m framebound dataset-validate --snapshot build/s1
+python -m framebound v2-mcp --project proj   # MCP stdio (same services as CLI/HTTP)
+# v1 prototype tools (check/brief/preflight/repair-plan/repair-evaluate/mcp) unchanged
 ```
 
 With a Meta Model API key (`MODEL_API_KEY`), generation and vision critique go live; without one, adapters return the exact request they would send and fabricate nothing.
