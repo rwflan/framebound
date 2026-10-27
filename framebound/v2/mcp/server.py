@@ -9,7 +9,8 @@ TOOLS = ["doctor", "project_get", "asset_import", "contract_propose",
          "clip_create_revision", "clip_evaluate", "brief_compile",
          "generation_submit", "generation_submit_offline", "job_get",
          "job_claim", "job_cancel", "job_reconcile", "orchestrator_run",
-         "capabilities", "correction_claim", "candidate_register",
+         "capabilities", "correction_claim", "correction_get", "correction_submit",
+         "eligibility_get", "candidate_register",
          "repair_plan", "repair_evaluate", "review_packet_create", "corrections_list"]
 
 
@@ -142,9 +143,14 @@ def build_server(project_dir: str) -> MCPServer:
             cdata, _ = S.get(con, "evaluations", candidate_evaluation_id)
             base = D.Evaluation.model_validate_json(_json.dumps(bdata))
             cand = D.Evaluation.model_validate_json(_json.dumps(cdata))
+            from ..services import packets as _P
+            _, base_contract = _P._resolve_revision(con, base.clip_revision_id)
+            _, cand_contract = _P._resolve_revision(con, cand.clip_revision_id)
         finally:
             con.close()
-        return R.evaluate_selection(base, cand, targets, subjective=subjective)
+        return R.evaluate_selection(base, cand, targets, subjective=subjective,
+                                    baseline_contract=base_contract,
+                                    candidate_contract=cand_contract)
 
     @server.tool(name="review_packet_create", description="Curate a review packet for a revision+evaluation")
     def review_packet_create(packet_id: str, revision_id: str, evaluation_id: str,
@@ -153,9 +159,39 @@ def build_server(project_dir: str) -> MCPServer:
         return packets.create_packet(project_dir, packet_id, revision_id,
                                      evaluation_id, intent).model_dump()
 
-    @server.tool(name="corrections_list", description="List open correction tasks (model work queue)")
-    def corrections_list() -> dict:
+    @server.tool(name="corrections_list", description="List correction tasks (model work queue)")
+    def corrections_list(status: str = "open") -> dict:
         from ..services import corrections
-        return corrections.list_open(project_dir)
+        if status == "open":
+            return corrections.list_open(project_dir)
+        if status == "all":
+            return corrections.list_tasks(project_dir)
+        return corrections.list_tasks(project_dir, [s.strip() for s in status.split(",")])
+
+    @server.tool(name="correction_get", description="Explicit correction task status + lease + attempts")
+    def correction_get(task_id: str) -> dict:
+        from ..services import corrections
+        return corrections.get_task(project_dir, task_id)
+
+    @server.tool(name="correction_submit", description="Gated repair submit (holder+token+lease+scope+matrix)")
+    def correction_submit(task_id: str, claim_token: str, new_revision_id: str,
+                          slot_assets: dict[str, str], recipe: str,
+                          baseline_evaluation_id: str, idempotency_key: str,
+                          expected_version: int = 1, transform: dict | None = None) -> dict:
+        from ..services import authz as _az, corrections as C
+        # MCP acts as the orchestrator worker; holder binding is checked inside.
+        return C.submit_correction(project_dir, _az.Actor(type="orchestrator", id="mcp-worker"),
+                                   task_id, claim_token=claim_token,
+                                   expected_version=int(expected_version),
+                                   new_revision_id=new_revision_id,
+                                   slot_asset_ids={int(k): v for k, v in slot_assets.items()},
+                                   recipe=recipe, transform=transform,
+                                   baseline_evaluation_id=baseline_evaluation_id,
+                                   idempotency_key=idempotency_key)
+
+    @server.tool(name="eligibility_get", description="Release eligibility for a revision")
+    def eligibility_get(revision_id: str) -> dict:
+        from ..services import eligibility as E
+        return E.release_eligibility(project_dir, revision_id)
 
     return server

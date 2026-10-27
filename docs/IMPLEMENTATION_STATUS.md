@@ -5,6 +5,77 @@ Baseline: `b680d84` (audited main, 2026-10-27). `main` has not advanced since th
 Prior ledger entries below are historical. The earlier "64 passing tests" and "engineering complete except
 for entrant actions" claims are NOT accepted as proof; each remediation package re-proves its gate.
 
+## Current package: R4 — bounded repair and complete correction state (done on branch `codex/r4-bounded-repair`, 2026-10-27)
+
+Acceptance gate: the 1x1-ROI whole-frame probe is rejected with zero partial writes;
+unclaimed/foreign-holder/wrong-token/expired-lease/stale-baseline submits refused;
+protected-pixel edits fail; error/unmeasured candidates never selected; subjective fixes reach
+only human comparison; idempotent retry replays, payload conflicts raise; budget blocks;
+history stays visible through resolve/reopen. All demonstrated.
+
+### Changed capability
+
+- `domain.EditMask` (new, frozen table `edit_masks`): reviewer-approved pixel authority —
+  mask asset + hash + covered slots + approval event. An issue ROI suggests scope but never
+  authorizes pixels by itself.
+- `CorrectionTask`: binds `baseline_evaluation_id` at `open_issue` (no evidence → no issue)
+  and `edit_mask_id` on approval; `last_error` for honest failure surfaces. Old rows load.
+- `services/masks.py` (new): `approve_mask` (reviewer-only, stages a real `approve_mask`
+  event), `scope_slots` (range/instance/mask union), `allowed_region` (per-slot ROI ∪ mask
+  raster at canvas size; hash-freshness enforced).
+- `services/repair.py`: `verify_scope` (out-of-scope slots, outside-region pixel diffs,
+  no-ops rejected; reports changed slots/pixels) and full-matrix `evaluate_selection`
+  (contract identity + required-set + (constraint, scope) matrix equality; new violations,
+  coverage reduction, unresolved/error/unmeasured targets refused; technical path needs
+  candidate PASS; subjective path needs passing baseline and returns `awaiting_human_comparison`).
+- `services/corrections.py`: the single gated `submit_correction` used by every transport —
+  holder/token/lease/state/baseline checks before any write; pixel scope then register →
+  evaluate → select → packet → task transition, each step idempotent so retries converge;
+  failures land as failed `Attempt` rows (deterministic `att-{sha(task:key)}` ids give
+  same-key replay vs different-payload conflict); expired leases requeue to OPEN with attempts
+  intact; 3 failures → BLOCKED; `get_task` (lease validity, attempts, issue), `list_tasks`
+  status filter, `reopen_issue` (resolved → REOPENED, history intact).
+- `services/eligibility.py` (new): central release rule — latest eval PASS + COMPLETE,
+  manifest present with unchanged candidate bytes, packet-bound reviewer approval for the
+  exact revision+evaluation (packetless decisions are signal, not release), no unresolved
+  blocking tasks.
+- Transports: API submit rewritten to the gated use case (failures return 200 `ok:false`,
+  never orphaned revisions); new `GET /api/corrections/{id}`, `POST /api/masks`,
+  `POST /api/issues/{id}/reopen`, `GET /api/eligibility/{rev}` (+ provider error codes
+  403/409/422/429/502/503/504 mapped); CLI `correction-submit/get`, `mask-approve`,
+  `issue-reopen`, `eligibility`; MCP `correction_get/submit`, `eligibility_get`,
+  `corrections_list` status filter, `repair_evaluate` now passes contract context.
+  `approve_mask` is deliberately absent from MCP/CLI-orchestrator surface (reviewer-only).
+- Desk journey updated to the honest flow: reviewer approves a full-frame edit mask before
+  the model may swap the faulty slot; claim version read from the task (mask approval bumps it).
+- `ReviewEvent.action` gains `approve_mask`; authz marks it reviewer-only; the state reducer
+  ignores it for acceptance (eligibility reads packet-bound approvals instead).
+
+### Failing repros fixed (reproduced before fixing)
+
+- 1x1 ROI + whole-frame replacement → refused at scope with zero new rows (pinned).
+- Unclaimed submit (old API accepted → 201) → refused; foreign holder, wrong token,
+  expired lease (requeued, attempts kept), stale baseline/evaluation, stale version → refused (pinned).
+- 1px protected-pixel change outside ROI/mask → refused (pinned).
+- Dropped required check / contract mismatch / error-unmeasured target → selection refused (pinned).
+- Same idempotency key replays the stored envelope (even with a stale version); different
+  payload → ConflictError; crash-retry converges through idempotent steps (pinned).
+- Subjective issue on passing baseline → comparison packet + AWAITING_COMPARISON; orchestrator
+  cannot resolve; reviewer resolve/reopen keeps full history (pinned).
+
+### Actual commands/results (2026-10-27, Dublin; python 3.11.4, node v22.23.4)
+
+- `python -m pytest tests/ -q` → `134 passed` (117 prior + 17 new R4).
+- `sh scripts/verify-local` → `ALL LOCAL CHECKS PASSED`, exit 0 (browser journey + live spike
+  recorded as SKIP, not passes).
+
+### Artifacts / limitations / next
+
+- Limitations: export/publication do not yet consume `release_eligibility` (R5 wires the training
+  view; desk wiring lands in R6). SAM `include_confidence` still provisional; SSE still in-memory.
+  The live spike (authorized participant credential) still blocks only live proof.
+- Next: R5 — rebuild training views and validate semantics.
+
 ## Current package: R3 — documented provider wire + durable controller/jobs (done on branch `codex/r3-providers-jobs`, 2026-10-27)
 
 Acceptance gate: strict fake rejects legacy payloads and accepts repaired documented payloads

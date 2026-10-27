@@ -72,6 +72,53 @@ def dispatch(args) -> dict:
     if cmd == "corrections-list":
         from .services import corrections
         return corrections.list_open(args.project)
+    if cmd == "corrections-list-open":
+        from .services import corrections
+        return corrections.list_tasks(args.project, ["open", "reopened"])
+    if cmd == "correction-get":
+        from .services import corrections
+        return corrections.get_task(args.project, args.task_id)
+    if cmd == "correction-submit":
+        import json as _json
+        from .services import corrections
+        slot_assets = {int(k): v for k, v in
+                       (kv.split("=") for kv in args.slots.split(","))} if args.slots else {}
+        return corrections.submit_correction(
+            args.project, __import__("framebound.v2.services.authz", fromlist=["Actor"]).Actor(
+                type="orchestrator", id=getattr(args, "actor_id", "cli")),
+            args.task_id, claim_token=args.claim_token,
+            expected_version=int(getattr(args, "expected_version", 1)),
+            new_revision_id=args.new_id, slot_asset_ids=slot_assets,
+            recipe=args.recipe,
+            transform=_json.loads(args.transform) if getattr(args, "transform", None) else None,
+            baseline_evaluation_id=args.baseline_evaluation,
+            idempotency_key=args.idempotency_key)
+    if cmd == "mask-approve":
+        from .services import masks as M
+        from .services.authz import Actor as _Actor
+        from .services import sessions as SN
+        import os as _os
+        token = getattr(args, "session_token", None) or _os.environ.get("FRAMEBOUND_REVIEWER_TOKEN", "")
+        reviewer = SN.resolve_session(args.project, token)
+        if reviewer is None:
+            raise SystemExit("reviewer session required: set --session-token or FRAMEBOUND_REVIEWER_TOKEN")
+        slots = [int(s) for s in args.slots.split(",")] if args.slots else []
+        return json.loads(M.approve_mask(args.project, _Actor(type="reviewer", id=reviewer),
+                                         args.issue, args.mask_asset, slots).model_dump_json())
+    if cmd == "issue-reopen":
+        from .services import corrections
+        from .services.authz import Actor as _Actor
+        from .services import sessions as SN
+        import os as _os
+        token = getattr(args, "session_token", None) or _os.environ.get("FRAMEBOUND_REVIEWER_TOKEN", "")
+        reviewer = SN.resolve_session(args.project, token)
+        if reviewer is None:
+            raise SystemExit("reviewer session required: set --session-token or FRAMEBOUND_REVIEWER_TOKEN")
+        return corrections.reopen_issue(args.project, _Actor(type="reviewer", id=reviewer),
+                                        args.issue, getattr(args, "note", ""))
+    if cmd == "eligibility":
+        from .services import eligibility as E
+        return E.release_eligibility(args.project, args.revision_id)
     if cmd == "reviewer-pair":
         from .services import sessions as SN
         return SN.pair_reviewer(args.project, args.reviewer_id)
