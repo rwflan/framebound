@@ -82,6 +82,12 @@ def main(argv=None):
     mv.add_argument("--source", required=True)
     mv.add_argument("--dry-run", action="store_true", default=True)
     mv.add_argument("--report", help="Write the migration report JSON here")
+    ex = sub.add_parser("export", help="v2: build a portable training snapshot")
+    ex.add_argument("--project", required=True); ex.add_argument("--snapshot", required=True)
+    ex.add_argument("--out", required=True); ex.add_argument("--revisions", required=True)
+    ex.add_argument("--policy", required=False, default=None)
+    dv = sub.add_parser("dataset-validate", help="v2: validate a snapshot with standard loaders")
+    dv.add_argument("--snapshot", required=True)
     vf = sub.add_parser("verify", help="v2: verify stored revisions, blobs and evidence freshness")
     vf.add_argument("--project", required=True)
     vf.add_argument("--report", help="Write the verification report JSON here")
@@ -100,6 +106,19 @@ def main(argv=None):
             Path(args.report).write_text(_json.dumps(rep, indent=2) + "\n")
         _print(rep)
         return 0
+    if args.cmd == "export":
+        import json as _json
+        from .v2.exports import build_snapshot as _snap
+        pol = _json.loads(open(args.policy).read()) if args.policy else None
+        rep = _snap(args.project, args.snapshot, args.revisions.split(","), args.out, pol)
+        _print({"snapshot": rep["snapshot"], "counts": rep["counts"],
+                "exclusions": rep["exclusions"]})
+        return 0
+    if args.cmd == "dataset-validate":
+        from .v2.exports import validate_snapshot as _val
+        rep = _val(args.snapshot)
+        _print(rep)
+        return 0 if rep["ok"] else 1
     if args.cmd == "verify":
         from .v2.verify import run_verify
         rep = run_verify(args.project)
