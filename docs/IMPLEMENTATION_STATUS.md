@@ -40,7 +40,52 @@ Acceptance gate: complete valid examples, invalid-input tests, stale-write prote
   PIL still missing — WP2 pins Pillow+NumPy raster. MCP SDK still missing — WP3 pins official SDK + real client handshake.
 - Next: WP2 canonical media + verification framework (registration, integer timeline, coverage matrix, evidence IDs, overlays, original faults).
 
-## Prior: WP3 — tools, providers and bounded loop (merged as PR #6) — tools, providers and bounded loop (done on branch `codex/wp3-tools-providers-loop`, 2026-10-27)
+## Current package: WP5 — portable training snapshots (done on branch `codex/wp5-training-snapshots`, 2026-10-27)
+
+Acceptance gate: moved snapshot loads with standard loaders; labels/preferences checked; hashes and duration match;
+exclusions visible. All pass.
+
+### Delivered
+
+- `framebound/v2/exports/snapshot.py` — frozen explicit selection (revision IDs + their evaluations at export time);
+  COCO (`images` + `annotations`: bbox from silhouette, RLE via pycocotools, `mask.encode`);
+  HF imagefolder (`data/*.png` + `metadata.jsonl`: character/clip/slot/hold/phase, technical status, issue codes,
+  human decision, metrics, `label_origin`, derivation recipe, source drawing, split); `preferences.jsonl` (prompt,
+  conditioning, chosen+revision, rejected+revision, named issue + reason); `temporal.jsonl` (frames, holds, loop,
+  duration ticks, evaluation id); dataset card (`hf/README.md` with label semantics); `manifest.json` (files+hashes,
+  policy, schemas, dep lock `export-validation-1`, exclusions with reasons, counts).
+- Honest labels: `human-approved` (pass + approval event for the EXACT revision), `weak-negative` (failed frames, never
+  positives), `procedural-test` (fixtures: regressions/demos; excluded from positives by default, opt-in only with labels
+  intact), `derived` (recipe recorded). Preference pairs require an approved PASSING descendant fix for the same slot —
+  otherwise withheld with reason. Split leakage (same source drawing in train+test): `strict` fails, default excludes
+  test frames with reason. Rights outside policy excluded with reason.
+- `framebound/v2/exports/validate.py` — rehashes every file; COCO loads via real `pycocotools` API + mask round-trip
+  (decode→encode area equality); imagefolder loads via real `datasets.load_dataset`; preferences resolve + name real
+  issues; durations equal hold sums; splits disjoint. Returns `{ok, issues, counts, exclusions, loaders}`.
+- CLI: `export --project --snapshot --out --revisions [--policy]` + `dataset-validate --snapshot` (exit 1 on failure).
+- Provenance fix (this package): v2 tests now import synthetic fixtures with `source_kind="procedural"` — earlier
+  tests imported them as `original`, which would have mislabeled fixtures as originals.
+- `tests/test_v2_export.py` (3 tests): full round-trip after `shutil.move` (COCO + datasets + prefs + durations);
+  strict split raises; default exclusions visible + every metadata row carries `label_origin`.
+- Pinned: `datasets>=3,<4`, `pycocotools>=2.0.8` in `export-validation` extra. Env note: pyenv 3.11.4 lacks `_lzma`;
+  validation shims `lzma` in-test only (`open` raises if xz is ever actually used — imagefolder PNGs never touch it);
+  COCO path unshimmed. `dep_lock_id` is the literal `export-validation-1` until lockfiles land in WP7.
+
+### Actual commands/results (2026-10-27, Dublin)
+
+- `python -m pytest tests/ -q` → `57 passed` (13 v1 + 11 WP1 + 14 WP2 + 14 WP3 + 2 WP4 + 3 WP5).
+- Manual: `export` → exclusions list split-leakage + procedural-positive gates; `dataset-validate` on moved snapshot →
+  `ok: true` with real loader counts.
+
+### Artifacts / limitations / next
+
+- Artifacts: exports code + tests in-repo; snapshots under `/tmp` (not committed).
+- Limitations: evaluations snapshotted by latest-at-export (documented; a fixed DB snapshot is WP7 hardening); brief
+  prompts reconstructed minimally (full brief bundles persist via WP3 ledger, not yet linked into prefs — recorded gap);
+  no held-out critic experiment (P1, correctly out of scope).
+- Next: WP6 genuine character demonstration (original run/jump/attack, transitions, provider ledger, stress benchmark).
+
+## Prior: WP3 — tools, providers and bounded loop (merged as PR #6) — tools, providers and bounded loop (merged as PR #6) — tools, providers and bounded loop (done on branch `codex/wp3-tools-providers-loop`, 2026-10-27)
 
 Acceptance gate: real client MCP handshake; references reach image model; outputs stored; masks decoded if available;
 bounded repair and no-regression policy work. All pass.
@@ -88,7 +133,7 @@ bounded repair and no-regression policy work. All pass.
 - Next: WP4 review desk + human round-trip (FastAPI routes, React desk, packet renderer, ROI/range issues, correction leases,
   before/after, restart journey).
 
-## Current package: WP4 — review desk and human round-trip (done on branch `codex/wp4-review-desk`, 2026-10-27)
+## Prior: WP4 — review desk and human round-trip (merged as PR #7) — review desk and human round-trip (done on branch `codex/wp4-review-desk`, 2026-10-27)
 
 Acceptance gate: full browser restart journey passes; human decisions cannot be written by model tools;
 subjective correction supported. All pass.
