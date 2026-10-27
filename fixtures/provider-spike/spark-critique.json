@@ -1,0 +1,31 @@
+{
+  "mode": "offline",
+  "sent": false,
+  "key": "REDACTED",
+  "request": {
+    "model": "muse-spark-1.3",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You review 2D animation frames against a frozen character contract. Name visible shape, size, movement, or appearance inconsistencies per frame. Do not approve art."
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Contract: <summary> Deterministic checks already found: [...] Describe any additional visible inconsistency, frame by frame."
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "data:image/png;base64,<BYTES_REDACTED>"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "endpoint": "POST https://api.meta.ai/v1/chat/completions",
+  "note": "Offline fixture 2026-10-27: request shape only. Advisory-only; never a gate."
+}
