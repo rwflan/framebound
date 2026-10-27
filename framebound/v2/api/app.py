@@ -1,27 +1,79 @@
-"""FastAPI review API. Human writes are reviewer-only; orchestrator tokens get 403.
+"""FastAPI review API. Human writes require a reviewer session token; orchestrator tokens get 403.
 
-Review writes require headers X-Actor-Type: reviewer + X-Actor-Id. Reads and the model
-queue (GET /api/corrections) are open to the orchestrator. Mutating the same revision
-concurrently is refused; stale expected_revision_id yields 409 stale_revision.
-Binds 127.0.0.1 by default; a remotely exposed writer needs real authentication (P0: local only).
+Reviewer sessions come from an explicit localhost pairing ceremony
+(`framebound reviewer-pair` / `reviewer-open`, or POST /api/reviewer/*):
+nobody becomes a reviewer by setting a request header. Reads and the model
+queue (GET /api/corrections) stay open to the orchestrator. Mutating the same
+revision concurrently is refused; stale views yield 409 stale_revision.
+Binds 127.0.0.1 by default; a remotely exposed writer needs real authentication
+(P0: local only).
+
+Threat boundary: these checks protect the API transport. A process with
+unrestricted filesystem access to the project database can rewrite it
+directly; no HTTP role check claims to prevent that.
 """
 from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+from pydantic import Field
 
 from .. import domain as D
 from .. import storage as S
 from ..services.authz import Actor
-from ..services.errors import AuthorizationError, InvalidInput, StaleRevision
+from ..services.errors import AuthorizationError, InvalidInput, StaleRevision as SvcStale
 
 
-def _actor(actor_type: str | None, actor_id: str | None) -> Actor:
-    return Actor(type=actor_type or "orchestrator", id=actor_id or "anonymous")
+class IssueBody(D.Strict):
+    id: str | None = Field(default=None, min_length=1, max_length=128)
+    clip_revision_id: str = Field(min_length=1, max_length=128)
+    packet_id: str | None = Field(default=None, min_length=1, max_length=128)
+    frame_instance_id: str | None = Field(default=None, min_length=1, max_length=128)
+    frame_range: list[D.StrictInt] | None = None
+    roi: D.Roi | None = None
+    category: str = Field(default="general", min_length=1, max_length=64)
+    note: str = Field(default="", max_length=2000)
+
+
+class DecisionBody(D.Strict):
+    id: str | None = Field(default=None, min_length=1, max_length=128)
+    action: Literal["approve", "reject", "needs_changes"]
+    clip_revision_id: str = Field(min_length=1, max_length=128)
+    packet_id: str | None = Field(default=None, min_length=1, max_length=128)
+    expected_revision_id: str | None = Field(default=None, min_length=1, max_length=128)
+    expected_evaluation_id: str | None = Field(default=None, min_length=1, max_length=128)
+    note: str = Field(default="", max_length=2000)
+
+
+class ResolveBody(D.Strict):
+    id: str | None = Field(default=None, min_length=1, max_length=128)
+    replacement_revision_id: str = Field(min_length=1, max_length=128)
+    packet_id: str | None = Field(default=None, min_length=1, max_length=128)
+    note: str = Field(default="", max_length=2000)
+
+
+class ClaimBody(D.Strict):
+    expected_version: D.StrictInt = 1
+
+
+class SubmitBody(D.Strict):
+    slot_assets: dict[str, str] = Field(default_factory=dict)
+    recipe: str = Field(default="repair:bounded-patch", min_length=1, max_length=500)
+    new_revision_id: str | None = Field(default=None, min_length=1, max_length=128)
+
+
+class PairBody(D.Strict):
+    reviewer_id: str = Field(min_length=1, max_length=200)
+
+
+class OpenBody(D.Strict):
+    pairing_code: str = Field(min_length=1, max_length=256)
 
 
 def create_app(project_dir: str) -> FastAPI:
@@ -33,6 +85,15 @@ def create_app(project_dir: str) -> FastAPI:
     def publish(event: dict) -> None:
         for q in app.state.subscribers:
             q.put_nowait(event)
+
+    def actor(x_session_token: str | None, x_actor_id: str | None) -> Actor:
+        if x_session_token:
+            from ..services import sessions as SN
+            rid = SN.resolve_session(project_dir, x_session_token)
+            if rid is None:
+                raise HTTPException(401, "invalid or expired reviewer session token")
+            return Actor(type="reviewer", id=rid)
+        return Actor(type="orchestrator", id=(x_actor_id or "anonymous")[:200] or "anonymous")
 
     @app.exception_handler(AuthorizationError)
     async def _forbidden(_: Request, e: AuthorizationError):
@@ -46,9 +107,41 @@ def create_app(project_dir: str) -> FastAPI:
     async def _stale(_: Request, e: S.StaleRevisionError):
         return JSONResponse({"code": "stale_revision", "detail": str(e)}, status_code=409)
 
+    @app.exception_handler(SvcStale)
+    async def _stale2(_: Request, e: SvcStale):
+        return JSONResponse({"code": "stale_revision", "detail": str(e)}, status_code=409)
+
+    @app.exception_handler(S.ConflictError)
+    async def _conflict(_: Request, e: S.ConflictError):
+        return JSONResponse({"code": "conflict", "detail": str(e)}, status_code=409)
+
+    @app.exception_handler(S.FrozenRevisionError)
+    async def _frozen(_: Request, e: S.FrozenRevisionError):
+        return JSONResponse({"code": "frozen_revision", "detail": str(e)}, status_code=409)
+
     @app.get("/api/health")
     def health():
         return {"ok": True, "schema_version": "2.0"}
+
+    @app.post("/api/reviewer/pair", status_code=201)
+    def reviewer_pair(body: PairBody):
+        """Local operator pairs a human reviewer id; returns a single-use code."""
+        from ..services import sessions as SN
+        try:
+            return SN.pair_reviewer(project_dir, body.reviewer_id)
+        except InvalidInput as e:
+            raise HTTPException(422, str(e))
+
+    @app.post("/api/reviewer/open", status_code=201)
+    def reviewer_open(body: OpenBody):
+        """Exchange a pairing code for a reviewer session token (shown once)."""
+        from ..services import sessions as SN
+        try:
+            return SN.open_session(project_dir, body.pairing_code)
+        except AuthorizationError as e:
+            raise HTTPException(403, str(e))
+        except InvalidInput as e:
+            raise HTTPException(422, str(e))
 
     @app.get("/api/project")
     def project():
@@ -82,7 +175,10 @@ def create_app(project_dir: str) -> FastAPI:
             raise HTTPException(404, str(e))
         finally:
             con.close()
-        return {"packet": pkt, "evaluation": ev, "revision": rev, "frames": aids, "contract": contract}
+        from ..services import review_state as RS
+        return {"packet": pkt, "evaluation": ev, "revision": rev, "frames": aids,
+                "contract": contract,
+                "current_decision": RS.current_state(project_dir, rev["id"])}
 
     @app.get("/api/asset/{asset_id}")
     def asset(asset_id: str):
@@ -107,111 +203,75 @@ def create_app(project_dir: str) -> FastAPI:
         return C.list_open(project_dir)
 
     @app.post("/api/issues", status_code=201)
-    def mark_issue(body: dict, x_actor_type: str | None = Header(default=None),
+    def mark_issue(body: IssueBody, x_session_token: str | None = Header(default=None),
                    x_actor_id: str | None = Header(default=None)):
-        """Reviewer marks an ROI/frame-range issue → open CorrectionTask (model queue)."""
-        actor = _actor(x_actor_type, x_actor_id)
-        for f in ("clip_revision_id", "packet_id"):
-            if f not in body:
-                raise HTTPException(422, f"missing {f}")
-        event = {"id": body.get("id") or f"evt-{abs(hash(json.dumps(body, sort_keys=True))) % 10**8}",
-                 "action": "mark_issue", "clip_revision_id": body["clip_revision_id"],
-                 "packet_id": body.get("packet_id"),
-                 "frame_instance_id": body.get("frame_instance_id"),
-                 "frame_range": body.get("frame_range"), "roi": body.get("roi"),
-                 "note": body.get("note", ""), "category": body.get("category", "general")}
-        from ..services import packets as P
-        out = P.record_review_event(project_dir, actor, event)
-        # open the machine-readable correction task in the same transaction boundary
-        task = D.CorrectionTask(id=f"task-{event['id']}", source_issue_event_id=event["id"],
-                                baseline_revision_id=event["clip_revision_id"],
-                                desired_outcome=event["note"] or event.get("category", "fix"),
-                                scope=json.dumps({"frame_range": event.get("frame_range"),
-                                                  "roi": event.get("roi")}))
-        con = S.connect(project_dir)
+        """Reviewer marks an ROI/frame-range issue → open CorrectionTask, atomically."""
+        act = actor(x_session_token, x_actor_id)
+        from ..services import corrections as C
         try:
-            try:
-                S.insert(con, task)
-            except S.ConflictError:
-                pass  # idempotent retry returns the same task
-        finally:
-            con.close()
-        publish({"type": "issue_marked", "task_id": task.id, "revision_id": event["clip_revision_id"]})
-        return {"event": out.model_dump(), "task_id": task.id}
+            env, task = C.open_issue(project_dir, act, {
+                "id": body.id, "action": "mark_issue",
+                "clip_revision_id": body.clip_revision_id, "packet_id": body.packet_id,
+                "frame_instance_id": body.frame_instance_id,
+                "frame_range": body.frame_range,
+                "roi": body.roi.model_dump() if body.roi else None,
+                "note": body.note, "category": body.category})
+        except S.ConflictError as e:
+            raise HTTPException(409, str(e))
+        publish({"type": "issue_marked", "task_id": task.id, "revision_id": body.clip_revision_id})
+        return {"event": {"operation_id": env.operation_id,
+                          "artifacts": env.artifacts}, "task_id": task.id}
 
     @app.post("/api/decisions", status_code=201)
-    def decision(body: dict, x_actor_type: str | None = Header(default=None),
+    def decision(body: DecisionBody, x_session_token: str | None = Header(default=None),
                  x_actor_id: str | None = Header(default=None)):
-        """approve / reject / needs-work for the exact revision. Reviewer only; never the model."""
-        actor = _actor(x_actor_type, x_actor_id)
-        action = body.get("action")
-        if action not in ("approve", "reject", "needs_changes"):
-            raise HTTPException(422, "action must be approve|reject|needs_changes")
-        # stale-write protection: the decision must name the revision it was viewed against
-        con = S.connect(project_dir)
-        try:
-            try:
-                S.get(con, "clip_revisions", body.get("clip_revision_id", ""))
-            except KeyError:
-                raise HTTPException(404, "unknown clip revision")
-            current = body.get("clip_revision_id")
-            if body.get("expected_revision_id") and body["expected_revision_id"] != current:
-                raise HTTPException(409, "stale_revision: packet view is behind; reload before deciding")
-        finally:
-            con.close()
+        """approve / reject / needs_changes for the exact revision. Reviewer only; never the model."""
+        act = actor(x_session_token, x_actor_id)
         from ..services import packets as P
-        out = P.record_review_event(project_dir, actor, {
-            "id": body.get("id") or f"evt-{abs(hash(json.dumps(body, sort_keys=True))) % 10**8}",
-            "action": action, "clip_revision_id": body["clip_revision_id"],
-            "packet_id": body.get("packet_id"), "note": body.get("note", "")})
-        publish({"type": "decision", "action": action, "revision_id": body["clip_revision_id"]})
+        try:
+            out = P.record_decision(project_dir, act, {
+                "id": body.id, "action": body.action,
+                "clip_revision_id": body.clip_revision_id, "packet_id": body.packet_id,
+                "expected_revision_id": body.expected_revision_id,
+                "expected_evaluation_id": body.expected_evaluation_id, "note": body.note})
+        except S.ConflictError as e:
+            raise HTTPException(409, str(e))
+        publish({"type": "decision", "action": body.action, "revision_id": body.clip_revision_id})
         return out.model_dump()
 
     @app.post("/api/issues/{event_id}/resolve", status_code=200)
-    def resolve_issue(event_id: str, body: dict, x_actor_type: str | None = Header(default=None),
+    def resolve_issue(event_id: str, body: ResolveBody,
+                      x_session_token: str | None = Header(default=None),
                       x_actor_id: str | None = Header(default=None)):
-        """Resolve the specific issue against a replacement revision. Unrelated approvals can't close it."""
-        actor = _actor(x_actor_type, x_actor_id)
-        if actor.type != "reviewer":
-            raise AuthorizationError("resolve_issue requires a reviewer session")
-        con = S.connect(project_dir)
-        try:
-            try:
-                S.get(con, "clip_revisions", body.get("replacement_revision_id", ""))
-            except KeyError:
-                raise HTTPException(404, "unknown replacement revision")
-            ev = D.ReviewEvent(id=body.get("id") or f"evt-res-{event_id}", actor_type="reviewer",
-                               actor_id=actor.id, action="resolve_issue",
-                               clip_revision_id=body["replacement_revision_id"],
-                               packet_id=body.get("packet_id"), note=body.get("note", ""))
-            S.insert(con, ev)
-            # mark the correction task resolved only via this explicit event
-            rows = con.execute("SELECT id, data, version FROM correction_tasks").fetchall()
-            for r in rows:
-                t = json.loads(r["data"])
-                if t.get("source_issue_event_id") == event_id and t.get("status") != "resolved":
-                    task = D.CorrectionTask.model_validate(t)
-                    task.status = D.CorrectionStatus.RESOLVED
-                    task.resolution_event_id = ev.id
-                    S.update_mutable(con, "correction_tasks", task, r["version"])
-        finally:
-            con.close()
-        publish({"type": "issue_resolved", "issue": event_id})
-        return {"ok": True, "resolution_event_id": ev.id}
-
-    @app.post("/api/corrections/{task_id}/claim", status_code=200)
-    def claim(task_id: str, body: dict):
+        """Resolve the specific issue against a replacement revision. Reviewer only."""
+        act = actor(x_session_token, x_actor_id)
         from ..services import corrections as C
         try:
-            return C.claim(project_dir, task_id, body.get("holder", "orchestrator"),
-                           int(body.get("expected_version", 1)))
+            out = C.resolve_issue(project_dir, act, event_id, body.replacement_revision_id,
+                                  body.packet_id, body.note, body.id)
+        except S.ConflictError as e:
+            raise HTTPException(409, str(e))
+        publish({"type": "issue_resolved", "issue": event_id})
+        return out
+
+    @app.post("/api/corrections/{task_id}/claim", status_code=200)
+    def claim(task_id: str, body: ClaimBody,
+              x_session_token: str | None = Header(default=None),
+              x_actor_id: str | None = Header(default=None)):
+        """Claim an open task. The holder is the authenticated caller, not a body field."""
+        from ..services import corrections as C
+        try:
+            return C.claim(project_dir, actor(x_session_token, x_actor_id), task_id,
+                           int(body.expected_version))
         except InvalidInput as e:
             raise HTTPException(409, str(e))
 
     @app.post("/api/corrections/{task_id}/submit", status_code=201)
-    def submit(task_id: str, body: dict, x_actor_type: str | None = Header(default=None),
+    def submit(task_id: str, body: SubmitBody,
+               x_session_token: str | None = Header(default=None),
                x_actor_id: str | None = Header(default=None)):
         """Orchestrator submits a replacement: child revision + evaluation + comparison packet."""
+        actor(x_session_token, x_actor_id)  # authenticated principal; lease checks land in R4
         from ..services import clips
         con = S.connect(project_dir)
         try:
@@ -221,10 +281,17 @@ def create_app(project_dir: str) -> FastAPI:
             raise HTTPException(404, "unknown correction task")
         finally:
             con.close()
-        slot_assets = {int(k): v for k, v in (body.get("slot_assets") or {}).items()}
-        recipe = body.get("recipe", "repair:bounded-patch")
-        new_id = body.get("new_revision_id") or f"{task.baseline_revision_id}-r1"
-        out = clips.register_candidate(project_dir, task.baseline_revision_id, new_id, slot_assets, recipe)
+        try:
+            slot_assets = {int(k): v for k, v in (body.slot_assets or {}).items()}
+        except ValueError:
+            raise HTTPException(422, "slot_assets keys must be integer slot ids")
+        recipe = body.recipe
+        new_id = body.new_revision_id or f"{task.baseline_revision_id}-r1"
+        try:
+            out = clips.register_candidate(project_dir, task.baseline_revision_id, new_id,
+                                           slot_assets, recipe)
+        except S.ConflictError as e:
+            raise HTTPException(409, str(e))
         ev_out = clips.evaluate(project_dir, new_id)
         from ..services import packets as P
         pkt = P.create_packet(project_dir, f"pkt-{new_id}", new_id,
@@ -236,7 +303,8 @@ def create_app(project_dir: str) -> FastAPI:
             t2 = D.CorrectionTask.model_validate_json(json.dumps(data))
             t2.status = D.CorrectionStatus.AWAITING_COMPARISON
             t2.attempt_ids = [*t2.attempt_ids, new_id]
-            S.update_mutable(con, "correction_tasks", t2, ver)
+            with S.atomic(con):
+                S.stage_update(con, "correction_tasks", t2, ver)
         finally:
             con.close()
         publish({"type": "comparison_ready", "task_id": task_id, "revision_id": new_id})
