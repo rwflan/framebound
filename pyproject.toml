@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "framebound"
+version = "0.1.0"
+description = "Consistency bounds for AI-generated 2D animation: shape, size, movement and appearance checks, model-facing repair tools, human review, and training-data export."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+framebound = "framebound.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["framebound*"]
+
+[tool.setuptools.package-data]
+framebound = ["knowledge.json"]
