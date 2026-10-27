@@ -54,6 +54,8 @@ def main(argv=None):
     dm.add_argument("--out", default="build/demo")
     dm.add_argument("--profile", default="v1", choices=["v1", "v2", "wp6"])
     dm.add_argument("--offline", action="store_true", default=False)
+    dm.add_argument("--replace", action="store_true", default=False,
+                    help="replace a previous framework-owned output (refuses unmarked dirs)")
     bm = sub.add_parser("benchmark", help="v2: run the procedural stress fixture and report timing")
     bm.add_argument("--fixture", default="stress-200", choices=["stress-200"])
     bm.add_argument("--report", help="Write the benchmark report JSON here")
@@ -86,6 +88,8 @@ def main(argv=None):
     ex.add_argument("--project", required=True); ex.add_argument("--snapshot", required=True)
     ex.add_argument("--out", required=True); ex.add_argument("--revisions", required=True)
     ex.add_argument("--policy", required=False, default=None)
+    ex.add_argument("--replace", action="store_true", default=False,
+                    help="replace a previous framework-owned snapshot output (refuses unmarked dirs)")
     dv = sub.add_parser("dataset-validate", help="v2: validate a snapshot with standard loaders")
     dv.add_argument("--snapshot", required=True)
     vf = sub.add_parser("verify", help="v2: verify stored revisions, blobs and evidence freshness")
@@ -109,7 +113,9 @@ def main(argv=None):
     if args.cmd == "export":
         import json as _json
         from .v2.exports import build_snapshot as _snap
-        pol = _json.loads(open(args.policy).read()) if args.policy else None
+        pol = _json.loads(open(args.policy).read()) if args.policy else {}
+        if args.replace:
+            pol["replace"] = True
         rep = _snap(args.project, args.snapshot, args.revisions.split(","), args.out, pol)
         _print({"snapshot": rep["snapshot"], "counts": rep["counts"],
                 "exclusions": rep["exclusions"]})
@@ -130,10 +136,12 @@ def main(argv=None):
     if args.cmd == "demo" and getattr(args, "profile", "v1") in ("v2", "wp6"):
         if getattr(args, "profile") == "wp6":
             from .v2.demo_wp6 import run_wp6 as _w6
-            _print(_w6(args.out))
+            # Demos are offline procedural replays; they never send provider
+            # traffic even when keys are configured (see --live spike in R3).
+            _print(_w6(args.out, replace=args.replace, offline=True))
             return 0
         from .v2.demo import run_demo
-        _print(run_demo(args.out))
+        _print(run_demo(args.out, replace=args.replace))
         return 0
     if args.cmd == "v2-mcp":
         import asyncio as _aio
@@ -209,16 +217,16 @@ def main(argv=None):
         from .mcp_server import serve_stdio
         serve_stdio(); return 0
     if args.cmd == "demo":
-        return _demo(args.out)
+        return _demo(args.out, replace=getattr(args, "replace", False))
     return 2
 
 
-def _demo(out_dir):
+def _demo(out_dir, replace=False):
     from .demo import build_demo, FAULTS
     from .audit import audit
     from .repair import plan, evaluate
     from .dataset import export_dataset
-    out, clean, faulty = build_demo(out_dir)
+    out, clean, faulty = build_demo(out_dir, replace=replace)
     contract = str(out / "contract.json")
     t0 = time.perf_counter()
     clean_report = audit(contract, frame_files=clean)

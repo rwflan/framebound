@@ -72,7 +72,9 @@ def build_snapshot(project_dir: str, snapshot_name: str, clip_revision_ids: list
     pol = {"rights_allow": ["original"], "split": {"train": [], "test": []},
            "split_policy": "exclude", "include_procedural_positives": False}
     pol.update(policy or {})
-    out = Path(out_dir)
+    from ..safe_output import prepare_output_dir
+    out = prepare_output_dir(out_dir, replace=bool(pol.get("replace", False)),
+                             tool="framebound-export-snapshot", refuse_inside=project_dir)
     (out / "hf" / "data").mkdir(parents=True, exist_ok=True)
     (out / "coco").mkdir(parents=True, exist_ok=True)
     con = S.connect(project_dir)
