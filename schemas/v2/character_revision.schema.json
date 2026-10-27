@@ -82,6 +82,12 @@
       "title": "Scale Ruler",
       "type": "string"
     },
+    "asymmetry": {
+      "default": "symmetric",
+      "description": "'symmetric', or a description of asymmetric costume/weapon layout; exact mirrors are prohibited as new drawings when asymmetric",
+      "title": "Asymmetry",
+      "type": "string"
+    },
     "reference_approval": {
       "anyOf": [
         {
