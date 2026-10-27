@@ -25,12 +25,13 @@ def critique_request(contract_summary: str, fault_codes: list[str], frame_refs: 
 
 
 def submit_critique(contract_summary: str, fault_codes: list[str], frame_refs: list[dict],
-                    project_dir: str) -> dict:
+                    project_dir: str, *, offline: bool = False) -> dict:
     from .base import _key
     from .ledger import record_artifact
     req = critique_request(contract_summary, fault_codes, frame_refs)
-    if not _key():
-        digest = record_artifact(project_dir, "spark_request", {"request": req, "sent": False})
+    if offline or not _key():
+        digest = record_artifact(project_dir, "spark_request",
+                                 {"request": req, "sent": False, "offline": offline})
         return {"mode": "not_configured", "sent": False, "request_artifact": digest,
                 "note": "Advisory only; deterministic checks remain the gate."}
     http = urllib.request.Request(BASE.rstrip("/") + "/responses", data=json.dumps(req).encode(),

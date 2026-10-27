@@ -1,37 +1,93 @@
 #!/bin/sh
-# Local P0 verification: offline core passes with clear failure exits.
-# Provider live tests are opt-in and visibly skipped without credentials.
-set -e
+# Local P0 verification (R0): offline core passes with reliable failure exits.
+# Each step captures a log and checks the real exit status; no `cmd | tail`
+# pipelines that would mask a runner failure with tail's status.
+# Usage: sh scripts/verify-local [--live]
+#   default: offline gates only; live provider spike is skipped honestly.
+#   --live:  fail unless a key is configured AND live calls actually ran
+#            (live spike runner lands in R3; until then --live fails loudly).
+set -u
 cd "$(dirname "$0")/.."
-echo "== v1 prototype =="
-python -m unittest discover -s tests 2>&1 | tail -2
-echo "== v2 suites =="
-python -m pytest tests/ -q 2>&1 | tail -2
-echo "== offline demos =="
-python -m framebound demo --profile v2 --offline --out /tmp/verify-v2 > /dev/null && echo "v2 demo OK"
-python -m framebound demo --profile wp6 --offline --out /tmp/verify-wp6 > /dev/null && echo "wp6 demo OK"
-echo "== storage/evidence =="
-python -m framebound verify --project /tmp/verify-wp6/project
-echo "== export round-trip =="
-python - << 'PYEOF'
-from framebound.v2.exports import build_snapshot, validate_snapshot
-import tempfile, json
+# Guard against self-recursion: the propagation tests below invoke this very
+# script, and this script runs the test suites that contain them. Nested
+# invocations skip the self-hosting tests and terminate.
+export FRAMEBOUND_VERIFY_ACTIVE=1
+
+LOGS="$(mktemp -d "${TMPDIR:-/tmp}/fb-verify-logs-XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/fb-verify-work-XXXXXX")"
+cleanup() { rm -rf "$LOGS" "$WORK"; }
+trap cleanup EXIT INT TERM
+
+step() {
+  name="$1"; shift
+  log="$LOGS/$name.log"
+  echo "== $name =="
+  "$@" >"$log" 2>&1
+  st=$?
+  tail -n 8 "$log"
+  if [ "$st" -ne 0 ]; then
+    echo "FAIL $name (exit $st; full log: $log; work kept at: $WORK)"
+    trap - EXIT INT TERM
+    echo "logs kept at $LOGS, work kept at $WORK for inspection"
+    exit "$st"
+  fi
+  echo "ok: $name"
+}
+
+LIVE=0
+if [ "${1:-}" = "--live" ]; then LIVE=1; fi
+
+step v1-unittest python -m unittest discover -s tests
+step v2-pytest python -m pytest tests/ -q
+
+# Offline neutrality: offline gates must not touch providers even when keys exist.
+# Remember real credentials for the --live check, then ensure *some* key value
+# is present so a code path that "helpfully" goes live when keys exist is caught.
+HAD_KEY=0
+if [ -n "${MODEL_API_KEY:-}" ] || [ -n "${META_API_KEY:-}" ]; then HAD_KEY=1; fi
+: "${MODEL_API_KEY:=verify-local-bogus-key}"
+: "${META_API_KEY:=verify-local-bogus-key}"
+export MODEL_API_KEY META_API_KEY
+step demo-v2-offline python -m framebound demo --profile v2 --offline --out "$WORK/verify-v2"
+step demo-wp6-offline python -m framebound demo --profile wp6 --offline --out "$WORK/verify-wp6"
+step verify-stored python -m framebound verify --project "$WORK/verify-wp6/project"
+
+step export-roundtrip python - "$WORK" << 'PYEOF'
+import json, sys
 from pathlib import Path
-from tests.test_v2_desk import DeskJourney
-t = tempfile.mkdtemp()
-DeskJourney()._build(t)
-out = str(Path(t) / "snap")
-man = build_snapshot(t, "verify", ["clip-bad-01"], out, {})
-moved = str(Path(t) / "moved")
-Path(out).rename(moved)
-rep = validate_snapshot(moved)
+from framebound.v2.devseed import build_minimal_project
+from framebound.v2.exports import build_snapshot, validate_snapshot
+work = Path(sys.argv[1])
+td = work / "devseed-proj"
+info = build_minimal_project(td)
+out = work / "snap"
+man = build_snapshot(str(td), "verify", ["clip-devseed-bad"], str(out), {})
+moved = work / "moved"
+out.rename(moved)
+rep = validate_snapshot(str(moved))
 assert rep["ok"], rep["issues"]
-print("snapshot OK:", rep["counts"])
+print("snapshot OK:", json.dumps(rep["counts"]))
 PYEOF
-echo "== providers (opt-in live; skipped honestly offline) =="
-if [ -z "$MODEL_API_KEY" ] && [ -z "$META_API_KEY" ]; then
-  echo "SKIP live provider spike: no MODEL_API_KEY (recorded, not a pass)"
+
+if [ -f web/package.json ] && command -v npm >/dev/null 2>&1; then
+  step web-typecheck npm --prefix web run typecheck
+  step web-build npm --prefix web run build
 else
-  echo "LIVE key present: run the redacted spike manually before claiming provider proof"
+  echo "SKIP web typecheck/build: npm or web/package.json unavailable (recorded, not a pass)"
 fi
+
+# Browser journey gate lands in R6; record its absence instead of passing silently.
+echo "SKIP browser/process-restart journey: not implemented until R6 (recorded, not a pass)"
+
+if [ "$LIVE" -eq 1 ]; then
+  if [ "$HAD_KEY" -eq 0 ]; then
+    echo "FAIL: --live requires a real MODEL_API_KEY/META_API_KEY (none configured)"
+    exit 2
+  fi
+  echo "FAIL: --live requested but the live provider spike runner is not implemented until R3 (no live calls ran)"
+  exit 3
+else
+  echo "SKIP live provider spike: offline mode (recorded, not a pass)"
+fi
+
 echo "ALL LOCAL CHECKS PASSED"

@@ -40,21 +40,24 @@ def build_request(brief: dict, reference_blobs: list[dict]) -> dict:
 
 
 def submit(brief: dict, reference_blobs: list[dict], project_dir: str,
-           idempotency_key: str) -> dict:
+           idempotency_key: str, *, offline: bool = False) -> dict:
     from .base import _key
     from .ledger import record_artifact
     req = build_request(brief, reference_blobs)
-    if not _key():
+    if offline or not _key():
         redacted = json.loads(json.dumps(req))
         for item in redacted.get("input", []):
             for part in item.get("content", []) if isinstance(item.get("content"), list) else []:
                 if isinstance(part, dict) and "image_b64" in part:
                     part["image_b64"] = "<bytes-redacted>"
         digest = record_artifact(project_dir, "image_request",
-                                 {"idempotency_key": idempotency_key, "request": redacted, "sent": False})
+                                 {"idempotency_key": idempotency_key, "request": redacted,
+                                  "sent": False, "offline": offline})
+        note = ("Offline mode: no request sent even though a key may be configured."
+                if offline else
+                "Set MODEL_API_KEY to send. No output fabricated; replay labels stay distinct from live.")
         return {"mode": "not_configured", "sent": False, "capability": "image-generation",
-                "request_artifact": digest,
-                "note": "Set MODEL_API_KEY to send. No output fabricated; replay labels stay distinct from live."}
+                "request_artifact": digest, "offline": offline, "note": note}
     payload = dict(req)
     http = urllib.request.Request(BASE.rstrip("/") + "/responses", data=json.dumps(payload).encode(),
                                   headers={"Authorization": f"Bearer {_key()}", "Content-Type": "application/json"})

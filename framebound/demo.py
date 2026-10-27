@@ -7,7 +7,6 @@ Run:  framebound demo --out build/demo
 """
 import json
 import math
-import shutil
 import time
 from pathlib import Path
 from .pngcodec import write_png, sha256_file
@@ -114,11 +113,10 @@ FAULTS = [
 ]
 
 
-def build_demo(out_dir):
-    out = Path(out_dir)
-    if out.exists():
-        shutil.rmtree(out)
-    (out / "frames").mkdir(parents=True)
+def build_demo(out_dir, *, replace: bool = False):
+    from framebound.v2.safe_output import prepare_output_dir
+    out = prepare_output_dir(out_dir, replace=replace, tool="framebound-demo-v1")
+    (out / "frames").mkdir(parents=True, exist_ok=True)
     phases = [i * math.pi / 4 for i in range(8)]
 
     def save(name, img):
