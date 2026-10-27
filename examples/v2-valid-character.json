@@ -1,0 +1,20 @@
+{
+  "schema_version": "2.0",
+  "id": "char-rev-01",
+  "project_id": "proj-demo",
+  "identity_asset_ids": [
+    "asset-identity"
+  ],
+  "style_asset_ids": [
+    "asset-style"
+  ],
+  "view_set": [
+    "side"
+  ],
+  "canvas": {
+    "width": 256,
+    "height": 256,
+    "units": "native_px"
+  },
+  "scale_ruler": "head_height_32px_at_native"
+}

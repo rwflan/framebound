@@ -1,0 +1,122 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "byte_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Byte Sha256",
+      "type": "string"
+    },
+    "pixel_sha256": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pixel Sha256"
+    },
+    "mime": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Mime",
+      "type": "string"
+    },
+    "width": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "maximum": 8192,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Width"
+    },
+    "height": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "maximum": 8192,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Height"
+    },
+    "color_policy": {
+      "default": "srgb_straight_alpha_rgba8",
+      "title": "Color Policy",
+      "type": "string"
+    },
+    "alpha_policy": {
+      "default": "straight",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Alpha Policy",
+      "type": "string"
+    },
+    "source_kind": {
+      "default": "original",
+      "enum": [
+        "original",
+        "procedural",
+        "generated",
+        "derived",
+        "imported"
+      ],
+      "title": "Source Kind",
+      "type": "string"
+    },
+    "lineage": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Lineage",
+      "type": "string"
+    },
+    "rights": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Rights",
+      "type": "string"
+    },
+    "eligible_roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Eligible Roles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "byte_sha256",
+    "mime",
+    "rights"
+  ],
+  "title": "Asset",
+  "type": "object"
+}

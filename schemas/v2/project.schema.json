@@ -1,0 +1,47 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "owner": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "creation_time": {
+      "title": "Creation Time",
+      "type": "string"
+    },
+    "rights_policy": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Rights Policy",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "owner",
+    "rights_policy"
+  ],
+  "title": "Project",
+  "type": "object"
+}

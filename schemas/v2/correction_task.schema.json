@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "CorrectionStatus": {
+      "enum": [
+        "open",
+        "claimed",
+        "attempting",
+        "awaiting_comparison",
+        "resolved",
+        "blocked",
+        "cancelled",
+        "reopened"
+      ],
+      "title": "CorrectionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "source_issue_event_id": {
+      "minLength": 1,
+      "title": "Source Issue Event Id",
+      "type": "string"
+    },
+    "baseline_revision_id": {
+      "minLength": 1,
+      "title": "Baseline Revision Id",
+      "type": "string"
+    },
+    "desired_outcome": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Desired Outcome",
+      "type": "string"
+    },
+    "scope": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Scope",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/CorrectionStatus",
+      "default": "open"
+    },
+    "claim_lease": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Claim Lease"
+    },
+    "attempt_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Attempt Ids",
+      "type": "array"
+    },
+    "resolution_event_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolution Event Id"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "source_issue_event_id",
+    "baseline_revision_id",
+    "desired_outcome",
+    "scope"
+  ],
+  "title": "CorrectionTask",
+  "type": "object"
+}
