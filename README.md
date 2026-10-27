@@ -2,10 +2,6 @@
 
 Consistency bounds for AI-generated 2D animation.
 
-## Greenfield implementation plan
-
-The [greenfield implementation plan](docs/GREENFIELD_IMPLEMENTATION_PLAN.md) is the implementation handoff for Muse Spark 1.3. It defines the replacement architecture, staged delivery, review workflow, training-data contracts, and acceptance gates. The package and documentation below describe the initial prototype; planned replacement features are not yet implemented.
-
 Image models produce a good style frame. They do not reliably hold a character's shape, size, movement, or appearance across dozens of frames of a specific action. Framebound gives the orchestrating model a frozen contract and deterministic tools to check its own work, repair only what failed, and send the rest to a human — with every result exported as training data so the model needs this less over time.
 
 Built for the Meta Global AI Developer Hackathon (Indie track, Build for Your World). See [docs/HACKATHON.md](docs/HACKATHON.md).

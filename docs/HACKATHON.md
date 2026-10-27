@@ -1,7 +1,5 @@
 # Hackathon positioning
 
-> Historical prototype positioning. Use the [greenfield implementation plan](GREENFIELD_IMPLEMENTATION_PLAN.md) for the current proposal and verified-source boundaries. The scoring weights, performance claims, and live integration claims below were not established by the planning audit and must be verified before being used in a submission.
-
 Event: Meta Global AI Developer Hackathon (Meta × Cerebral Valley), virtual, 26 Oct – 4 Nov 2026. Submissions due 4 Nov, 9:00 PM ET. Judging 4–8 Nov; finals 9 Nov.
 
 ## Entry
