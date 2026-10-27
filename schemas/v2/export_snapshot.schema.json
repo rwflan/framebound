@@ -1,0 +1,57 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "clip_revision_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Clip Revision Ids",
+      "type": "array"
+    },
+    "policy": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Policy",
+      "type": "string"
+    },
+    "dependency_lock_id": {
+      "minLength": 1,
+      "title": "Dependency Lock Id",
+      "type": "string"
+    },
+    "byte_manifest": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "minProperties": 1,
+      "title": "Byte Manifest",
+      "type": "object"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "clip_revision_ids",
+    "policy",
+    "dependency_lock_id",
+    "byte_manifest"
+  ],
+  "title": "ExportSnapshot",
+  "type": "object"
+}

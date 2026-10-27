@@ -1,0 +1,110 @@
+{
+  "schema_version": "2.0",
+  "id": "contract-run-01",
+  "character_revision_id": "char-rev-01",
+  "action": {
+    "name": "run",
+    "view": "side",
+    "facing": "toward",
+    "loop": true
+  },
+  "canvas": {
+    "width": 256,
+    "height": 256,
+    "units": "native_px"
+  },
+  "timing": {
+    "ticks_per_second": 60,
+    "holds": [
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4
+    ]
+  },
+  "root_policy": {
+    "mode": "in_place",
+    "ground_y": 236
+  },
+  "references": {
+    "identity": "asset-identity",
+    "style": "asset-style",
+    "motion_guide_revision": "motion-guide-01"
+  },
+  "phase_schedule": [
+    {
+      "slot": 0,
+      "phase": "A_contact",
+      "motion_reference_id": "pose-A-contact"
+    },
+    {
+      "slot": 1,
+      "phase": "A_compression",
+      "motion_reference_id": "pose-A-compression"
+    },
+    {
+      "slot": 2,
+      "phase": "A_passing",
+      "motion_reference_id": "pose-A-passing"
+    },
+    {
+      "slot": 3,
+      "phase": "A_flight",
+      "motion_reference_id": "pose-A-flight"
+    },
+    {
+      "slot": 4,
+      "phase": "B_contact",
+      "motion_reference_id": "pose-B-contact"
+    },
+    {
+      "slot": 5,
+      "phase": "B_compression",
+      "motion_reference_id": "pose-B-compression"
+    },
+    {
+      "slot": 6,
+      "phase": "B_passing",
+      "motion_reference_id": "pose-B-passing"
+    },
+    {
+      "slot": 7,
+      "phase": "B_flight",
+      "motion_reference_id": "pose-B-flight"
+    }
+  ],
+  "constraints": [
+    {
+      "id": "registration",
+      "check": "native_registration",
+      "required": true
+    },
+    {
+      "id": "support",
+      "check": "declared_contacts",
+      "required": true,
+      "annotation_revision_id": "contacts-01",
+      "max_error_px": 1.0
+    },
+    {
+      "id": "local_body",
+      "check": "visible_span",
+      "required": false,
+      "annotation_revision_id": "features-01",
+      "reference_revision_id": "span-bounds-01"
+    }
+  ],
+  "allowed_transforms": {
+    "per_pose_scale": false,
+    "rigid_translation_budget_px": 2
+  },
+  "transition_contract_ids": [
+    "idle-run-01",
+    "run-idle-01",
+    "run-attack-01"
+  ]
+}

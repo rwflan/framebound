@@ -1,0 +1,102 @@
+{
+  "$defs": {
+    "JobStatus": {
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "needs_attention"
+      ],
+      "title": "JobStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Kind",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/JobStatus",
+      "default": "queued"
+    },
+    "idempotency_key": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "payload_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Payload Sha256",
+      "type": "string"
+    },
+    "lease_holder": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lease Holder"
+    },
+    "lease_expires": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lease Expires"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "idempotency_key",
+    "payload_sha256"
+  ],
+  "title": "Job",
+  "type": "object"
+}

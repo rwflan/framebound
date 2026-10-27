@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "Canvas": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 2048,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 2048,
+          "title": "Height",
+          "type": "integer"
+        },
+        "units": {
+          "const": "native_px",
+          "default": "native_px",
+          "title": "Units",
+          "type": "string"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "Canvas",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "project_id": {
+      "minLength": 1,
+      "title": "Project Id",
+      "type": "string"
+    },
+    "identity_asset_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Identity Asset Ids",
+      "type": "array"
+    },
+    "style_asset_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Style Asset Ids",
+      "type": "array"
+    },
+    "view_set": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "View Set",
+      "type": "array"
+    },
+    "canvas": {
+      "$ref": "#/$defs/Canvas"
+    },
+    "scale_ruler": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Scale Ruler",
+      "type": "string"
+    },
+    "reference_approval": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Approval"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "identity_asset_ids",
+    "style_asset_ids",
+    "view_set",
+    "canvas",
+    "scale_ruler"
+  ],
+  "title": "CharacterRevision",
+  "type": "object"
+}

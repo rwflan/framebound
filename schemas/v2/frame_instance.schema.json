@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "clip_revision_id": {
+      "minLength": 1,
+      "title": "Clip Revision Id",
+      "type": "string"
+    },
+    "slot": {
+      "minimum": 0,
+      "title": "Slot",
+      "type": "integer"
+    },
+    "asset_id": {
+      "minLength": 1,
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "phase": {
+      "minLength": 1,
+      "title": "Phase",
+      "type": "string"
+    },
+    "hold_ticks": {
+      "exclusiveMinimum": 0,
+      "title": "Hold Ticks",
+      "type": "integer"
+    },
+    "registration_id": {
+      "minLength": 1,
+      "title": "Registration Id",
+      "type": "string"
+    },
+    "source_drawing_id": {
+      "minLength": 1,
+      "title": "Source Drawing Id",
+      "type": "string"
+    },
+    "derivation_recipe": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Derivation Recipe",
+      "type": "string"
+    },
+    "part_mask_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Part Mask Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "clip_revision_id",
+    "slot",
+    "asset_id",
+    "phase",
+    "hold_ticks",
+    "registration_id",
+    "source_drawing_id",
+    "derivation_recipe"
+  ],
+  "title": "FrameInstance",
+  "type": "object"
+}

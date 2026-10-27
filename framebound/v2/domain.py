@@ -1,0 +1,401 @@
+"""v2 domain models: explicit authority boundaries, separate states, frozen contracts.
+
+Pydantic v2 strict models. Schema version "2.0" throughout. A contract revision is
+immutable once stored: changes create a new revision with supersedes + reason.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+SCHEMA_VERSION = "2.0"
+
+
+def utcnow() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class TechnicalStatus(str, Enum):
+    PASS = "pass"
+    FAIL = "fail"
+    INCOMPLETE = "incomplete"
+    ERROR = "error"
+
+
+class CoverageStatus(str, Enum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    UNSUPPORTED = "unsupported"
+
+
+class HumanAcceptance(str, Enum):
+    UNREVIEWED = "unreviewed"
+    NEEDS_CHANGES = "needs_changes"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class PublicationStatus(str, Enum):
+    DRAFT = "draft"
+    CANDIDATE = "candidate"
+    RELEASED = "released"
+
+
+class JobStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    NEEDS_ATTENTION = "needs_attention"
+
+
+class CheckOutcome(str, Enum):
+    PASS = "pass"
+    FAIL = "fail"
+    UNMEASURED = "unmeasured"
+    NOT_APPLICABLE = "not_applicable"
+    ERROR = "error"
+
+
+class CorrectionStatus(str, Enum):
+    OPEN = "open"
+    CLAIMED = "claimed"
+    ATTEMPTING = "attempting"
+    AWAITING_COMPARISON = "awaiting_comparison"
+    RESOLVED = "resolved"
+    BLOCKED = "blocked"
+    CANCELLED = "cancelled"
+    REOPENED = "reopened"
+
+
+class Strict(BaseModel):
+    model_config = {"extra": "forbid", "str_strip_whitespace": True}
+
+
+class Canvas(Strict):
+    width: int = Field(gt=0, le=2048)
+    height: int = Field(gt=0, le=2048)
+    units: Literal["native_px"] = "native_px"
+
+
+class Timing(Strict):
+    ticks_per_second: int = Field(default=60, gt=0, le=240)
+    holds: list[int] = Field(min_length=1, max_length=512)
+
+    @field_validator("holds")
+    @classmethod
+    def _positive_holds(cls, v: list[int]) -> list[int]:
+        if any(not isinstance(h, int) or h <= 0 for h in v):
+            raise ValueError("holds must be positive integers (half-open tick intervals)")
+        return v
+
+    def total_ticks(self) -> int:
+        return sum(self.holds)
+
+    def slot_at_tick(self, tick: int, loop: bool) -> int:
+        """Half-open interval selection: slot i covers [sum(holds[:i]), sum(holds[:i+1]))."""
+        total = self.total_ticks()
+        if total <= 0:
+            raise ValueError("empty timing")
+        t = tick % total if loop else min(tick, total - 1)
+        acc = 0
+        for i, h in enumerate(self.holds):
+            if acc <= t < acc + h:
+                return i
+            acc += h
+        raise AssertionError("unreachable tick mapping")
+
+
+class ActionIntent(Strict):
+    name: str = Field(min_length=1, max_length=64)
+    view: str = Field(min_length=1, max_length=32)
+    facing: Literal["left", "right"] = "right"
+    loop: bool = True
+
+
+class RootPolicy(Strict):
+    mode: Literal["in_place", "world_grounded"] = "in_place"
+    ground_y: float | None = None
+
+
+class PhaseEntry(Strict):
+    slot: int = Field(ge=0)
+    phase: str = Field(min_length=1, max_length=64)
+    motion_reference_id: str = Field(min_length=1)
+
+
+class ConstraintSpec(Strict):
+    id: str = Field(min_length=1, max_length=64)
+    check: str = Field(min_length=1, max_length=64)
+    required: bool = True
+    annotation_revision_id: str | None = None
+    reference_revision_id: str | None = None
+    max_error_px: float | None = Field(default=None, ge=0)
+
+
+class AllowedTransforms(Strict):
+    per_pose_scale: bool = False
+    rigid_translation_budget_px: float = Field(default=2.0, ge=0)
+
+
+class Project(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=200)
+    owner: str = Field(min_length=1, max_length=200)
+    creation_time: str = Field(default_factory=utcnow)
+    rights_policy: str = Field(min_length=1, max_length=200)
+
+
+class Asset(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    byte_sha256: str = Field(min_length=64, max_length=64)
+    pixel_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    mime: str = Field(min_length=1, max_length=128)
+    width: int | None = Field(default=None, gt=0, le=8192)
+    height: int | None = Field(default=None, gt=0, le=8192)
+    color_policy: str = "srgb_straight_alpha_rgba8"
+    alpha_policy: str = Field(default="straight", min_length=1, max_length=64)
+    source_kind: Literal["original", "procedural", "generated", "derived", "imported"] = "original"
+    lineage: str = Field(default="", max_length=500)
+    rights: str = Field(min_length=1, max_length=200)
+    eligible_roles: list[str] = Field(default_factory=list)
+
+
+class CharacterRevision(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    project_id: str = Field(min_length=1)
+    identity_asset_ids: list[str] = Field(min_length=1)
+    style_asset_ids: list[str] = Field(min_length=1)
+    view_set: list[str] = Field(min_length=1)
+    canvas: Canvas
+    scale_ruler: str = Field(min_length=1, max_length=500)
+    reference_approval: dict[str, Any] | None = None  # explicit human approval event ref when set
+
+    @field_validator("identity_asset_ids", "style_asset_ids")
+    @classmethod
+    def _distinct_roles(cls, v: list[str]) -> list[str]:
+        if len(set(v)) != len(v):
+            raise ValueError("duplicate asset in role list")
+        return v
+
+
+class ClipContractRevision(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    character_revision_id: str = Field(min_length=1)
+    action: ActionIntent
+    canvas: Canvas
+    timing: Timing
+    root_policy: RootPolicy = Field(default_factory=RootPolicy)
+    references: dict[str, str] = Field(min_length=1)
+    phase_schedule: list[PhaseEntry] = Field(min_length=1)
+    constraints: list[ConstraintSpec] = Field(default_factory=list)
+    allowed_transforms: AllowedTransforms = Field(default_factory=AllowedTransforms)
+    transition_contract_ids: list[str] = Field(default_factory=list)
+    supersedes: str | None = None
+    change_reason: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def _schedule_covers_holds(self) -> "ClipContractRevision":
+        slots = sorted(e.slot for e in self.phase_schedule)
+        if len(set(slots)) != len(slots):
+            raise ValueError("duplicate slot in phase_schedule")
+        if slots != list(range(len(self.timing.holds))):
+            raise ValueError(
+                f"phase_schedule slots {slots} must cover exactly holds range 0..{len(self.timing.holds) - 1}"
+            )
+        cids = [c.id for c in self.constraints]
+        if len(set(cids)) != len(cids):
+            raise ValueError("duplicate constraint id")
+        return self
+
+
+class FrameInstance(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    clip_revision_id: str = Field(min_length=1)
+    slot: int = Field(ge=0)
+    asset_id: str = Field(min_length=1)
+    phase: str = Field(min_length=1)
+    hold_ticks: int = Field(gt=0)
+    registration_id: str = Field(min_length=1)
+    source_drawing_id: str = Field(min_length=1)
+    derivation_recipe: str = Field(min_length=1, max_length=500)
+    part_mask_ids: list[str] = Field(default_factory=list)
+
+
+class ClipRevision(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    contract_revision_id: str = Field(min_length=1)
+    frame_instance_ids: list[str] = Field(min_length=1)
+    parent_revision_id: str | None = None
+    origin_run_id: str | None = None
+    created_at: str = Field(default_factory=utcnow)
+
+    @field_validator("frame_instance_ids")
+    @classmethod
+    def _unique_frames(cls, v: list[str]) -> list[str]:
+        if len(set(v)) != len(v):
+            raise ValueError("duplicate frame instance in clip revision")
+        return v
+
+
+class AnnotationRevision(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    source_asset_id: str = Field(min_length=1)
+    source_pixel_sha256: str = Field(min_length=64, max_length=64)
+    view: str = Field(min_length=1)
+    coordinate_space: Literal["native_px"] = "native_px"
+    visibility: Literal["visible", "occluded", "ambiguous"] = "visible"
+    annotator_type: Literal["human_reviewed", "model_proposed", "imported"] = "model_proposed"
+    reviewer: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    supersedes: str | None = None
+
+
+class CheckResult(Strict):
+    constraint_id: str = Field(min_length=1)
+    scope: str = Field(min_length=1, max_length=200)
+    outcome: CheckOutcome
+    observed_value: float | str | None = None
+    units: str | None = None
+    expected_interval: list[float] | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
+    reason: str = Field(min_length=1, max_length=2000)
+
+    @model_validator(mode="after")
+    def _unmeasured_needs_reason(self) -> "CheckResult":
+        if self.outcome in (CheckOutcome.UNMEASURED, CheckOutcome.NOT_APPLICABLE, CheckOutcome.ERROR):
+            if not self.reason or len(self.reason.strip()) < 8:
+                raise ValueError(f"{self.outcome} results need an explicit reason + applicability rule")
+        return self
+
+
+class Evaluation(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    clip_revision_id: str = Field(min_length=1)
+    evidence_manifest_sha256: str = Field(min_length=64, max_length=64)
+    analyzer_version: str = Field(min_length=1)
+    dependency_lock_id: str = Field(min_length=1)
+    results: list[CheckResult] = Field(min_length=1)
+    technical_status: TechnicalStatus
+    coverage_status: CoverageStatus
+    created_at: str = Field(default_factory=utcnow)
+
+
+class Attempt(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    baseline_revision_id: str = Field(min_length=1)
+    brief_id: str = Field(min_length=1)
+    provider: str = Field(min_length=1, max_length=64)
+    request_sha256: str = Field(min_length=64, max_length=64)
+    response_ref: str | None = None
+    candidate_asset_ids: list[str] = Field(default_factory=list)
+    cost: str = Field(default="unknown", max_length=200)
+    repair_mask_id: str | None = None
+    targeted_issue_ids: list[str] = Field(default_factory=list)
+    result: str = Field(min_length=1, max_length=64)
+    no_progress_signature: str | None = None
+
+
+class ReviewPacket(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    clip_revision_id: str = Field(min_length=1)
+    evaluation_id: str = Field(min_length=1)
+    intent: str = Field(min_length=1, max_length=500)
+    comparison_revision_id: str | None = None
+    issue_ids: list[str] = Field(default_factory=list)
+    unresolved_coverage: list[str] = Field(default_factory=list)
+    created_at: str = Field(default_factory=utcnow)
+
+
+class Roi(Strict):
+    left: int = Field(ge=0)
+    top: int = Field(ge=0)
+    right: int = Field(ge=0)
+    bottom: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _nonempty(self) -> "Roi":
+        if not (self.right > self.left and self.bottom > self.top):
+            raise ValueError("ROI must be a non-empty pixel-edge rect [left, top, right, bottom)")
+        return self
+
+
+class ReviewEvent(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    actor_type: Literal["reviewer", "orchestrator", "system"] = "reviewer"
+    actor_id: str = Field(min_length=1, max_length=200)
+    action: Literal["approve_reference", "approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue"] = "mark_issue"
+    packet_id: str | None = None
+    clip_revision_id: str = Field(min_length=1)
+    frame_instance_id: str | None = None
+    frame_range: list[int] | None = None
+    roi: Roi | None = None
+    note: str = Field(default="", max_length=2000)
+    supersedes: str | None = None
+    created_at: str = Field(default_factory=utcnow)
+
+
+class CorrectionTask(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    source_issue_event_id: str = Field(min_length=1)
+    baseline_revision_id: str = Field(min_length=1)
+    desired_outcome: str = Field(min_length=1, max_length=1000)
+    scope: str = Field(min_length=1, max_length=500)
+    status: CorrectionStatus = CorrectionStatus.OPEN
+    claim_lease: str | None = None
+    attempt_ids: list[str] = Field(default_factory=list)
+    resolution_event_id: str | None = None
+    created_at: str = Field(default_factory=utcnow)
+
+
+class Job(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    kind: str = Field(min_length=1, max_length=64)
+    status: JobStatus = JobStatus.QUEUED
+    idempotency_key: str = Field(min_length=1, max_length=256)
+    payload_sha256: str = Field(min_length=64, max_length=64)
+    lease_holder: str | None = None
+    lease_expires: str | None = None
+    error: str | None = Field(default=None, max_length=2000)
+    created_at: str = Field(default_factory=utcnow)
+
+
+class ExportSnapshot(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    clip_revision_ids: list[str] = Field(min_length=1)
+    policy: str = Field(min_length=1, max_length=500)
+    dependency_lock_id: str = Field(min_length=1)
+    byte_manifest: dict[str, str] = Field(min_length=1)
+    created_at: str = Field(default_factory=utcnow)
+
+
+class ResultEnvelope(Strict):
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    ok: bool = True
+    operation_id: str = Field(min_length=1)
+    revision_id: str | None = None
+    technical_status: TechnicalStatus | None = None
+    human_acceptance: HumanAcceptance = HumanAcceptance.UNREVIEWED
+    coverage: dict[str, int] | None = None
+    issues: list[dict[str, Any]] = Field(default_factory=list)
+    artifacts: list[dict[str, Any]] = Field(default_factory=list)
+    next_actions: list[str] = Field(default_factory=list)
+    cursor: str | None = None

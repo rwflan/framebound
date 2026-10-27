@@ -1,0 +1,166 @@
+{
+  "$defs": {
+    "Roi": {
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "minimum": 0,
+          "title": "Left",
+          "type": "integer"
+        },
+        "top": {
+          "minimum": 0,
+          "title": "Top",
+          "type": "integer"
+        },
+        "right": {
+          "minimum": 0,
+          "title": "Right",
+          "type": "integer"
+        },
+        "bottom": {
+          "minimum": 0,
+          "title": "Bottom",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "left",
+        "top",
+        "right",
+        "bottom"
+      ],
+      "title": "Roi",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "actor_type": {
+      "default": "reviewer",
+      "enum": [
+        "reviewer",
+        "orchestrator",
+        "system"
+      ],
+      "title": "Actor Type",
+      "type": "string"
+    },
+    "actor_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "action": {
+      "default": "mark_issue",
+      "enum": [
+        "approve_reference",
+        "approve",
+        "reject",
+        "needs_changes",
+        "mark_issue",
+        "resolve_issue",
+        "reopen_issue"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "packet_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Packet Id"
+    },
+    "clip_revision_id": {
+      "minLength": 1,
+      "title": "Clip Revision Id",
+      "type": "string"
+    },
+    "frame_instance_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Frame Instance Id"
+    },
+    "frame_range": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Frame Range"
+    },
+    "roi": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Roi"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "note": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Note",
+      "type": "string"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "actor_id",
+    "clip_revision_id"
+  ],
+  "title": "ReviewEvent",
+  "type": "object"
+}

@@ -1,0 +1,105 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "source_asset_id": {
+      "minLength": 1,
+      "title": "Source Asset Id",
+      "type": "string"
+    },
+    "source_pixel_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Source Pixel Sha256",
+      "type": "string"
+    },
+    "view": {
+      "minLength": 1,
+      "title": "View",
+      "type": "string"
+    },
+    "coordinate_space": {
+      "const": "native_px",
+      "default": "native_px",
+      "title": "Coordinate Space",
+      "type": "string"
+    },
+    "visibility": {
+      "default": "visible",
+      "enum": [
+        "visible",
+        "occluded",
+        "ambiguous"
+      ],
+      "title": "Visibility",
+      "type": "string"
+    },
+    "annotator_type": {
+      "default": "model_proposed",
+      "enum": [
+        "human_reviewed",
+        "model_proposed",
+        "imported"
+      ],
+      "title": "Annotator Type",
+      "type": "string"
+    },
+    "reviewer": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewer"
+    },
+    "confidence": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Confidence"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes"
+    }
+  },
+  "required": [
+    "id",
+    "source_asset_id",
+    "source_pixel_sha256",
+    "view"
+  ],
+  "title": "AnnotationRevision",
+  "type": "object"
+}

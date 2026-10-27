@@ -52,7 +52,37 @@ def main(argv=None):
 
     sub.add_parser("mcp", help="Serve the same tools over MCP (stdio)")
 
+    sub.add_parser("doctor", help="v2: check runtime, dependencies and project layout")
+    mv = sub.add_parser("migrate-v1", help="v2: report v1 importability (dry run only)")
+    mv.add_argument("--source", required=True)
+    mv.add_argument("--dry-run", action="store_true", default=True)
+    mv.add_argument("--report", help="Write the migration report JSON here")
+    vf = sub.add_parser("verify", help="v2: verify stored revisions, blobs and evidence freshness")
+    vf.add_argument("--project", required=True)
+    vf.add_argument("--report", help="Write the verification report JSON here")
+
     args = p.parse_args(argv)
+    if args.cmd == "doctor":
+        from .v2.doctor import run_doctor
+        _print(run_doctor())
+        return 0
+    if args.cmd == "migrate-v1":
+        import json as _json
+        from .v2.migration import dry_run as _dry
+        rep = _dry(args.source)
+        if args.report:
+            Path(args.report).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.report).write_text(_json.dumps(rep, indent=2) + "\n")
+        _print(rep)
+        return 0
+    if args.cmd == "verify":
+        from .v2.verify import run_verify
+        rep = run_verify(args.project)
+        if args.report:
+            Path(args.report).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.report).write_text(json.dumps(rep, indent=2) + "\n")
+        _print({"ok": rep["ok"], "issues": rep["issues"]})
+        return 0 if rep["ok"] else 1
     from .audit import audit, preflight
     if args.cmd == "check":
         anchors = None
