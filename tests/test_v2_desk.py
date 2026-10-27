@@ -33,14 +33,14 @@ class DeskJourney(unittest.TestCase):
         src = Path(td) / "src"
         meta = F.build_cycle(src)
         for i, rel in enumerate(meta["clean"]):
-            assets.import_asset(td, str(src / rel), f"f-clean-{i}")
-        assets.import_asset(td, str(src / meta["clean"][0]), "a-id")
-        assets.import_asset(td, str(src / meta["clean"][1]), "a-st")
+            assets.import_asset(td, str(src / rel), f"f-clean-{i}", source_kind="procedural")
+        assets.import_asset(td, str(src / meta["clean"][0]), "a-id", source_kind="procedural")
+        assets.import_asset(td, str(src / meta["clean"][1]), "a-st", source_kind="procedural")
         contracts.propose_contract(td, _contract())
         aids = [f"f-clean-{i}" for i in range(8)]
         clips.create_revision(td, "contract-desk-01", "clip-bad-01", aids, [f"p{i}" for i in range(8)])
         # introduce one faulty slot via a second revision
-        assets.import_asset(td, str(src / meta["faults"]["phase"]), "f-wrong")
+        assets.import_asset(td, str(src / meta["faults"]["phase"]), "f-wrong", source_kind="procedural")
         faulty = [f"f-clean-{i}" for i in range(8)]
         faulty[3] = "f-wrong"
         clips.create_revision(td, "contract-desk-01", "clip-bad-02", faulty, [f"p{i}" for i in range(8)])
