@@ -5,6 +5,75 @@ Baseline: `b680d84` (audited main, 2026-10-27). `main` has not advanced since th
 Prior ledger entries below are historical. The earlier "64 passing tests" and "engineering complete except
 for entrant actions" claims are NOT accepted as proof; each remediation package re-proves its gate.
 
+## Current package: R2 — fail-closed evaluation and reproducible evidence (done on branch `codex/r2-failclosed-evidence`, 2026-10-27)
+
+Acceptance gate: every F03/F04/F05 probe fails-or-blocks; distinct reference pixels change evidence;
+tampered blobs invalidate verify; F17 measurement fixes; CLI/MCP/service parity. All demonstrated.
+
+### Changed capability
+
+- `checks/params.py` (new): typed param schemas for all 14 canonical checks; unknown check codes rejected
+  at `contract-propose` time (CLI + service); windows bounds-checked against the contract canvas; registry
+  codes unified with evaluator dispatch (`silhouette_area`, `appearance_palette`, ... — the `_drift`
+  suffixed registry names that no contract used are gone).
+- `checks/evaluate.py` (rewritten): explicit expected matrix (required check x applicable scope) built
+  before measuring; status computed against the matrix; registration/decodability + structural sequence
+  integrity are mandatory prerequisites (a truncated/padded sequence raises, never passes); missing inputs
+  emit UNMEASURED with named gaps; missing dispatch items synthesize analyzer ERROR; only
+  contract-declared exemptions (flight slots, occluded slots, loop flag) yield NOT_APPLICABLE.
+  Single dispatch keyed exactly on registry codes.
+- Evidence closure: manifest binds candidate pixel+byte hashes, per-slot reference pixel hashes (+ byte
+  hashes when the service resolves stored assets), character/contract content, annotation hashes,
+  registration records, timeline/trace, analyzer code digest, check config, schema versions, dependency-lock
+  digest. Different reference pixels always change the evidence ID at identical slot keys.
+- `services/clips.evaluate`: resolves the full stored context (frames + held timing, motion-guide
+  references from the stored R1 approval, character, annotations, registrations, presented holds);
+  no more unconditional empty reference map. Re-evaluation of the same context returns the stored record
+  (no more duplicate-ID ConflictError); changed context mints a superseding record. Manifest stored as a
+  self-consistent blob under its own hash. Presented holds detect retimed clips via locked_cadence.
+- `services/clips.create/register`: identity `Registration` records per frame; typed `TransformSpec`
+  is the only transform authority (budget/asymmetry checked; legacy mirror/per-pose-fit strings denied,
+  symmetric-character mirrors still allowed as recorded transforms). Registration table added + frozen.
+- `domain`: `AnnotationRevision` requires real geometry (points and/or mask asset) with proposal/review
+  provenance; `Registration` + `TransformSpec`/`TransformOp` models; `Evaluation.supersedes`.
+- `verify.py`: nonexistent project path is an error without materializing anything; blob rehash,
+  canonical-pixel rehash, relationship/sequence checks, manifest presence + reference-byte freshness,
+  non-human approval flagging.
+- `media/canonical.py`: dimension guard before raster decode, EXIF transpose.
+- F17 fixes: cumulative stance-anchor drift (100x1-unit slide fails tol 2; replant resets); optional
+  `support_color` pinning for contacts; loop-seam pulse (last→first) for looped clips; adjacent phases no
+  longer excluded by default; occlusion reasons generic + contract-note; multi-blob features UNMEASURED.
+- Fixture repair (recorded authority, measurement unchanged): idle compass was fragmented into two blobs
+  by arm/scarf overdraw in `demo_character.py`; the declared chest feature now renders after those strokes.
+  The strict detector caught a real fixture flaw; the fix is to the art, not to any bound.
+
+### Failing repros fixed (reproduced before fixing)
+
+- Required `world_sliding` without trace → was pass with zero results; now UNMEASURED/INCOMPLETE naming
+  the missing trace (pinned). Invented check code → now rejected at proposal on every transport (pinned).
+- One-frame revision against an eight-frame contract → evaluator and service both refuse (pinned).
+- Clean vs opaque reference pixels at identical slots → was pass/fail under one evidence ID; now distinct
+  manifest hashes + distinct verdicts (pinned). Re-evaluation → stable record, single row (pinned).
+- Corrupted blob / deleted manifest / missing project → verify flags; ghost path creates nothing (pinned).
+- 99-unit cumulative slide with 1-unit steps → FAIL; adjacent-phase exclusion removed; seam pulse present;
+  ambiguous compass blobs → UNMEASURED instead of averaged (pinned, incl. the live idle fixture).
+
+### Actual commands/results (2026-10-27, Dublin; python 3.11.4, node v22.23.4)
+
+- `python -m pytest tests/ -q` → `100 passed` (88 prior + 12 new R2).
+- `sh scripts/verify-local` → `ALL LOCAL CHECKS PASSED`, exit 0.
+- Demo: run/jump/attack/idle all pass under the strict measurement (idle via genuine whole compass art).
+
+### Artifacts / limitations / next
+
+- Limitations (carried forward): provider wire format + durable jobs (R3); repair lease/scope gating (R4 —
+  `repair_protection` with context is implemented but no transport supplies masks yet); export semantics
+  incl. COCO geometry (R5); desk media experience (R6); demo relabel + transition traces (R7); benchmark of
+  the public service (R8). `world_positions`/`planted` have no stored trace yet — R7 records presented
+  traces; until then required sliding without a bound trace stays honestly UNMEASURED. Annotation
+  consumption by checks (support evidence, protection masks) lands with R4/R6, not here.
+- Next: R3 — documented provider wire encoding, real output parsing, durable controller/jobs.
+
 ## Current package: R1 — real authority and transaction layer (done on branch `codex/r1-authority-transactions`, 2026-10-27)
 
 Acceptance gate: session-backed reviewers, stored approval authority, relationship validation, atomic

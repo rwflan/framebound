@@ -27,14 +27,14 @@ register(CheckSpec(code="native_registration", applicability="every frame; requi
     required_inputs="asset pixels, frozen canvas", method="dimensions + nonempty alpha + frozen transform match",
     units="native_px", limits="blank/malformed fail closed", severity="error",
     blind_spots="cannot certify anatomy, only frame fit"))
-register(CheckSpec(code="silhouette_area_drift", applicability="same-view, same-phase reference pairs",
+register(CheckSpec(code="silhouette_area", applicability="same-view, same-phase reference pairs",
     required_inputs="candidate + independent phase reference mask", method="area fraction vs reference",
     units="fraction", limits="profile bounds; cape/weapon motion can legitimately change bounds",
     blind_spots="whole-frame area cannot prove limb volume"))
-register(CheckSpec(code="silhouette_width_drift", applicability="same-view, same-phase",
+register(CheckSpec(code="silhouette_width", applicability="same-view, same-phase",
     required_inputs="candidate + reference", method="width fraction vs reference", units="fraction",
     limits="profile bounds", blind_spots="foreshortening needs compatible-pose profile, never standing frontal"))
-register(CheckSpec(code="silhouette_height_drift", applicability="same-view, same-phase",
+register(CheckSpec(code="silhouette_height", applicability="same-view, same-phase",
     required_inputs="candidate + reference", method="height fraction vs reference", units="fraction",
     limits="profile bounds", blind_spots="equal height can hide width/mass change"))
 register(CheckSpec(code="phase_correspondence", applicability="run/cycle phases with independent guides",
@@ -57,7 +57,7 @@ register(CheckSpec(code="visible_span", applicability="declared visible feature 
 register(CheckSpec(code="local_pulse", applicability="adjacent frames",
     required_inputs="adjacent spans", method="frame-to-frame span delta", units="native_px",
     limits="profile bound", blind_spots="smear frames and declared squash/stretch need exemptions"))
-register(CheckSpec(code="appearance_palette_drift", applicability="masked part-level preferred; global fallback",
+register(CheckSpec(code="appearance_palette", applicability="masked part-level preferred; global fallback",
     required_inputs="candidate + same-phase reference", method="quantized histogram distance", units="fraction",
     limits="profile bound", blind_spots="global histogram misses swapped colors and identity drift; part masks can fail"))
 register(CheckSpec(code="locked_cadence", applicability="every clip",
@@ -131,7 +131,9 @@ def check_phase(cid: str, scope: str, px: bytes, w: int, h: int, region: list[in
 
 
 def check_contacts(cid: str, scope: str, px: bytes, w: int, h: int, window: list[int],
-                   min_visible: int, flight: bool = False) -> D.CheckResult:
+                   min_visible: int, flight: bool = False,
+                   support_color: tuple[int, int, int] | None = None,
+                   color_tol: int = 40) -> D.CheckResult:
     if flight:
         return _res(cid, scope, D.CheckOutcome.NOT_APPLICABLE, "flight phase has no planted-foot requirement",
                     units="pixels")
@@ -139,26 +141,45 @@ def check_contacts(cid: str, scope: str, px: bytes, w: int, h: int, window: list
     n = 0
     for y in range(max(0, t), min(h, b)):
         for x in range(max(0, l), min(w, r)):
-            if px[(y * w + x) * 4 + 3] >= 128:
+            i = (y * w + x) * 4
+            if px[i + 3] < 128:
+                continue
+            if support_color is None or (abs(px[i] - support_color[0]) <= color_tol
+                                         and abs(px[i + 1] - support_color[1]) <= color_tol
+                                         and abs(px[i + 2] - support_color[2]) <= color_tol):
                 n += 1
+    method = "declared support color" if support_color is not None else "coarse alpha proxy"
     if n < min_visible:
         return _res(cid, scope, D.CheckOutcome.FAIL,
-                    f"planted phase shows {n} support pixels in window, need {min_visible}",
+                    f"planted phase shows {n} support pixels in window ({method}), need {min_visible}",
                     observed_value=n, units="pixels", expected_interval=[min_visible, w * h])
-    return _res(cid, scope, D.CheckOutcome.PASS, f"support present ({n} px in declared window)",
+    return _res(cid, scope, D.CheckOutcome.PASS, f"support present ({n} px in declared window, {method})",
                 observed_value=n, units="pixels")
 
 
 def check_world_sliding(cid: str, scope: str, world_positions: list[tuple[float, float]],
                         planted: list[bool], tol: float) -> D.CheckResult:
-    worst = 0.0
-    for i in range(1, len(world_positions)):
-        if planted[i] and planted[i - 1]:
-            d = math.dist(world_positions[i], world_positions[i - 1])
-            worst = max(worst, d)
+    """Cumulative stance drift: displacement from each continuous stance's anchor.
+
+    Adjacent-step deltas alone miss slow slides (1 unit/tick x 100 ticks = 99 units
+    of drift, 1 unit of step). The anchor resets only when contact breaks, so a
+    replanted foot starts a new stance instead of inheriting old drift.
+    """
+    worst, worst_at = 0.0, -1
+    anchor = None
+    for i, (pos, on) in enumerate(zip(world_positions, planted)):
+        if not on:
+            anchor = None
+            continue
+        if anchor is None:
+            anchor = pos
+        d = math.dist(pos, anchor)
+        if d > worst:
+            worst, worst_at = d, i
     if worst > tol:
         return _res(cid, scope, D.CheckOutcome.FAIL,
-                    f"planted support slides {worst:.2f} world units across held ticks (tol {tol})",
+                    f"planted support drifts {worst:.2f} world units from its stance anchor "
+                    f"(tick {worst_at}, tol {tol})",
                     observed_value=worst, units="world_units", expected_interval=[0, tol])
     return _res(cid, scope, D.CheckOutcome.PASS, f"planted support holds within {tol} world units",
                 observed_value=worst, units="world_units")
@@ -167,12 +188,15 @@ def check_world_sliding(cid: str, scope: str, world_positions: list[tuple[float,
 def check_span(cid: str, scope: str, px: bytes, w: int, h: int, color_a: tuple[int, int, int],
                color_b: tuple[int, int, int], window_a: list[int], window_b: list[int],
                expected: float, max_delta: float) -> D.CheckResult:
-    ca = centroid(feature_points(px, w, h, color_a, window_a))
-    cb = centroid(feature_points(px, w, h, color_b, window_b))
-    if ca is None or cb is None:
+    from .raster import feature_components
+    comps_a = feature_components(px, w, h, color_a, window_a)
+    comps_b = feature_components(px, w, h, color_b, window_b)
+    if len(comps_a) != 1 or len(comps_b) != 1:
         return _res(cid, scope, D.CheckOutcome.UNMEASURED,
-                    "required declared feature missing or ambiguous; needs reviewed annotation, blocks required gate",
+                    f"declared feature ambiguous ({len(comps_a)} vs {len(comps_b)} distinct blobs); "
+                    "averaging decoys would invent a phantom center: needs reviewed annotation, blocks required gate",
                     units="native_px")
+    ca, cb = centroid(comps_a[0]), centroid(comps_b[0])
     span = math.dist(ca, cb)
     if abs(span - expected) > max_delta:
         return _res(cid, scope, D.CheckOutcome.FAIL,

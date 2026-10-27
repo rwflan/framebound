@@ -93,8 +93,6 @@ def render(pose: tuple, facing: str = "right") -> Image.Image:
     # satchel on LEFT hip (asymmetry) + brass buckle
     d.rectangle([hip[0] - 12, hip[1] - 6, hip[0] - 4, hip[1] + 2], fill=SATCHEL)
     d.rectangle([hip[0] - 10, hip[1] - 3, hip[0] - 6, hip[1] + 1], fill=BRASS)
-    # compass at chest (visible feature)
-    d.ellipse([neck[0] - 2, neck[1] + 2, neck[0] + 2, neck[1] + 6], fill=BRASS)
     # arms: courier's tagging arm swings wide
     hand = (hip[0] + arm, neck[1] + 10)
     elbow = (hip[0] + arm * 0.5, neck[1] + 5)
@@ -104,6 +102,10 @@ def render(pose: tuple, facing: str = "right") -> Image.Image:
     sx = neck[0] - 4
     d.line([(sx, neck[1]), (sx - 8 - scarf, neck[1] - 2 - scarf * 0.4)], fill=SCARF, width=3)
     d.line([(sx - 8 - scarf, neck[1] - 2 - scarf * 0.4), (sx - 12 - scarf, neck[1] + 2)], fill=SCARF, width=2)
+    # compass at chest (visible feature): drawn last so arm/scarf strokes cannot
+    # fragment the declared feature into ambiguous blobs (R2 fixture repair;
+    # the span measurement itself is unchanged and still rejects ambiguity)
+    d.ellipse([neck[0] - 2, neck[1] + 2, neck[0] + 2, neck[1] + 6], fill=BRASS)
     if facing == "left":
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
     return img

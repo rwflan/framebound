@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS reviewer_pairings(code_sha TEXT PRIMARY KEY, data TEX
 CREATE TABLE IF NOT EXISTS reviewer_sessions(token_sha TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS motion_guides(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS reference_approvals(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS registrations(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 """
 
 # Evidence-bearing entities are append-only: corrections arrive as superseding
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS reference_approvals(id TEXT PRIMARY KEY, data TEXT NO
 # mutable, and only through expected-version transitions.
 FROZEN_TABLES = {"assets", "character_revisions", "contract_revisions", "clip_revisions",
                  "frame_instances", "annotation_revisions", "evaluations", "attempts",
-                 "review_packets", "review_events", "export_snapshots"}
+                 "review_packets", "review_events", "export_snapshots", "registrations"}
 
 
 def connect(project_dir: str | Path) -> sqlite3.Connection:
@@ -117,6 +118,7 @@ def _table_for(model: D.Strict) -> str:
         "ReviewEvent": "review_events", "CorrectionTask": "correction_tasks",
         "Job": "jobs", "ExportSnapshot": "export_snapshots",
         "MotionGuide": "motion_guides", "ReferenceApproval": "reference_approvals",
+        "Registration": "registrations",
     }
     return mapping[type(model).__name__]
 
