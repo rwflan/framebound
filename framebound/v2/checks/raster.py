@@ -96,3 +96,41 @@ def centroid(pts: list[tuple[float, float]]) -> tuple[float, float] | None:
     if not pts:
         return None
     return (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
+
+
+def feature_components(px: bytes, w: int, h: int, color: tuple[int, int, int],
+                       window: list[int], tol: int = 40,
+                       min_pixels: int = 1) -> list[list[tuple[float, float]]]:
+    """Connected components (8-connectivity) of color-matching pixels in a window.
+
+    Averaging all matching pixels hides ambiguity: two distinct blobs (a real
+    feature plus a same-colored decoy) would silently average to a phantom
+    center. Callers must treat >=2 significant components as ambiguous.
+    """
+    l, t, r, b = window
+    l, t, r, b = max(0, l), max(0, t), min(w, r), min(h, b)
+    hits: set[tuple[int, int]] = set()
+    for y in range(t, b):
+        for x in range(l, r):
+            i = (y * w + x) * 4
+            if px[i + 3] < 128:
+                continue
+            if abs(px[i] - color[0]) <= tol and abs(px[i + 1] - color[1]) <= tol \
+                    and abs(px[i + 2] - color[2]) <= tol:
+                hits.add((x, y))
+    components = []
+    while hits:
+        seed = hits.pop()
+        stack, comp = [seed], [seed]
+        while stack:
+            x, y = stack.pop()
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    n = (x + dx, y + dy)
+                    if n in hits:
+                        hits.discard(n)
+                        stack.append(n)
+                        comp.append(n)
+        if len(comp) >= min_pixels:
+            components.append([(x + 0.5, y + 0.5) for x, y in comp])
+    return components

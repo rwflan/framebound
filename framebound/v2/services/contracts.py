@@ -10,6 +10,8 @@ def propose_contract(project_dir: str, contract_dict: dict) -> D.ResultEnvelope:
         contract = D.ClipContractRevision.model_validate(contract_dict)
     except Exception as e:
         raise InvalidInput(f"contract invalid: {e}") from e
+    from ..checks import params as _params
+    _params.validate_contract_constraints(contract, contract.canvas.width, contract.canvas.height)
     con = S.connect(project_dir)
     try:
         # authority check: referenced assets must exist
