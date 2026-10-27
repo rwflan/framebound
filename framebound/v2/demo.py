@@ -93,12 +93,16 @@ def run_benchmark() -> dict:
         a[60:200, 60:200] = 255
         noise = (rng.random((256, 256)) * 20).astype(np.uint8)
         frames.append((a, noise))
-    t0 = time.perf_counter()
-    for a, noise in frames:
-        px = np.dstack([np.full((256, 256, 3), 120, dtype=np.uint8), (a > 128).astype(np.uint8) * 255]).tobytes()
-        m = alpha_mask(px, 256, 256)
-        silhouette(m, 256, 256)
-    dt = time.perf_counter() - t0
+    def one_pass():
+        t0 = time.perf_counter()
+        for a, noise in frames:
+            px = np.dstack([np.full((256, 256, 3), 120, dtype=np.uint8), (a > 128).astype(np.uint8) * 255]).tobytes()
+            m = alpha_mask(px, 256, 256)
+            silhouette(m, 256, 256)
+        return time.perf_counter() - t0
+    cold, warm = one_pass(), one_pass()
     return {"fixture": "stress-200", "frames": 200, "canvas": [256, 256],
-            "seconds_total": round(dt, 3), "ms_per_frame": round(dt / 200 * 1000, 3),
-            "note": "core raster only, excludes providers and video encoding; cold/warm split in WP6 harness"}
+            "cold_seconds": round(cold, 3), "warm_seconds": round(warm, 3),
+            "cold_ms_per_frame": round(cold / 200 * 1000, 3),
+            "warm_ms_per_frame": round(warm / 200 * 1000, 3),
+            "note": "core raster only, excludes providers and video encoding; this dev machine"}
