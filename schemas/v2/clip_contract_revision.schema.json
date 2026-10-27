@@ -140,6 +140,11 @@
           ],
           "default": null,
           "title": "Max Error Px"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
         }
       },
       "required": [
