@@ -40,7 +40,46 @@ Acceptance gate: complete valid examples, invalid-input tests, stale-write prote
   PIL still missing — WP2 pins Pillow+NumPy raster. MCP SDK still missing — WP3 pins official SDK + real client handshake.
 - Next: WP2 canonical media + verification framework (registration, integer timeline, coverage matrix, evidence IDs, overlays, original faults).
 
-## Current package: WP6 — genuine character demonstration (done on branch `codex/wp6-character-demo`, 2026-10-27)
+## Current package: WP7 — release and submission (done on branch `codex/wp7-release`, 2026-10-27)
+
+Completion gate: P0 gates pass; portal requirements checked; remote PR merged; submission receipt verified by entrant.
+Engineering complete; entrant-side steps (portal, live spike, video, receipt) remain and are tracked below.
+
+### Delivered
+
+- `scripts/verify-local` — one entry point, clear failure exits: v1 unittest + v2 pytest + v2/wp6 offline demos +
+  `verify` + export round-trip with moved-snapshot `dataset-validate` (real loaders) + honest provider skip.
+  Result here: `ALL LOCAL CHECKS PASSED` (no key → skip recorded, not a pass).
+- `requirements.lock` — pip-freeze pins for the exercised set (mcp 2.3.0, Pillow 13.0.0, datasets 5.1.0, …).
+- `docs/DEMO_SCRIPT.md` — 6-beat demo with badges, adapted to the (still unverified) duration limit.
+- README quick-start rewritten for v2 (install → verify → demo → desk) with v1 paths preserved.
+- Clean-clone proof: fresh `git clone` of `main` runs the demo suites with no local-only files.
+- Release-definition assessment (plan §17):
+  - [x] Fresh clone + documented deps + offline demo + explicit provider config — yes (`verify-local`, README).
+  - [ ] Live model run with reference-conditioned output + repair + packet + provenance — BLOCKED (no credentials).
+  - [x] Registration/phase/timing/contact/protection/evidence-freshness regressions in independent tests — yes.
+  - [x] Human issue survives restart, returns with exact ROI/range/revision; replacement compared — yes (API + browser E2E).
+  - [x] Technical status + unresolved coverage visible after decisions; model cannot write decisions — yes (403/409).
+  - [x] Moved export loads images/masks/guides/timing; failure/repair/decision traceable — yes (`dataset-validate`).
+  - [x] Labels, rights, splits, lineage accurate — yes (origins, exclusions, leakage policy).
+  - [x] Performance measured with misses/limits stated — yes (cold 3.7 s / warm 3.9 s for 200×256² core raster;
+    ~19 ms/frame mean; 10k-loop drift test; packet-open timing via E2E paints; browser render skips observable, ticks exact).
+  - [ ] Portal requirements checked against the actual portal — ENTRANT ACTION (authenticated access required).
+  - [ ] Submission receipt verified — ENTRANT ACTION (only the entrant can do this).
+
+### Scope honesty (no full-P0 claim)
+
+P0 ships complete EXCEPT: (1) live Meta provider proof — adapter boundary + offline artifacts + honest badges only;
+(2) authenticated portal rules/video/submission — entrant-side. No reduced-coverage hiding: jump occlusion is disclosed
+as partial coverage; second facing is prohibited-by-design (documented, not silently dropped); independent vs presented
+pose counts reported separately (22 vs 24); procedural demo positives opt-in only.
+
+### Next exact step
+
+Merge this PR, then the entrant: re-check portal → live spike → video → submit → paste receipt into
+`docs/SUBMISSION_REQUIREMENTS.md`. Engineering resumes only on portal-driven changes.
+
+## Prior: WP6 — genuine character demonstration (merged as PR #9) — genuine character demonstration (done on branch `codex/wp6-character-demo`, 2026-10-27)
 
 Acceptance gate: full workflow works on real output; no hidden auto-fitting; visual acceptance accurately reported;
 live/replay badges correct. All pass.

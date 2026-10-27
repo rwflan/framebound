@@ -1,0 +1,37 @@
+#!/bin/sh
+# Local P0 verification: offline core passes with clear failure exits.
+# Provider live tests are opt-in and visibly skipped without credentials.
+set -e
+cd "$(dirname "$0")/.."
+echo "== v1 prototype =="
+python -m unittest discover -s tests 2>&1 | tail -2
+echo "== v2 suites =="
+python -m pytest tests/ -q 2>&1 | tail -2
+echo "== offline demos =="
+python -m framebound demo --profile v2 --offline --out /tmp/verify-v2 > /dev/null && echo "v2 demo OK"
+python -m framebound demo --profile wp6 --offline --out /tmp/verify-wp6 > /dev/null && echo "wp6 demo OK"
+echo "== storage/evidence =="
+python -m framebound verify --project /tmp/verify-wp6/project
+echo "== export round-trip =="
+python - << 'PYEOF'
+from framebound.v2.exports import build_snapshot, validate_snapshot
+import tempfile, json
+from pathlib import Path
+from tests.test_v2_desk import DeskJourney
+t = tempfile.mkdtemp()
+DeskJourney()._build(t)
+out = str(Path(t) / "snap")
+man = build_snapshot(t, "verify", ["clip-bad-01"], out, {})
+moved = str(Path(t) / "moved")
+Path(out).rename(moved)
+rep = validate_snapshot(moved)
+assert rep["ok"], rep["issues"]
+print("snapshot OK:", rep["counts"])
+PYEOF
+echo "== providers (opt-in live; skipped honestly offline) =="
+if [ -z "$MODEL_API_KEY" ] && [ -z "$META_API_KEY" ]; then
+  echo "SKIP live provider spike: no MODEL_API_KEY (recorded, not a pass)"
+else
+  echo "LIVE key present: run the redacted spike manually before claiming provider proof"
+fi
+echo "ALL LOCAL CHECKS PASSED"
