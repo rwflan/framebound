@@ -49,6 +49,11 @@ def main(argv=None):
 
     dm = sub.add_parser("demo", help="Build and verify the procedural demo project end to end")
     dm.add_argument("--out", default="build/demo")
+    dm.add_argument("--profile", default="v1", choices=["v1", "v2"])
+    dm.add_argument("--offline", action="store_true", default=False)
+    bm = sub.add_parser("benchmark", help="v2: run the procedural stress fixture and report timing")
+    bm.add_argument("--fixture", default="stress-200", choices=["stress-200"])
+    bm.add_argument("--report", help="Write the benchmark report JSON here")
 
     sub.add_parser("mcp", help="Serve the same tools over MCP (stdio)")
 
@@ -83,6 +88,18 @@ def main(argv=None):
             Path(args.report).write_text(json.dumps(rep, indent=2) + "\n")
         _print({"ok": rep["ok"], "issues": rep["issues"]})
         return 0 if rep["ok"] else 1
+    if args.cmd == "demo" and getattr(args, "profile", "v1") == "v2":
+        from .v2.demo import run_demo
+        _print(run_demo(args.out))
+        return 0
+    if args.cmd == "benchmark":
+        from .v2.demo import run_benchmark
+        rep = run_benchmark()
+        if args.report:
+            Path(args.report).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.report).write_text(json.dumps(rep, indent=2) + "\n")
+        _print(rep)
+        return 0
     from .audit import audit, preflight
     if args.cmd == "check":
         anchors = None

@@ -135,6 +135,7 @@ class ConstraintSpec(Strict):
     annotation_revision_id: str | None = None
     reference_revision_id: str | None = None
     max_error_px: float | None = Field(default=None, ge=0)
+    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class AllowedTransforms(Strict):

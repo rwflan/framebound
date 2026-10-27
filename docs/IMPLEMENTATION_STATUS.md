@@ -40,6 +40,46 @@ Acceptance gate: complete valid examples, invalid-input tests, stale-write prote
   PIL still missing — WP2 pins Pillow+NumPy raster. MCP SDK still missing — WP3 pins official SDK + real client handshake.
 - Next: WP2 canonical media + verification framework (registration, integer timeline, coverage matrix, evidence IDs, overlays, original faults).
 
+## Current package: WP2 — canonical media and verification (done on branch `codex/wp2-media-checks`, 2026-10-27)
+
+Acceptance gate: clean and negative fixtures behave correctly; per-tick sliding and loop/one-shot cases tested; stale evidence rejected. All pass.
+
+### Delivered
+
+- `framebound/v2/media/` — canonical import (sRGB straight-alpha RGBA8, transparent-RGB normalized once at import, byte+pixel hashes,
+  bomb/malformed/traversal guards), frozen registration (uniform family scale, integer translation default, recorded recipe, no per-pose fit),
+  integer timeline (`select_slot` half-open intervals, `render_trace`, 10k-loop drift test), diagnostic overlays (review derivatives only).
+- `framebound/v2/checks/` — registry with declared applicability/inputs/units/limits/blind-spots; raster primitives (alpha, silhouette,
+  occupancy descriptor + signed horizontal-asymmetry term, quantized palette, feature points); 14 registered checks:
+  native_registration, silhouette area/width/height, phase_correspondence (adjacent-slot exclusion: smooth motion is not ambiguity),
+  declared_contacts, world_sliding (per-tick planted drift; catches held-drawing slide that static windows miss),
+  visible_span, local_pulse, appearance_palette, locked_cadence, loop_seam (seam-vs-own-steps ratio, never identical-pose demand),
+  repair_protection (exact RGBA outside support + protected regions), provenance_coverage.
+- `framebound/v2/checks/evaluate.py` — evidence manifest (contract, char revision, input hashes, refs, recipes, timeline, analyzer `v2-checks-1`,
+  dep lock, settings, schemas; no timestamps) → `evidence_manifest_sha256`; fail/incomplete/error/pass + complete/partial/unsupported.
+- `framebound/v2/checks/fixtures.py` — independent Pillow procedural runner (8 genuinely distinct poses: 2x-frequency bob + offset arm pump),
+  faults: torso pulse, wrong phase, blank, resized canvas, clipped toe, palette recolor, missing feature. Labeled test-only, never accepted art.
+- Calibration honesty (no loosened bounds): asymmetry term + adjacency exclusion + seam ratio came from diagnosing genuine aliasing;
+  palette `max_drift` 0.06 frozen between clean 0.0 and full-shirt recolor 0.109; palette fault fixture re-phased to isolate color.
+- CLI: `demo --profile v2 --offline`, `benchmark --fixture stress-200`. v1 commands untouched.
+- `tests/test_v2_verify.py` (14 tests): clean pass/complete; pulse caught while height constant; wrong phase; blank→error; resized→registration fail;
+  missing feature→unmeasured + never pass; empty refs→incomplete + coverage gap; static-pass/world-slide-fail pair; hold boundaries + 10k loops;
+  one-shot seam N/A; mirror double-flip + ROI remap; protection in/outside support; stale evidence hash change; repair no-regression.
+
+### Actual commands/results (2026-10-27, Dublin; `python` 3.11.4, Pillow 13.0.0)
+
+- `python -m pytest tests/ -q` → `38 passed` (13 v1 + 11 WP1 + 14 WP2).
+- `python -m framebound demo --profile v2 --offline --out /tmp/fb-v2-demo` → clean `pass`/complete, faulty `fail`
+  (`look`, `phase`, `torso_span`), repair selected, ~16 ms/frame at 64x64 core raster (not a P0 claim).
+- `python -m framebound benchmark` → 200 frames at 256x256 in ~4.1 s (~20.7 ms/frame core raster, excludes providers/video).
+
+### Artifacts / limitations / next
+
+- Artifacts: fixtures generated under `/tmp` (outside repo); `framebound/v2/media`, `checks`, `demo` in-repo.
+- Limitations: references keyed in-memory (no asset-ID resolution yet — WP3 services); no annotation/mask revisions wired (alpha only, SAM pending);
+  no persisted evaluation store writes from CLI; dependency lock-in is `dev-no-lock` until WP3 pins.
+- Next: WP3 tools, providers, bounded loop (services, MCP SDK handshake, reference-conditioned image adapter, SAM decode, 3-attempt repair policy).
+
 ## Prior: WP0 — baseline and integration spike (merged to `main` as PR #3) — baseline and integration spike (in progress, branch `codex/wp0-baseline-spike`)
 
 Acceptance gate: existing tests recorded; actual available endpoints/outputs established or explicit access blocker documented; no fabricated live claim.
