@@ -45,12 +45,23 @@ def import_asset(project_dir: str | Path, src: str | Path, *, asset_id: str,
         raise ValueError("malformed media: empty file")
     try:
         img = Image.open(src)
-        img.load()
     except Exception as e:
         raise ValueError(f"malformed media: cannot decode {src}: {e}") from e
+    # dimension guard BEFORE allocating the full raster (decompression-bomb defense)
     w, h = img.size
     if w <= 0 or h <= 0 or w > MAX_DIM or h > MAX_DIM or w * h > MAX_PIXELS:
         raise ValueError(f"media dimensions rejected: {w}x{h}")
+    try:
+        from PIL import ImageOps as _ImageOps
+        img = _ImageOps.exif_transpose(img)
+        w, h = img.size
+        if w > MAX_DIM or h > MAX_DIM or w * h > MAX_PIXELS:
+            raise ValueError(f"media dimensions rejected after orientation: {w}x{h}")
+        img.load()
+    except ValueError:
+        raise
+    except Exception as e:
+        raise ValueError(f"malformed media: cannot decode {src}: {e}") from e
     if img.format not in (None, "PNG"):
         # P0 accepts PNG originals; other formats must convert explicitly upstream
         pass

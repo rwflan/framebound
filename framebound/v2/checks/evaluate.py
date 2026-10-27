@@ -1,9 +1,20 @@
-"""Clip evaluation: run the contract's required checks, build the evidence manifest.
+"""Clip evaluation: explicit expected-result matrix, fail-closed status, evidence closure.
 
-Evidence ID hashes: canonical contract JSON, character revision, every input byte+pixel
-hash, mask/annotation revisions, registration recipes, timeline/trace, analyzer version,
-dependency lock id, settings, schema versions. No timestamps in the hashed manifest.
-Cache keys use the same dependencies. A changed input invalidates dependents (verify).
+For every contract, the evaluator builds the full expected matrix (required
+check x applicable scope) BEFORE measuring. Status is computed against that
+matrix, not against whatever happened to execute:
+- unknown check codes are rejected at contract validation (see params.py);
+- a required check with missing inputs emits UNMEASURED with a reason;
+- a missing result for an expected item is itself an analyzer ERROR;
+- only contract-declared exemptions (flight slots, occluded slots, loop flag)
+  may yield NOT_APPLICABLE.
+
+Evidence binds the actual pixels: candidate pixel+byte hashes, reference pixel
+hashes per slot (+ byte hashes when the service resolves stored assets), the
+character/contract content, annotation hashes, registration, timeline/trace,
+analyzer code identity, check configuration, schema versions and the
+dependency-lock digest. Different reference pixels always change the evidence
+ID even when slot numbers are unchanged.
 """
 from __future__ import annotations
 
@@ -15,177 +26,361 @@ from PIL import Image
 
 from .. import domain as D
 from ..media.canonical import canonical_pixels
+from ..services.errors import InvalidInput
 from . import implementations as C
-from .raster import alpha_mask, centroid, feature_points, silhouette
+from .raster import alpha_mask
 
-ANALYZER_VERSION = "v2-checks-1"
+ANALYZER_VERSION = "v2-checks-2"
 PROFILE = C.PROFILE
 
 
-def _bytes_of(img: Image.Image) -> bytes:
-    return canonical_pixels(img)
+def _code_sha256() -> str:
+    h = hashlib.sha256()
+    for name in ("implementations.py", "evaluate.py", "raster.py", "registry.py", "params.py"):
+        h.update((Path(__file__).parent / name).read_bytes())
+    return h.hexdigest()
 
 
-def _manifest_sha256(manifest: dict) -> str:
-    return hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+def _lock_digest() -> str | None:
+    for parent in Path(__file__).resolve().parents:
+        lock = parent / "requirements.lock"
+        if lock.is_file():
+            return hashlib.sha256(lock.read_bytes()).hexdigest()
+    return None
+
+
+PER_FRAME_CHECKS = {"native_registration", "silhouette_area", "silhouette_width",
+                    "silhouette_height", "visible_span", "phase_correspondence",
+                    "declared_contacts", "appearance_palette"}
+
+
+def _matrix(contract: D.ClipContractRevision) -> list[tuple[str, str, str]]:
+    """Expected (constraint_id, check, scope) items in stable order."""
+    n = len(contract.timing.holds)
+    items: list[tuple[str, str, str]] = []
+    reg_ids = [c.id for c in contract.constraints if c.check == "native_registration"]
+    reg_cid = reg_ids[0] if reg_ids else "registration"
+    for slot in range(n):
+        items.append((reg_cid, "native_registration", f"slot {slot}"))
+    for c in contract.constraints:
+        if c.check in PER_FRAME_CHECKS and c.check != "native_registration":
+            for slot in range(n):
+                items.append((c.id, c.check, f"slot {slot}"))
+        elif c.check in PER_FRAME_CHECKS:
+            for slot in range(n):
+                if (c.id, f"slot {slot}") not in [(i, s) for i, _, s in items]:
+                    items.append((c.id, c.check, f"slot {slot}"))
+    for c in contract.constraints:
+        if c.check == "local_pulse":
+            for s in range(1, n):
+                items.append((c.id, c.check, f"slots {s - 1}->{s}"))
+            if contract.action.loop and n >= 2:
+                items.append((c.id, c.check, f"slots {n - 1}->0 seam"))
+        elif c.check == "world_sliding":
+            items.append((c.id, c.check, "planted support across ticks"))
+        elif c.check == "locked_cadence":
+            items.append((c.id, c.check, "clip"))
+        elif c.check == "loop_seam":
+            items.append((c.id, c.check, "loop seam"))
+        elif c.check == "repair_protection":
+            items.append((c.id, c.check, "repaired slots"))
+        elif c.check == "provenance_coverage":
+            items.append((c.id, c.check, "authority inventory"))
+    return items
+
+
+class _Ctx:
+    def __init__(self, contract, frames_px, refs_px, world_positions, planted, context):
+        self.contract = contract
+        self.frames_px = frames_px
+        self.refs_px = refs_px
+        self.world_positions = world_positions
+        self.planted = planted
+        self.context = context or {}
+        self.by_check = {c.id: c for c in contract.constraints}
+        self.n = len(frames_px)
+        self.W, self.H = contract.canvas.width, contract.canvas.height
+        self.P = C.PROFILE_DEFAULTS
+        self.spans: list[float | None] = [None] * self.n
+        self.gaps: list[str] = []
+
+    def tol(self, cid, key, default):
+        c = self.by_check.get(cid)
+        if c is not None and isinstance(c.params, dict) and key in c.params:
+            v = c.params[key]
+            if isinstance(v, bool):
+                raise InvalidInput(f"constraint {cid}: param {key} must be a number, not a boolean")
+            return float(v)
+        return default
+
+
+def _frame_ok(ctx: _Ctx, slot: int) -> D.CheckResult | None:
+    """Registration prerequisite: invalid media blocks dependent measurements as ERROR."""
+    img_px = ctx.frames_px[slot]
+    w, h = ctx.sizes[slot]
+    reg_c = ctx.by_check.get("registration")
+    cid = reg_c.id if reg_c else "registration"
+    r = C.check_registration(cid, f"slot {slot}", img_px, w, h, (ctx.W, ctx.H))
+    if (w, h) != (ctx.W, ctx.H) or r.outcome != D.CheckOutcome.PASS:
+        return r
+    return None
+
+
+def _h_frame(ctx: _Ctx, cid: str, check: str, scope: str) -> D.CheckResult:
+    slot = int(scope.split()[1])
+    if check == "native_registration":
+        px = ctx.frames_px[slot]
+        w, h = ctx.sizes[slot]
+        return C.check_registration(cid, scope, px, w, h, (ctx.W, ctx.H))
+    blocked = _frame_ok(ctx, slot)
+    if blocked is not None:
+        return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.ERROR,
+            reason=f"blocked: registration prerequisite failed ({blocked.reason})")
+    px = ctx.frames_px[slot]
+    w, h = ctx.sizes[slot]
+    ref = ctx.refs_px.get(slot)
+    c = ctx.by_check[cid]
+    p = c.params or {}
+    if check in ("silhouette_area", "silhouette_width", "silhouette_height"):
+        if ref is None:
+            ctx.gaps.append(f"{cid}: slot {slot} has no independent same-phase reference")
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
+                reason="no independent same-phase reference bound; measurement blocked", units="fraction")
+        dim = {"silhouette_area": "area", "silhouette_width": "width",
+               "silhouette_height": "height"}[check]
+        key = {"silhouette_area": "max_area_fraction", "silhouette_width": "max_width_fraction",
+               "silhouette_height": "max_height_fraction"}[check]
+        return C.check_silhouette(cid, scope, px, w, h, ref,
+            ctx.tol(cid, "max_fraction", ctx.P[key]), dim)
+    if check == "visible_span":
+        if slot in set(p.get("occluded_slots", [])):
+            note = p.get("occlusion_note") or "declared occlusion in contract"
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.NOT_APPLICABLE,
+                reason=f"{note}: shape unmeasured for this slot, needs human visual decision",
+                units="native_px")
+        r = C.check_span(cid, scope, px, w, h, tuple(p.get("color_a", (255, 200, 40))),
+                         tuple(p.get("color_b", (255, 200, 40))),
+                         p.get("window_a", [20, 18, 44, 34]), p.get("window_b", [20, 34, 44, 48]),
+                         float(p.get("expected", 14.0)),
+                         ctx.tol(cid, "max_delta", ctx.P["max_feature_span_delta"]))
+        if r.outcome == D.CheckOutcome.PASS and isinstance(r.observed_value, (int, float)):
+            ctx.spans[slot] = float(r.observed_value)
+        return r
+    if check == "phase_correspondence":
+        n = ctx.n
+        near = set(p.get("adjacent_slots", []))
+        alts = [ctx.refs_px[a] for a in p.get("alt_slots", [])
+                if a in ctx.refs_px and a != slot and min((a - slot) % n, (slot - a) % n) not in near]
+        if ref is None or not alts:
+            ctx.gaps.append(f"{cid}: slot {slot} lacks expected + alternative independent guides")
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
+                reason="phase check needs expected + alternative independent guides; "
+                       "ambiguous silhouettes stay unmeasured", units="descriptor")
+        return C.check_phase(cid, scope, px, w, h, p.get("region", [8, 8, 56, 60]),
+            p.get("grid", [6, 6]), ref, alts,
+            ctx.tol(cid, "max_expected_excess", ctx.P["max_expected_excess"]),
+            ctx.tol(cid, "min_phase_ratio", ctx.P["min_phase_ratio"]))
+    if check == "declared_contacts":
+        flight_slots = set(p.get("flight_slots", []))
+        is_flight = bool(p.get("flight", False)) or slot in flight_slots
+        if is_flight:
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.NOT_APPLICABLE,
+                reason="contract-declared flight slot: no planted-foot requirement", units="pixels")
+        color = p.get("support_color")
+        kw = {"support_color": tuple(color)} if color else {}
+        return C.check_contacts(cid, scope, px, w, h, p.get("window", [8, 50, 56, 62]),
+            int(p.get("min_visible", 20)), flight=False, **kw)
+    if check == "appearance_palette":
+        if ref is None:
+            ctx.gaps.append(f"{cid}: slot {slot} has no same-phase reference for appearance")
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
+                reason="no same-phase reference for appearance comparison", units="fraction")
+        return C.check_palette(cid, scope, px, ref,
+            ctx.tol(cid, "max_drift", ctx.P["max_palette_drift"]))
+    raise AssertionError(f"no per-frame dispatch for {check}")
+
+
+def _h_temporal(ctx: _Ctx, cid: str, check: str, scope: str) -> D.CheckResult:
+    c = ctx.by_check[cid]
+    p = c.params or {}
+    if check == "local_pulse":
+        if scope.endswith("seam"):
+            span, prev = ctx.spans[ctx.n - 1], ctx.spans[0]
+        else:
+            a, b = scope.split()[1].split("->")
+            span, prev = ctx.spans[int(b)], ctx.spans[int(a)]
+        return C.check_pulse(cid, scope, span, prev, ctx.tol(cid, "max_delta", ctx.P["max_adjacent_span_delta"]))
+    if check == "world_sliding":
+        total = sum(ctx.contract.timing.holds)
+        if ctx.world_positions is not None and len(ctx.world_positions) != total:
+            ctx.gaps.append(f"{cid}: world trace has {len(ctx.world_positions)} ticks vs {total} held")
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
+                reason=f"world trace length does not match the {total} held ticks; cannot verify sliding",
+                units="world_units")
+        if ctx.planted is not None and ctx.world_positions is not None \
+                and len(ctx.planted) != len(ctx.world_positions):
+            ctx.gaps.append(f"{cid}: planted flags do not match trace length")
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
+                reason="planted flags length differs from world trace length", units="world_units")
+        if ctx.world_positions is None or ctx.planted is None:
+            ctx.gaps.append(f"{cid}: no world trace bound (positions + planted flags)")
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
+                reason="required world_sliding has no world positions/planted trace bound; "
+                       "a passing verdict without the trace would be fabricated", units="world_units")
+        return C.check_world_sliding(cid, scope, ctx.world_positions, ctx.planted,
+            ctx.tol(cid, "tol", 2.0))
+    if check == "locked_cadence":
+        presented = list(p.get("presented", ctx.contract.timing.holds))
+        if "presented_holds" in ctx.context and ctx.context["presented_holds"] is not None:
+            presented = list(ctx.context["presented_holds"])
+        return C.check_cadence(cid, scope, list(ctx.contract.timing.holds), presented)
+    if check == "loop_seam":
+        if not ctx.contract.action.loop:
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.NOT_APPLICABLE,
+                reason="one-shot contract (loop=false): no artificial last->first seam test", units="descriptor")
+        return C.check_loop_seam(cid, scope, list(ctx.frames_px), ctx.W, ctx.H, True,
+            p.get("region", [8, 8, 56, 60]), p.get("grid", [6, 6]),
+            ctx.tol(cid, "max_ratio", 2.0))
+    if check == "repair_protection":
+        rep = ctx.context.get("repair")
+        if not rep or not rep.get("baseline") or not rep.get("allowed_mask"):
+            ctx.gaps.append(f"{cid}: no repair context bound (baseline + edit support)")
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
+                reason="required repair_protection has no baseline/edit-support context bound; "
+                       "protection cannot pass by default", units="pixels")
+        base, allowed = rep["baseline"], rep["allowed_mask"]
+        protected = rep.get("protected_mask")
+        bad = 0
+        for slot in rep.get("repaired_slots", list(range(ctx.n))):
+            r = C.check_protection(cid, f"slot {slot}", base[slot], ctx.frames_px[slot],
+                                   ctx.W, ctx.H, allowed[slot] if isinstance(allowed, list) else allowed,
+                                   (protected[slot] if isinstance(protected, list) else protected)
+                                   if protected is not None else None)
+            if r.outcome != D.CheckOutcome.PASS:
+                return r
+        return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.PASS,
+            reason="exterior + protected pixels identical across repaired slots", units="pixels")
+    if check == "provenance_coverage":
+        gaps = sorted(set(ctx.gaps))
+        if gaps or not ctx.context.get("byte_hashes_complete", False):
+            extra = [] if ctx.context.get("byte_hashes_complete", False) else ["origin byte hashes unavailable"]
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.FAIL,
+                reason="authority/coverage gaps: " + "; ".join(gaps + extra), units="counts")
+        if ctx.context.get("character_absent"):
+            return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.FAIL,
+                reason="no character revision bound: references cannot be tied to an approved identity",
+                units="counts")
+        return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.PASS,
+            reason="authority and coverage complete for the required matrix", units="counts")
+    raise AssertionError(f"no temporal dispatch for {check}")
 
 
 def evaluate_frames(contract: D.ClipContractRevision, frames: list[Image.Image],
                     references: dict[int, Image.Image],
                     dep_lock_id: str = "dev-no-lock",
                     world_positions: list[tuple[float, float]] | None = None,
-                    planted: list[bool] | None = None) -> D.Evaluation:
+                    planted: list[bool] | None = None,
+                    context: dict | None = None) -> D.Evaluation:
     """Evaluate ordered frame images against a contract revision.
 
     references: slot -> independent same-phase reference image (never from the batch).
+    context (service-built): frame/reference byte hashes, character content,
+    registration, annotations, repair context, presented holds, origin label.
+    Structural mismatches (frame count vs holds) raise: a truncated clip must
+    never flow into a passing verdict.
     """
+    n = len(contract.timing.holds)
+    if len(frames) != n:
+        raise InvalidInput(f"{len(frames)} frames vs {n} contract holds: a truncated or padded "
+                           "sequence can never enter evaluation")
+    ctx = context or {}
+    frames_px = [canonical_pixels(f) for f in frames]
+    refs_px = {s: canonical_pixels(r) for s, r in references.items()}
+    state = _Ctx(contract, frames_px, refs_px, world_positions, planted, ctx)
+    state.sizes = [f.size for f in frames]
+    expected = _matrix(contract)
     results: list[D.CheckResult] = []
-    man_inputs: list[str] = []
-    spans: list[float | None] = [None] * len(frames)
-    by_check = {c.id: c for c in contract.constraints}
-    P = C.PROFILE_DEFAULTS
-    W, H = contract.canvas.width, contract.canvas.height
+    seen: set[tuple[str, str]] = set()
+    for cid, check, scope in expected:
+        try:
+            if check in PER_FRAME_CHECKS:
+                r = _h_frame(state, cid, check, scope)
+            else:
+                r = _h_temporal(state, cid, check, scope)
+        except InvalidInput:
+            raise
+        except Exception as e:
+            r = D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.ERROR,
+                reason=f"analyzer failure in {check}: {type(e).__name__}: {e}")
+        if (cid, scope) in seen:
+            r = D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.ERROR,
+                reason="analyzer emitted a duplicate result for one matrix item")
+        seen.add((cid, scope))
+        results.append(r)
+    produced = {(r.constraint_id, r.scope) for r in results}
+    for cid, check, scope in expected:
+        if (cid, scope) not in produced:
+            results.append(D.CheckResult(constraint_id=cid, scope=scope,
+                outcome=D.CheckOutcome.ERROR,
+                reason=f"dispatch omission: no analyzer produced the expected {check} result"))
 
-    def tol(cid: str, key: str, default: float) -> float:
-        c = by_check.get(cid)
-        if c is not None and key in c.params:
-            return float(c.params[key])
-        return default
-
-    # per-frame checks
-    for slot, img in enumerate(frames):
-        scope = f"slot {slot}"
-        px = _bytes_of(img)
-        man_inputs.append(hashlib.sha256(px).hexdigest())
-        w, h = img.size
-        reg_c = by_check.get("registration")
-        if reg_c is not None or True:
-            results.append(C.check_registration(reg_c.id if reg_c else "registration", scope, px, w, h, (W, H)))
-        if (w, h) != (W, H):
-            continue  # invalid dims stop downstream measurements for this frame
-        ref = references.get(slot)
-        for check_id, dim in (("silhouette_area", "area"), ("silhouette_width", "width"), ("silhouette_height", "height")):
-            pass
-        # silhouette checks keyed by constraint ids present in contract
-        for c in contract.constraints:
-            if c.check == "silhouette_area":
-                if ref is None:
-                    results.append(D.CheckResult(constraint_id=c.id, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
-                        reason="no independent same-phase reference bound; measurement blocked", units="fraction"))
-                else:
-                    results.append(C.check_silhouette(c.id, scope, px, w, h, _bytes_of(ref),
-                        tol(c.id, "max_fraction", P["max_area_fraction"]), "area"))
-            elif c.check == "silhouette_width":
-                if ref is None:
-                    results.append(D.CheckResult(constraint_id=c.id, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
-                        reason="no independent same-phase reference bound; measurement blocked", units="fraction"))
-                else:
-                    results.append(C.check_silhouette(c.id, scope, px, w, h, _bytes_of(ref),
-                        tol(c.id, "max_fraction", P["max_width_fraction"]), "width"))
-            elif c.check == "silhouette_height":
-                if ref is None:
-                    results.append(D.CheckResult(constraint_id=c.id, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
-                        reason="no independent same-phase reference bound; measurement blocked", units="fraction"))
-                else:
-                    results.append(C.check_silhouette(c.id, scope, px, w, h, _bytes_of(ref),
-                        tol(c.id, "max_fraction", P["max_height_fraction"]), "height"))
-            elif c.check == "visible_span":
-                p = c.params
-                if slot in set(p.get("occluded_slots", [])):
-                    results.append(D.CheckResult(constraint_id=c.id, scope=scope,
-                        outcome=D.CheckOutcome.NOT_APPLICABLE,
-                        reason="declared occlusion: buckle covered by flared cloak mid-air; "
-                               "annotated in contract, needs human visual decision", units="native_px"))
-                    continue
-                r = C.check_span(c.id, scope, px, w, h, tuple(p.get("color_a", (255, 200, 40))),
-                                 tuple(p.get("color_b", (255, 200, 40))),
-                                 p.get("window_a", [20, 18, 44, 34]), p.get("window_b", [20, 34, 44, 48]),
-                                 float(p.get("expected", 14.0)), float(p.get("max_delta", P["max_feature_span_delta"])))
-                if r.outcome == D.CheckOutcome.PASS and isinstance(r.observed_value, (int, float)):
-                    spans[slot] = float(r.observed_value)
-                results.append(r)
-            elif c.check == "phase_correspondence":
-                p = c.params
-                n = len(frames)
-                near = set(p.get("adjacent_slots", [1]))
-                alts = [references[a] for a in p.get("alt_slots", []) if a in references and a != slot
-                        and min((a - slot) % n, (slot - a) % n) not in near]
-                if ref is None or not alts:
-                    results.append(D.CheckResult(constraint_id=c.id, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
-                        reason="phase check needs expected + alternative independent guides; ambiguous silhouettes stay unmeasured",
-                        units="descriptor"))
-                else:
-                    results.append(C.check_phase(c.id, scope, px, w, h, p.get("region", [8, 8, 56, 60]),
-                        p.get("grid", [6, 6]), _bytes_of(ref), [_bytes_of(a) for a in alts],
-                        P["max_expected_excess"], P["min_phase_ratio"]))
-            elif c.check == "declared_contacts":
-                p = c.params
-                flight_slots = set(p.get("flight_slots", []))
-                is_flight = bool(p.get("flight", False)) or slot in flight_slots
-                results.append(C.check_contacts(c.id, scope, px, w, h, p.get("window", [8, 50, 56, 62]),
-                    int(p.get("min_visible", 20)), flight=is_flight))
-            elif c.check == "appearance_palette":
-                if ref is None:
-                    results.append(D.CheckResult(constraint_id=c.id, scope=scope, outcome=D.CheckOutcome.UNMEASURED,
-                        reason="no same-phase reference for appearance comparison", units="fraction"))
-                else:
-                    results.append(C.check_palette(c.id, scope, px, _bytes_of(ref),
-                        tol(c.id, "max_drift", P["max_palette_drift"])))
-
-    # temporal checks across frames
-    for c in contract.constraints:
-        if c.check == "local_pulse":
-            for s in range(1, len(frames)):
-                results.append(C.check_pulse(c.id, f"slots {s-1}→{s}", spans[s], spans[s-1],
-                    float(c.params.get("max_delta", P["max_adjacent_span_delta"]))))
-        elif c.check == "world_sliding" and world_positions is not None and planted is not None:
-            results.append(C.check_world_sliding(c.id, "planted support across ticks", world_positions, planted,
-                float(c.params.get("tol", 2.0))))
-        elif c.check == "locked_cadence":
-            results.append(C.check_cadence(c.id, "clip", list(contract.timing.holds),
-                list(c.params.get("presented", contract.timing.holds))))
-        elif c.check == "loop_seam" and len(frames) >= 2:
-            p = c.params
-            results.append(C.check_loop_seam(c.id, "loop seam", [_bytes_of(f) for f in frames],
-                W, H, contract.action.loop, p.get("region", [8, 8, 56, 60]), p.get("grid", [6, 6]),
-                float(p.get("max_ratio", 2.0))))
-
-    # status + coverage. Declared NOT_APPLICABLE (flight phases, annotated occlusion) is an
-    # intentional exemption, not a gap: it neither passes nor fails the gate. But a gate with
-    # zero actual measurements is incomplete, never a vacuous pass.
-    required = [c for c in contract.constraints if c.required]
-    required_ids = {c.id for c in required}
+    reg_ids = [c.id for c in contract.constraints if c.check == "native_registration"]
+    reg_cid = reg_ids[0] if reg_ids else "registration"
+    required_ids = {c.id for c in contract.constraints if c.required} | {reg_cid}
     gated = [r for r in results if r.constraint_id in required_ids
              and r.outcome != D.CheckOutcome.NOT_APPLICABLE]
-    if not required or not gated:
+    if not required_ids or not gated:
         tech = D.TechnicalStatus.INCOMPLETE
-    elif any(r.outcome == D.CheckOutcome.ERROR for r in gated):
-        tech = D.TechnicalStatus.ERROR
     elif any(r.outcome == D.CheckOutcome.FAIL for r in gated):
         tech = D.TechnicalStatus.FAIL
+    elif any(r.outcome == D.CheckOutcome.ERROR for r in gated):
+        tech = D.TechnicalStatus.ERROR
     elif any(r.outcome == D.CheckOutcome.UNMEASURED for r in gated):
         tech = D.TechnicalStatus.INCOMPLETE
     else:
         tech = D.TechnicalStatus.PASS
-    measured_req = sum(1 for r in gated if r.outcome in (D.CheckOutcome.PASS, D.CheckOutcome.FAIL))
-    exempt_req = sum(1 for r in results if r.constraint_id in required_ids
-                     and r.outcome == D.CheckOutcome.NOT_APPLICABLE)
-    if gated and measured_req == len(gated) and not exempt_req:
+    bad = sum(1 for r in results if r.outcome in (D.CheckOutcome.UNMEASURED, D.CheckOutcome.ERROR))
+    measured = sum(1 for r in results if r.outcome in (D.CheckOutcome.PASS, D.CheckOutcome.FAIL,
+                                                       D.CheckOutcome.NOT_APPLICABLE))
+    if bad == 0 and measured == len(results):
         cov = D.CoverageStatus.COMPLETE
-    elif measured_req == 0 and gated:
+    elif measured == 0:
         cov = D.CoverageStatus.UNSUPPORTED
     else:
         cov = D.CoverageStatus.PARTIAL
 
+    frame_hashes = [hashlib.sha256(px).hexdigest() for px in frames_px]
+    ref_hashes = {str(s): hashlib.sha256(px).hexdigest() for s, px in refs_px.items()}
     manifest = {
-        "contract": contract.model_dump(mode="json"), "frame_pixel_hashes": man_inputs,
-        "reference_slots": sorted(references.keys()), "analyzer_version": ANALYZER_VERSION,
-        "dependency_lock_id": dep_lock_id, "profile": PROFILE,
-        "profile_defaults": C.PROFILE_DEFAULTS, "schema_versions": {"domain": "2.0"},
-        "world_positions": world_positions, "planted": planted,
+        "contract": contract.model_dump(mode="json"),
+        "character": ctx.get("character") or {"absent": True},
+        "frames": [{"slot": i, "pixel_sha256": h,
+                    "byte_sha256": (ctx.get("frame_byte_hashes") or [None] * n)[i]}
+                   for i, h in enumerate(frame_hashes)],
+        "references": {s: {"pixel_sha256": h,
+                           "byte_sha256": (ctx.get("reference_byte_hashes") or {}).get(int(s))}
+                       for s, h in ref_hashes.items()},
+        "annotations": ctx.get("annotation_hashes", []),
+        "registration": ctx.get("registration"),
+        "timeline": {"holds": list(contract.timing.holds), "loop": contract.action.loop,
+                     "world_positions": world_positions, "planted": planted},
+        "analyzer": {"version": ANALYZER_VERSION, "code_sha256": _code_sha256(),
+                     "profile": PROFILE, "profile_defaults": C.PROFILE_DEFAULTS},
+        "check_config": [{"id": c.id, "check": c.check, "required": c.required,
+                          "params": c.params} for c in contract.constraints],
+        "schema_versions": {"domain": "2.0"},
+        "dependency_lock": {"id": dep_lock_id, "digest": _lock_digest()},
+        "origin": ctx.get("origin", "direct"),
     }
-    ev = D.Evaluation(id=f"eval-{hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()[:16]}",
-        clip_revision_id=contract.id, evidence_manifest_sha256=_manifest_sha256(manifest),
+    manifest_sha = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+    ev = D.Evaluation(id=f"eval-{manifest_sha[:16]}",
+        clip_revision_id=contract.id, evidence_manifest_sha256=manifest_sha,
         analyzer_version=ANALYZER_VERSION, dependency_lock_id=dep_lock_id,
         results=results, technical_status=tech, coverage_status=cov)
+    object.__setattr__(ev, "_manifest_cache", manifest)  # side-channel for the storing service
     return ev
+
+
+def manifest_of(ev: D.Evaluation) -> dict | None:
+    """Retrieve the canonical manifest built alongside a fresh evaluate_frames result."""
+    return getattr(ev, "_manifest_cache", None)

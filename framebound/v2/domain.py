@@ -250,6 +250,37 @@ class FrameInstance(Strict):
     part_mask_ids: list[str] = Field(default_factory=list)
 
 
+class TransformOp(Strict):
+    op: Literal["translate"] = "translate"
+    dx: StrictInt = Field(ge=-512, le=512)
+    dy: StrictInt = Field(ge=-512, le=512)
+
+
+class TransformSpec(Strict):
+    """Typed recorded transform: the only thing that can authorize pixel movement.
+
+    A free-text recipe string never authorizes a transform; it is documentation.
+    mirror/per_pose_scale are checked against the character + contract at use time.
+    """
+    ops: list[TransformOp] = Field(default_factory=list)
+    mirror: bool = False
+    per_pose_scale: bool = False
+    note: str = Field(default="", max_length=500)
+
+
+class Registration(Strict):
+    """Persisted verified recipe: how a frame's pixels sit on the frozen canvas."""
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    method: Literal["frozen_native", "verified_translate"] = "frozen_native"
+    frame_instance_id: str = Field(min_length=1)
+    translation_px: list[StrictInt] = Field(default_factory=lambda: [0, 0],
+                                           min_length=2, max_length=2)
+    transform: TransformSpec = Field(default_factory=TransformSpec)
+    verified_by: str = Field(default="import", min_length=1, max_length=200)
+    created_at: str = Field(default_factory=utcnow)
+
+
 class ClipRevision(Strict):
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
@@ -276,11 +307,29 @@ class AnnotationRevision(Strict):
     coordinate_space: Literal["native_px"] = "native_px"
     visibility: Literal["visible", "occluded", "ambiguous"] = "visible"
     annotator_type: Literal["human_reviewed", "model_proposed", "imported"] = "model_proposed"
+    role: str = Field(default="support", min_length=1, max_length=64)
+    frame_instance_id: str | None = None
+    points: list[list[float]] | None = Field(default=None, min_length=1)
+    mask_asset_id: str | None = None
+    transform: dict[str, Any] | None = None
     reviewer: str | None = None
+    proposal_event_id: str | None = None
+    review_event_id: str | None = None
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
     _finite_confidence = field_validator("confidence")(classmethod(lambda cls, v: _finite_float(v)))
     supersedes: str | None = None
+
+    @model_validator(mode="after")
+    def _geometry_present(self) -> "AnnotationRevision":
+        if self.points is None and self.mask_asset_id is None:
+            raise ValueError("annotation needs point geometry, a mask asset, or both: "
+                             "a bare label cannot support measurements")
+        if self.points is not None:
+            for pt in self.points:
+                if len(pt) != 2 or not all(math.isfinite(v) for v in pt):
+                    raise ValueError("annotation points must be finite [x, y] native_px pairs")
+        return self
 
 
 class CheckResult(Strict):
@@ -311,6 +360,7 @@ class Evaluation(Strict):
     results: list[CheckResult] = Field(min_length=1)
     technical_status: TechnicalStatus
     coverage_status: CoverageStatus
+    supersedes: str | None = None
     created_at: str = Field(default_factory=utcnow)
 
 
