@@ -119,6 +119,32 @@ def create_app(project_dir: str) -> FastAPI:
     async def _frozen(_: Request, e: S.FrozenRevisionError):
         return JSONResponse({"code": "frozen_revision", "detail": str(e)}, status_code=409)
 
+    from ..services import errors as _E
+
+    @app.exception_handler(_E.PermissionDenied)
+    async def _perm(_: Request, e: _E.PermissionDenied):
+        return JSONResponse({"code": "permission_denied", "detail": str(e)}, status_code=403)
+
+    @app.exception_handler(_E.ModelUnavailable)
+    async def _noun(_: Request, e: _E.ModelUnavailable):
+        return JSONResponse({"code": "model_unavailable", "detail": str(e)}, status_code=502)
+
+    @app.exception_handler(_E.ResponseInvalid)
+    async def _rinv(_: Request, e: _E.ResponseInvalid):
+        return JSONResponse({"code": "response_invalid", "detail": str(e)}, status_code=502)
+
+    @app.exception_handler(_E.TransportError)
+    async def _terr(_: Request, e: _E.TransportError):
+        return JSONResponse({"code": "transport_error", "detail": str(e)}, status_code=503)
+
+    @app.exception_handler(_E.ProviderTimeout)
+    async def _pto(_: Request, e: _E.ProviderTimeout):
+        return JSONResponse({"code": "provider_timeout", "detail": str(e)}, status_code=504)
+
+    @app.exception_handler(_E.RateLimited)
+    async def _rl(_: Request, e: _E.RateLimited):
+        return JSONResponse({"code": "rate_limited", "detail": str(e)}, status_code=429)
+
     @app.get("/api/health")
     def health():
         return {"ok": True, "schema_version": "2.0"}
@@ -309,6 +335,83 @@ def create_app(project_dir: str) -> FastAPI:
             con.close()
         publish({"type": "comparison_ready", "task_id": task_id, "revision_id": new_id})
         return {"revision": out.model_dump(), "evaluation": ev_out.model_dump(), "packet": pkt.model_dump()}
+
+    @app.post("/api/jobs", status_code=201)
+    def jobs_submit(body: dict):
+        from ..services import jobs as J
+        try:
+            brief = body.get("brief") or {}
+            refs = body.get("references") or brief.get("_reference_blobs", [])
+            env = J.submit_generation(project_dir, brief, refs,
+                                      str(body.get("idempotency_key", "")),
+                                      offline=bool(body.get("offline", False)),
+                                      max_attempts=int(body.get("max_attempts", 3)))
+        except S.ConflictError as e:
+            raise HTTPException(409, str(e))
+        return env.model_dump()
+
+    @app.get("/api/jobs/{job_id}")
+    def jobs_get(job_id: str):
+        from ..services import jobs as J
+        try:
+            return J.job_get(project_dir, job_id)
+        except KeyError:
+            raise HTTPException(404, f"unknown job {job_id}")
+
+    @app.post("/api/jobs/{job_id}/claim", status_code=200)
+    def jobs_claim(job_id: str, body: dict,
+                   x_session_token: str | None = Header(default=None),
+                   x_actor_id: str | None = Header(default=None)):
+        from ..services import jobs as J
+        act = actor(x_session_token, x_actor_id)
+        try:
+            return J.job_claim(project_dir, job_id, act.id,
+                               expected_version=int(body.get("expected_version", 1)))
+        except S.StaleRevisionError as e:
+            raise HTTPException(409, str(e))
+
+    @app.post("/api/jobs/{job_id}/cancel", status_code=200)
+    def jobs_cancel(job_id: str, body: dict,
+                    x_session_token: str | None = Header(default=None),
+                    x_actor_id: str | None = Header(default=None)):
+        from ..services import jobs as J
+        actor(x_session_token, x_actor_id)  # authenticated principal
+        try:
+            return J.job_cancel(project_dir, job_id,
+                                int(body.get("expected_version", 1)))
+        except S.StaleRevisionError as e:
+            raise HTTPException(409, str(e))
+
+    @app.post("/api/jobs/reconcile", status_code=200)
+    def jobs_reconcile():
+        from ..services import jobs as J
+        return J.job_reconcile(project_dir)
+
+    @app.post("/api/orchestrator/runs", status_code=201)
+    def orch_runs(body: dict):
+        from ..services import orchestrator as O
+        return O.start_run(project_dir, list(body.get("job_ids", [])),
+                           max_attempts=int(body.get("max_attempts", 3)))
+
+    @app.post("/api/orchestrator/send", status_code=200)
+    def orch_send(body: dict,
+                  x_session_token: str | None = Header(default=None),
+                  x_actor_id: str | None = Header(default=None)):
+        from ..services import orchestrator as O
+        act = actor(x_session_token, x_actor_id)
+        brief = body.get("brief") or {}
+        try:
+            return O.orchestrator_send(project_dir, str(body.get("run_id")),
+                                       str(body.get("job_id")), brief,
+                                       worker_id=act.id,
+                                       offline=bool(body.get("offline", False)))
+        except S.StaleRevisionError as e:
+            raise HTTPException(409, str(e))
+
+    @app.get("/api/capabilities")
+    def capabilities():
+        from ..services import capabilities as C
+        return C.table()
 
     @app.get("/api/events")
     async def events():

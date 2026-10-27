@@ -80,6 +80,12 @@ def main(argv=None):
         ("brief-compile", "v2: compile a conditioning bundle", [("--contract-id", True), ("--slot", True), ("--project", True)]),
         ("job-submit", "v2: submit a generation job (idempotent)", [("--brief", True), ("--project", True), ("--idempotency-key", True)]),
         ("job-get", "v2: read a persisted job", [("--job-id", True), ("--project", True)]),
+        ("job-claim", "v2: claim a queued job with a lease", [("--job-id", True), ("--project", True), ("--worker-id", True), ("--expected-version", True)]),
+        ("job-cancel", "v2: cancel a non-terminal job", [("--job-id", True), ("--project", True), ("--expected-version", True)]),
+        ("job-reconcile", "v2: recover expired-lease RUNNING jobs", [("--project", True)]),
+        ("orchestrator-run", "v2: start a durable orchestrator run", [("--project", True)]),
+        ("orchestrator-send", "v2: claimed-send-complete for one job", [("--project", True), ("--run-id", True), ("--job-id", True), ("--brief", True), ("--worker-id", True)]),
+        ("capabilities", "v2: audited transport x operation table", [("--project", True)]),
         ("candidate-register", "v2: register replacements as a child revision", [("--baseline", True), ("--new-id", True), ("--project", True), ("--slots", True), ("--recipe", True)]),
         ("packet-create", "v2: curate a review packet", [("--packet-id", True), ("--revision-id", True), ("--evaluation-id", True), ("--project", True), ("--intent", False)]),
         ("corrections-list", "v2: list open correction tasks", [("--project", True)]),
@@ -87,6 +93,15 @@ def main(argv=None):
         c = sub.add_parser(name, help=helps)
         for flag, req in args:
             c.add_argument(flag, required=req)
+        if name == "job-submit":
+            c.add_argument("--offline", action="store_true", default=False,
+                           help="never transmit even when a key is configured")
+            c.add_argument("--max-attempts", default="3")
+        if name == "orchestrator-run":
+            c.add_argument("--jobs", default="")
+            c.add_argument("--max-attempts", default="3")
+        if name == "orchestrator-send":
+            c.add_argument("--offline", action="store_true", default=False)
 
     sub.add_parser("mcp", help="Serve the same tools over MCP (stdio)")
 
@@ -161,7 +176,9 @@ def main(argv=None):
         _aio.run(_s.run_stdio_async())
         return 0
     if args.cmd in ("asset-import", "contract-propose", "clip-create", "clip-evaluate",
-                    "brief-compile", "job-submit", "job-get", "candidate-register",
+                    "brief-compile", "job-submit", "job-get", "job-claim",
+                    "job-cancel", "job-reconcile", "orchestrator-run",
+                    "orchestrator-send", "capabilities", "candidate-register",
                     "packet-create", "corrections-list", "reviewer-pair", "reviewer-open",
                     "guide-propose", "reference-approve"):
         from .v2 import cli_commands as _v2c

@@ -138,12 +138,22 @@ def run_wp6(out_dir: str | Path, *, replace: bool = False, offline: bool = True)
         dep = select_slot(run_holds, tick, True)
         interruptions.append({"tick": tick, "departure_slot": dep, "entry": "attack:0",
                               "preserved": True})
-    # provider ledger: attempt live generation honestly (offline → not_configured)
+    # provider ledger: attempt live generation honestly (offline → not_configured).
+    # Real approved pixels ride along so the recorded request is the exact shape
+    # a live send would carry; nothing is transmitted in this replay.
+    import base64 as _b64
+    import hashlib as _h
     from .providers import image as img_provider
-    ledger = img_provider.submit({"instruction": "demo", "conditioning_sha256": "00" * 32}, [
-        {"role": "approved_identity", "asset_id": "pip-identity", "byte_sha256": "00" * 64, "bytes_b64": ""},
-        {"role": "approved_style", "asset_id": "pip-style", "byte_sha256": "00" * 64, "bytes_b64": ""}],
-        proj, "wp6-demo-1", offline=offline)
+    _blobs = []
+    for _role, _aid, _rel in (("approved_identity", "pip-identity", "identity.png"),
+                              ("approved_style", "pip-style", "style.png")):
+        _raw = (char_dir / _rel).read_bytes()
+        _blobs.append({"role": _role, "asset_id": _aid,
+                       "byte_sha256": _h.sha256(_raw).hexdigest(),
+                       "mime": "image/png",
+                       "bytes_b64": _b64.b64encode(_raw).decode()})
+    ledger = img_provider.submit({"instruction": "demo", "conditioning_sha256": "00" * 32},
+                                 _blobs, proj, "wp6-demo-1", offline=offline)
     # review round-trip on the run clip
     con = S.connect(proj)
     try:
