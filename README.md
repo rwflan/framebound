@@ -23,7 +23,8 @@ No dependencies. Python 3.11+.
 
 ```sh
 python -m framebound demo --out build/demo     # clean passes, 4 named faults fail, repair selected
-python -m framebound serve --contract build/demo/contract.json --port 8765
+python -m framebound serve --project build/v2proj --port 8765  # v2 desk+API
+# desk dev: cd web && npm install && npm run dev   (proxies /api to :8765)
 python -m unittest discover -s tests
 ```
 

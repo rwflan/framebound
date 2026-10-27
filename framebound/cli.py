@@ -44,7 +44,10 @@ def main(argv=None):
     ex.add_argument("--contract", required=True); ex.add_argument("--out", required=True)
 
     sv = sub.add_parser("serve", help="Start the persistent human review desk")
-    sv.add_argument("--contract", required=True); sv.add_argument("--port", type=int, default=8765)
+    sv.add_argument("--contract", required=False, default=None)
+    sv.add_argument("--project", required=False, default=None)
+    sv.add_argument("--port", type=int, default=8765)
+    sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--db")
 
     dm = sub.add_parser("demo", help="Build and verify the procedural demo project end to end")
@@ -128,6 +131,11 @@ def main(argv=None):
             Path(args.report).parent.mkdir(parents=True, exist_ok=True)
             Path(args.report).write_text(json.dumps(rep, indent=2) + "\n")
         _print(rep)
+        return 0
+    if args.cmd == "serve" and getattr(args, "project", None):
+        from .v2.api.app import create_app as _create
+        import uvicorn as _uv
+        _uv.run(_create(args.project), host=args.host, port=args.port)
         return 0
     from .audit import audit, preflight
     if args.cmd == "check":
