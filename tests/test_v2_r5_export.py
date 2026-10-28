@@ -381,10 +381,13 @@ class TestPortability(unittest.TestCase):
             # rebuild identical content under the same name: dedupe, no conflict
             man2 = build_snapshot(td, "atom", ["rev-good"], str(Path(td) / "snap2"), {})
             self.assertEqual(man2["files"], man["files"])
-            # existing output refuses without replace; unmarked replace refused
-            with self.assertRaises(Exception):
-                build_snapshot(td, "atom", ["rev-good"], str(out), {})
+            # retrying the identical request returns its identity (no rebuild,
+            # no overwrite); an incompatible payload to the same name conflicts
+            man3 = build_snapshot(td, "atom", ["rev-good"], str(out), {})
+            self.assertEqual(man3["inputs_digest"], man["inputs_digest"])
             self.assertTrue((out / "manifest.json").is_file())
+            with self.assertRaises(Exception):
+                build_snapshot(td, "atom", ["rev-bad"], str(out), {})
             foreign = Path(td) / "foreign"
             foreign.mkdir()
             (foreign / "keep.txt").write_text("user data")

@@ -41,6 +41,14 @@ def task_relates_to(con, task, revision_id: str) -> bool:
 
 
 def current_state(project_dir: str, revision_id: str) -> dict:
+    con = S.connect(project_dir)
+    try:
+        return current_state_in(con, project_dir, revision_id)
+    finally:
+        con.close()
+
+
+def current_state_in(con, project_dir: str, revision_id: str) -> dict:
     """Single ordered reducer for current human acceptance.
 
     Fold in durable (created_at, id) order; the latest valid reviewer
@@ -48,8 +56,7 @@ def current_state(project_dir: str, revision_id: str) -> dict:
     confer acceptance. Reapproval after rejection restores approval; reopen
     revokes it again.
     """
-    con = S.connect(project_dir)
-    try:
+    if True:
         events = []
         for r in con.execute("SELECT data FROM review_events").fetchall():
             try:
@@ -65,8 +72,6 @@ def current_state(project_dir: str, revision_id: str) -> dict:
             except Exception:
                 continue
         related = {t.id for t in tasks if task_relates_to(con, t, revision_id)}
-    finally:
-        con.close()
     events.sort(key=lambda e: (e.created_at, e.id))
     acceptance = D.HumanAcceptance.UNREVIEWED.value
     decided_by = decided_at = decided_event = decided_packet = None

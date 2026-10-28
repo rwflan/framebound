@@ -33,9 +33,17 @@ def _blob_text(project_dir: str, digest: str):
 
 def verify_evidence(project_dir: str, revision_id: str,
                     evaluation: D.Evaluation) -> tuple[bool, list[str]]:
-    issues: list[str] = []
     con = S.connect(project_dir)
     try:
+        return verify_evidence_in(con, project_dir, revision_id, evaluation)
+    finally:
+        con.close()
+
+
+def verify_evidence_in(con, project_dir: str, revision_id: str,
+                       evaluation: D.Evaluation) -> tuple[bool, list[str]]:
+    issues: list[str] = []
+    if True:
         try:
             rdata, _ = S.get(con, "clip_revisions", revision_id)
         except KeyError:
@@ -138,6 +146,4 @@ def verify_evidence(project_dir: str, revision_id: str,
         # --- contract binding
         if (manifest.get("contract") or {}).get("id") != contract.id:
             issues.append("manifest contract does not match stored revision contract")
-    finally:
-        con.close()
     return (not issues), issues

@@ -43,10 +43,17 @@ def _lineage(con, revision_id: str) -> list[str]:
 
 
 def release_eligibility(project_dir: str, revision_id: str) -> dict:
-    reasons: list[str] = []
-    eligible = True
     con = S.connect(project_dir)
     try:
+        return release_eligibility_in(con, project_dir, revision_id)
+    finally:
+        con.close()
+
+
+def release_eligibility_in(con, project_dir: str, revision_id: str) -> dict:
+    reasons: list[str] = []
+    eligible = True
+    if True:
         try:
             rev, contract = P._resolve_revision(con, revision_id)
         except KeyError:
@@ -66,7 +73,7 @@ def release_eligibility(project_dir: str, revision_id: str) -> dict:
         # pixels, relevant annotations, analyzer and lock identity. A stored
         # JSON flag or a matching status field never substitutes for it.
         from . import evidence as _EV
-        verdict, problems = _EV.verify_evidence(project_dir, revision_id, latest)
+        verdict, problems = _EV.verify_evidence_in(con, project_dir, revision_id, latest)
         if not verdict:
             eligible = False
             reasons.append("evidence invalid: " + "; ".join(problems[:4]))
@@ -75,7 +82,7 @@ def release_eligibility(project_dir: str, revision_id: str) -> dict:
         # needs that decision bound to this exact revision+evaluation through
         # a packet: packetless decisions are acceptance signal, not release.
         from . import review_state as _RS
-        state = _RS.current_state(project_dir, revision_id)
+        state = _RS.current_state_in(con, project_dir, revision_id)
         if state["acceptance"] != D.HumanAcceptance.APPROVED.value:
             eligible = False
             reasons.append(f"current human acceptance is {state['acceptance']}, not approved")
@@ -114,8 +121,6 @@ def release_eligibility(project_dir: str, revision_id: str) -> dict:
         if blocking:
             eligible = False
             reasons.append(f"unresolved tasks: {sorted(blocking)[:4]}")
-    finally:
-        con.close()
     return {"revision_id": revision_id, "eligible": eligible,
             "evaluation_id": latest.id if latest else None,
             "reasons": reasons}
