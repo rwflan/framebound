@@ -44,8 +44,17 @@ def _check_coco(snap: Path, manifest: dict, issues: list[str]) -> dict:
         if not ipath.is_file():
             issues.append(f"coco image {iid} missing file {info['file_name']}")
             continue
-        src = Image.open(ipath)
-        want, w, h = _alpha_raster(src)
+        try:
+            src = Image.open(ipath)
+            src.load()
+        except Exception as e:
+            issues.append(f"coco image {iid} undecodable ({info['file_name']}): {type(e).__name__}")
+            continue
+        try:
+            want, w, h = _alpha_raster(src)
+        except Exception as e:
+            issues.append(f"coco image {iid} pixels unreadable: {type(e).__name__}: {e}")
+            continue
         if [w, h] != [info["width"], info["height"]]:
             issues.append(f"coco image {iid} dims {w}x{h} != header {info['width']}x{info['height']}")
         for a in coco.loadAnns(coco.getAnnIds(imgIds=[iid])):
