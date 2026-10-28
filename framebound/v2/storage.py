@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, data TEXT NOT NULL, version
 CREATE TABLE IF NOT EXISTS edit_masks(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS compiled_briefs(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS world_traces(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS transition_traces(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 """
 
 # Evidence-bearing entities are append-only: corrections arrive as superseding
@@ -69,7 +70,7 @@ FROZEN_TABLES = {"assets", "character_revisions", "contract_revisions", "clip_re
                  "frame_instances", "annotation_revisions", "evaluations", "attempts",
                  "review_packets", "review_events", "export_snapshots", "registrations",
                  "edit_masks",
-                 "compiled_briefs", "world_traces"}
+                 "compiled_briefs", "world_traces", "transition_traces"}
 
 
 def connect(project_dir: str | Path) -> sqlite3.Connection:
@@ -125,6 +126,7 @@ def _table_for(model: D.Strict) -> str:
         "Job": "jobs", "ExportSnapshot": "export_snapshots",
         "MotionGuide": "motion_guides", "ReferenceApproval": "reference_approvals", "Run": "runs",
             "EditMask": "edit_masks", "CompiledBrief": "compiled_briefs", "WorldTrace": "world_traces",
+            "TransitionTrace": "transition_traces",
         "Registration": "registrations",
     }
     return mapping[type(model).__name__]

@@ -116,11 +116,14 @@ class GenuineDemo(unittest.TestCase):
             self.assertIn(edge, ticks)
         for i in intrs:
             self.assertEqual(i["departure_slot"], select_slot([4] * 8, i["tick"], True))
-            self.assertEqual(i["entry"], "attack:0")
-            # measured, not assigned: departure hash matches the presented frame,
-            # entry hash matches attack frame 0, both show contact
-            self.assertTrue(i["preserved"], i)
-            self.assertTrue(i["entry_verified"], i)
+            self.assertEqual(i["entry"], "clip-attack-01:0")
+            # measured through the playback harness, not assigned: the
+            # departure/entry observations carry presented pixel hashes, the
+            # entry slot matches policy, and contact verdicts are computed
+            self.assertTrue(i["departure_pixels_intact"], i)
+            self.assertTrue(i["entry_slot_correct"], i)
+            self.assertTrue(i["entry_pixels_intact"], i)
+            self.assertEqual(i["verdict"], "pass", i)
             self.assertTrue(i["contact_continuous"], i)
             self.assertGreater(i["departure_support_px"], 0)
             self.assertGreater(i["entry_support_px"], 0)

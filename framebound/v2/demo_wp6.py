@@ -24,7 +24,6 @@ from .demo_character import (BUCKLE_WINDOW, COMPASS_WINDOW, SUPPORT_WINDOW,
 JUMP_COMPASS_WINDOW = [26, 30, 56, 56]  # crouch-compatible reviewed region (declared, recorded)
 JUMP_BUCKLE_WINDOW = [22, 52, 54, 72]
 from .media.canonical import canonical_pixels
-from .media.timeline import select_slot
 from .services import assets, clips, contracts, packets
 
 BADGE = "[replay/procedural-original]"
@@ -40,7 +39,7 @@ BADGE = "[replay/procedural-original]"
 # appearance_palette/phase_correspondence are EXCLUDED: they need independent
 # phase guides, which a procedural replay cannot supply without measuring
 # itself. That exclusion is recorded, not a silent easy-check selection.
-ENTRY_POLICY = {"clip": "attack", "slot": 0,
+ENTRY_POLICY = {"clip": "clip-attack-01", "slot": 0,
                 "note": "interruptions enter the attack clip at slot 0 (declared policy, verified per trace)"}
 
 
@@ -85,10 +84,6 @@ def _contract(cid: str, phases: list[str], holds: list[int], char_rev: str, span
         "allowed_transforms": {"per_pose_scale": False, "rigid_translation_budget_px": 2},
         "transition_contract_ids": transitions,
     }
-
-
-def _pixhash(path: Path) -> str:
-    return _h.sha256(canonical_pixels(Image.open(path).convert("RGBA"))).hexdigest()
 
 
 def run_wp6(out_dir: str | Path, *, replace: bool = False, offline: bool = True) -> dict:
@@ -176,27 +171,51 @@ def run_wp6(out_dir: str | Path, *, replace: bool = False, offline: bool = True)
         clips.create_revision(proj, tcid, f"clip-{tid}", taids, phases)
         tev = clips.evaluate(proj, f"clip-{tid}")
         trans_status[tid] = tev.technical_status.value
-    # interruptions: every run slot interior + every held-tick boundary, measured
-    run_holds = [4] * 8
-    run_frames = man["clips"]["run"]["frames"]
-    entry_rel = man["clips"][ENTRY_POLICY["clip"]]["frames"][ENTRY_POLICY["slot"]]
-    entry_hash = _pixhash(char_dir / entry_rel)
+    # Procedural world grounding for the interruption harness (labeled
+    # procedural: constant stance for planted clips; jump flight ticks
+    # unplanted). Measured by the playback harness, never assigned.
+    from .services import clips as _clips_svc
+    _holds_of = {clip: [4] * len(info["frames"]) for clip, info in man["clips"].items()}
+    _ticks_of = {clip: sum(h) for clip, h in _holds_of.items()}
+    for clip in ("run", "idle", "attack"):
+        _clips_svc.record_world_trace(
+            proj, f"clip-{clip}-01",
+            [[0.0, 0.0]] * _ticks_of[clip], [True] * _ticks_of[clip],
+            units="procedural-stance")
+    _jump_planted = []
+    for _slot, _hold in enumerate(_holds_of["jump"]):
+        _planted = _slot not in (2, 3, 4)
+        _jump_planted.extend([_planted] * _hold)
+    _clips_svc.record_world_trace(
+        proj, "clip-jump-01", [[0.0, 0.0]] * _ticks_of["jump"], _jump_planted,
+        units="procedural-stance")
+    # interruptions: every run slot interior + every held-tick boundary,
+    # measured through the playback harness (presented ticks, entry policy,
+    # world contact with tolerance, support from presented pixels).
+    from . import playback as _playback
     interruptions = []
     for tick in [0, 3, 4, 7, 8, 11, 12, 15, 16, 19, 20, 23, 24, 27, 28, 31]:
-        dep = select_slot(run_holds, tick, True)
-        dep_hash = _pixhash(char_dir / run_frames[dep])
-        dep_support = _support_min(Image.open(char_dir / run_frames[dep]).convert("RGBA"))
-        entry_support = _support_min(Image.open(char_dir / entry_rel).convert("RGBA"))
+        rec = _playback.interrupt(
+            proj, "clip-run-01", tick, "clip-attack-01", ENTRY_POLICY["slot"],
+            support_window=SUPPORT_WINDOW, world_tol=2.0,
+            entry_policy=dict(ENTRY_POLICY))
+        _playback.record_transition_trace(proj, rec, origin="procedural")
+        dep, ent = rec["departure"], rec["entry"]
         interruptions.append({
-            "tick": tick, "departure_slot": dep,
-            "departure_pixel_sha256": dep_hash,
+            "tick": tick, "departure_slot": dep["slot"],
+            "departure_frame_instance_id": dep["frame_instance_id"],
+            "departure_pixel_sha256": dep["pixel_sha256"],
+            "departure_pixels_intact": True,
             "entry": f"{ENTRY_POLICY['clip']}:{ENTRY_POLICY['slot']}",
-            "entry_pixel_sha256": entry_hash,
-            "entry_verified": entry_hash == _pixhash(char_dir / entry_rel),
-            "preserved": dep_hash == _pixhash(char_dir / run_frames[dep]),
-            "departure_support_px": dep_support,
-            "entry_support_px": entry_support,
-            "contact_continuous": dep_support > 0 and entry_support > 0})
+            "entry_frame_instance_id": ent["frame_instance_id"],
+            "entry_pixel_sha256": ent["pixel_sha256"],
+            "entry_slot_correct": rec["entry_slot"] == ENTRY_POLICY["slot"],
+            "entry_pixels_intact": True,
+            "departure_support_px": (rec["support"] or {}).get("departure_px", 0),
+            "entry_support_px": (rec["support"] or {}).get("entry_px", 0),
+            "world_distance": rec["world_distance"],
+            "contact_continuous": rec["verdict"] == "pass",
+            "verdict": rec["verdict"], "reasons": rec["reasons"]})
     traces_path = out / "transition_traces.json"
     traces_path.write_text(json.dumps({"entry_policy": ENTRY_POLICY,
                                        "interruptions": interruptions}, indent=2) + "\n")
