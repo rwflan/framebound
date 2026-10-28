@@ -178,6 +178,20 @@ def _simulated_assets(con) -> set[str]:
             continue
         if job.get("origin") == "simulated-transport":
             out.update(job.get("output_asset_ids") or [])
+    # Stage B: retain derivation through aliases. Assets materialized from a
+    # simulated response carry simulated lineage even when the job row link is
+    # copied, renamed, or aliased.
+    try:
+        for r in con.execute("SELECT data FROM assets").fetchall():
+            try:
+                a = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
+            except Exception:
+                continue
+            lin = str(a.get("lineage") or "")
+            if "simulated" in lin and a.get("id"):
+                out.add(a["id"])
+    except Exception:
+        pass
     return out
 
 

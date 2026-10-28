@@ -96,9 +96,14 @@ def _check_baseline_contract(project_dir: str, contract_id: str,
 
 
 def _materialize_generated(project_dir: str, out_bytes: bytes, asset_id: str,
-                           output_mime: str, w: int, h: int) -> D.Asset:
+                           output_mime: str, w: int, h: int,
+                           *, origin: str | None = None) -> D.Asset:
     """Store paid provider bytes as an asset; identical retries reuse the row
-    instead of spending again or duplicating."""
+    instead of spending again or duplicating.
+
+    Stage B: origin is retained through aliases via lineage (simulated output
+    stays simulated and can never become a live positive).
+    """
     from .media.canonical import canonical_pixels, pixel_sha256
     from PIL import Image as _Image
     import io as _io
@@ -108,7 +113,8 @@ def _materialize_generated(project_dir: str, out_bytes: bytes, asset_id: str,
     asset = D.Asset(id=asset_id, byte_sha256=raw_digest,
                     pixel_sha256=pixel_sha256(canonical_pixels(im.convert("RGBA"))),
                     mime=output_mime, width=im.size[0], height=im.size[1],
-                    source_kind="generated", rights="original", eligible_roles=[])
+                    source_kind="generated", rights="original", eligible_roles=[],
+                    lineage=f"recorded-run:{origin}" if origin else "")
     con = S.connect(project_dir)
     try:
         S.insert(con, asset)
@@ -172,7 +178,8 @@ def _controller_send(project_dir: str, brief: dict, idem: str, *,
                 raise
             raw = S.blob_path(project_dir, blob_digest).read_bytes()
             asset = _materialize_generated(
-                project_dir, raw, aid, "image/png", 0, 0)
+                project_dir, raw, aid, "image/png", 0, 0,
+                origin=data.get("origin"))
             adata = {"byte_sha256": asset.byte_sha256,
                      "mime": asset.mime, "width": asset.width,
                      "height": asset.height}
@@ -269,17 +276,23 @@ def _capability_sam(project_dir: str, image_bytes: bytes, prompt: str,
     for rec in res.get("records", []):
         raster = bytes(rec["mask"]["raster"])
         w, h = rec["mask"]["width"], rec["mask"]["height"]
+        # Stage B: materialize through the shared media path. Mask rasters are
+        # 0/1; encode as 0/255 grayscale so the approved-mask reader (>127)
+        # observes foreground, and hash canonical RGBA pixels (not PNG bytes).
         from PIL import Image as _Image
+        from .media.canonical import canonical_pixels, pixel_sha256 as _pxh
         img = _Image.new("L", (w, h))
-        img.putdata(list(raster))
+        img.putdata([255 if v else 0 for v in raster])
+        rgba = img.convert("RGBA")
+        canon = canonical_pixels(rgba)
         import io as _io
         buf = _io.BytesIO()
-        img.save(buf, format="PNG")
+        rgba.save(buf, format="PNG")
         raw = buf.getvalue()
         digest = S.store_blob(project_dir, raw)
         aid = f"{proposal_prefix}-sam-{rec['frame']}-{rec['object_id']}"
         asset = D.Asset(id=aid, byte_sha256=digest,
-                        pixel_sha256=digest, mime="image/png", width=w, height=h,
+                        pixel_sha256=_pxh(canon), mime="image/png", width=w, height=h,
                         source_kind="derived", lineage=f"sam:{res.get('response_id')}",
                         rights="original", eligible_roles=[])
         con = S.connect(project_dir)
@@ -410,7 +423,8 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
             "note": "generation failed; recorded, not retried, not cherry-picked"})
     gen_asset = _materialize_generated(
         project_dir, gen["output_bytes"], f"{new_revision_id}-gen",
-        gen["output_mime"], gen["output_size"][0], gen["output_size"][1])
+        gen["output_mime"], gen["output_size"][0], gen["output_size"][1],
+        origin=gen.get("origin", origin))
     if (gen_asset.width, gen_asset.height) != canvas:
         return _write_bundle(Path(out_path), {
             "origin": origin, "status": "recorded-failure",
@@ -441,7 +455,8 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
                                "faulted phase within the approved scope"})
         edit_asset = _materialize_generated(
             project_dir, edit["output_bytes"], f"{new_revision_id}-edit",
-            edit["output_mime"], edit["output_size"][0], edit["output_size"][1])
+            edit["output_mime"], edit["output_size"][0], edit["output_size"][1],
+            origin=edit.get("origin", origin))
         if (edit_asset.width, edit_asset.height) != canvas:
             raise RuntimeError(f"edit {(edit_asset.width, edit_asset.height)} != canvas")
         capabilities.append({"capability": "image-edit", "status": "recorded",

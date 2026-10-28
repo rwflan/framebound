@@ -395,6 +395,27 @@ def evaluate_frames(contract: D.ClipContractRevision, frames: list[Image.Image],
 
     frame_hashes = [hashlib.sha256(px).hexdigest() for px in frames_px]
     ref_hashes = {str(s): hashlib.sha256(px).hexdigest() for s, px in refs_px.items()}
+    # Stage B: repair support is part of the evidence identity. Different
+    # allowed/protected support must yield a different context key; a narrowed
+    # mask can never reuse an old PASS verdict.
+    _rep = ctx.get("repair") or {}
+    _allowed = _rep.get("allowed_mask")
+    if isinstance(_allowed, (bytes, bytearray)):
+        _allowed_h = [hashlib.sha256(bytes(_allowed)).hexdigest()]
+    elif isinstance(_allowed, list):
+        _allowed_h = [hashlib.sha256(bytes(m) if isinstance(m, (bytes, bytearray)) else b"").hexdigest()
+                      for m in _allowed]
+    else:
+        _allowed_h = []
+    _repair_key = {
+        "repaired_slots": list(_rep.get("repaired_slots", [])),
+        "allowed_mask_sha256": _allowed_h,
+        "protected_present": _rep.get("protected_mask") is not None,
+        "baseline_byte_sha256": _rep.get("baseline_byte_sha256", []),
+        "task_id": _rep.get("task_id"),
+        "mask_id": _rep.get("mask_id"),
+        "support_id": _rep.get("support_id"),
+    }
     manifest = {
         "contract": contract.model_dump(mode="json"),
         "character": ctx.get("character") or {"absent": True},
@@ -408,6 +429,7 @@ def evaluate_frames(contract: D.ClipContractRevision, frames: list[Image.Image],
         "authority": ctx.get("authority", {}),
         "transitions": ctx.get("transitions", []),
         "registration": ctx.get("registration"),
+        "repair": _repair_key,
         "timeline": {"holds": list(contract.timing.holds), "loop": contract.action.loop,
                      "world_positions": world_positions, "planted": planted},
         "analyzer": {"version": ANALYZER_VERSION, "code_sha256": _code_sha256(),

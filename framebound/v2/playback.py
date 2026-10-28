@@ -63,6 +63,7 @@ def play_clip(project_dir: str, revision_id: str) -> dict:
                 regs[fi.slot] = D.Registration.model_validate(rrow)
             except KeyError:
                 regs[fi.slot] = None
+        from .media.render import render_native as _render_native
         total = contract.timing.total_ticks()
         presented = []
         for tick in range(total):
@@ -70,23 +71,17 @@ def play_clip(project_dir: str, revision_id: str) -> dict:
             fi = by_slot[slot]
             adata, _ = S.get(con, "assets", fi.asset_id)
             raw = S.blob_path(project_dir, adata["byte_sha256"]).read_bytes()
-            base = Image.open(_io.BytesIO(raw)).convert("RGBA")
             reg = regs.get(slot)
             dx, dy = 0, 0
             if reg is not None and reg.translation_px:
                 dx, dy = int(reg.translation_px[0]), int(reg.translation_px[1])
             w, h = contract.canvas.width, contract.canvas.height
-            if base.size != (w, h):
-                canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-                canvas.paste(base, (0, 0))
-                base = canvas
-            shown = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-            shown.paste(base, (dx, dy))
-            canon = canonical_pixels(shown)
+            # Stage B: single shared render path, translation applied exactly once.
+            canon, pxh, _ = _render_native(raw, [dx, dy], (w, h))
             presented.append({"tick": tick, "slot": slot,
                               "frame_instance_id": fi.id, "asset_id": fi.asset_id,
                               "phase": fi.phase,
-                              "pixel_sha256": pixel_sha256(canon),
+                              "pixel_sha256": pxh,
                               "translation_px": [dx, dy],
                               "registration_id": fi.registration_id})
     finally:
