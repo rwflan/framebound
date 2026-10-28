@@ -138,10 +138,40 @@ def _materialize(raw: bytes) -> dict:
 def submit(brief: dict, reference_blobs: list[dict], project_dir: str,
            idempotency_key: str, *, offline: bool = False,
            transport=None, timeout: float = 120.0,
-           previous_response_id: str | None = None) -> dict:
+           previous_response_id: str | None = None,
+           job_offline: bool = False) -> dict:
+    """Queue-or-send boundary for image generation.
+
+    `job_offline` is the persisted job restriction when sending through the
+    durable controller: a persisted offline job is never transmitted, even
+    when this call requests a live send. Exactly one transport dispatch per
+    call; ambiguous outcomes raise instead of retrying.
+    """
+    # The offline restriction travels as an explicit parameter, never inside
+    # the brief dict (caller descriptions confer no authority).
+    req = build_request(brief, reference_blobs, previous_response_id=previous_response_id)
+    return submit_resolved(brief, reference_blobs, project_dir, idempotency_key,
+                           req=req, offline=offline, transport=transport,
+                           timeout=timeout,
+                           previous_response_id=previous_response_id,
+                           job_offline=bool(job_offline))
+
+
+def submit_resolved(brief: dict, reference_blobs: list[dict], project_dir: str,
+                    idempotency_key: str, *, req: dict | None = None,
+                    offline: bool = False, transport=None, timeout: float = 120.0,
+                    previous_response_id: str | None = None,
+                    job_offline: bool = False) -> dict:
+    """Send pre-resolved references with exactly one dispatch.
+
+    The persisted offline restriction is enforced at this lowest shared send
+    boundary: job_offline=True refuses transmission regardless of the caller's
+    offline flag.
+    """
     from .base import _key, http_post
     from .ledger import record_artifact
-    req = build_request(brief, reference_blobs, previous_response_id=previous_response_id)
+    req = req if req is not None else build_request(
+        brief, reference_blobs, previous_response_id=previous_response_id)
     redacted = W.redact_wire(req)
     if offline or not _key():
         digest = record_artifact(project_dir, "image_request",
@@ -157,17 +187,20 @@ def submit(brief: dict, reference_blobs: list[dict], project_dir: str,
                 "wire_model": req["model"],
                 "wire_image_parts": sum(1 for m in req["input"] for c in m["content"]
                                         if c.get("type") == "input_image")}
+    if job_offline:
+        raise InvalidInput("persisted offline restriction: transmission refused; "
+                           "authorize an explicit live job instead")
     payload = req
     req_digest = record_artifact(project_dir, "image_request",
                                  {"idempotency_key": idempotency_key, "request": redacted,
                                   "sent": True, "model": req["model"]},
                                  provider="image", model=req["model"])
-    (body, _tries) = (None, 0)
-    from .base import retry_transient
-    def _send():
-        return http_post(W.RESPONSE_PATH, payload, timeout=timeout,
-                         idempotency_key=idempotency_key, transport=transport)
-    body, _tries = retry_transient(_send)
+    # Exactly one dispatch: a generation POST is not provably idempotent, so
+    # an ambiguous outcome must surface as unknown (reconcile before another
+    # spend), never as silent retries. Only explicit provider refusals
+    # (permission/model/rate-limit/validation) propagate as typed errors.
+    body = http_post(W.RESPONSE_PATH, payload, timeout=timeout,
+                     idempotency_key=idempotency_key, transport=transport)
     parsed = parse_response(body)
     first = parsed["images"][0]
     meta = _materialize(first["bytes"])

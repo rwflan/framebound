@@ -50,11 +50,14 @@ def dispatch(args) -> dict:
                            max_attempts=int(getattr(args, "max_attempts", 3)))
     if cmd == "orchestrator-send":
         from .services import orchestrator as O
-        brief = json.loads(open(args.brief).read())
-        refs = brief.get("_reference_blobs", [])
-        _ = refs  # bytes always re-resolve server-side; caller blobs never trusted
+        # No caller brief needed: the frozen job row owns the request. A
+        # supplied file must fingerprint-match the submission exactly.
+        brief = None
+        if getattr(args, "brief", None):
+            brief = json.loads(open(args.brief).read())
         return O.orchestrator_send(args.project, args.run_id, args.job_id, brief,
                                    worker_id=getattr(args, "worker_id", "cli"),
+                                   fencing_token=getattr(args, "fencing_token", None),
                                    offline=bool(getattr(args, "offline", False)))
     if cmd == "world-trace-record":
         from .services import clips as _CL

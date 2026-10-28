@@ -309,19 +309,19 @@ class TestDurableJobs(unittest.TestCase):
                 _, jver = S.get(con, "jobs", job_id)
                 con.close()
                 claim = J.job_claim(td, job_id, "worker-1", expected_version=jver)
-                # drive the full live path with a fake transport: the fake
-                # returns a real decodable PNG over the documented envelope
+                # drive the full live path through the fenced controller with
+                # a fake transport (real decodable PNG over the documented
+                # envelope). No caller brief: the worker resumes from the
+                # frozen job row alone.
                 seen2: dict = {}
                 fake = self._live_png_transport(seen2)
-                res = IMG.submit(brief, J._resolve_references(td, brief, []), td,
-                                 "key-live-1", transport=fake)
-                self.assertTrue(res["sent"])
-                done = J.job_complete_success(
-                    td, job_id, worker_id="worker-1",
-                    expected_version=claim["version"], image_bytes=res["output_bytes"],
-                    mime=res["output_mime"], provider_response_id=res["response_id"],
-                    usage=res["usage"])
+                out = O.orchestrator_send(td, run["run_id"], job_id, worker_id="worker-1",
+                                          fencing_token=claim["fencing_token"],
+                                          transport=fake)
+                self.assertEqual(out["action"], "succeeded", out)
+                done = out
                 self.assertEqual(done["status"], "succeeded")
+                self.assertEqual(J.job_get(td, job_id)["job"]["attempt_count"], 1)
                 reg = clips.register_candidate(td, "clip-R3", "clip-R3-gen",
                                                {0: done["asset_id"]},
                                                recipe="repair:bounded-patch@identity+guide")
@@ -360,13 +360,14 @@ class TestDurableJobs(unittest.TestCase):
                 con = S.connect(td)
                 _, v0 = S.get(con, "jobs", job_id)
                 con.close()
-                J.job_claim(td, job_id, "w1", expected_version=v0)
+                cl1 = J.job_claim(td, job_id, "w1", expected_version=v0)
                 con = S.connect(td)
                 _, v1 = S.get(con, "jobs", job_id)
                 con.close()
                 # ambiguous timeout: outcome unknown -> reconcile, never blind retry
                 unk = J.job_mark_unknown_outcome(td, job_id, worker_id="w1",
-                                                 expected_version=v1, detail="timeout ambiguous")
+                                                 expected_version=v1, detail="timeout ambiguous",
+                                                 fencing_token=cl1["fencing_token"])
                 self.assertTrue(unk["reconciliation_required"])
                 before = J.job_get(td, job_id)
                 self.assertEqual(before["job"]["status"], "needs_attention")
@@ -383,13 +384,14 @@ class TestDurableJobs(unittest.TestCase):
                     con = S.connect(td)
                     _, v = S.get(con, "jobs", j2)
                     con.close()
-                    J.job_claim(td, j2, "w2", expected_version=v)
+                    cl2 = J.job_claim(td, j2, "w2", expected_version=v)
                     con = S.connect(td)
                     _, v = S.get(con, "jobs", j2)
                     con.close()
                     J.job_complete_failure(td, j2, worker_id="w2",
                                            expected_version=v, error="boom",
-                                           retryable=True)
+                                           retryable=True,
+                                           fencing_token=cl2["fencing_token"])
                 fin = J.job_get(td, j2)
                 self.assertEqual(fin["job"]["status"], "needs_attention")
                 self.assertEqual(fin["job"]["attempt_count"], 2)
@@ -434,8 +436,9 @@ class TestDurableJobs(unittest.TestCase):
             con = S.connect(td)
             _, jver = S.get(con, "jobs", job_id)
             con.close()
-            J.job_claim(td, job_id, "w", expected_version=jver)
-            out = O.orchestrator_send(td, run["run_id"], job_id, brief, worker_id="w")
+            claim = J.job_claim(td, job_id, "w", expected_version=jver)
+            out = O.orchestrator_send(td, run["run_id"], job_id, brief, worker_id="w",
+                                      fencing_token=claim["fencing_token"])
             self.assertEqual(out["action"], "stop")
             self.assertIn("no-progress", out["reason"])
 
