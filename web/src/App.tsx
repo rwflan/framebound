@@ -11,7 +11,8 @@ type View =
   | { name: 'issues'; revision?: string }
   | { name: 'corrections' }
   | { name: 'export' }
-  | { name: 'activity' };
+  | { name: 'activity' }
+  | { name: 'status' };
 
 function parseHash(): View {
   const h = window.location.hash.replace(/^#/, '');
@@ -28,6 +29,7 @@ function parseHash(): View {
   if (seg[0] === 'corrections') return { name: 'corrections' };
   if (seg[0] === 'export') return { name: 'export' };
   if (seg[0] === 'activity') return { name: 'activity' };
+  if (seg[0] === 'status') return { name: 'status' };
   return { name: 'inbox' };
 }
 
@@ -66,6 +68,7 @@ export default function App() {
         <button onClick={() => nav({ name: 'issues' })}>Issues</button>
         <button onClick={() => nav({ name: 'export' })}>Export</button>
         <button onClick={() => nav({ name: 'activity' })}>Activity</button>
+        <button onClick={() => nav({ name: 'status' })}>Status</button>
         <span style={{ color: '#666' }}>decisions bind exact revisions — never slots</span>
         <span style={{ marginLeft: 'auto' }}>
           {reviewer ? <>reviewer: <b>{reviewer}</b> <button onClick={() => { clearSession(); setReviewer(null); }}>forget</button></>
@@ -80,27 +83,30 @@ export default function App() {
       {view.name === 'corrections' && <CorrectionsView />}
       {view.name === 'export' && <ExportView />}
       {view.name === 'activity' && <ActivityView />}
+      {view.name === 'status' && <StatusView />}
     </div>
   );
 }
 
 function LoginPanel({ onLogin }: { onLogin: (r: string) => void }) {
-  const [id, setId] = useState('human-1');
+  // Reviewer bootstrap is operator-issued: the human pastes the single-use
+  // pairing code from `framebound reviewer-pair` (operator console). The
+  // browser never mints reviewer authority itself (anonymous pairing is 403).
+  const [code, setCode] = useState('');
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const login = async () => {
     setErr(null); setBusy(true);
     try {
-      const p = await api.reviewerPair(id);
-      const o = await api.reviewerOpen(p.pairing_code);
+      const o = await api.reviewerOpen(code.trim());
       setSession(o.session_token, o.reviewer_id);
       onLogin(o.reviewer_id);
     } catch (e) { setErr(e); } finally { setBusy(false); }
   };
   return (
     <span>
-      <label>reviewer <input value={id} onChange={(e) => setId(e.target.value)} size={10} /></label>{' '}
-      <button onClick={login} disabled={busy}>{busy ? '…' : 'pair + open'}</button>
+      <label>pairing code <input value={code} onChange={(e) => setCode(e.target.value)} size={24} /></label>{' '}
+      <button onClick={login} disabled={busy || !code.trim()}>{busy ? '…' : 'open session'}</button>
       <Err e={err} />
     </span>
   );
@@ -611,6 +617,36 @@ function ActivityView() {
       <Err e={err} />
       <ul>{events.slice(-50).reverse().map((e) => (
         <li key={e.id}><small>{e.created_at} · {e.action} · {e.actor_id} · {e.clip_revision_id} · {e.note}</small></li>))}</ul>
+    </section>
+  );
+}
+
+function StatusView() {
+  // Concise capability truth + pending model work with evidence links.
+  // A review tool, not a manual editor: open items go to the model's queue.
+  const caps = useLoad('capabilities', api.capabilities);
+  const open = useLoad('corrections-open', () => api.corrections('open'));
+  const awaiting = useLoad('corrections-awaiting', () => api.corrections('awaiting_comparison,blocked,attempting,claimed'));
+  return (
+    <section>
+      <h2>Status</h2>
+      <Err e={caps.err} />
+      <Err e={open.err} />
+      <h3>Pending model work</h3>
+      {!open.data ? <p>Loading…</p> : ((open.data.open ?? []) as Record<string, unknown>[]).length === 0
+        ? <p><small>No open correction tasks.</small></p>
+        : <ul>{((open.data.open ?? []) as Record<string, unknown>[]).map((t) => (
+          <li key={String(t.id)}><small><button onClick={() => nav({ name: 'corrections' })}>{String(t.id)}</button> open</small></li>))}</ul>}
+      {!awaiting.data ? null : ((awaiting.data.tasks ?? []) as Record<string, unknown>[]).length === 0 ? null : (
+        <ul>{((awaiting.data.tasks ?? []) as Record<string, unknown>[]).map((t) => (
+          <li key={String(t.id)}><small><button onClick={() => nav({ name: 'corrections' })}>{String(t.id)}</button> {String(t.status)}</small></li>))}</ul>)}
+      <h3>Capabilities</h3>
+      {!caps.data ? <p>Loading…</p> : (
+        <table><thead><tr><th>transport</th><th>operation</th><th>status</th><th>note</th></tr></thead>
+          <tbody>{caps.data.rows.map((r, i) => (
+            <tr key={i}><td><small>{r.transport}</small></td><td><small>{r.operation}</small></td>
+              <td><small>{r.status}</small></td><td><small>{r.note}</small></td></tr>))}</tbody>
+        </table>)}
     </section>
   );
 }

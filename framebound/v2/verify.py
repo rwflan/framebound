@@ -24,6 +24,7 @@ TABLE_MODEL = {
     "motion_guides": D.MotionGuide, "reference_approvals": D.ReferenceApproval,
     "registrations": D.Registration, "edit_masks": D.EditMask,
     "compiled_briefs": D.CompiledBrief, "world_traces": D.WorldTrace, "runs": D.Run,
+    "transition_traces": D.TransitionTrace,
 }
 
 

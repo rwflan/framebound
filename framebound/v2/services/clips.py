@@ -139,6 +139,7 @@ def evaluate(project_dir: str, revision_id: str, dep_lock_id: str | None = None)
                                  "sha256": hashlib.sha256(r["data"].encode()).hexdigest()})
         relevant.sort(key=lambda a: a["id"])
         world_positions, planted = _resolve_world_trace(project_dir, con, rev, contract)
+        transitions = _resolve_transition_traces(con, rev)
         repair = _resolve_repair_context(project_dir, con, rev)
         rctx = dict(repair) if repair else {}
         if world_positions is not None:
@@ -150,6 +151,7 @@ def evaluate(project_dir: str, revision_id: str, dep_lock_id: str | None = None)
                "annotation_hashes": sorted(a["sha256"] for a in relevant),
                "annotations": relevant,
                "authority": authority,
+               "transitions": transitions,
                "presented_holds": presented,
                "byte_hashes_complete": True, "origin": "stored-service"}
         if repair:
@@ -304,6 +306,26 @@ def _resolve_world_trace(project_dir: str, con, rev: D.ClipRevision,
     if len(wt.positions) != total or len(wt.planted) != total:
         return None, None  # malformed legacy trace: checks stay UNMEASURED, loudly
     return [tuple(p) for p in wt.positions], list(wt.planted)
+
+
+def _resolve_transition_traces(con, rev: D.ClipRevision) -> list[dict]:
+    """Bound interruption evidence for this revision as departure or entry."""
+    out = []
+    try:
+        rows = con.execute("SELECT data FROM transition_traces").fetchall()
+    except Exception:
+        return out
+    for r in rows:
+        try:
+            td = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
+        except Exception:
+            continue
+        if td.get("departure_revision_id") == rev.id or td.get("entry_revision_id") == rev.id:
+            out.append({"id": td.get("id"), "verdict": td.get("verdict"),
+                        "departure_tick": td.get("departure_tick"),
+                        "entry_first_tick": td.get("entry_first_tick"),
+                        "world_distance": td.get("world_distance")})
+    return out
 
 
 def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
