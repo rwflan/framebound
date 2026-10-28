@@ -56,6 +56,12 @@ def dispatch(args) -> dict:
         return O.orchestrator_send(args.project, args.run_id, args.job_id, brief,
                                    worker_id=getattr(args, "worker_id", "cli"),
                                    offline=bool(getattr(args, "offline", False)))
+    if cmd == "world-trace-record":
+        from .services import clips as _CL
+        import json as _json
+        return _CL.record_world_trace(
+            args.project, args.revision_id,
+            _json.loads(args.positions), _json.loads(args.planted)).model_dump()
     if cmd == "capabilities":
         from .services import capabilities as C
         return C.table()

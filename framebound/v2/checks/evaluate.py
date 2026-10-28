@@ -36,8 +36,17 @@ PROFILE = C.PROFILE
 
 def _code_sha256() -> str:
     h = hashlib.sha256()
+    here = Path(__file__).parent
     for name in ("implementations.py", "evaluate.py", "raster.py", "registry.py", "params.py"):
-        h.update((Path(__file__).parent / name).read_bytes())
+        h.update((here / name).read_bytes())
+    # The stored service's context resolver, canonical raster, and domain
+    # schema are part of the measurement identity: changing how references,
+    # annotations, registration, or pixels are resolved must invalidate old
+    # evidence instead of silently reinterpreting it.
+    for extra in (here.parent / "services" / "clips.py",
+                  here.parent / "media" / "canonical.py",
+                  here.parent / "domain.py"):
+        h.update(extra.read_bytes())
     return h.hexdigest()
 
 
@@ -395,7 +404,8 @@ def evaluate_frames(contract: D.ClipContractRevision, frames: list[Image.Image],
         "references": {s: {"pixel_sha256": h,
                            "byte_sha256": (ctx.get("reference_byte_hashes") or {}).get(int(s))}
                        for s, h in ref_hashes.items()},
-        "annotations": ctx.get("annotation_hashes", []),
+        "annotations": ctx.get("annotations", ctx.get("annotation_hashes", [])),
+        "authority": ctx.get("authority", {}),
         "registration": ctx.get("registration"),
         "timeline": {"holds": list(contract.timing.holds), "loop": contract.action.loop,
                      "world_positions": world_positions, "planted": planted},

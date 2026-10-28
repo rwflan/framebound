@@ -550,6 +550,49 @@ class ReferenceApproval(Strict):
     created_at: str = Field(default_factory=utcnow)
 
 
+class CompiledBrief(Strict):
+    """Immutable frozen conditioning: the ONLY submittable generation request.
+
+    Binds contract/character revisions, the exact human approval + motion guide
+    (ids + asset hashes), slot/phase/timing, the full brief dict digest, and
+    the per-role asset byte/pixel hashes the provider must receive. Versioned;
+    legacy dict-only briefs are rejected at submission, never recompiled from
+    caller claims.
+    """
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    contract_revision_id: str = Field(min_length=1, max_length=128)
+    character_revision_id: str = Field(min_length=1, max_length=128)
+    approval_id: str = Field(min_length=1, max_length=128)
+    approval_event_id: str = Field(min_length=1, max_length=128)
+    motion_guide_id: str = Field(min_length=1, max_length=128)
+    slot: StrictInt = Field(ge=0)
+    phase: str = Field(min_length=1, max_length=64)
+    phase_asset_id: str = Field(min_length=1, max_length=128)
+    phase_byte_sha256: str = Field(**HEX64)
+    identity_asset_id: str = Field(min_length=1, max_length=128)
+    style_asset_id: str = Field(min_length=1, max_length=128)
+    brief_digest: str = Field(**HEX64)
+    brief: dict[str, Any] = Field(min_length=1)
+    created_at: str = Field(default_factory=utcnow)
+
+
+class WorldTrace(Strict):
+    """Stored per-tick world grounding for one clip revision (frozen).
+
+    positions/planted cover every held tick in order; evaluation binds them to
+    world_sliding/declared_contacts instead of passing silently. Length must
+    equal the contract's total held ticks.
+    """
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    clip_revision_id: str = Field(min_length=1, max_length=128)
+    positions: list[list[float]] = Field(min_length=1)
+    planted: list[bool] = Field(min_length=1)
+    units: str = Field(default="world_units", max_length=64)
+    created_at: str = Field(default_factory=utcnow)
+
+
 class ReviewerPairing(Strict):
     code_sha256: str = Field(**HEX64)
     reviewer_id: str = Field(min_length=1, max_length=200)

@@ -34,32 +34,71 @@ def _payload_hash(brief: dict, resolved_refs: list[dict]) -> str:
 
 def _resolve_references(project_dir: str, brief: dict,
                         caller_blobs: list[dict]) -> list[dict]:
-    """Bind reference bytes server-side from the blob store, hash-verified.
+    """Bind reference bytes server-side from frozen stored conditioning.
 
-    The brief carries role/asset_id/byte_sha256 from stored authority; pixels
-    always come from the local store, never from caller-supplied bytes alone.
-    Caller blobs are cross-checked when present and rejected on mismatch.
+    The presented brief must carry the `compiled_brief_id` of a stored
+    CompiledBrief and deep-equal its frozen bundle: caller-authored role
+    labels, invented hashes, or zero-approval forgeries are refused before any
+    transport. Pixels always come from the local store, never from
+    caller-supplied bytes alone. Caller blobs are cross-checked when present
+    and rejected on mismatch. The approved phase/pose guide image is resolved
+    from the frozen binding and transmitted as `approved_phase` pixels — the
+    model receives guide pixels, not just a text label.
     """
-    inputs = brief.get("inputs")
-    if not isinstance(inputs, list) or not inputs:
-        raise InvalidInput("brief has no reference inputs: compile it from stored approval first")
+    from . import briefs as _B
+    if not isinstance(brief, dict):
+        raise InvalidInput("brief must be a compiled brief bundle, not a caller description")
+    cbid = brief.get("compiled_brief_id")
+    if not cbid:
+        raise InvalidInput(
+            "brief carries no compiled_brief_id: caller-authored briefs confer no "
+            "authority; compile against stored human approval first")
+    cb = _B.load_compiled_brief(project_dir, cbid)
+    presented = {k: v for k, v in brief.items() if k != "compiled_brief_id"}
+    frozen = dict(cb.brief)
+    if hashlib.sha256(json.dumps(presented, sort_keys=True).encode()).hexdigest() != cb.brief_digest \
+            and presented != frozen:
+        raise InvalidInput("brief diverges from its frozen compiled conditioning: resubmission "
+                           "of an altered brief is refused; recompile explicitly")
+    # Frozen authority: exact approval/guide/phase-asset bindings.
+    from . import approvals as _A
+    con = S.connect(project_dir)
+    try:
+        try:
+            apdata, _ = S.get(con, "reference_approvals", cb.approval_id)
+        except KeyError:
+            raise InvalidInput(f"brief approval {cb.approval_id} is no longer stored")
+        ap = D.ReferenceApproval.model_validate_json(json.dumps(apdata))
+        for aid in [*ap.identity_asset_ids, *ap.style_asset_ids, cb.phase_asset_id]:
+            if ap.identity_asset_ids.__contains__(aid) or ap.style_asset_ids.__contains__(aid):
+                expect = ap.asset_hashes.get(aid)
+            else:
+                expect = cb.phase_byte_sha256
+            try:
+                adata, _ = S.get(con, "assets", aid)
+            except KeyError:
+                raise InvalidInput(f"missing_input: frozen reference asset {aid} not stored")
+            raw = S.blob_path(project_dir, adata["byte_sha256"]).read_bytes()
+            digest = hashlib.sha256(raw).hexdigest()
+            if digest != expect or digest != adata["byte_sha256"]:
+                raise InvalidInput(f"frozen reference {aid}: bytes changed since human approval")
+    finally:
+        con.close()
     by_asset = {b.get("asset_id"): b for b in caller_blobs if isinstance(b, dict)}
     con = S.connect(project_dir)
     try:
         resolved = []
-        for item in inputs:
-            aid = item.get("asset_id")
-            if not aid:
-                continue  # phase_authority entries carry no pixels here
+        plan = [("approved_identity", cb.identity_asset_id),
+                ("approved_style", cb.style_asset_id),
+                ("approved_phase", cb.phase_asset_id)]
+        for role, aid in plan:
             try:
                 adata, _ = S.get(con, "assets", aid)
             except KeyError:
-                raise InvalidInput(f"missing_input: brief reference asset {aid} not stored")
+                raise InvalidInput(f"missing_input: frozen reference asset {aid} not stored")
             raw = S.blob_path(project_dir, adata["byte_sha256"]).read_bytes()
             digest = hashlib.sha256(raw).hexdigest()
-            if digest != item.get("byte_sha256") or digest != adata["byte_sha256"]:
-                raise InvalidInput(f"brief reference {aid}: bytes changed since approval")
-            entry = {"role": item.get("role", "reference"), "asset_id": aid,
+            entry = {"role": role, "asset_id": aid,
                      "byte_sha256": digest, "mime": adata.get("mime", "image/png"),
                      "bytes_b64": base64.b64encode(raw).decode()}
             if aid in by_asset:
@@ -75,8 +114,8 @@ def _resolve_references(project_dir: str, brief: dict,
                     except Exception:
                         raise InvalidInput(f"caller bytes for {aid} are not valid base64")
             resolved.append(entry)
-        if not resolved:
-            raise InvalidInput("brief resolved to zero reference assets")
+        if len(resolved) < 3:
+            raise InvalidInput("frozen conditioning resolved without phase guide pixels")
         return resolved
     finally:
         con.close()
