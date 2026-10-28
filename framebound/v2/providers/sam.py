@@ -193,6 +193,10 @@ def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/
                                  provider="sam", model=req["model"])
         return {"mode": "not_configured", "sent": False, "request_artifact": digest,
                 "note": "Set MODEL_API_KEY to send; alpha stays labeled offline-alpha, never SAM."}
+    req_digest = record_artifact(project_dir, "sam_request",
+                                 {"request": redacted, "sent": True,
+                                  "model": req["model"]},
+                                 provider="sam", model=req["model"])
     def _send():
         return http_post(W.RESPONSE_PATH, req, timeout=timeout, transport=transport)
     body, _tries = retry_transient(_send)
@@ -217,13 +221,15 @@ def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/
         response_id = body.get("id") if isinstance(body, dict) else None
     parsed = parse_output_text(text, source_width=source_width, source_height=source_height)
     digest = record_artifact(project_dir, "sam_response",
-                             {"request": redacted, "sent": True, "model": req["model"],
+                             {"request_artifact": req_digest,
+                              "request": redacted, "sent": True, "model": req["model"],
                               "response_id": response_id,
                               "outcome": parsed["outcome"], "reason": parsed.get("reason"),
                               "record_count": len(parsed.get("records", []))},
                              provider="sam", model=req["model"],
                              request_id=str(response_id or ""))
-    out = {"mode": "live", "sent": True, "response_artifact": digest,
+    out = {"mode": "live", "sent": True, "request_artifact": req_digest,
+           "response_artifact": digest,
            "response_id": response_id, **parsed}
     # Strip rasters from the returned envelope? No — callers need geometry, but
     # rasters are bytes; expose foreground counts + boxes, keep rasters under "records".

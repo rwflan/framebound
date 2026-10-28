@@ -134,6 +134,15 @@ def main(argv=None):
                     help="replace a previous framework-owned snapshot output (refuses unmarked dirs)")
     dv = sub.add_parser("dataset-validate", help="v2: validate a snapshot with standard loaders")
     dv.add_argument("--snapshot", required=True)
+    rr = sub.add_parser("recorded-run", help="v2: one recorded provider workflow (or honest pending bundle)")
+    rr.add_argument("--project", required=True)
+    rr.add_argument("--contract", required=True)
+    rr.add_argument("--slot", required=True)
+    rr.add_argument("--baseline", required=True)
+    rr.add_argument("--new-id", required=True)
+    rr.add_argument("--out", required=True)
+    rr.add_argument("--offline", action="store_true", default=False)
+    rr.add_argument("--idempotency-key", required=False, default="recorded-run-1")
     vf = sub.add_parser("verify", help="v2: verify stored revisions, blobs and evidence freshness")
     vf.add_argument("--project", required=True)
     vf.add_argument("--report", help="Write the verification report JSON here")
@@ -163,6 +172,13 @@ def main(argv=None):
         rep = _snap(args.project, args.snapshot, args.revisions.split(","), args.out, pol)
         _print({"snapshot": rep["snapshot"], "counts": rep["counts"],
                 "exclusions": rep["exclusions"]})
+        return 0
+    if args.cmd == "recorded-run":
+        from .v2 import recorded_run as _rr
+        _print(_rr.run_recorded(args.project, args.out, contract_id=args.contract,
+                                slot=int(args.slot), baseline_revision_id=args.baseline,
+                                new_revision_id=args.new_id, offline=bool(args.offline),
+                                idempotency_key=args.idempotency_key))
         return 0
     if args.cmd == "dataset-validate":
         from .v2.exports import validate_snapshot as _val
