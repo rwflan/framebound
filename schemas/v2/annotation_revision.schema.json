@@ -19,8 +19,7 @@
       "type": "string"
     },
     "source_pixel_sha256": {
-      "maxLength": 64,
-      "minLength": 64,
+      "pattern": "^[0-9a-fA-F]{64}$",
       "title": "Source Pixel Sha256",
       "type": "string"
     },
@@ -55,6 +54,69 @@
       "title": "Annotator Type",
       "type": "string"
     },
+    "role": {
+      "default": "support",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Role",
+      "type": "string"
+    },
+    "frame_instance_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Frame Instance Id"
+    },
+    "points": {
+      "anyOf": [
+        {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Points"
+    },
+    "mask_asset_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mask Asset Id"
+    },
+    "transform": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Transform"
+    },
     "reviewer": {
       "anyOf": [
         {
@@ -66,6 +128,30 @@
       ],
       "default": null,
       "title": "Reviewer"
+    },
+    "proposal_event_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposal Event Id"
+    },
+    "review_event_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Review Event Id"
     },
     "confidence": {
       "anyOf": [

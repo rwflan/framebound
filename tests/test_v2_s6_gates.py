@@ -24,7 +24,8 @@ from framebound.v2.services import review_state as RS
 from framebound.v2.services.authz import Actor
 
 import sys
-sys.path.insert(0, "/Volumes/datadisk0/data/appdata/repositories/framebound/tests")
+from pathlib import Path as _TestPath
+sys.path.insert(0, str(_TestPath(__file__).resolve().parent))
 from test_v2_r5_export import _seed, _fix_flow  # noqa: E402
 
 REV = Actor(type="reviewer", id="human-1")

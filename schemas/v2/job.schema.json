@@ -14,6 +14,7 @@
     }
   },
   "additionalProperties": false,
+  "description": "Durable generation job. New fields default so pre-R3 rows still load.",
   "properties": {
     "schema_version": {
       "const": "2.0",
@@ -44,10 +45,139 @@
       "type": "string"
     },
     "payload_sha256": {
-      "maxLength": 64,
-      "minLength": 64,
+      "pattern": "^[0-9a-fA-F]{64}$",
       "title": "Payload Sha256",
       "type": "string"
+    },
+    "provider": {
+      "default": "image",
+      "maxLength": 64,
+      "title": "Provider",
+      "type": "string"
+    },
+    "targets": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Targets",
+      "type": "array"
+    },
+    "attempt_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Attempt Count",
+      "type": "integer"
+    },
+    "max_attempts": {
+      "default": 3,
+      "maximum": 10,
+      "minimum": 1,
+      "title": "Max Attempts",
+      "type": "integer"
+    },
+    "budget_reserved": {
+      "default": "unbounded-note",
+      "maxLength": 200,
+      "title": "Budget Reserved",
+      "type": "string"
+    },
+    "cost_estimate": {
+      "default": "unknown",
+      "maxLength": 200,
+      "title": "Cost Estimate",
+      "type": "string"
+    },
+    "cost_actual": {
+      "default": "unknown",
+      "maxLength": 200,
+      "title": "Cost Actual",
+      "type": "string"
+    },
+    "no_progress_signatures": {
+      "items": {
+        "type": "string"
+      },
+      "title": "No Progress Signatures",
+      "type": "array"
+    },
+    "request_brief": {
+      "additionalProperties": true,
+      "title": "Request Brief",
+      "type": "object"
+    },
+    "provider_settings": {
+      "additionalProperties": true,
+      "title": "Provider Settings",
+      "type": "object"
+    },
+    "origin": {
+      "default": "unknown",
+      "maxLength": 64,
+      "title": "Origin",
+      "type": "string"
+    },
+    "fencing_token_sha256": {
+      "default": "",
+      "title": "Fencing Token Sha256",
+      "type": "string"
+    },
+    "dispatch_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Dispatch Count",
+      "type": "integer"
+    },
+    "reserved_cost": {
+      "default": "unbounded-note",
+      "maxLength": 200,
+      "title": "Reserved Cost",
+      "type": "string"
+    },
+    "request_artifact": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Request Artifact"
+    },
+    "response_artifact": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Response Artifact"
+    },
+    "output_asset_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Output Asset Ids",
+      "type": "array"
+    },
+    "reconciliation_required": {
+      "default": false,
+      "title": "Reconciliation Required",
+      "type": "boolean"
+    },
+    "cancel_requested": {
+      "default": false,
+      "title": "Cancel Requested",
+      "type": "boolean"
+    },
+    "offline": {
+      "default": false,
+      "title": "Offline",
+      "type": "boolean"
     },
     "lease_holder": {
       "anyOf": [
@@ -88,6 +218,10 @@
     },
     "created_at": {
       "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "title": "Updated At",
       "type": "string"
     }
   },

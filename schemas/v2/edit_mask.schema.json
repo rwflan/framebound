@@ -1,0 +1,73 @@
+{
+  "additionalProperties": false,
+  "description": "Reviewer-approved edit support: exactly which pixels a repair may touch.\n\nAn issue ROI suggests scope but never authorizes pixels by itself. Changed\ncandidate pixels must lie inside the ROI and/or this approved mask.",
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "issue_event_id": {
+      "minLength": 1,
+      "title": "Issue Event Id",
+      "type": "string"
+    },
+    "task_id": {
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "mask_asset_id": {
+      "minLength": 1,
+      "title": "Mask Asset Id",
+      "type": "string"
+    },
+    "mask_byte_sha256": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Mask Byte Sha256",
+      "type": "string"
+    },
+    "covered_slots": {
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 1,
+      "title": "Covered Slots",
+      "type": "array"
+    },
+    "approved_by": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Approved By",
+      "type": "string"
+    },
+    "approval_event_id": {
+      "minLength": 1,
+      "title": "Approval Event Id",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "issue_event_id",
+    "task_id",
+    "mask_asset_id",
+    "mask_byte_sha256",
+    "covered_slots",
+    "approved_by",
+    "approval_event_id"
+  ],
+  "title": "EditMask",
+  "type": "object"
+}

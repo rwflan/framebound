@@ -273,7 +273,8 @@ class RecordedRun(unittest.TestCase):
                                   baseline_revision_id="rev-rr-base",
                                   new_revision_id="rev-rr-gen",
                                   offline=False, transport=fake,
-                                  idempotency_key="rr-sim-1")
+                                  idempotency_key="rr-sim-1",
+                                  include_spark=True)
             self.assertEqual(out["origin"], "provider-simulated")
             self.assertNotEqual(out["origin"], "live")
             self.assertEqual(out["acceptance"], "unreviewed")

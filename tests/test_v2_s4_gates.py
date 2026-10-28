@@ -21,7 +21,8 @@ from framebound.v2.providers import wire as W
 from framebound.v2.services.errors import InvalidInput, ResponseInvalid
 
 import sys
-sys.path.insert(0, "/Volumes/datadisk0/data/appdata/repositories/framebound/tests")
+from pathlib import Path as _TestPath
+sys.path.insert(0, str(_TestPath(__file__).resolve().parent))
 from test_v2_r3_providers import _seed, _EnvKey, _png_bytes  # noqa: E402
 
 
@@ -199,6 +200,8 @@ class TestOriginAndRunner(unittest.TestCase):
                                       baseline_revision_id="rev-rr-base",
                                       new_revision_id="rev-rr-4cap",
                                       offline=False, transport=fake,
+                                      spark_transport=fake,
+                                      include_spark=True,
                                       idempotency_key="rr-4cap-1")
             finally:
                 del _os.environ["MODEL_API_KEY"]
