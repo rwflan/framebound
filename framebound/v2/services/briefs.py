@@ -29,7 +29,7 @@ def compile_reference_brief(project_dir: str, contract_id: str, slot: int) -> di
             raise InvalidInput(f"slot must be an exact integer, got {slot!r}")
         if not (0 <= slot < len(contract.timing.holds)):
             raise InvalidInput(f"slot {slot} outside 0..{len(contract.timing.holds) - 1}")
-        approval = A.current_approval(project_dir, contract.character_revision_id)
+        approval = A.approval_for_contract(project_dir, contract, con)
         if not A.approval_event_is_human(project_dir, approval.event_id):
             raise InvalidInput("reference approval is not a recorded human reviewer decision")
         assets: dict[str, D.Asset] = {}

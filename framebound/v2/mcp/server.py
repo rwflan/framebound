@@ -17,6 +17,22 @@ TOOLS = ["doctor", "project_get", "asset_import", "contract_propose",
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
+    @server.tool(name='project_create', description='Create or resume a project with identical inputs')
+    def project_create(project_id: str, name: str = '') -> dict:
+        from ..services import projects
+        return projects.create_project(project_dir, {'id':project_id, 'name':name or project_id}).model_dump()
+
+    @server.tool(name='character_propose', description='Propose stored character identity/style and native calibration')
+    def character_propose(character: dict) -> dict:
+        from ..services import characters
+        return characters.propose_character(project_dir, character).model_dump()
+
+    @server.tool(name='guide_propose', description='Propose independent phase guides; does not approve them')
+    def guide_propose(guide: dict) -> dict:
+        from ..services import approvals
+        from ..services.authz import Actor
+        return approvals.propose_motion_guide(project_dir, Actor(type='orchestrator',id='mcp'), guide).model_dump()
+
     @server.tool(name="doctor", description="Offline runtime and dependency check")
     def doctor() -> dict:
         from ..doctor import run_doctor

@@ -33,5 +33,5 @@ def bootstrap_empty_project(project_dir: str, *, character_id: str = "char-01",
     return {"project_dir": str(_Path(project_dir).resolve()),
             "character_id": character_id, "contract_id": contract_id,
             "revision_id": revision_id,
-            "next_actions": ["asset_import", "contract_propose", "reference_approve",
+            "next_actions": ["asset_import", "character_propose", "guide_propose", "contract_propose", "reference_approve",
                              "clip_create_revision", "clip_evaluate", "review_packet_create"]}

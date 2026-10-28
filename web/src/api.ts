@@ -8,6 +8,7 @@ import type {
   ExportResultDto,
   IssueDetailDto,
   PacketBundleDto,
+  ReferencesDto,
   TaskStatusDto,
 } from './api-types';
 
@@ -72,6 +73,10 @@ const q = (params: Record<string, string | number | undefined>) => {
 };
 
 export const api = {
+  references: () => req<ReferencesDto>('/api/references'),
+  approveReferences: (character: string, guide: string, eventId: string) =>
+    req<{ok:boolean}>('/api/references/approve', {method:'POST',body:JSON.stringify({
+      character_revision_id:character,motion_guide_id:guide,event_id:eventId})}),
   health: () => req<{ ok: boolean; schema_version: string }>('/api/health'),
   project: () => req<{ summary: Record<string, unknown> }>('/api/project'),
   packets: () => req<{ packets: Record<string, unknown>[] }>('/api/packets'),
