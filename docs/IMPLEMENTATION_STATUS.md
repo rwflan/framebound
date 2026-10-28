@@ -5,6 +5,83 @@ Baseline: `b680d84` (audited main, 2026-10-27). `main` has not advanced since th
 Prior ledger entries below are historical. The earlier "64 passing tests" and "engineering complete except
 for entrant actions" claims are NOT accepted as proof; each remediation package re-proves its gate.
 
+## Current package: R6 — the actual review experience (done on branch `codex/r6-review-desk`, 2026-10-28)
+
+Acceptance gate (browser, real services/transports, disposable data): packet opens with
+actual frame pixels + asset identity; pause/step/resume/speed preserve timeline continuity;
+two intentionally different revisions both render with a measured pixel difference; a known
+ROI + frame range is server-stored with exact geometry/category; API restart + browser reload
+restore the same issue, decision context and source bytes; claim/submit via CLI then compare
++ resolve + reopen through the browser with the exact resolution event; export through the
+desk, moved and consumed independently. Stalled media, missing range entries, absent issues
+after restart or mismatched pixels all fail loudly. All demonstrated — `browser-journey: ok`.
+
+### Changed capability
+
+- `api/dto.py` (new, 20+ DTOs): the single typed contract per endpoint; wired as FastAPI
+  response models (permissive extras, guaranteed fields) so the schema enforces the desk
+  contract at runtime. `scripts/gen_api_types.py` (new, reproducible): emits
+  `web/src/api-types.ts` (DTOs + 32-route endpoint table) with `--check` for CI.
+- New endpoints: `GET /api/compare` (both immutable revisions + media URLs, evals, per-side
+  holds/tps/loop; same character+action required, retiming mapped explicitly instead of
+  frame-index equality), `GET /api/issues` (full detail: ROI/range/attempts/candidates/
+  findings/coverage/decision/resolution), `GET /api/corrections?status=` (awaiting-comparison
+  and blocked stay visible), `GET /api/packet/:id/contact-sheet` (deterministic PNG,
+  content-hash header), `POST /api/packet/:id/preview` (deterministic hold-expanded mp4 via
+  ffmpeg; 501 without it, never a fake video), `GET /api/activity` (DB-backed cursor
+  catch-up that survives restarts), `POST|GET /api/exports` (desk-driven R5 export+validate).
+  Packet frames now carry server-resolved `asset_url`s (the DTO caught the gap).
+- Desk rewrite (`web/src/App.tsx`, `api.ts`, `useClock.ts`, `playback.ts`): hash routing
+  (packet/compare/issues/corrections/export/activity) so reload restores context from the
+  server; reviewer pair/open ceremony with session token (no self-asserted headers);
+  presentation clock with monotonic accumulator (pause/resume/speed/step preserve authored
+  ticks; one-shot terminal; keyboard); exact tick stepper + frame identity readout; native
+  aspect ratio (no 288px distortion) with a tested `toNative` mapper (separate x/y scales,
+  mirroring, clamping); preloaded media with error states and stale-callback guards; blink
+  + canvas-difference compare with measured mean-abs-diff; issue detail with per-candidate
+  resolve + reopen; corrections queue with all states + status filter; export builder view;
+  DB-backed activity polling with persisted cursor; typed API client where errors become
+  alerts, never empty success lists. No numerical quality score anywhere.
+- `web/test/playback.test.mjs` + `npm run test:unit` (esbuild + node:test): slot/tick math
+  mirrors `media/timeline.py`; the single-width-scale distortion is pinned wrong (5 vs 10).
+- `web/e2e/journey.mjs` rewritten to the gate (setup via `web/e2e/setup.py` production
+  services): asserts frame pixels/asset identity, tick continuity across pause/step/resume/
+  speed, real diff %, server ROI/range/category, byte-identical assets across SIGKILL restart,
+  CLI claim/submit, browser resolve with exact event, reopen visibility, desk export moved +
+  independently validated. `verify-local` runs it as `browser-journey` (no more SKIP).
+
+### Failing repros fixed (reproduced before fixing)
+
+- Empty Compare screen → loads both revisions' media/evals/timing via `/api/compare`; proves
+  both images visible + difference real (3.08% at the differing slot in the gate run) (pinned).
+- Paint-counter evidence → accumulator clock + frame identity + media error states; unit tests
+  pin tick math and the width-scale distortion (pinned).
+- ROI/range accepted to 9000 → server bounds + `start<=end<total` validation; desk parses and
+  the gate asserts stored geometry within ±2 native px (pinned).
+- Reload losing context → hash routes + server-sourced issues/decisions + persisted activity
+  cursor; gate kills the API process and reloads (pinned).
+- In-memory SSE as only events → `/api/activity` cursor pagination, DB-backed (pinned).
+- `Packet=any` bodies → generated DTOs + response models + `test_v2_api_dto.py` conformance
+  (21 live assertions incl. cursor pagination and export round-trip) (pinned).
+
+### Actual commands/results (2026-10-28, Dublin; python 3.11.4, node v22.23.4, chromium 156/headless-shell, ffmpeg 9.0.2)
+
+- `python -m pytest tests/ -q` → `151 passed, 1 skipped` (145 prior + 5 R6 desk + 1 API-DTO file).
+- `web` typecheck clean; `npm run test:unit` 3/3; production build ok (170 kB).
+- `sh scripts/verify-local` → `ALL LOCAL CHECKS PASSED`, exit 0, incl. `browser-journey: ok`
+  (real API on :8766 + real chromium; diff 3.08%; export moved + revalidated).
+- Contact-sheet bytes identical across separate app instances; preview mp4 deterministic
+  across rebuilds (ffmpeg present) with command + hashes recorded.
+
+### Artifacts / limitations / next
+
+- Limitations: contact-sheet/preview/contact overlays for guides+masks render client-side only
+  (server contact-sheet covers frames); SSE still in-memory (activity polling is the durable
+  path); video preview needs ffmpeg (501 otherwise); imported-video review path not exercised
+  (no fixtures); live provider spike still needs an authorized participant credential.
+- Docs-vs-reality audit + benchmark of the public service remain R8's gate.
+- Next: R7 — rebuild the demonstration as evidence (relabel + transition traces).
+
 ## Current package: R5 — portable training views with pixel-correct masks (done on branch `codex/r5-training-views`, 2026-10-28)
 
 Acceptance gate: the 3x5 mask decodes pixel-exact with independently recomputed bbox/area;

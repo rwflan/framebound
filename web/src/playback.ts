@@ -12,14 +12,31 @@ export function slotAtTick(holds: number[], tick: number, loop: boolean): number
   throw new Error('unreachable tick');
 }
 
-/** Map a pointer event on a zoomed/mirrored canvas back to native pixels. */
+/** First authored tick of a slot (for exact selection/stepping). */
+export function tickOfSlot(holds: number[], slot: number): number {
+  let acc = 0;
+  for (let i = 0; i < Math.min(slot, holds.length); i++) acc += holds[i];
+  return acc;
+}
+
+export function totalTicks(holds: number[]): number {
+  return holds.reduce((a, b) => a + b, 0);
+}
+
+/** Map a pointer event on a transformed canvas back to native pixels.
+ *  scaleX/scaleY are CSS-px-per-native-px (uniform when aspect is preserved);
+ *  using one width scale for both axes distorts non-square frames, so the
+ *  caller must pass both. Mirroring flips around the native width. */
 export function toNative(
-  clientX: number, clientY: number, rect: DOMRect,
+  clientX: number, clientY: number, rect: { left: number; top: number; width: number; height: number },
   nativeW: number, nativeH: number,
-  opts: { scale: number; offsetX: number; offsetY: number; mirrored: boolean; dpr?: number },
+  opts: { scaleX: number; scaleY: number; offsetX: number; offsetY: number; mirrored: boolean },
 ): { x: number; y: number } {
-  const cssX = (clientX - rect.left - opts.offsetX) / opts.scale;
-  const cssY = (clientY - rect.top - opts.offsetY) / opts.scale;
+  const cssX = (clientX - rect.left - opts.offsetX) / opts.scaleX;
+  const cssY = (clientY - rect.top - opts.offsetY) / opts.scaleY;
   const x = opts.mirrored ? nativeW - cssX : cssX;
-  return { x: Math.max(0, Math.min(nativeW - 1e-6, x)), y: Math.max(0, Math.min(nativeH - 1e-6, cssY)) };
+  return {
+    x: Math.max(0, Math.min(nativeW - 1e-6, x)),
+    y: Math.max(0, Math.min(nativeH - 1e-6, cssY)),
+  };
 }
