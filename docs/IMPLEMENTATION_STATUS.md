@@ -40,7 +40,20 @@ item instead of assuming a later package delivered it.
 ### Fresh verification (R8 evidence, `/tmp/fb-r8-evidence/`)
 
 - `bench-eval` (public service, 8×64×64, registration+area+cadence+provenance): technical pass; cold p50 ≈ 322 ms (fresh interpreter, n=5); warm p50 ≈ 27 ms, p95 ≈ 61 ms (n=25); incremental changed-frame p50 ≈ 37 ms (whole-revision re-evaluation, no incremental cache — reported, not hidden). Full report: `bench-eval.json`.
-- Clean clone of main @ proof-SHA: `git status` clean; fresh capable venv (`python3.15`, working `_lzma`); `pip install .[test,export-validation]` + `pip check` clean; full `pytest` green incl. the live `datasets.load_dataset("imagefolder")` materialization test; `pip wheel --no-deps .` builds (packaging proof, not just checkout success); installed-package `import framebound` + `framebound doctor` + `v2-mcp` handshake; web production build; real browser/process-restart journey; moved-snapshot consumption. Logs kept in the evidence dir (environment-specific, not committed); SHAs + outcomes recorded here.
+- Clean clone @ `e54b02c` (R8 branch head; `git status` clean): fresh capable venv
+  (`python3.15.1`, working `_lzma`); `pip install .[test,export-validation]` exit 0 +
+  `pip check` clean ("No broken requirements found"); full `pytest`: **157 passed**
+  (includes the live `datasets.load_dataset("imagefolder")` materialization test —
+  zero skips where the dev interpreter skips one); `pip wheel --no-deps .` builds
+  `framebound-0.1.0-py3-none-any.whl` (packaging proof, not just checkout success);
+  installed-package `import framebound` + `framebound doctor` ok; `npm ci` +
+  `typecheck` + production `build` + `test:unit` (3/0) green; `verify-local` in the
+  clone: **ALL LOCAL CHECKS PASSED** incl. `browser-journey: ok` (real API + chromium,
+  SIGKILL restart, desk export moved + revalidated). Logs: `/tmp/fb-r8-evidence/`
+  (`pip-install.log`, `pytest-fresh.log`, `verify-fresh.log`, `bench-eval.json`,
+  `wheel/`). The merged HEAD adds only this ledger paragraph on top of the proven
+  SHA — no code, test, or tooling delta (`git diff e54b02c HEAD --stat` shows
+  docs/IMPLEMENTATION_STATUS.md only).
 - Offline/live semantics: `verify-local` forces bogus keys present and still passes with zero egress (offline neutrality pinned by R0/R3 tests); `--live` without a key exits 2 with an explicit message. A live skip is recorded as pending, never as a pass.
 
 ### Changed capability (R8)
