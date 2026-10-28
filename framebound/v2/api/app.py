@@ -480,11 +480,14 @@ def create_app(project_dir: str) -> FastAPI:
                   x_actor_id: str | None = Header(default=None)):
         from ..services import orchestrator as O
         act = actor(x_session_token, x_actor_id)
-        brief = body.get("brief") or {}
+        # The executable request is the frozen job row: no caller brief is
+        # needed. A supplied brief must fingerprint-match the submission.
+        brief = body.get("brief")
         try:
             return O.orchestrator_send(project_dir, str(body.get("run_id")),
                                        str(body.get("job_id")), brief,
                                        worker_id=act.id,
+                                       fencing_token=body.get("fencing_token"),
                                        offline=bool(body.get("offline", False)))
         except S.StaleRevisionError as e:
             raise HTTPException(409, str(e))
