@@ -12,7 +12,8 @@ type View =
   | { name: 'corrections' }
   | { name: 'export' }
   | { name: 'activity' }
-  | { name: 'status' };
+  | { name: 'status' }
+  | { name: 'references' };
 
 function parseHash(): View {
   const h = window.location.hash.replace(/^#/, '');
@@ -29,6 +30,7 @@ function parseHash(): View {
   if (seg[0] === 'corrections') return { name: 'corrections' };
   if (seg[0] === 'export') return { name: 'export' };
   if (seg[0] === 'activity') return { name: 'activity' };
+  if (seg[0] === 'references') return { name: 'references' };
   if (seg[0] === 'status') return { name: 'status' };
   return { name: 'inbox' };
 }
@@ -68,6 +70,7 @@ export default function App() {
         <button onClick={() => nav({ name: 'issues' })}>Issues</button>
         <button onClick={() => nav({ name: 'export' })}>Export</button>
         <button onClick={() => nav({ name: 'activity' })}>Activity</button>
+        <button onClick={() => nav({ name: 'references' })}>References</button>
         <button onClick={() => nav({ name: 'status' })}>Status</button>
         <span style={{ color: '#666' }}>decisions bind exact revisions — never slots</span>
         <span style={{ marginLeft: 'auto' }}>
@@ -84,6 +87,7 @@ export default function App() {
       {view.name === 'export' && <ExportView />}
       {view.name === 'activity' && <ActivityView />}
       {view.name === 'status' && <StatusView />}
+      {view.name === 'references' && <ReferencesView />}
     </div>
   );
 }
@@ -649,4 +653,35 @@ function StatusView() {
         </table>)}
     </section>
   );
+}
+
+function ReferencesView() {
+  const [data,setData] = useState<Awaited<ReturnType<typeof api.references>> | null>(null);
+  const [error,setError] = useState<unknown>(null);
+  const [busy,setBusy] = useState<string | null>(null);
+  const refresh = useCallback(() => api.references().then(setData).catch(setError),[]);
+  useEffect(() => { void refresh(); },[refresh]);
+  return <section aria-label="Reference proposals"><h2>Reference proposals</h2><Err e={error}/>
+    {!data && <p>Loading references…</p>}
+    {data && data.motion_guides.length === 0 && <p>No guide proposals.</p>}
+    {data?.motion_guides.map(guide => {
+      const char=data.character_revisions.find(c=>c.id===guide.character_revision_id);
+      const approved=data.reference_approvals.some(a=>a.character_revision_id===guide.character_revision_id && a.motion_guide_id===guide.id);
+      return <article key={guide.id} style={{borderTop:'1px solid #ccc',padding:'20px 0'}}>
+        <h3>{guide.character_revision_id} · {guide.id}</h3>
+        <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
+          {char && [['Identity',char.identity_asset_ids],['Style',char.style_asset_ids]].map(([label,ids]) =>
+            <div key={String(label)}><h4>{String(label)}</h4>{(ids as string[]).map(id =>
+              <figure key={id} style={{display:'inline-block',margin:8}}><img alt={`${label}: ${id}`} src={api.assetUrl(id)} width={128} height={128} style={{objectFit:'contain',imageRendering:'pixelated',background:'#eee'}}/><figcaption>{id}</figcaption></figure>)}</div>)}
+          <div><h4>Phase guide</h4>{guide.entries.map(entry => <figure key={entry.phase} style={{display:'inline-block',margin:8}}>
+            <img alt={`Phase ${entry.phase}`} src={api.assetUrl(entry.asset_id)} width={128} height={128} style={{objectFit:'contain',imageRendering:'pixelated',background:'#eee'}}/><figcaption>{entry.phase}</figcaption></figure>)}</div>
+        </div>
+        <button disabled={approved || !getReviewer() || busy!==null} onClick={async()=>{
+          setBusy(guide.id);setError(null);
+          try { await api.approveReferences(guide.character_revision_id,guide.id,`ref-${crypto.randomUUID()}`);await refresh(); }
+          catch(e){setError(e);}finally{setBusy(null);}
+        }}>{approved?'References approved':busy===guide.id?'Recording…':'Approve these references'}</button>
+      </article>;
+    })}
+  </section>;
 }

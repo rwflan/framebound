@@ -152,6 +152,24 @@ def insert(con: sqlite3.Connection, model: D.Strict) -> int:
     return 1
 
 
+def stage_identical(con: sqlite3.Connection, model: D.Strict,
+                    generated_fields: tuple[str, ...] = ()) -> bool:
+    """Insert immutable input, or replay only the identical semantic payload."""
+    table = table_for(model)
+    row = con.execute(f"SELECT data FROM {table} WHERE id=?", (model.id,)).fetchone()
+    if row is None:
+        stage(con, model)
+        return True
+    old = type(model).model_validate_json(row['data']).model_dump(mode='json')
+    new = model.model_dump(mode='json')
+    for field in generated_fields:
+        old.pop(field, None)
+        new.pop(field, None)
+    if old != new:
+        raise ConflictError(f"{table}/{model.id}: identifier already bound to different inputs")
+    return False
+
+
 @contextlib.contextmanager
 def atomic(con: sqlite3.Connection):
     """Use-case-owned transaction: all staged writes commit together.
