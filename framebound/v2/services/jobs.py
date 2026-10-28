@@ -9,6 +9,7 @@ records; a restarted worker resumes rather than resetting them.
 """
 from __future__ import annotations
 
+import contextlib
 import base64
 import hashlib
 import json
@@ -25,6 +26,24 @@ MAX_TARGET_ATTEMPTS = 3
 
 TERMINAL = {D.JobStatus.SUCCEEDED, D.JobStatus.FAILED,
             D.JobStatus.CANCELLED}
+
+
+PROVIDER_SETTING_KEYS={'model','transport','base_url','grant_id','previous_response_id','edit_instruction',
+                       'max_spend_usd','provider','source_asset_id','prompt'}
+
+
+def validate_provider_settings(value):
+    if value is None:return {}
+    if not isinstance(value,dict) or set(value)-PROVIDER_SETTING_KEYS:
+        raise InvalidInput('unknown provider settings; credentials never belong in a job')
+    settings=dict(value)
+    if settings.get('max_spend_usd') is not None:
+        from decimal import Decimal,InvalidOperation
+        try:amount=Decimal(str(settings['max_spend_usd']).removeprefix('usd-'))
+        except InvalidOperation as exc:raise InvalidInput('invalid money ceiling') from exc
+        if not amount.is_finite() or amount<=0:raise InvalidInput('invalid/zero money ceiling')
+        settings['max_spend_usd']=format(amount.normalize(),'f')
+    return settings
 
 
 def _payload_hash(brief: dict, resolved_refs: list[dict]) -> str:
@@ -151,16 +170,7 @@ def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict]
     if not isinstance(max_attempts, int) or isinstance(max_attempts, bool) \
             or not (1 <= max_attempts <= 10):
         raise InvalidInput("max_attempts must be an int in 1..10")
-    allowed_settings={'model','transport','base_url','grant_id','previous_response_id','edit_instruction',
-                      'max_spend_usd','provider','source_asset_id','prompt'}
-    if provider_settings is not None:
-        if not isinstance(provider_settings,dict) or set(provider_settings)-allowed_settings:
-            raise InvalidInput('unknown provider settings; credentials never belong in a job')
-        if provider_settings.get('max_spend_usd') is not None:
-            from decimal import Decimal,InvalidOperation
-            try:amount=Decimal(str(provider_settings['max_spend_usd']).removeprefix('usd-'))
-            except InvalidOperation as exc:raise InvalidInput('invalid money ceiling') from exc
-            if not amount.is_finite() or amount<=0:raise InvalidInput('invalid/zero money ceiling')
+    provider_settings=validate_provider_settings(provider_settings)
     resolved = _resolve_references(project_dir, brief, reference_blobs or [])
     from ..providers import image as _imgmod
     provider=(provider_settings or {}).get('provider','image')
@@ -173,6 +183,16 @@ def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict]
     settings.setdefault('base_url', _base())
     if not isinstance(settings['model'],str) or not settings['model'].strip() or settings['transport']!='responses':
         raise InvalidInput('invalid frozen provider model/transport')
+    if settings.get('previous_response_id'):
+        con=S.connect(project_dir)
+        try:
+            self_id='job-'+hashlib.sha256(idempotency_key.encode()).hexdigest()[:12]
+            parents=[D.Job.model_validate_json(row['data']) for row in con.execute('SELECT data FROM jobs')]
+            parents=[j for j in parents if j.id!=self_id and j.provider=='image' and j.status==D.JobStatus.SUCCEEDED
+                     and j.provider_response_id==settings['previous_response_id'] and set(j.targets)==set(_targets(brief))]
+            if len(parents)!=1:raise InvalidInput('edit requires one durable successful response for the same target')
+            settings['previous_job_id']=parents[0].id;settings['previous_asset_ids']=parents[0].output_asset_ids
+        finally:con.close()
     if provider=='sam':
         con=S.connect(project_dir)
         try:
@@ -357,7 +377,7 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
                          expected_version: int, image_bytes: bytes,
                          mime: str, provider_response_id: str | None,
                          usage: dict | None, output_asset_id: str | None = None,
-                         fencing_token: str | None = None, origin: str = 'unknown') -> dict:
+                         fencing_token: str | None = None, origin: str = 'unknown', connection=None, count_attempt=True) -> dict:
     """Persist provider output as a generated asset and mark SUCCEEDED.
 
     Fenced: holder + token + live lease + RUNNING status, all enforced.
@@ -368,7 +388,8 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
     import io as _io
     if not image_bytes:
         raise InvalidInput("cannot complete a job with empty output bytes")
-    con = S.connect(project_dir)
+    owned=connection is None
+    con=connection if connection is not None else S.connect(project_dir)
     try:
         data, _ = S.get(con, "jobs", job_id)
         job = D.Job.model_validate_json(json.dumps(data))
@@ -396,6 +417,7 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
             parents=[cb.identity_asset_id,cb.style_asset_id,cb.phase_asset_id]
             controls=cb.brief.get('repair_controls') or {}
             parents += [controls[key] for key in ('source_asset_id','editable_mask_asset_id','protected_mask_asset_id') if controls.get(key)]
+            parents += job.provider_settings.get('previous_asset_ids',[])
             parents=list(dict.fromkeys(parents))
             inherited={rights}|{S.get(con,'assets',parent)[0].get('rights','unknown') for parent in parents}
             rights=next(iter(inherited)) if len(inherited)==1 else 'unknown' if 'unknown' in inherited else 'mixed'
@@ -403,7 +425,7 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
                          mime=mime or "image/png", width=w, height=h,
                          source_kind="generated", rights=rights,source_job_id=job.id,origin=origin,parent_asset_ids=parents,
                          eligible_roles=[])
-        with S.atomic(con):
+        with S.atomic(con) if owned else contextlib.nullcontext(con):
             S.stage(con, asset)
             job.dispatch_inflight = False
             job.provider_response_id=provider_response_id
@@ -413,7 +435,7 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
             # request_artifact is the pre-send intent; the response link lives
             # in response_artifact and must never overwrite it.
             job.cost_actual = json.dumps(usage or {})[:200]
-            job.attempt_count = job.attempt_count + 1
+            if count_attempt:job.attempt_count += 1
             job.lease_holder = None
             job.lease_expires = None
             job.fencing_token_sha256 = ""
@@ -423,7 +445,7 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
             if ver2 != expected_version:
                 raise S.StaleRevisionError(
                     f"stale_revision: jobs/{job_id} at version {ver2}, writer expected {expected_version}")
-            _record_attempt(project_dir, con, job, result="succeeded",
+            if count_attempt:_record_attempt(project_dir, con, job, result="succeeded",
                             request_sha=job.payload_sha256,
                             response_ref=provider_response_id,
                             candidate_ids=[aid], signature=None,
@@ -433,20 +455,21 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
                 "version": nv, "size": [w, h],
                 "response_id": provider_response_id}
     finally:
-        con.close()
+        if owned:con.close()
 
 
 def job_complete_segmentation(project_dir: str, job_id: str, *, worker_id: str,
                               expected_version: int, result: dict,
-                              fencing_token: str | None) -> dict:
+                              fencing_token: str | None, connection=None, count_attempt=True) -> dict:
     """Commit source-bound model proposals and the one reserved attempt together."""
     from PIL import Image
     from ..media.canonical import canonical_pixels,pixel_sha256
     import io
-    con=S.connect(project_dir)
+    owned=connection is None
+    con=connection if connection is not None else S.connect(project_dir)
     try:
-        with S.atomic(con):
-            con.execute('BEGIN IMMEDIATE')
+        with S.atomic(con) if owned else contextlib.nullcontext(con):
+            if owned:con.execute('BEGIN IMMEDIATE')
             data,version=S.get(con,'jobs',job_id);job=D.Job.model_validate(data)
             if version!=expected_version:raise S.StaleRevisionError('segmentation completion is stale')
             _check_fencing(job,job_id,worker_id,fencing_token)
@@ -482,15 +505,18 @@ def job_complete_segmentation(project_dir: str, job_id: str, *, worker_id: str,
             job.provider_response_id=result.get('response_id');job.response_artifact=result.get('response_artifact')
             job.status=D.JobStatus.SUCCEEDED if outcome in ('mask','no_match') else D.JobStatus.FAILED
             job.output_asset_ids=ids;job.output_annotation_ids=annotations
-            job.dispatch_inflight=False;job.attempt_count+=1
+            job.dispatch_inflight=False
+            if count_attempt:job.attempt_count+=1
+            job.reconciliation_required=False
             job.lease_holder=None;job.lease_expires=None;job.fencing_token_sha256=''
             job.error=None if job.status==D.JobStatus.SUCCEEDED else str(result.get('reason',outcome))
-            _record_attempt(project_dir,con,job,result=f'SAM {outcome}',request_sha=job.payload_sha256,
+            if count_attempt:_record_attempt(project_dir,con,job,result=f'SAM {outcome}',request_sha=job.payload_sha256,
                 response_ref=result.get('response_id'),candidate_ids=ids,signature=None)
             new_version=S.stage_update(con,'jobs',job,version)
             return {'job_id':job_id,'status':job.status.value,'version':new_version,
                     'asset_ids':ids,'annotation_ids':annotations,'outcome':outcome,'usable':usable}
-    finally:con.close()
+    finally:
+        if owned:con.close()
 
 
 def job_complete_failure(project_dir: str, job_id: str, *, worker_id: str,
@@ -571,23 +597,20 @@ def job_mark_unknown_outcome(project_dir: str, job_id: str, *, worker_id: str,
 
 
 def job_cancel(project_dir: str, job_id: str, expected_version: int) -> dict:
-    con = S.connect(project_dir)
+    con=S.connect(project_dir)
     try:
-        data, _ = S.get(con, "jobs", job_id)
-        job = D.Job.model_validate_json(json.dumps(data))
-        if job.status in TERMINAL:
-            raise InvalidInput(f"job {job_id} is already terminal ({job.status.value}); "
-                               "cancellation is a no-op, not a transition")
-        job.status = D.JobStatus.CANCELLED
-        job.cancel_requested = True
-        job.lease_holder = None
-        job.lease_expires = None
-        job.fencing_token_sha256 = ""
-        job.updated_at = datetime.now(timezone.utc).isoformat()
-        nv = S.update_mutable(con, "jobs", job, expected_version)
-    finally:
-        con.close()
-    return {"job_id": job_id, "status": "cancelled", "version": nv}
+        with S.atomic(con):
+            con.execute('BEGIN IMMEDIATE')
+            data,version=S.get(con,'jobs',job_id);job=D.Job.model_validate(data)
+            if version!=expected_version:raise S.StaleRevisionError('cancellation is stale')
+            if job.status in TERMINAL:raise InvalidInput(f'job {job_id} is already terminal')
+            from .provider_recovery import release_unsent_in
+            release_unsent_in(con,job)
+            job.status=D.JobStatus.CANCELLED;job.cancel_requested=True
+            job.lease_holder=None;job.lease_expires=None;job.fencing_token_sha256=''
+            nv=S.stage_update(con,'jobs',job,version)
+    finally:con.close()
+    return {'job_id':job_id,'status':'cancelled','version':nv}
 
 
 def job_reconcile(project_dir: str, *, worker_id: str = "reconciler",

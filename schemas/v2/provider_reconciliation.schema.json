@@ -1,0 +1,86 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "input_sha256": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Input Sha256",
+      "type": "string"
+    },
+    "request_sha256": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Request Sha256",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "not_accepted",
+        "response",
+        "abandoned"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "receipt_reference": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Receipt Reference",
+      "type": "string"
+    },
+    "evidence_note": {
+      "maxLength": 2000,
+      "minLength": 8,
+      "title": "Evidence Note",
+      "type": "string"
+    },
+    "artifact_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Artifact Sha256"
+    },
+    "result": {
+      "additionalProperties": true,
+      "title": "Result",
+      "type": "object"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "job_id",
+    "input_sha256",
+    "request_sha256",
+    "outcome",
+    "receipt_reference",
+    "evidence_note",
+    "result"
+  ],
+  "title": "ProviderReconciliation",
+  "type": "object"
+}

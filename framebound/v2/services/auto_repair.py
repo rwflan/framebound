@@ -146,7 +146,9 @@ def get_run(project_dir,run_id):
 
 
 def start_run(project_dir,revision_id,idempotency_key=None,*,provider_settings=None,offline=True):
-    settings=dict(provider_settings or {})
+    from .jobs import validate_provider_settings
+    settings=validate_provider_settings(provider_settings)
+    if type(offline) is not bool:raise InvalidInput('offline must be an exact boolean')
     if set(settings)-{'model','grant_id','base_url','transport','max_spend_usd'}:raise InvalidInput('unsupported automatic provider settings')
     con=S.connect(project_dir)
     try:
