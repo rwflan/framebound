@@ -92,21 +92,9 @@ class TestMachineOrigin(unittest.TestCase):
             env = clips.evaluate(td, "rev-CD-bad")
             self.assertEqual(env.technical_status.value, "fail")
             out = AR.run_automatic(td, "rev-CD-bad")
-            self.assertIn(out["status"], ("machine_tasks_opened", "blocked"))
-            if out["status"] == "machine_tasks_opened":
-                self.assertTrue(out["machine_tasks"])
-                for t in out["machine_tasks"]:
-                    self.assertEqual(t["origin"], "machine")
-                # No human mark_issue event was fabricated.
-                con = S.connect(td)
-                try:
-                    rows = con.execute("SELECT data FROM review_events").fetchall()
-                finally:
-                    con.close()
-                humans = [json.loads(r["data"]) for r in rows
-                          if json.loads(r["data"]).get("action") == "mark_issue"
-                          and json.loads(r["data"]).get("actor_type") == "reviewer"]
-                self.assertEqual(humans, [])
+            self.assertEqual(out['status'],'blocked')
+            self.assertIn('no human-approved automatic repair policy',out['blocker'])
+
 
 
 class TestExternalModelBounds(unittest.TestCase):
@@ -127,59 +115,15 @@ class TestExternalModelBounds(unittest.TestCase):
 
 
 class TestDeterministicOperators(unittest.TestCase):
-    def test_translate_and_protected_restore_fix_real_faults_with_zero_provider_calls(self):
+    def test_unapproved_pixel_writers_and_redraw_are_refused(self):
         with tempfile.TemporaryDirectory() as td:
             _seed(td)
-            con = S.connect(td)
-            try:
-                adata, _ = S.get(con, "assets", "f0")
-                raw = S.blob_path(td, adata["byte_sha256"]).read_bytes()
-            finally:
-                con.close()
-            base = Image.open(io.BytesIO(raw)).convert("RGBA")
-            # Operator 1: deterministic translate within budget.
-            asset = AR.execute_translate(td, "f0", 1, 0, "moved-1", budget_px=2)
-            self.assertEqual((asset.width, asset.height), (64, 64))
-            self.assertIn("translate", asset.lineage)
-            # Out-of-budget refused, not silently clamped.
-            with self.assertRaises(InvalidInput):
-                AR.execute_translate(td, "f0", 5, 0, "moved-bad", budget_px=2)
-            # Operator 2: damage exterior, restore exactly.
-            dmg = base.copy()
-            px = dmg.load()
-            px[0, 0] = (255, 0, 0, 255)
-            buf = io.BytesIO()
-            dmg.save(buf, format="PNG")
-            (P(td) / "dmg.png").write_bytes(buf.getvalue())
-            AS.import_asset(td, str(P(td) / "dmg.png"), "dmg0",
-                            source_kind="procedural", rights="original")
-            allow = bytes([0] * (64 * 64))  # exterior only; interior change none
-            # Damage is at (0,0) which is protected (allowed 0) -> restore fixes it.
-            fixed = AR.execute_protected_restore(td, "f0", "dmg0", allow, "fixed0")
-            con = S.connect(td)
-            try:
-                fdata, _ = S.get(con, "assets", "fixed0")
-                bdata, _ = S.get(con, "assets", "f0")
-                self.assertEqual(fdata["pixel_sha256"], bdata["pixel_sha256"])
-            finally:
-                con.close()
-            # Zero provider calls: no transport was ever consulted (offline by construction).
-
-    def test_redraw_request_is_typed_bounded_and_composite_exact(self):
-        with tempfile.TemporaryDirectory() as td:
-            _seed(td)
-            ev = clips.evaluate(td, "rev-CD-base")
-            # Open a human issue to get a task, then construct redraw.
-            from framebound.v2.services import packets as PK
-            pkt = PK.create_packet(td, "pkt-cd2", "rev-CD-base", ev.artifacts[0]["id"], "review")
-            _, task = C.open_issue(td, REV, {"action": "mark_issue",
-                "clip_revision_id": "rev-CD-base", "packet_id": "pkt-cd2",
-                "frame_instance_id": "rev-CD-base-fi-00", "category": "t", "note": "n"})
-            req = AR.construct_redraw_request(td, task.id, 0)
-            self.assertEqual(req["operation"], "scoped_redraw")
-            self.assertIn("brief_digest", req)
-            self.assertIn("request_sha256", req)
-            self.assertEqual(req["protection"], "exterior pixels composited back exactly")
+            with self.assertRaisesRegex(InvalidInput,'authorized operation'):
+                AR.execute_translate(td,'f0',1,0,'moved-1',budget_px=2)
+            with self.assertRaisesRegex(InvalidInput,'authorized operation'):
+                AR.execute_protected_restore(td,'f0','f0',bytes(4096),'restored')
+            with self.assertRaisesRegex(InvalidInput,'authorized operation'):
+                AR.construct_redraw_request(td,'task',0)
 
 
 class TestSafeProgress(unittest.TestCase):

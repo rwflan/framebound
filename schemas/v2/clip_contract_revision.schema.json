@@ -182,6 +182,58 @@
       "title": "PhaseEntry",
       "type": "object"
     },
+    "RepairPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "operators": {
+          "items": {
+            "enum": [
+              "translate",
+              "protected_restore",
+              "scoped_redraw"
+            ],
+            "type": "string"
+          },
+          "title": "Operators",
+          "type": "array"
+        },
+        "translation_budget_px": {
+          "default": 2,
+          "maximum": 32,
+          "minimum": 0,
+          "title": "Translation Budget Px",
+          "type": "number"
+        },
+        "max_local_attempts": {
+          "default": 3,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Local Attempts",
+          "type": "integer"
+        },
+        "max_compute_steps": {
+          "default": 8,
+          "maximum": 256,
+          "minimum": 1,
+          "title": "Max Compute Steps",
+          "type": "integer"
+        },
+        "generation_allowed": {
+          "default": false,
+          "title": "Generation Allowed",
+          "type": "boolean"
+        },
+        "max_provider_dispatches": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Max Provider Dispatches",
+          "type": "integer"
+        }
+      },
+      "title": "RepairPolicy",
+      "type": "object"
+    },
     "RootPolicy": {
       "additionalProperties": false,
       "properties": {
@@ -325,6 +377,17 @@
       ],
       "default": null,
       "title": "Change Reason"
+    },
+    "repair_policy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RepairPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

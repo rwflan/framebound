@@ -17,6 +17,31 @@ TOOLS = ["doctor", "project_get", "asset_import", "contract_propose",
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
+    @server.tool(name='animation_compile', description='Compile frozen human-approved controls and bounded repair policy')
+    def animation_compile(contract_id: str) -> dict:
+        from ..services.auto_repair import compile_plan
+        return compile_plan(project_dir,contract_id)
+
+    @server.tool(name='animation_start', description='Start resumable automatic native animation work')
+    def animation_start(revision_id: str, idempotency_key: str | None = None) -> dict:
+        from ..services.auto_repair import start_run
+        return start_run(project_dir,revision_id,idempotency_key)
+
+    @server.tool(name='animation_step', description='Execute one bounded repair step with persisted attempts')
+    def animation_step(run_id: str) -> dict:
+        from ..services.auto_repair import step_run
+        return step_run(project_dir,run_id)
+
+    @server.tool(name='animation_get', description='Read automatic work and its measured internal progress')
+    def animation_get(run_id: str) -> dict:
+        from ..services.auto_repair import get_run
+        return get_run(project_dir,run_id)
+
+    @server.tool(name='source_calibrate', description='Materialize the approved fixed family calibration')
+    def source_calibrate(contract_id: str, source_asset_id: str, output_asset_id: str) -> dict:
+        from ..services.animation_context import calibrate_source
+        return calibrate_source(project_dir,contract_id,source_asset_id,output_asset_id).model_dump()
+
     @server.tool(name='project_create', description='Create or resume a project with identical inputs')
     def project_create(project_id: str, name: str = '') -> dict:
         from ..services import projects

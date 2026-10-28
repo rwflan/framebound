@@ -24,7 +24,7 @@ def _window_in_canvas(name: str, w: list[int], cw: int, ch: int) -> None:
 
 
 class RegistrationParams(Strict):
-    pass
+    max_anchor_drift_px: float | None = Field(default=None,ge=0,le=32)
 
 
 class SilhouetteParams(Strict):

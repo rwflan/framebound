@@ -1,0 +1,265 @@
+{
+  "$defs": {
+    "FrameControl": {
+      "additionalProperties": false,
+      "properties": {
+        "slot": {
+          "minimum": 0,
+          "title": "Slot",
+          "type": "integer"
+        },
+        "phase": {
+          "title": "Phase",
+          "type": "string"
+        },
+        "baseline_asset_id": {
+          "title": "Baseline Asset Id",
+          "type": "string"
+        },
+        "baseline_byte_sha256": {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "title": "Baseline Byte Sha256",
+          "type": "string"
+        },
+        "editable_mask_asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Editable Mask Asset Id"
+        },
+        "editable_mask_byte_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Editable Mask Byte Sha256"
+        },
+        "protected_mask_asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protected Mask Asset Id"
+        },
+        "protected_mask_byte_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protected Mask Byte Sha256"
+        },
+        "scope_sha256": {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "title": "Scope Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot",
+        "phase",
+        "baseline_asset_id",
+        "baseline_byte_sha256",
+        "scope_sha256"
+      ],
+      "title": "FrameControl",
+      "type": "object"
+    },
+    "RepairPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "operators": {
+          "items": {
+            "enum": [
+              "translate",
+              "protected_restore",
+              "scoped_redraw"
+            ],
+            "type": "string"
+          },
+          "title": "Operators",
+          "type": "array"
+        },
+        "translation_budget_px": {
+          "default": 2,
+          "maximum": 32,
+          "minimum": 0,
+          "title": "Translation Budget Px",
+          "type": "number"
+        },
+        "max_local_attempts": {
+          "default": 3,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Local Attempts",
+          "type": "integer"
+        },
+        "max_compute_steps": {
+          "default": 8,
+          "maximum": 256,
+          "minimum": 1,
+          "title": "Max Compute Steps",
+          "type": "integer"
+        },
+        "generation_allowed": {
+          "default": false,
+          "title": "Generation Allowed",
+          "type": "boolean"
+        },
+        "max_provider_dispatches": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Max Provider Dispatches",
+          "type": "integer"
+        }
+      },
+      "title": "RepairPolicy",
+      "type": "object"
+    },
+    "SourceCalibration": {
+      "additionalProperties": false,
+      "properties": {
+        "source_width": {
+          "maximum": 2048,
+          "minimum": 1,
+          "title": "Source Width",
+          "type": "integer"
+        },
+        "source_height": {
+          "maximum": 2048,
+          "minimum": 1,
+          "title": "Source Height",
+          "type": "integer"
+        },
+        "crop": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "title": "Crop",
+          "type": "array"
+        },
+        "resampling": {
+          "const": "nearest",
+          "default": "nearest",
+          "title": "Resampling",
+          "type": "string"
+        },
+        "formats": {
+          "items": {
+            "enum": [
+              "PNG",
+              "JPEG"
+            ],
+            "type": "string"
+          },
+          "title": "Formats",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_width",
+        "source_height",
+        "crop"
+      ],
+      "title": "SourceCalibration",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "contract_revision_id": {
+      "title": "Contract Revision Id",
+      "type": "string"
+    },
+    "reference_approval_id": {
+      "title": "Reference Approval Id",
+      "type": "string"
+    },
+    "inputs_sha256": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Inputs Sha256",
+      "type": "string"
+    },
+    "profile": {
+      "const": "native_sprite_v1",
+      "default": "native_sprite_v1",
+      "title": "Profile",
+      "type": "string"
+    },
+    "policy": {
+      "$ref": "#/$defs/RepairPolicy"
+    },
+    "source_calibration": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourceCalibration"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "controls": {
+      "items": {
+        "$ref": "#/$defs/FrameControl"
+      },
+      "title": "Controls",
+      "type": "array"
+    },
+    "required_matrix": {
+      "items": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Required Matrix",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "contract_revision_id",
+    "reference_approval_id",
+    "inputs_sha256",
+    "policy",
+    "controls",
+    "required_matrix"
+  ],
+  "title": "CompiledAnimationPlan",
+  "type": "object"
+}

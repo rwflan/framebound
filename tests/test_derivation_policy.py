@@ -9,20 +9,26 @@ from framebound.v2.exports import build_snapshot
 from framebound.v2 import recorded_run as RR
 from test_v2_r5_export import _seed
 
+def derive(project,source,dx,new_id):
+    con=S.connect(project)
+    try:image=Image.open(S.blob_path(project,S.get(con,'assets',source)[0]['byte_sha256'])).convert('RGBA')
+    finally:con.close()
+    return write_derived(project,new_id,AR._translate_pixels(image,dx,0),[source],{'operator':'translate','dx':dx,'dy':0})
+
 def test_derivations_keep_unknown_rights_and_conflicting_ids_refuse(tmp_path):
     p=str(tmp_path);_seed(p)
-    a=AR.execute_translate(p,'fx-unknown',0,0,'derived',budget_px=2)
+    a=derive(p,'fx-unknown',0,'derived')
     assert a.rights=='unknown'
     assert a.parent_asset_ids==['fx-unknown']
-    with pytest.raises(S.ConflictError):AR.execute_translate(p,'fx-unknown',1,0,'derived',budget_px=2)
+    with pytest.raises(S.ConflictError):derive(p,'fx-unknown',1,'derived')
 
 def test_simulated_ancestry_survives_multiple_operators_and_default_export(tmp_path):
     p=str(tmp_path/'project');_seed(p);con=S.connect(p)
     try:raw=S.blob_path(p,S.get(con,'assets','f0')[0]['byte_sha256']).read_bytes()
     finally:con.close()
     alias=RR._materialize_generated(p,raw,'alias','image/png',64,64,origin='simulated-transport')
-    a=AR.execute_translate(p,alias.id,1,0,'moved',budget_px=2)
-    b=AR.execute_translate(p,a.id,-1,0,'returned',budget_px=2)
+    a=derive(p,alias.id,1,'moved')
+    b=derive(p,a.id,-1,'returned')
     con=S.connect(p)
     try:assert 'simulated-transport' in ancestry_in(con,b.id)['origins']
     finally:con.close()
