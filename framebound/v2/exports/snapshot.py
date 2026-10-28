@@ -166,7 +166,13 @@ def _simulated_assets(con) -> set[str]:
     ineligible for positives and positive preferences (research views may
     still document it with its origin label).
     """
+    from ..services.provenance import ancestry_in, provenance_index_in
+    index = provenance_index_in(con)
     out: set[str] = set()
+    for row in con.execute('SELECT id FROM assets'):
+        ancestry = ancestry_in(con,row['id'],index=index)
+        if set(ancestry['origins']) & {'simulated-transport','provider-simulated'}:
+            out.add(row['id'])
     try:
         rows = con.execute("SELECT data FROM jobs").fetchall()
     except Exception:
@@ -543,6 +549,8 @@ def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[st
         requested_positives = 0
         exported_positives = 0
         excluded_positives = 0
+        from ..services.provenance import ancestry_in, provenance_index_in
+        provenance_index = provenance_index_in(con)
         for rid, rev in revs.items():
             contract = contracts[rid]
             ev = evals.get(rid)
@@ -552,6 +560,13 @@ def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[st
                 fr = frames[fid]
                 fi, a = fr["fi"], fr["asset"]
                 reasons = []
+                from ..services.provenance import ancestry_in
+                ancestry = ancestry_in(con, a.id,index=provenance_index)
+                reasons.extend(ancestry['issues'])
+                if any(right not in pol['rights_allow'] for right in ancestry['rights']):
+                    reasons.append('ancestor rights disallow this training view')
+                if 'procedural' in ancestry['origins'] and not pol['include_procedural_positives']:
+                    reasons.append('procedural ancestor excluded from default positives')
                 if a.rights not in pol["rights_allow"]:
                     reasons.append(f"rights {a.rights!r} not in {pol['rights_allow']}")
                 if a.source_kind == "procedural" and not pol["include_procedural_positives"]:
@@ -569,7 +584,8 @@ def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[st
                 if not reasons:
                     requested_positives += 1
                 blob = S.blob_path(project_dir, a.byte_sha256)
-                img = Image.open(blob).convert("RGBA")
+                from ..media.canonical import load_native_image
+                img = load_native_image(blob)
                 rec = _silhouette_records(img)
                 rle = _rle(rec["mask"], *rec["size"])
                 img_id = len(coco_images)

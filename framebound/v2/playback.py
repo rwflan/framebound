@@ -75,6 +75,8 @@ def play_clip(project_dir: str, revision_id: str) -> dict:
             dx, dy = 0, 0
             if reg is not None and reg.translation_px:
                 dx, dy = int(reg.translation_px[0]), int(reg.translation_px[1])
+                if dx or dy:
+                    raise InvalidInput('nonzero registration requires explicit native re-materialization')
             w, h = contract.canvas.width, contract.canvas.height
             # Stage B: single shared render path, translation applied exactly once.
             canon, pxh, _ = _render_native(raw, [dx, dy], (w, h))

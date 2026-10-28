@@ -20,6 +20,7 @@ from PIL import Image
 from .. import domain as D
 from .. import storage as S
 from .errors import InvalidInput
+from ..media.canonical import load_native_image
 
 # Finite deterministic operator whitelist. Only these execute without a
 # provider call; everything else constructs a typed redraw request.
@@ -134,7 +135,7 @@ def execute_translate(project_dir: str, baseline_asset_id: str, dx: int, dy: int
         raw = S.blob_path(project_dir, adata["byte_sha256"]).read_bytes()
     finally:
         con.close()
-    base = Image.open(io.BytesIO(raw)).convert("RGBA")
+    base = load_native_image(raw)
     w, h = base.size
     out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     out.alpha_composite(base, (dx, dy))
@@ -144,20 +145,9 @@ def execute_translate(project_dir: str, baseline_asset_id: str, dx: int, dy: int
     from ..media.canonical import canonical_pixels, pixel_sha256 as _pxh
     canon = canonical_pixels(out)
     digest = S.store_blob(project_dir, out_bytes)
-    asset = D.Asset(id=new_asset_id, byte_sha256=digest, pixel_sha256=_pxh(canon),
-                    mime="image/png", width=w, height=h,
-                    source_kind="derived", lineage=f"auto:translate:{dx},{dy}",
-                    rights="original", eligible_roles=[])
-    con = S.connect(project_dir)
-    try:
-        try:
-            S.insert(con, asset)
-        except S.ConflictError:
-            data, _ = S.get(con, "assets", new_asset_id)
-            asset = D.Asset.model_validate(data)
-    finally:
-        con.close()
-    return asset
+    from .provenance import write_derived
+    return write_derived(project_dir,new_asset_id,out,[baseline_asset_id],
+                         {'operator':'translate','dx':dx,'dy':dy})
 
 
 def execute_protected_restore(project_dir: str, baseline_asset_id: str,
@@ -181,8 +171,8 @@ def execute_protected_restore(project_dir: str, baseline_asset_id: str,
         draw = S.blob_path(project_dir, ddata["byte_sha256"]).read_bytes()
     finally:
         con.close()
-    base = Image.open(io.BytesIO(braw)).convert("RGBA")
-    dmg = Image.open(io.BytesIO(draw)).convert("RGBA")
+    base = load_native_image(braw)
+    dmg = load_native_image(draw)
     if base.size != dmg.size:
         raise InvalidInput("protected restore needs equal dimensions (no resampling)")
     w, h = base.size
@@ -202,20 +192,10 @@ def execute_protected_restore(project_dir: str, baseline_asset_id: str,
     out_bytes = buf.getvalue()
     canon = _canon(out_img)
     digest = S.store_blob(project_dir, out_bytes)
-    asset = D.Asset(id=new_asset_id, byte_sha256=digest, pixel_sha256=_pxh(canon),
-                    mime="image/png", width=w, height=h,
-                    source_kind="derived", lineage="auto:protected_restore",
-                    rights="original", eligible_roles=[])
-    con = S.connect(project_dir)
-    try:
-        try:
-            S.insert(con, asset)
-        except S.ConflictError:
-            data, _ = S.get(con, "assets", new_asset_id)
-            asset = D.Asset.model_validate(data)
-    finally:
-        con.close()
-    return asset
+    from .provenance import write_derived
+    return write_derived(project_dir,new_asset_id,out_img,
+                         list(dict.fromkeys([baseline_asset_id,damaged_asset_id])),
+                         {'operator':'protected_restore','support_sha256':hashlib.sha256(allowed_mask).hexdigest()})
 
 
 def construct_redraw_request(project_dir: str, task_id: str, slot: int) -> dict:

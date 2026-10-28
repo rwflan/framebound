@@ -8,7 +8,7 @@ from PIL import Image
 from .. import domain as D
 from .. import storage as S
 from ..checks import evaluate as E
-from ..media.canonical import canonical_pixels
+from ..media.canonical import canonical_pixels, load_native_image
 from .errors import InvalidInput
 
 
@@ -19,7 +19,7 @@ def _images_for(con: S.sqlite3.Connection, project_dir: str, asset_ids: list[str
         if row is None:
             raise InvalidInput(f"missing_input: asset {aid} not stored")
         blob = S.blob_path(project_dir, json.loads(row["data"])["byte_sha256"])
-        imgs.append(Image.open(blob).convert("RGBA"))
+        imgs.append(load_native_image(blob))
     return imgs
 
 
@@ -60,7 +60,7 @@ def create_revision(project_dir: str, contract_id: str, revision_id: str,
                                      registration_id=f"{revision_id}-fi-{slot:02d}-reg",
                                      source_drawing_id=aid, derivation_recipe="imported:accepted-revision")
                 S.stage(con, fi)
-                S.stage(con, D.Registration(id=fi.registration_id, method="frozen_native",
+                S.stage(con, D.Registration(id=fi.registration_id, pixels_baked=True, method="frozen_native",
                                             frame_instance_id=fi.id, verified_by="import"))
                 inst_ids.append(fi.id)
             rev = D.ClipRevision(id=revision_id, contract_revision_id=contract_id,
@@ -78,90 +78,89 @@ def _default_lock_id() -> str:
     return f"requirements:{digest[:16]}" if digest else "dev-no-lock"
 
 
-def evaluate(project_dir: str, revision_id: str, dep_lock_id: str | None = None) -> D.ResultEnvelope:
-    """Evaluate a stored revision with the complete stored context.
-
-    Resolves exact frame instances + held timing, independent same-phase guides
-    from the stored motion-guide approval, character content, annotation hashes
-    and registration records — never an unconditional empty reference map.
-    Re-evaluating the same revision/context returns the stored record; changed
-    inputs produce a new record that supersedes the previous one.
-    """
+def compute_evaluation_in(con, project_dir: str, revision_id: str, dep_lock_id: str | None = None):
+    """Resolve and measure the complete current closure without writing records."""
     from ..checks import evaluate as EV
+    try:
+        rdata, _ = S.get(con, "clip_revisions", revision_id)
+    except KeyError:
+        raise InvalidInput(f"unknown clip revision {revision_id}")
+    rev = D.ClipRevision.model_validate_json(json.dumps(rdata))
+    cdata, _ = S.get(con, "contract_revisions", rev.contract_revision_id)
+    contract = D.ClipContractRevision.model_validate_json(json.dumps(cdata))
+    frames, aids, presented, byte_hashes = [], [], [], []
+    reg_records = []
+    for fid in rev.frame_instance_ids:
+        fdata, _ = S.get(con, "frame_instances", fid)
+        fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
+        aids.append(fi.asset_id)
+        presented.append(fi.hold_ticks)
+        row = con.execute("SELECT data FROM assets WHERE id=?", (fi.asset_id,)).fetchone()
+        if row is None:
+            raise InvalidInput(f"missing_input: asset {fi.asset_id} not stored")
+        byte_hashes.append(json.loads(row["data"])["byte_sha256"])
+        try:
+            rrow = con.execute("SELECT data FROM registrations WHERE id=?",
+                               (fi.registration_id,)).fetchone()
+            reg_records.append(json.loads(rrow["data"]) if rrow else None)
+        except Exception:
+            reg_records.append(None)
+    frames = _images_for(con, project_dir, aids)
+    try:
+        chdata, _ = S.get(con, "character_revisions", contract.character_revision_id)
+        character: dict | None = chdata
+    except KeyError:
+        character = None
+    references, ref_byte_hashes, authority = _resolve_guide_references(
+        project_dir, con, contract)
+    # Relevant annotations only: bound to this revision's frames or source
+    # assets. Unrelated project annotations never validate or invalidate
+    # this evidence.
+    frame_id_set = set(rev.frame_instance_ids)
+    asset_id_set = set(aids)
+    relevant = []
+    bound_annotations = {c.annotation_revision_id for c in contract.constraints if c.annotation_revision_id}
+    for r in con.execute("SELECT id, data FROM annotation_revisions").fetchall():
+        try:
+            ad = json.loads(r["data"])
+        except Exception:
+            continue
+        if (ad.get('annotator_type') == 'human_reviewed' or ad.get('id') in bound_annotations) and (
+                ad.get("frame_instance_id") in frame_id_set or ad.get("source_asset_id") in asset_id_set):
+            relevant.append({"id": r["id"],
+                             "sha256": hashlib.sha256(r["data"].encode()).hexdigest()})
+    relevant.sort(key=lambda a: a["id"])
+    world_positions, planted = _resolve_world_trace(project_dir, con, rev, contract)
+    transitions = _resolve_transition_traces(con, rev)
+    repair = _resolve_repair_context(project_dir, con, rev)
+    rctx = dict(repair) if repair else {}
+    if world_positions is not None:
+        rctx.setdefault("world_trace_revision_ids", [])
+    ctx = {"frame_byte_hashes": byte_hashes, "reference_byte_hashes": ref_byte_hashes,
+           "character": character, "character_absent": character is None,
+           "registration": {"records": reg_records,
+                            "complete": all(x is not None for x in reg_records)},
+           "annotation_hashes": sorted(a["sha256"] for a in relevant),
+           "annotations": relevant,
+           "authority": authority,
+           "transitions": transitions,
+           "presented_holds": presented,
+           "byte_hashes_complete": True, "origin": "stored-service"}
+    if repair:
+        ctx["repair"] = repair
+    lock = dep_lock_id or _default_lock_id()
+    ev = EV.evaluate_frames(contract, frames, references, dep_lock_id=lock,
+                            world_positions=world_positions, planted=planted,
+                            context=ctx)
+    manifest = EV.manifest_of(ev) or {}
+    assert manifest, "evaluator must return its canonical manifest"
+    return contract, ev, manifest
+
+
+def evaluate(project_dir: str, revision_id: str, dep_lock_id: str | None = None) -> D.ResultEnvelope:
     con = S.connect(project_dir)
     try:
-        try:
-            rdata, _ = S.get(con, "clip_revisions", revision_id)
-        except KeyError:
-            raise InvalidInput(f"unknown clip revision {revision_id}")
-        rev = D.ClipRevision.model_validate_json(json.dumps(rdata))
-        cdata, _ = S.get(con, "contract_revisions", rev.contract_revision_id)
-        contract = D.ClipContractRevision.model_validate_json(json.dumps(cdata))
-        frames, aids, presented, byte_hashes = [], [], [], []
-        reg_records = []
-        for fid in rev.frame_instance_ids:
-            fdata, _ = S.get(con, "frame_instances", fid)
-            fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
-            aids.append(fi.asset_id)
-            presented.append(fi.hold_ticks)
-            row = con.execute("SELECT data FROM assets WHERE id=?", (fi.asset_id,)).fetchone()
-            if row is None:
-                raise InvalidInput(f"missing_input: asset {fi.asset_id} not stored")
-            byte_hashes.append(json.loads(row["data"])["byte_sha256"])
-            try:
-                rrow = con.execute("SELECT data FROM registrations WHERE id=?",
-                                   (fi.registration_id,)).fetchone()
-                reg_records.append(json.loads(rrow["data"]) if rrow else None)
-            except Exception:
-                reg_records.append(None)
-        frames = _images_for(con, project_dir, aids)
-        try:
-            chdata, _ = S.get(con, "character_revisions", contract.character_revision_id)
-            character: dict | None = chdata
-        except KeyError:
-            character = None
-        references, ref_byte_hashes, authority = _resolve_guide_references(
-            project_dir, con, contract)
-        # Relevant annotations only: bound to this revision's frames or source
-        # assets. Unrelated project annotations never validate or invalidate
-        # this evidence.
-        frame_id_set = set(rev.frame_instance_ids)
-        asset_id_set = set(aids)
-        relevant = []
-        for r in con.execute("SELECT id, data FROM annotation_revisions").fetchall():
-            try:
-                ad = json.loads(r["data"])
-            except Exception:
-                continue
-            if ad.get("frame_instance_id") in frame_id_set \
-                    or ad.get("source_asset_id") in asset_id_set:
-                relevant.append({"id": r["id"],
-                                 "sha256": hashlib.sha256(r["data"].encode()).hexdigest()})
-        relevant.sort(key=lambda a: a["id"])
-        world_positions, planted = _resolve_world_trace(project_dir, con, rev, contract)
-        transitions = _resolve_transition_traces(con, rev)
-        repair = _resolve_repair_context(project_dir, con, rev)
-        rctx = dict(repair) if repair else {}
-        if world_positions is not None:
-            rctx.setdefault("world_trace_revision_ids", [])
-        ctx = {"frame_byte_hashes": byte_hashes, "reference_byte_hashes": ref_byte_hashes,
-               "character": character, "character_absent": character is None,
-               "registration": {"records": reg_records,
-                                "complete": all(x is not None for x in reg_records)},
-               "annotation_hashes": sorted(a["sha256"] for a in relevant),
-               "annotations": relevant,
-               "authority": authority,
-               "transitions": transitions,
-               "presented_holds": presented,
-               "byte_hashes_complete": True, "origin": "stored-service"}
-        if repair:
-            ctx["repair"] = repair
-        lock = dep_lock_id or _default_lock_id()
-        ev = EV.evaluate_frames(contract, frames, references, dep_lock_id=lock,
-                                world_positions=world_positions, planted=planted,
-                                context=ctx)
-        manifest = EV.manifest_of(ev) or {}
-        assert manifest, "evaluator must return its canonical manifest"
+        contract, ev, manifest = compute_evaluation_in(con, project_dir, revision_id, dep_lock_id)
         # stable record identity: same revision + same evidence returns stored
         for r in con.execute("SELECT data FROM evaluations").fetchall():
             try:
@@ -218,19 +217,7 @@ def _resolve_guide_references(project_dir: str, con, contract: D.ClipContractRev
             return {}, {}, {}
         # Find the human approval that binds this exact guide (immutable
         # history, even if superseded by a newer approval for new work).
-        approval = None
-        for r in con.execute("SELECT data FROM reference_approvals").fetchall():
-            try:
-                ap = D.ReferenceApproval.model_validate_json(r["data"])
-            except Exception:
-                continue
-            if ap.character_revision_id == contract.character_revision_id \
-                    and ap.motion_guide_id == declared:
-                if A.approval_event_is_human(project_dir, ap.event_id):
-                    if approval is None or ap.created_at >= approval.created_at:
-                        approval = ap
-        if approval is None:
-            return {}, {}, {}
+        approval = A.approval_for_contract(project_dir, contract, con)
         authority = {"approval_id": approval.id,
                      "approval_event_id": approval.event_id,
                      "motion_guide_id": declared,
@@ -249,7 +236,7 @@ def _resolve_guide_references(project_dir: str, con, contract: D.ClipContractRev
             if not blob.is_file():
                 return {}, {}, {}
             from PIL import Image as _Image
-            refs[entry.slot] = _Image.open(blob).convert("RGBA")
+            refs[entry.slot] = load_native_image(blob)
             hashes[entry.slot] = json.loads(row["data"])["byte_sha256"]
         return refs, hashes, authority
     except Exception:
@@ -371,6 +358,7 @@ def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
         except KeyError:
             return None
         task = None
+        candidates = []
         for r in con.execute("SELECT data FROM correction_tasks").fetchall():
             try:
                 # row data is already a JSON string; never double-encode it.
@@ -378,8 +366,10 @@ def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
             except Exception:
                 continue
             if cand.baseline_revision_id == rev.parent_revision_id and cand.edit_mask_id:
-                task = cand
-                break
+                if rev.repair_task_id is None or cand.id == rev.repair_task_id:
+                    candidates.append(cand)
+        if len(candidates) == 1:
+            task = candidates[0]
         if task is None:
             return None
         base_by_slot: dict[int, bytes] = {}
@@ -389,7 +379,7 @@ def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
             fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
             adata, _ = S.get(con, "assets", fi.asset_id)
             raw = S.blob_path(project_dir, adata["byte_sha256"]).read_bytes()
-            base_by_slot[fi.slot] = _canon(_Image.open(_io.BytesIO(raw)))
+            base_by_slot[fi.slot] = _canon(load_native_image(raw))
             base_byte_by_slot[fi.slot] = adata["byte_sha256"]
         child_by_slot: dict[int, str] = {}
         for fid in rev.frame_instance_ids:
@@ -416,7 +406,7 @@ def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
         mask_id = getattr(task, "edit_mask_id", None)
         try:
             mdata, _ = S.get(con, "edit_masks", mask_id) if mask_id else (None, None)
-            support_id = json.loads(mdata)["mask_byte_sha256"] if mdata else None
+            support_id = mdata["mask_byte_sha256"] if mdata else None
         except Exception:
             support_id = None
         return {"baseline": [base_by_slot[s] for s in range(n)],
@@ -532,7 +522,7 @@ def _check_mirror_policy(con, contract: D.ClipContractRevision, recipe: str,
 
 def register_candidate(project_dir: str, baseline_revision_id: str, new_revision_id: str,
                        slot_asset_ids: dict[int, str], recipe: str,
-                       transform: dict | None = None) -> D.ResultEnvelope:
+                       transform: dict | None = None, *, repair_task_id: str | None = None) -> D.ResultEnvelope:
     """Register a repair/replacement candidate as a child revision (frozen recipe).
 
     slot_asset_ids: slot -> replacement asset id. Unlisted slots inherit baseline assets.
@@ -590,13 +580,13 @@ def register_candidate(project_dir: str, baseline_revision_id: str, new_revision
                 # therefore [0,0] (already applied exactly once); the typed
                 # TransformSpec is retained for provenance.
                 method = "verified_translate" if transform and transform.ops else "frozen_native"
-                S.stage(con, D.Registration(id=fi.registration_id, method=method,
+                S.stage(con, D.Registration(id=fi.registration_id, pixels_baked=True, method=method,
                                             frame_instance_id=fi.id,
                                             translation_px=[0, 0],
                                             transform=transform or D.TransformSpec(),
                                             verified_by="register_candidate"))
                 inst_ids.append(fi.id)
-            rev = D.ClipRevision(id=new_revision_id, contract_revision_id=base.contract_revision_id,
+            rev = D.ClipRevision(id=new_revision_id, contract_revision_id=base.contract_revision_id, repair_task_id=repair_task_id,
                                  frame_instance_ids=inst_ids, parent_revision_id=baseline_revision_id)
             S.stage(con, rev)
     finally:
