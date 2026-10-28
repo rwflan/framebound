@@ -29,4 +29,4 @@ framebound = "framebound.cli:main"
 include = ["framebound*"]
 
 [tool.setuptools.package-data]
-framebound = ["knowledge.json"]
+framebound = ["knowledge.json", "requirements.lock", "requirements-lock.sha256", "desk/**/*"]

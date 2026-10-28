@@ -67,6 +67,8 @@ def main(argv=None):
     mc.add_argument("--project", required=True)
     rp = sub.add_parser("reviewer-pair", help="v2: pair a human reviewer (prints single-use code)")
     rp.add_argument("--project", required=True); rp.add_argument("--reviewer-id", required=True)
+    rp.add_argument("--operator-secret", required=False, default=None,
+                    help="operator secret (or FRAMEBOUND_OPERATOR_SECRET env)")
     ro = sub.add_parser("reviewer-open", help="v2: exchange a pairing code for a session token")
     ro.add_argument("--project", required=True); ro.add_argument("--code", required=True)
     gp = sub.add_parser("guide-propose", help="v2: propose a draft motion guide (orchestrator tool)")

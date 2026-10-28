@@ -15,12 +15,14 @@ from framebound.v2 import domain as D
 from framebound.v2 import storage as S
 from framebound.v2.api.app import create_app
 from framebound.v2.checks import fixtures as F
+import os as _os
 from framebound.v2.services import approvals as A
 from framebound.v2.services import briefs as B
 from framebound.v2.services import clips, contracts, packets, sessions as SN
 from framebound.v2.services.authz import Actor
 from framebound.v2.services.errors import InvalidInput
 
+_os.environ.setdefault("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret")
 MOD = {"X-Actor-Id": "spark-1"}  # orchestrator: no session token, never a reviewer
 
 
@@ -76,7 +78,7 @@ def _seed_approval_project(td: str) -> dict:
 
 def _reviewer_headers(td: str, reviewer_id: str = "human-1") -> dict:
     c = TestClient(create_app(td))
-    pr = c.post("/api/reviewer/pair", json={"reviewer_id": reviewer_id})
+    pr = c.post("/api/reviewer/pair", json={"reviewer_id": reviewer_id}, headers={"X-Operator-Secret": _os.environ.get("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret")})
     assert pr.status_code == 201, pr.text
     op = c.post("/api/reviewer/open", json={"pairing_code": pr.json()["pairing_code"]})
     assert op.status_code == 201, op.text
@@ -193,7 +195,7 @@ class TestReviewerSessions(unittest.TestCase):
 
     def test_pairing_code_is_single_use(self):
         with tempfile.TemporaryDirectory() as td:
-            pr = SN.pair_reviewer(td, "human-1")
+            pr = SN.pair_reviewer(td, "human-1", operator_credential=_os.environ.get("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret"))
             SN.open_session(td, pr["pairing_code"])
             from framebound.v2.services.errors import AuthorizationError
             with self.assertRaises(AuthorizationError):
@@ -372,7 +374,7 @@ class TestAtomicTransactions(unittest.TestCase):
                 self.assertEqual(con.execute(
                     "SELECT COUNT(*) AS n FROM clip_revisions").fetchone()["n"], 1)
                 # authority tables exist again and work
-                pr = SN.pair_reviewer(td, "human-1")
+                pr = SN.pair_reviewer(td, "human-1", operator_credential=_os.environ.get("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret"))
                 self.assertIn("pairing_code", pr)
             finally:
                 con.close()

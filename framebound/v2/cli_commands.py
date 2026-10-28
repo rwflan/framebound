@@ -128,7 +128,11 @@ def dispatch(args) -> dict:
         return E.release_eligibility(args.project, args.revision_id)
     if cmd == "reviewer-pair":
         from .services import sessions as SN
-        return SN.pair_reviewer(args.project, args.reviewer_id)
+        import os as _os
+        return SN.pair_reviewer(
+            args.project, args.reviewer_id,
+            operator_credential=getattr(args, "operator_secret", None)
+            or _os.environ.get("FRAMEBOUND_OPERATOR_SECRET", ""))
     if cmd == "reviewer-open":
         from .services import sessions as SN
         from .services.errors import AuthorizationError, InvalidInput
