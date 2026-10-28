@@ -21,6 +21,9 @@ TABLE_MODEL = {
     "evaluations": D.Evaluation, "attempts": D.Attempt, "review_packets": D.ReviewPacket,
     "review_events": D.ReviewEvent, "correction_tasks": D.CorrectionTask,
     "jobs": D.Job, "export_snapshots": D.ExportSnapshot,
+    "motion_guides": D.MotionGuide, "reference_approvals": D.ReferenceApproval,
+    "registrations": D.Registration, "edit_masks": D.EditMask,
+    "compiled_briefs": D.CompiledBrief, "world_traces": D.WorldTrace, "runs": D.Run,
 }
 
 
