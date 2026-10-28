@@ -497,10 +497,19 @@ class Job(Strict):
     origin: str = Field(default="unknown", max_length=64)
     fencing_token_sha256: str = ""
     dispatch_count: int = Field(default=0, ge=0)
+    dispatch_inflight: bool = False
+    wire_started: bool = False
+    dispatch_token_sha256: str | None = None
+    frozen_request: dict[str, Any] = Field(default_factory=dict)
+    frozen_request_sha256: str | None = None
+    reserved_microusd: int = Field(default=0, ge=0)
     reserved_cost: str = Field(default="unbounded-note", max_length=200)
     request_artifact: str | None = None
     response_artifact: str | None = None
     output_asset_ids: list[str] = Field(default_factory=list)
+    output_annotation_ids: list[str] = Field(default_factory=list)
+    provider_response_id: str | None = None
+    provider_outcome: str | None = None
     reconciliation_required: bool = False
     cancel_requested: bool = False
     offline: bool = False

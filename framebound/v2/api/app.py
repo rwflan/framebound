@@ -221,6 +221,11 @@ def create_app(project_dir: str) -> FastAPI:
         finally:
             con.close()
 
+    @app.post('/api/provider-grants', status_code=201)
+    def provider_grant(body: dict, x_operator_secret: str | None = Header(default=None)):
+        from ..services.provider_grants import issue
+        return issue(project_dir,body,x_operator_secret or '')
+
     @app.post('/api/references/approve')
     def approve_references(body: ReferenceBody,
                            x_session_token: str | None = Header(default=None),
@@ -444,6 +449,7 @@ def create_app(project_dir: str) -> FastAPI:
             env = J.submit_generation(project_dir, brief, refs,
                                       str(body.get("idempotency_key", "")),
                                       offline=bool(body.get("offline", False)),
+            provider_settings=body.get("provider_settings"),
                                       max_attempts=int(body.get("max_attempts", 3)))
         except S.ConflictError as e:
             raise HTTPException(409, str(e))

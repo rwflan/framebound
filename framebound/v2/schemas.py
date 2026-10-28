@@ -6,6 +6,8 @@ from pathlib import Path
 
 from . import domain as D
 
+from .services.provider_grants import ProviderGrant
+
 MODELS = {
     "project": D.Project, "asset": D.Asset, "character_revision": D.CharacterRevision,
     "clip_contract_revision": D.ClipContractRevision, "frame_instance": D.FrameInstance,
@@ -17,7 +19,7 @@ MODELS = {
     "run": D.Run, "compiled_brief": D.CompiledBrief, "world_trace": D.WorldTrace,
     "transition_trace": D.TransitionTrace, "motion_guide": D.MotionGuide,
     "reference_approval": D.ReferenceApproval, "registration": D.Registration,
-    "edit_mask": D.EditMask,
+    "edit_mask": D.EditMask, "provider_grant": ProviderGrant,
 }
 
 

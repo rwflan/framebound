@@ -14,6 +14,8 @@ from . import domain as D
 from . import storage as S
 from .media.canonical import canonical_pixels
 
+from .services.provider_grants import ProviderGrant
+
 TABLE_MODEL = {
     "projects": D.Project, "assets": D.Asset, "character_revisions": D.CharacterRevision,
     "contract_revisions": D.ClipContractRevision, "clip_revisions": D.ClipRevision,
@@ -23,7 +25,7 @@ TABLE_MODEL = {
     "jobs": D.Job, "export_snapshots": D.ExportSnapshot,
     "motion_guides": D.MotionGuide, "reference_approvals": D.ReferenceApproval,
     "registrations": D.Registration, "edit_masks": D.EditMask,
-    "compiled_briefs": D.CompiledBrief, "world_traces": D.WorldTrace, "runs": D.Run,
+    "provider_grants": ProviderGrant, "compiled_briefs": D.CompiledBrief, "world_traces": D.WorldTrace, "runs": D.Run,
     "transition_traces": D.TransitionTrace,
 }
 

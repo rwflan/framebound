@@ -161,7 +161,7 @@ def submit_resolved(brief: dict, reference_blobs: list[dict], project_dir: str,
                     idempotency_key: str, *, req: dict | None = None,
                     offline: bool = False, transport=None, timeout: float = 120.0,
                     previous_response_id: str | None = None,
-                    job_offline: bool = False) -> dict:
+                    job_offline: bool = False, permit=None) -> dict:
     """Send pre-resolved references with exactly one dispatch.
 
     The persisted offline restriction is enforced at this lowest shared send
@@ -202,7 +202,7 @@ def submit_resolved(brief: dict, reference_blobs: list[dict], project_dir: str,
     # spend), never as silent retries. Only explicit provider refusals
     # (permission/model/rate-limit/validation) propagate as typed errors.
     body = http_post(W.RESPONSE_PATH, payload, timeout=timeout,
-                     idempotency_key=idempotency_key, transport=transport)
+                     idempotency_key=idempotency_key, transport=transport, permit=permit)
     parsed = parse_response(body)
     first = parsed["images"][0]
     meta = _materialize(first["bytes"])
