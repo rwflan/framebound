@@ -64,6 +64,28 @@
       "default": null,
       "title": "Edit Mask Id"
     },
+    "origin": {
+      "default": "human",
+      "enum": [
+        "human",
+        "machine"
+      ],
+      "title": "Origin",
+      "type": "string"
+    },
+    "repair_operator": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Repair Operator"
+    },
     "desired_outcome": {
       "maxLength": 1000,
       "minLength": 1,
