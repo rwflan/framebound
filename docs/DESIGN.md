@@ -1,5 +1,15 @@
 # Design
 
+> Status (2026-10-28): the v1 prototype design below is historical. The
+> implementation went through corrective passes R0–R8 (see
+> IMPLEMENTATION_STATUS.md): schema `2.0` contracts, typed services
+> (`framebound/v2/`), FastAPI desk, documented Meta Responses wire, durable
+> jobs, gated bounded repair, eligible-only training views, a real browser
+> journey, and an honestly labeled procedural replay. Corrections to the v1
+> text are marked [v2]; unmarked sections describe the prototype.
+
+## Problem
+
 ## Problem
 
 A 2D game character may need hundreds of frames across run, jump, attack, hurt, and idle cycles. Image generation is strong at one frame in a style and weak at holding, across all of them: body proportions, costume colours, which pose belongs to which phase, whether a foot is planted, and whether frame 40 still matches frame 1. Human review catches this late and does not scale; unreviewed, it ships.
@@ -79,11 +89,11 @@ brief ──> generate (Muse Image) ──> preflight ──> pass ──> human
 | SAM 3.1 | Instance masks for shape measurement where alpha is insufficient. |
 | Muse Spark / Wonder | Orchestrates the loop via CLI/MCP tools; second visual critic. Advisory only. |
 
-Adapters (`meta_api.py`) use the Meta Model API (`https://api.meta.ai/v1`, `MODEL_API_KEY`). Offline, they return the request payload and fabricate nothing. At hackathon scale the deterministic core runs at ~20 ms/frame in pure Python on a 96×96 canvas; it is the fast inner loop, models are the slow outer loop.
+Adapters [v1: `meta_api.py`; v2: `framebound/v2/providers/`] use the Meta Model API (`https://api.meta.ai/v1`, `MODEL_API_KEY`). Offline, they return the request they would send and fabricate nothing. At hackathon scale the deterministic core (pydantic/Pillow/numpy, not stdlib) is the fast inner loop and models are the slow outer loop: the public 8-frame 64×64 evaluation service benchmarks at warm p50 ≈ 27 ms (cold ≈ 320 ms), Apple Silicon, `benchmark-eval` report; raster primitives are microbenchmarked separately.
 
 ## Review desk
 
-Standard-library HTTP server + SQLite (`review.py`). Persistent across restarts. Playback honours holds; per-frame metrics and errors are shown beside the frame; issues are marked by category and note; decisions are approve / reject / needs-work. `GET /api/corrections` is the model's work queue. Dataset export is one click and includes the recorded decisions.
+[v1: standard-library HTTP server + SQLite (`review.py`).] [v2: FastAPI (`framebound/v2/api/app.py`) + SQLite with the same persistence guarantees, plus a React desk with hash routing, a presentation clock, side-by-side/blink/difference comparison, issue detail, corrections queue, export view, and a DB-backed activity log. Browser journey proven in CI.] Persistent across restarts. Playback honours holds; per-frame metrics and errors are shown beside the frame; issues are marked by category and note; decisions are approve / reject / needs-work. `GET /api/corrections` is the model's work queue. Dataset export is one click and includes the recorded decisions.
 
 The desk is for humans, but its consumer contract is machine-first: every human action is stored as structured data, not prose.
 

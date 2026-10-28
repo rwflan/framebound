@@ -59,6 +59,10 @@ def main(argv=None):
     bm = sub.add_parser("benchmark", help="v2: run the procedural stress fixture and report timing")
     bm.add_argument("--fixture", default="stress-200", choices=["stress-200"])
     bm.add_argument("--report", help="Write the benchmark report JSON here")
+    be = sub.add_parser("benchmark-eval", help="v2: benchmark the public evaluation service (cold/warm/incremental)")
+    be.add_argument("--report", help="Write the benchmark report JSON here")
+    be.add_argument("--warm-runs", default="25")
+    be.add_argument("--cold-runs", default="5")
     mc = sub.add_parser("v2-mcp", help="v2: serve application services over MCP (stdio)")
     mc.add_argument("--project", required=True)
     rp = sub.add_parser("reviewer-pair", help="v2: pair a human reviewer (prints single-use code)")
@@ -227,6 +231,14 @@ def main(argv=None):
                     "guide-propose", "reference-approve"):
         from .v2 import cli_commands as _v2c
         _print(_v2c.dispatch(args))
+        return 0
+    if args.cmd == "benchmark-eval":
+        from .v2 import bench_eval as _be
+        rep = _be.run_bench_eval(warm_runs=int(args.warm_runs), cold_runs=int(args.cold_runs))
+        if args.report:
+            Path(args.report).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.report).write_text(json.dumps(rep, indent=2) + "\n")
+        _print(rep)
         return 0
     if args.cmd == "benchmark":
         from .v2.demo import run_benchmark

@@ -38,3 +38,33 @@ Exit codes: `check`/`preflight` return 1 on any error-severity issue; `repair-ev
 - No per-pose canvas fitting.
 - Declared-but-unmeasurable anatomy is a warning to surface, not a pass to claim.
 - A technical pass is not approval. Do not report art as accepted.
+
+## v2 services (remediation pass, schema 2.0)
+
+Same pattern — JSON in/out, thin transports over shared services (`framebound/v2/`).
+Transports must not reimplement policy; CLI/MCP/API parity is audited in
+`services/capabilities.py` (`capabilities` command).
+
+```sh
+python -m framebound asset-import --project proj --src img.png --asset-id a-01
+python -m framebound contract-propose --project proj --contract contract.json
+python -m framebound clip-create --project proj --contract-id c-01 --revision-id clip-01 --frames a,b,c --phases p0,p1,p2
+python -m framebound clip-evaluate --project proj --revision-id clip-01
+python -m framebound brief-compile --project proj --contract-id c-01 --slot 2   # needs stored human approval
+python -m framebound job-submit --project proj --brief brief.json --idempotency-key k1 [--offline]
+python -m framebound job-get --project proj --job-id job-xxx
+python -m framebound correction-submit --project proj --task-id t --claim-token tok --new-id r2 --slots 3=a --recipe "repair:bounded-patch" --baseline-evaluation ev --idempotency-key k2
+python -m framebound mask-approve --project proj --issue evt --mask-asset m --slots 3   # reviewer session required
+python -m framebound export --project proj --snapshot s1 --out build/s1 --revisions clip-01
+python -m framebound dataset-validate --snapshot build/s1
+python -m framebound recorded-run --project proj --contract c-01 --slot 0 --baseline clip-01 --new-id gen-01 --out run.json --offline
+python -m framebound v2-mcp --project proj     # MCP stdio, official SDK (mcp==2.3.0), real handshake tested
+python -m framebound serve --project proj --port 8765   # FastAPI review desk + typed DTOs (api/dto.py)
+python -m framebound benchmark-eval --report bench.json   # public-service latency (cold/warm/incremental)
+```
+
+Rules the v2 tools enforce on the model (tested at the transport boundary):
+unknown check codes are rejected at proposal; missing required inputs/authority can
+never yield pass; evidence binds real pixels + code; reviewer identity comes from
+sessions, never headers; repairs obey ROI/mask scope, leases, matrix equivalence and
+no-regression selection; failures land as attempts, never orphaned revisions.
