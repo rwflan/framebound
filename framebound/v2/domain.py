@@ -483,6 +483,11 @@ class Job(Strict):
     cost_estimate: str = Field(default="unknown", max_length=200)
     cost_actual: str = Field(default="unknown", max_length=200)
     no_progress_signatures: list[str] = Field(default_factory=list)
+    request_brief: dict[str, Any] = Field(default_factory=dict)
+    provider_settings: dict[str, Any] = Field(default_factory=dict)
+    fencing_token_sha256: str = ""
+    dispatch_count: int = Field(default=0, ge=0)
+    reserved_cost: str = Field(default="unbounded-note", max_length=200)
     request_artifact: str | None = None
     response_artifact: str | None = None
     output_asset_ids: list[str] = Field(default_factory=list)

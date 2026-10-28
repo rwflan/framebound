@@ -140,6 +140,7 @@ def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict]
             or not (1 <= max_attempts <= 10):
         raise InvalidInput("max_attempts must be an int in 1..10")
     resolved = _resolve_references(project_dir, brief, reference_blobs or [])
+    from ..providers import image as _imgmod
     con = S.connect(project_dir)
     try:
         digest = hashlib.sha256(idempotency_key.encode()).hexdigest()[:12]
@@ -149,6 +150,11 @@ def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict]
                     provider="image", targets=_targets(brief),
                     max_attempts=max_attempts,
                     budget_reserved=f"max_attempts={max_attempts}",
+                    # The complete executable request is frozen at submit time:
+                    # a restarted worker resumes from this row alone and no
+                    # caller can substitute a different brief at send time.
+                    request_brief=dict(brief),
+                    provider_settings={"model": _imgmod._model(), "transport": "responses"},
                     offline=bool(offline))
         job, created = S.create_job_idempotent(con, job)
         if not created:
@@ -161,7 +167,7 @@ def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict]
         from ..providers import base as _base
         if offline_req or not _base._key():
             res = img.submit(brief, resolved, project_dir, idempotency_key,
-                             offline=offline_req)
+                             offline=offline_req, job_offline=bool(offline))
             job.request_artifact = res.get("request_artifact")
             S.update_mutable(con, "jobs", job, 1)
             return D.ResultEnvelope(ok=True, operation_id=f"op-{job.id}",
@@ -191,9 +197,52 @@ def job_get(project_dir: str, job_id: str) -> dict:
     return {"job": data, "version": ver}
 
 
+def _lease_live(job: D.Job) -> bool:
+    """True when the job holds an unexpired, well-formed lease."""
+    if not job.lease_holder or not job.lease_expires:
+        return False
+    try:
+        exp = datetime.fromisoformat(job.lease_expires)
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        return exp > datetime.now(timezone.utc)
+    except Exception:
+        return False
+
+
+def _check_fencing(job: D.Job, job_id: str, worker_id: str,
+                   fencing_token: str | None) -> None:
+    """Fencing for every mutating job transition: holder + token + live lease.
+
+    An expired worker cannot finish or fail after reassignment; an arbitrary
+    worker cannot touch another worker's job, nor an unclaimed queued job.
+    """
+    if job.status != D.JobStatus.RUNNING:
+        raise InvalidInput(
+            f"job {job_id} is {job.status.value}, not running: claim it before mutating")
+    if not job.lease_holder or job.lease_holder != worker_id:
+        raise InvalidInput(f"job {job_id} is held by {job.lease_holder or 'nobody'}, "
+                           f"not {worker_id}: foreign-worker mutation refused")
+    if not _lease_live(job):
+        raise InvalidInput(f"job {job_id}: lease expired or malformed; "
+                           "run job-reconcile before any further mutation")
+    if job.fencing_token_sha256:
+        import hashlib as _h
+        if not fencing_token or _h.sha256(fencing_token.encode()).hexdigest() \
+                != job.fencing_token_sha256:
+            raise InvalidInput(f"job {job_id}: fencing token mismatch; "
+                               "a stale or foreign worker cannot publish")
+
+
 def job_claim(project_dir: str, job_id: str, worker_id: str,
               *, expected_version: int, lease_seconds: int = 300) -> dict:
-    """QUEUED (or expired-lease RUNNING) -> RUNNING with a lease. Terminal jobs refuse."""
+    """QUEUED -> RUNNING with a fenced lease. Everything else refuses.
+
+    Terminal, RUNNING, NEEDS_ATTENTION and CANCELLED jobs are never
+    auto-claimed: expired RUNNING leases enter recovery via job_reconcile,
+    and unknown/exhausted jobs need explicit reconciliation. A new claim
+    mints a fencing token the worker must present to send/complete/fail.
+    """
     if not worker_id or not worker_id.strip():
         raise InvalidInput("worker_id is required to claim a job")
     con = S.connect(project_dir)
@@ -202,29 +251,30 @@ def job_claim(project_dir: str, job_id: str, worker_id: str,
         job = D.Job.model_validate_json(json.dumps(data))
         if job.status in TERMINAL:
             raise InvalidInput(f"job {job_id} is terminal ({job.status.value}); cannot claim")
-        if job.status == D.JobStatus.RUNNING and job.lease_expires:
-            try:
-                exp = datetime.fromisoformat(job.lease_expires)
-                if exp.tzinfo is None:
-                    exp = exp.replace(tzinfo=timezone.utc)
-                if exp > datetime.now(timezone.utc) and job.lease_holder != worker_id:
-                    raise InvalidInput(f"job {job_id} is leased to {job.lease_holder} until {job.lease_expires}")
-            except InvalidInput:
-                raise
-            except Exception:
-                pass  # unparseable lease: allow reclaim rather than wedging
+        if job.status != D.JobStatus.QUEUED:
+            if job.status == D.JobStatus.RUNNING and not _lease_live(job):
+                raise InvalidInput(
+                    f"job {job_id} lease expired while running: run job-reconcile "
+                    "first; outcome is unknown until reconciled, never auto-reclaimed")
+            raise InvalidInput(f"job {job_id} is {job.status.value}, not queued; "
+                               "only queued jobs are claimable")
         if job.cancel_requested:
             job.status = D.JobStatus.CANCELLED
             nv = S.update_mutable(con, "jobs", job, expected_version)
             return {"job_id": job_id, "status": "cancelled", "version": nv}
+        import secrets as _secrets
+        import hashlib as _h
+        token = _secrets.token_hex(16)
         job.status = D.JobStatus.RUNNING
         job.lease_holder = worker_id
         job.lease_expires = (datetime.now(timezone.utc)
                              + timedelta(seconds=lease_seconds)).isoformat()
+        job.fencing_token_sha256 = _h.sha256(token.encode()).hexdigest()
         job.updated_at = datetime.now(timezone.utc).isoformat()
         nv = S.update_mutable(con, "jobs", job, expected_version)
         return {"job_id": job_id, "status": "running", "lease_holder": worker_id,
-                "lease_expires": job.lease_expires, "version": nv}
+                "lease_expires": job.lease_expires, "fencing_token": token,
+                "version": nv}
     finally:
         con.close()
 
@@ -248,8 +298,13 @@ def _record_attempt(project_dir: str, con, job: D.Job, *, result: str,
 def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
                          expected_version: int, image_bytes: bytes,
                          mime: str, provider_response_id: str | None,
-                         usage: dict | None, output_asset_id: str | None = None) -> dict:
-    """Persist provider output as a generated asset and mark SUCCEEDED."""
+                         usage: dict | None, output_asset_id: str | None = None,
+                         fencing_token: str | None = None) -> dict:
+    """Persist provider output as a generated asset and mark SUCCEEDED.
+
+    Fenced: holder + token + live lease + RUNNING status, all enforced.
+    A successful send consumes exactly one attempt.
+    """
     from ..media.canonical import canonical_pixels, pixel_sha256
     from PIL import Image as _Image
     import io as _io
@@ -261,8 +316,7 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
         job = D.Job.model_validate_json(json.dumps(data))
         if job.status in TERMINAL:
             raise InvalidInput(f"job {job_id} is terminal ({job.status.value})")
-        if job.lease_holder and job.lease_holder != worker_id:
-            raise InvalidInput(f"job {job_id} is leased to {job.lease_holder}")
+        _check_fencing(job, job_id, worker_id, fencing_token)
         try:
             img = _Image.open(_io.BytesIO(image_bytes))
             img.load()
@@ -282,10 +336,13 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
             S.stage(con, asset)
             job.status = D.JobStatus.SUCCEEDED
             job.output_asset_ids = [*job.output_asset_ids, aid]
-            job.response_artifact = job.response_artifact
+            # request_artifact is the pre-send intent; the response link lives
+            # in response_artifact and must never overwrite it.
             job.cost_actual = json.dumps(usage or {})[:200]
+            job.attempt_count = job.attempt_count + 1
             job.lease_holder = None
             job.lease_expires = None
+            job.fencing_token_sha256 = ""
             job.reconciliation_required = False
             job.updated_at = datetime.now(timezone.utc).isoformat()
             data2, ver2 = S.get(con, "jobs", job_id)
@@ -306,14 +363,19 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
 
 def job_complete_failure(project_dir: str, job_id: str, *, worker_id: str,
                          expected_version: int, error: str,
-                         retryable: bool = False) -> dict:
-    """Record a failed attempt; retryable errors requeue while budget remains."""
+                         retryable: bool = False,
+                         fencing_token: str | None = None) -> dict:
+    """Record a failed attempt; retryable errors requeue while budget remains.
+
+    Fenced like success: an arbitrary worker cannot fail another worker's job.
+    """
     con = S.connect(project_dir)
     try:
         data, _ = S.get(con, "jobs", job_id)
         job = D.Job.model_validate_json(json.dumps(data))
         if job.status in TERMINAL:
             raise InvalidInput(f"job {job_id} is terminal ({job.status.value})")
+        _check_fencing(job, job_id, worker_id, fencing_token)
         job.attempt_count = job.attempt_count + 1
         sig = hashlib.sha256(error.encode()).hexdigest()[:16]
         with S.atomic(con):
@@ -324,6 +386,7 @@ def job_complete_failure(project_dir: str, job_id: str, *, worker_id: str,
             job.error = error[:2000]
             job.lease_holder = None
             job.lease_expires = None
+            job.fencing_token_sha256 = ""
             job.updated_at = datetime.now(timezone.utc).isoformat()
             if retryable and job.attempt_count < job.max_attempts:
                 job.status = D.JobStatus.QUEUED
@@ -341,14 +404,20 @@ def job_complete_failure(project_dir: str, job_id: str, *, worker_id: str,
 
 
 def job_mark_unknown_outcome(project_dir: str, job_id: str, *, worker_id: str,
-                             expected_version: int, detail: str) -> dict:
-    """Ambiguous timeout: never blindly retry, never leave invisible-queued."""
+                             expected_version: int, detail: str,
+                             fencing_token: str | None = None) -> dict:
+    """Ambiguous timeout: one dispatch becomes durable unknown-outcome.
+
+    Never blindly retried, never left invisible-queued, never reclaimable
+    without explicit reconciliation. Fenced like every other mutation.
+    """
     con = S.connect(project_dir)
     try:
         data, _ = S.get(con, "jobs", job_id)
         job = D.Job.model_validate_json(json.dumps(data))
         if job.status in TERMINAL:
             raise InvalidInput(f"job {job_id} is terminal ({job.status.value})")
+        _check_fencing(job, job_id, worker_id, fencing_token)
         job.attempt_count = job.attempt_count + 1
         with S.atomic(con):
             _record_attempt(project_dir, con, job, result=f"unknown_outcome: {detail[:120]}",
@@ -359,6 +428,7 @@ def job_mark_unknown_outcome(project_dir: str, job_id: str, *, worker_id: str,
             job.error = f"unknown provider outcome after ambiguous timeout; reconcile before retry: {detail[:500]}"
             job.lease_holder = None
             job.lease_expires = None
+            job.fencing_token_sha256 = ""
             job.updated_at = datetime.now(timezone.utc).isoformat()
             nv = S.stage_update(con, "jobs", job, expected_version)
         return {"job_id": job_id, "status": "needs_attention",
@@ -379,6 +449,7 @@ def job_cancel(project_dir: str, job_id: str, expected_version: int) -> dict:
         job.cancel_requested = True
         job.lease_holder = None
         job.lease_expires = None
+        job.fencing_token_sha256 = ""
         job.updated_at = datetime.now(timezone.utc).isoformat()
         nv = S.update_mutable(con, "jobs", job, expected_version)
     finally:
@@ -419,6 +490,7 @@ def job_reconcile(project_dir: str, *, worker_id: str = "reconciler",
             job.error = job.error[:2000]
             job.lease_holder = None
             job.lease_expires = None
+            job.fencing_token_sha256 = ""
             job.updated_at = now.isoformat()
             try:
                 nv = S.update_mutable(con, "jobs", job, ver)

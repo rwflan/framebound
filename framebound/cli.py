@@ -90,7 +90,7 @@ def main(argv=None):
         ("job-cancel", "v2: cancel a non-terminal job", [("--job-id", True), ("--project", True), ("--expected-version", True)]),
         ("job-reconcile", "v2: recover expired-lease RUNNING jobs", [("--project", True)]),
         ("orchestrator-run", "v2: start a durable orchestrator run", [("--project", True)]),
-        ("orchestrator-send", "v2: claimed-send-complete for one job", [("--project", True), ("--run-id", True), ("--job-id", True), ("--brief", True), ("--worker-id", True)]),
+        ("orchestrator-send", "v2: authorized send-complete for one job (stored request; brief optional)", [("--project", True), ("--run-id", True), ("--job-id", True), ("--brief", False), ("--worker-id", True)]),
         ("capabilities", "v2: audited transport x operation table", [("--project", True)]),
         ("candidate-register", "v2: register replacements as a child revision", [("--baseline", True), ("--new-id", True), ("--project", True), ("--slots", True), ("--recipe", True)]),
         ("correction-submit", "v2: gated repair submit (holder+token+lease+scope+matrix)", [("--project", True), ("--task-id", True), ("--claim-token", True), ("--new-id", True), ("--slots", True), ("--recipe", True), ("--baseline-evaluation", True), ("--idempotency-key", True)]),
@@ -116,6 +116,8 @@ def main(argv=None):
             c.add_argument("--max-attempts", default="3")
         if name == "orchestrator-send":
             c.add_argument("--offline", action="store_true", default=False)
+            c.add_argument("--fencing-token", default=None,
+                           help="fencing token from job-claim (required to send)")
         if name == "correction-submit":
             c.add_argument("--transform", default=None)
             c.add_argument("--expected-version", default="1")

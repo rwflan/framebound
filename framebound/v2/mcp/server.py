@@ -89,6 +89,20 @@ def build_server(project_dir: str) -> MCPServer:
         from ..services import orchestrator as O
         return O.start_run(project_dir, list(job_ids or []), max_attempts=int(max_attempts))
 
+    @server.tool(name="orchestrator_step", description="Claim the run's next job; resume from stored state")
+    def orchestrator_step(run_id: str, worker_id: str) -> dict:
+        from ..services import orchestrator as O
+        return O.run_once(project_dir, run_id, worker_id=worker_id)
+
+    @server.tool(name="orchestrator_send", description="Authorized send-complete for a claimed job (stored request)")
+    def orchestrator_send(run_id: str, job_id: str, worker_id: str,
+                          fencing_token: str, brief: dict | None = None,
+                          offline: bool = False) -> dict:
+        from ..services import orchestrator as O
+        return O.orchestrator_send(project_dir, run_id, job_id, brief,
+                                   worker_id=worker_id, fencing_token=fencing_token,
+                                   offline=bool(offline))
+
     @server.tool(name="capabilities", description="Audited transport x operation table")
     def capabilities() -> dict:
         from ..services import capabilities as C
