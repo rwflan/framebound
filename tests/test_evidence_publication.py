@@ -49,7 +49,10 @@ def test_applicable_membership_checked_but_unused_proposals_do_not_churn(tmp_pat
     assert 'reviewer' in str(rejected.value)
     ANN.propose(p,HUMAN,proposal)
     assert not verify_evidence(p,'clip-R3',ev)[0]
+    from framebound.v2.verify import run_verify
+    assert not run_verify(p)['ok']
     assert clips.evaluate(p,'clip-R3').artifacts[0]['id']!=ev.id
+    assert run_verify(p)['ok']
 
 def test_scope_change_after_precheck_refuses_packet_publication(tmp_path):
     p=str(tmp_path);seed5(p)

@@ -41,7 +41,7 @@ def verify_evidence(project_dir: str, revision_id: str,
 
 
 def verify_evidence_in(con, project_dir: str, revision_id: str,
-                       evaluation: D.Evaluation) -> tuple[bool, list[str]]:
+                       evaluation: D.Evaluation, *, require_current: bool = True) -> tuple[bool, list[str]]:
     issues: list[str] = []
     if True:
         try:
@@ -136,17 +136,17 @@ def verify_evidence_in(con, project_dir: str, revision_id: str,
 
         # --- analyzer + lock identity
         from ..checks import evaluate as _EV
-        if (manifest.get("analyzer") or {}).get("code_sha256") != _EV._code_sha256():
+        if require_current and (manifest.get("analyzer") or {}).get("code_sha256") != _EV._code_sha256():
             issues.append("analyzer implementation changed since evaluation: re-evaluate")
         from ..checks.evaluate import lock_identity as _lockid
         running_lock = _lockid()["digest"]
-        if (manifest.get("dependency_lock") or {}).get("digest") != running_lock:
+        if require_current and (manifest.get("dependency_lock") or {}).get("digest") != running_lock:
             issues.append("dependency lock changed since evaluation: re-evaluate")
 
         # --- contract binding
         if (manifest.get("contract") or {}).get("id") != contract.id:
             issues.append("manifest contract does not match stored revision contract")
-        if not issues:
+        if require_current and not issues:
             from .clips import compute_evaluation_in
             try:
                 _, current, _ = compute_evaluation_in(con, project_dir, revision_id)
