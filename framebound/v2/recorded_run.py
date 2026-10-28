@@ -138,26 +138,16 @@ def _controller_send(project_dir: str, brief: dict, idem: str, *,
     """
     from .services import jobs as J
     from .services import orchestrator as O
-    env = J.submit_generation(project_dir, brief, [], idem, offline=offline)
+    # Stage E: queued model/settings are immutable. Edit-chain settings are
+    # frozen at submit time, never mutated after queueing.
+    env = J.submit_generation(project_dir, brief, [], idem, offline=offline,
+                              provider_settings=dict(provider_settings) if provider_settings else None)
     job_id = env.artifacts[0]["id"]
     con = S.connect(project_dir)
     try:
         data, _ = S.get(con, "jobs", job_id)
     finally:
         con.close()
-    if provider_settings:
-        con = S.connect(project_dir)
-        try:
-            data2, ver2 = S.get(con, "jobs", job_id)
-            job = D.Job.model_validate(data2)
-            if job.status.value == "queued" and (
-                    "previous_response_id" not in (job.provider_settings or {})):
-                job.provider_settings = {**(job.provider_settings or {}),
-                                          **dict(provider_settings)}
-                S.update_mutable(con, "jobs", job, ver2)
-                data = job.model_dump()
-        finally:
-            con.close()
     if data["status"] == "succeeded" and data.get("output_asset_ids"):
         aid = data["output_asset_ids"][-1]
         try:
