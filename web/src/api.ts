@@ -1,6 +1,7 @@
 /** Thin typed client over the v2 review API. No policy lives here. */
 import type {
   ActivityPageDto,
+  CapabilitiesDto,
   CompareBundleDto,
   CorrectionsListDto,
   EligibilityDto,
@@ -98,8 +99,8 @@ export const api = {
     req<{ ok: boolean; task_id: string; status: string; event_id: string }>(`/api/issues/${encodeURIComponent(eventId)}/reopen`, { method: 'POST', body: JSON.stringify(body) }),
   approveMask: (body: { issue_event_id: string; mask_asset_id: string; covered_slots: number[] }) =>
     req<Record<string, unknown>>('/api/masks', { method: 'POST', body: JSON.stringify(body) }),
-  reviewerPair: (reviewerId: string) =>
-    req<{ pairing_code: string; reviewer_id: string }>('/api/reviewer/pair', { method: 'POST', body: JSON.stringify({ reviewer_id: reviewerId }) }),
+  capabilities: () =>
+    req<CapabilitiesDto>('/api/capabilities'),
   reviewerOpen: (pairingCode: string) =>
     req<{ session_token: string; reviewer_id: string }>('/api/reviewer/open', { method: 'POST', body: JSON.stringify({ pairing_code: pairingCode }) }),
   eligibility: (revisionId: string) =>

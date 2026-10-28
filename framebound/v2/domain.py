@@ -599,6 +599,27 @@ class WorldTrace(Strict):
     created_at: str = Field(default_factory=utcnow)
 
 
+class TransitionTrace(Strict):
+    """Measured interruption handoff: presented departure/entry observations,
+    world contact comparison, and the pass/fail verdict (frozen)."""
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
+    id: str = Field(min_length=1, max_length=128)
+    departure_revision_id: str = Field(min_length=1, max_length=128)
+    departure_tick: StrictInt = Field(ge=0)
+    entry_revision_id: str = Field(min_length=1, max_length=128)
+    entry_slot: StrictInt = Field(ge=0)
+    entry_first_tick: StrictInt = Field(ge=0)
+    departure_pixel_sha256: str = Field(**HEX64)
+    entry_pixel_sha256: str = Field(**HEX64)
+    world_distance: float | None = Field(default=None)
+    planted_departure: bool | None = Field(default=None)
+    planted_entry: bool | None = Field(default=None)
+    verdict: Literal["pass", "fail"] = "pass"
+    reasons: list[str] = Field(default_factory=list)
+    origin: str = Field(default="procedural", max_length=64)
+    created_at: str = Field(default_factory=utcnow)
+
+
 class ReviewerPairing(Strict):
     code_sha256: str = Field(**HEX64)
     reviewer_id: str = Field(min_length=1, max_length=200)

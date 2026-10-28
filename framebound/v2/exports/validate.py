@@ -297,7 +297,8 @@ def validate_snapshot(snapshot_dir: str) -> dict:
         closure_rows = {}
         for name in ("evaluations.jsonl", "events.jsonl", "attempts.jsonl",
                      "masks.jsonl", "packets.jsonl", "tasks.jsonl",
-                     "annotations.jsonl", "traces.jsonl", "briefs.jsonl"):
+                     "annotations.jsonl", "traces.jsonl", "briefs.jsonl",
+                     "transition_traces.jsonl"):
             rows = []
             for line in (snap / "closure" / name).read_text().splitlines():
                 if line.strip():
@@ -323,6 +324,14 @@ def validate_snapshot(snapshot_dir: str) -> dict:
                         or pkt.get("comparison_revision_id") != pr.get("rejected_revision"):
                     issues.append("preference packet " + str(pkt.get("id")) + " addresses a "
                                   "different pair than the preference row")
+        selected = set(manifest.get("clip_revisions", []))
+        for tr in closure_rows["transition_traces.jsonl"]:
+            if tr.get("verdict") not in ("pass", "fail"):
+                issues.append("transition trace " + str(tr.get("id")) + " has no verdict")
+            if tr.get("departure_revision_id") not in selected \
+                    and tr.get("entry_revision_id") not in selected:
+                issues.append("transition trace " + str(tr.get("id")) +
+                              " addresses unselected revisions")
         for e in closure_rows["evaluations.jsonl"]:
             digest = e.get("evidence_manifest_sha256")
             if not digest:
