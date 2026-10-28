@@ -497,15 +497,15 @@ class TestCapabilityAndTransportParity(unittest.TestCase):
             with _mock.patch("urllib.request.urlopen",
                              side_effect=_boom(401)):
                 with self.assertRaises(E.PermissionDenied):
-                    BASE.http_post("/responses", {"model": "m", "input": "x"})
+                    BASE._http_post_approved("/responses", {"model": "m", "input": "x"})
             with _mock.patch("urllib.request.urlopen",
                              side_effect=_boom(429)):
                 with self.assertRaises(E.RateLimited):
-                    BASE.http_post("/responses", {"model": "m", "input": "x"})
+                    BASE._http_post_approved("/responses", {"model": "m", "input": "x"})
             with _mock.patch("urllib.request.urlopen",
                              side_effect=_boom(400)):
                 with self.assertRaises(E.ModelUnavailable):
-                    BASE.http_post("/responses", {"model": "m", "input": "x"})
+                    BASE._http_post_approved("/responses", {"model": "m", "input": "x"})
 
     def test_capability_table_honest_and_transports_share_services(self):
         from framebound.v2.services import capabilities as C

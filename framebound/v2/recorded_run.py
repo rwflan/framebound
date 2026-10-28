@@ -97,33 +97,28 @@ def _check_baseline_contract(project_dir: str, contract_id: str,
 
 def _materialize_generated(project_dir: str, out_bytes: bytes, asset_id: str,
                            output_mime: str, w: int, h: int,
-                           *, origin: str | None = None) -> D.Asset:
-    """Store paid provider bytes as an asset; identical retries reuse the row
-    instead of spending again or duplicating.
-
-    Stage B: origin is retained through aliases via lineage (simulated output
-    stays simulated and can never become a live positive).
-    """
-    from .media.canonical import canonical_pixels, pixel_sha256
-    from PIL import Image as _Image
-    import io as _io
-    raw_digest = S.store_blob(project_dir, out_bytes)
-    im = _Image.open(_io.BytesIO(out_bytes))
-    im.load()
-    asset = D.Asset(id=asset_id, byte_sha256=raw_digest,
-                    pixel_sha256=pixel_sha256(canonical_pixels(im.convert("RGBA"))),
-                    mime=output_mime, width=im.size[0], height=im.size[1],
-                    source_kind="generated", rights="original", eligible_roles=[],
-                    lineage=f"recorded-run:{origin}" if origin else "", origin=origin or "unknown")
-    con = S.connect(project_dir)
+                           *, origin: str | None = None, parent_asset_id: str | None = None,
+                           source_job_id: str | None = None) -> D.Asset:
+    from .media.canonical import load_native_image,canonical_pixels,pixel_sha256
+    image=load_native_image(out_bytes)
+    if parent_asset_id:
+        from .services.provenance import write_derived
+        return write_derived(project_dir,asset_id,image,[parent_asset_id],
+                             {'operator':'alias','source_job_id':source_job_id})
+    con=S.connect(project_dir)
     try:
-        S.insert(con, asset)
-    except S.ConflictError:
-        data, _ = S.get(con, "assets", asset_id)
-        asset = D.Asset.model_validate(data)
-    finally:
-        con.close()
-    return asset
+        rights='unknown'
+        if source_job_id:
+            job=S.get(con,'jobs',source_job_id)[0]
+            grant=job.get('provider_settings',{}).get('grant_id')
+            if grant:rights=S.get(con,'provider_grants',grant)[0].get('output_rights','unknown')
+        asset=D.Asset(id=asset_id,byte_sha256=S.store_blob(project_dir,out_bytes),
+            pixel_sha256=pixel_sha256(canonical_pixels(image)),mime='image/png',width=image.width,height=image.height,
+            source_kind='generated',rights=rights,origin=origin or 'unknown',source_job_id=source_job_id,
+            lineage=f'recorded-run:{origin}' if origin else '')
+        with S.atomic(con):S.stage_identical(con,asset)
+        return asset
+    finally:con.close()
 
 
 def _controller_send(project_dir: str, brief: dict, idem: str, *,
@@ -138,10 +133,15 @@ def _controller_send(project_dir: str, brief: dict, idem: str, *,
     """
     from .services import jobs as J
     from .services import orchestrator as O
+    from .providers import ledger as _ledger
     # Stage E: queued model/settings are immutable. Edit-chain settings are
     # frozen at submit time, never mutated after queueing.
+    import os
+    settings=dict(provider_settings or {})
+    if os.environ.get('FRAMEBOUND_PROVIDER_GRANT'):
+        settings.setdefault('grant_id',os.environ['FRAMEBOUND_PROVIDER_GRANT'])
     env = J.submit_generation(project_dir, brief, [], idem, offline=offline,
-                              provider_settings=dict(provider_settings) if provider_settings else None)
+                              provider_settings=settings or None)
     job_id = env.artifacts[0]["id"]
     con = S.connect(project_dir)
     try:
@@ -169,7 +169,7 @@ def _controller_send(project_dir: str, brief: dict, idem: str, *,
             raw = S.blob_path(project_dir, blob_digest).read_bytes()
             asset = _materialize_generated(
                 project_dir, raw, aid, "image/png", 0, 0,
-                origin=data.get("origin"))
+                origin=data.get("origin"),source_job_id=data["id"])
             adata = {"byte_sha256": asset.byte_sha256,
                      "mime": asset.mime, "width": asset.width,
                      "height": asset.height}
@@ -248,10 +248,36 @@ def _capability_spark(project_dir: str, contract_summary: str, frame_blobs: list
 def _capability_sam(project_dir: str, image_bytes: bytes, prompt: str,
                     source_width: int, source_height: int, gen_asset: D.Asset,
                     contract_view: str, proposal_prefix: str, *,
-                    transport=None, timeout: float = 120.0) -> dict:
+                    transport=None, timeout: float = 120.0,
+                    compiled_brief: dict | None = None, idempotency_key: str | None = None) -> dict:
     """Capability 4: real SAM segmentation; proposals materialized as stored
     rows carrying the exact source pixel hash (never a bare raster)."""
     from .providers import sam as _sam
+    if compiled_brief is not None:
+        from .services import jobs as J,orchestrator as O
+        import os
+        settings={'provider':'sam','source_asset_id':gen_asset.id,'prompt':prompt}
+        if os.environ.get('FRAMEBOUND_PROVIDER_GRANT'):settings['grant_id']=os.environ['FRAMEBOUND_PROVIDER_GRANT']
+        env=J.submit_generation(project_dir,compiled_brief,[],idempotency_key or f'{proposal_prefix}-sam',provider_settings=settings)
+        jid=env.artifacts[0]['id'];job=J.job_get(project_dir,jid)['job']
+        if job['status']=='queued':
+            run=O.start_run(project_dir,[jid]);step=O.run_once(project_dir,run['run_id'],worker_id='recorded-sam')
+            if step['action']=='send_ready':
+                O.orchestrator_send(project_dir,run['run_id'],jid,worker_id='recorded-sam',
+                    fencing_token=step['fencing_token'],transport=transport,timeout=timeout)
+            job=J.job_get(project_dir,jid)['job']
+        con=S.connect(project_dir)
+        try:
+            proposals=[]
+            for aid,ann in zip(job['output_asset_ids'],job.get('output_annotation_ids',[])):
+                asset=S.get(con,'assets',aid)[0]
+                proposals.append({'asset_id':aid,'annotation_id':ann,'pixel_sha256':asset['pixel_sha256']})
+        finally:con.close()
+        return {'capability':'sam-segmentation','status':'recorded' if job['status']=='succeeded' and job.get('provider_outcome')=='mask' else 'failed',
+                'job_id':jid,'outcome':job.get('provider_outcome'),'reason':job.get('error'),
+                'request_artifact':job.get('request_artifact'),'response_artifact':job.get('response_artifact'),
+                'response_id':job.get('provider_response_id'),'origin':job['origin'],
+                'proposals':proposals,'record_count':len(proposals)}
     try:
         res = _sam.submit(base64.b64encode(image_bytes).decode(), prompt, project_dir,
                           transport=transport, timeout=timeout,
@@ -262,6 +288,10 @@ def _capability_sam(project_dir: str, image_bytes: bytes, prompt: str,
     if res.get("mode") != "live":
         return {"capability": "sam-segmentation", "status": "blocked",
                 "note": res.get("note", "SAM not configured")}
+    if res.get('outcome') != 'mask':
+        return {'capability':'sam-segmentation','status':'failed','outcome':res.get('outcome'),
+                'reason':res.get('reason'),'request_artifact':res.get('request_artifact'),
+                'response_artifact':res.get('response_artifact'),'origin':res.get('origin')}
     proposals: list[dict] = []
     for rec in res.get("records", []):
         raster = bytes(rec["mask"]["raster"])
@@ -284,7 +314,8 @@ def _capability_sam(project_dir: str, image_bytes: bytes, prompt: str,
         asset = D.Asset(id=aid, byte_sha256=digest,
                         pixel_sha256=_pxh(canon), mime="image/png", width=w, height=h,
                         source_kind="derived", lineage=f"sam:{res.get('response_id')}",
-                        rights="original", eligible_roles=[])
+                        rights=gen_asset.rights, eligible_roles=[],parent_asset_ids=[gen_asset.id],
+                        origin=res.get('origin','unknown'),derivation={'operator':'segmentation'})
         con = S.connect(project_dir)
         try:
             try:
@@ -414,7 +445,7 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
     gen_asset = _materialize_generated(
         project_dir, gen["output_bytes"], f"{new_revision_id}-gen",
         gen["output_mime"], gen["output_size"][0], gen["output_size"][1],
-        origin=gen.get("origin", origin))
+        origin=gen.get("origin", origin),parent_asset_id=gen["output_asset_id"],source_job_id=gen["job_id"])
     if (gen_asset.width, gen_asset.height) != canvas:
         return _write_bundle(Path(out_path), {
             "origin": origin, "status": "recorded-failure",
@@ -446,7 +477,7 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
         edit_asset = _materialize_generated(
             project_dir, edit["output_bytes"], f"{new_revision_id}-edit",
             edit["output_mime"], edit["output_size"][0], edit["output_size"][1],
-            origin=edit.get("origin", origin))
+            origin=edit.get("origin", origin),parent_asset_id=edit["output_asset_id"],source_job_id=edit["job_id"])
         if (edit_asset.width, edit_asset.height) != canvas:
             raise RuntimeError(f"edit {(edit_asset.width, edit_asset.height)} != canvas")
         capabilities.append({"capability": "image-edit", "status": "recorded",
@@ -493,7 +524,8 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
                               canvas[0], canvas[1], gen_asset, view,
                               f"{new_revision_id}-prop",
                               transport=sam_transport if sam_transport is not None
-                              else transport, timeout=timeout)
+                              else transport, timeout=timeout,compiled_brief=prepared['brief'],
+                              idempotency_key=f'{idempotency_key}-sam')
     capabilities.append(sam_cap)
     # Stage A corrected handoff: spark-critique is advisory-only and never gates.
     failed = [c for c in capabilities if c.get("capability") != "spark-critique" and c.get("status") != "recorded"]

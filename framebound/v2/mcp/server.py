@@ -74,10 +74,10 @@ def build_server(project_dir: str) -> MCPServer:
 
     @server.tool(name="generation_submit", description="Submit a reference-conditioned generation job (idempotent)")
     def generation_submit(brief: dict, references: list[dict], idempotency_key: str,
-                          offline: bool = False) -> dict:
+                          offline: bool = False, provider_settings: dict | None = None) -> dict:
         from ..services import jobs
         return jobs.submit_generation(project_dir, brief, references, idempotency_key,
-                                      offline=bool(offline)).model_dump()
+                                      offline=bool(offline),provider_settings=provider_settings).model_dump()
 
     @server.tool(name="job_get", description="Read a persisted job by id")
     def job_get(job_id: str) -> dict:

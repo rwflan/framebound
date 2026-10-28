@@ -181,7 +181,7 @@ def alpha_fallback(mask_nonzero: int, width: int, height: int) -> dict:
 def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/png",
            file_id: str | None = None, offline: bool = False, transport=None,
            timeout: float = 120.0, source_width: int | None = None,
-           source_height: int | None = None) -> dict:
+           source_height: int | None = None, req: dict | None = None, permit=None) -> dict:
     """Submit a SAM request and parse the special-token lane.
 
     Exactly one dispatch: segmentation POSTs are not provably idempotent, so
@@ -193,7 +193,7 @@ def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/
     if source_width is None or source_height is None:
         raise InvalidInput("SAM submit needs source_width + source_height: "
                            "unbound frame sizes cannot validate the returned geometry")
-    req = build_request(image_b64, prompt, mime=mime, file_id=file_id, stream=False)
+    req = req if req is not None else build_request(image_b64, prompt, mime=mime, file_id=file_id, stream=False)
     redacted = W.redact_wire(req)
     if offline or not _key():
         digest = record_artifact(project_dir, "sam_request",
@@ -208,7 +208,7 @@ def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/
                                  {"request": redacted, "sent": True,
                                   "model": req["model"], "origin": origin},
                                  provider="sam", model=req["model"])
-    body = http_post(W.RESPONSE_PATH, req, timeout=timeout, transport=transport)
+    body = http_post(W.RESPONSE_PATH, req, timeout=timeout, transport=transport,permit=permit)
     # Non-streaming: output_text lane; streaming SSE bodies carry events — both
     # funnel into one text lane before parsing.
     if isinstance(body, dict) and "events" in body:
@@ -236,7 +236,8 @@ def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/
                               "request": redacted, "sent": True, "model": req["model"],
                               "response_id": response_id,
                               "outcome": parsed["outcome"], "reason": parsed.get("reason"),
-                              "record_count": len(parsed.get("records", []))},
+                              "record_count": len(parsed.get("records", [])),
+                              "provider_status":status,"output_text":text},
                              provider="sam", model=req["model"],
                              request_id=str(response_id or ""))
     out = {"mode": "live", "sent": True, "request_artifact": req_digest,

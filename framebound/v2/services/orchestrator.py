@@ -127,7 +127,7 @@ def run_once(project_dir: str, run_id: str, *, worker_id: str,
 
 def _authorize_send(project_dir: str, run_id: str, job_id: str,
                     brief: dict | None, worker_id: str,
-                    fencing_token: str | None, offline: bool) -> tuple:
+                    fencing_token: str | None, offline: bool, *, simulation_mode: bool | None = None) -> tuple:
     """Central pre-send authorization, checked atomically before network I/O.
 
     One gate for every transport: job belongs to the run; request fingerprint
@@ -199,6 +199,11 @@ def _authorize_send(project_dir: str, run_id: str, job_id: str,
         raise InvalidInput(f"job {job_id}: frozen request no longer resolves to its "
                              "recorded fingerprint (stored bytes changed); reconcile first")
     J._check_fencing(job, job_id, worker_id, fencing_token)
+    if simulation_mode is not None:
+        import hashlib
+        if not job.frozen_request or hashlib.sha256(json.dumps(job.frozen_request,sort_keys=True).encode()).hexdigest()!=job.frozen_request_sha256:
+            raise InvalidInput('legacy or altered frozen wire request: resubmit explicitly')
+
     # No-progress guard first: a repeated identical fingerprint halts instead
     # of rebuying, whether or not attempts remain.
     if job.payload_sha256 in job.no_progress_signatures and job.attempt_count > 0:
@@ -212,69 +217,72 @@ def _authorize_send(project_dir: str, run_id: str, job_id: str,
     # Stage E: numeric spend gate. A zero/exhausted cap fails closed; string
     # notes never authorize spend. New keys cannot reset the same target's
     # allowance (enforced below via target-level accounting).
-    _spend_cap = (job.provider_settings or {}).get("max_spend_usd")
-    if _spend_cap is not None:
+    import os
+    from decimal import Decimal, InvalidOperation
+    caps = [(job.provider_settings or {}).get('max_spend_usd'),os.environ.get('FRAMEBOUND_SPEND_CEILING')]
+    for cap in caps:
+        if cap is None: continue
         try:
-            if float(_spend_cap) <= 0:
-                raise InvalidInput(f"job {job_id}: spend cap {_spend_cap} allows no dispatch")
-        except InvalidInput:
-            raise
-        except Exception:
-            raise InvalidInput(f"job {job_id}: invalid spend cap {_spend_cap!r}")
-    if "usd-0" in str(job.budget_reserved) or "usd_0" in str(job.budget_reserved):
-        raise InvalidInput(f"job {job_id}: zero spend cap allows no dispatch")
+            amount = Decimal(str(cap).removeprefix('calls-').removeprefix('usd-'))
+            if not amount.is_finite() or amount <= 0:
+                raise InvalidInput('spend ceiling allows no dispatch')
+        except (InvalidOperation,ValueError) as exc:
+            raise InvalidInput('invalid spend ceiling') from exc
+    if str(job.budget_reserved) in ('usd-0','usd_0','usd-0.0','usd_0.0'):
+        raise InvalidInput('zero spend cap allows no dispatch')
     # Stage E: run-level ceiling enforced at authorize time (not just at
     # run_once entry) so two jobs in a run capped at one cannot both dispatch.
     if run.attempts_used >= run.max_attempts:
         raise InvalidInput(f"run {run_id}: attempt ceiling {run.attempts_used}/{run.max_attempts} exhausted")
-    # Stage E: target-level ceiling across idempotency keys. Four keys for the
-    # same contract slot share one 3-attempt allowance; a new key never resets it.
-    try:
-        _con2 = S.connect(project_dir)
-        try:
-            _tried = 0
-            for _r in _con2.execute("SELECT data FROM jobs").fetchall():
-                try:
-                    _j = D.Job.model_validate_json(_r["data"])
-                except Exception:
-                    continue
-                if set(_j.targets or []) & set(job.targets or []) and _j.id != job.id:
-                    _tried += _j.attempt_count + _j.dispatch_count
-            if _tried + job.attempt_count + job.dispatch_count >= 3 and set(job.targets or []):
-                raise InvalidInput(f"target {job.targets}: shared attempt ceiling exhausted; new keys do not reset it")
-        finally:
-            _con2.close()
-    except InvalidInput:
-        raise
-    except Exception:
-        pass
-    # Atomic reservation before network I/O: increment dispatch_count in the
-    # same compare-and-swap so two concurrent workers cannot both dispatch.
-    # The version check serializes overlapping sends; the loser gets
-    # StaleRevision and must reconcile instead of double-spending.
+    # Reserve job, run and target units under one write lock, before I/O.
     con = S.connect(project_dir)
     try:
-        job2, v2 = _get_job(con, job_id)
-        if v2 != jver:
-            raise S.StaleRevisionError(
-                f"stale_revision: jobs/{job_id} changed during authorization")
-        J._check_fencing(job2, job_id, worker_id, fencing_token)
-        if job2.dispatch_count >= job2.max_attempts:
-            raise InvalidInput(f"job {job_id}: dispatch ceiling exhausted (raced)")
-        job2.dispatch_count = job2.dispatch_count + 1
-        job2.reserved_cost = (
-            f"reserved:max_attempts={job2.max_attempts} "
-            f"(dispatch {job2.dispatch_count}/{job2.max_attempts})")
-        job2.updated_at = _utc()
-        nv = S.update_mutable(con, "jobs", job2, v2)
+        with S.atomic(con):
+            con.execute('BEGIN IMMEDIATE')
+            job2, v2 = _get_job(con, job_id)
+            live_run, rv = S.get(con, 'runs', run_id)
+            run = D.Run.model_validate(live_run)
+            if v2 != jver:
+                raise S.StaleRevisionError('job changed during authorization')
+            J._check_fencing(job2, job_id, worker_id, fencing_token)
+            if job2.dispatch_inflight:
+                raise InvalidInput('dispatch already in flight; reconcile before another send')
+            if run.status != 'running' or run.attempts_used >= run.max_attempts:
+                raise InvalidInput('run attempt ceiling exhausted')
+            grant_id=job2.provider_settings.get('grant_id')
+            target_limit=J.MAX_TARGET_ATTEMPTS
+            if grant_id:
+                try:target_limit=S.get(con,'provider_grants',grant_id)[0]['max_dispatches']
+                except KeyError as exc:raise InvalidInput('provider grant not found') from exc
+            tried=0;project_calls=0
+            for row in con.execute('SELECT data FROM jobs'):
+                other=D.Job.model_validate_json(row['data']);project_calls+=other.dispatch_count
+                if set(other.targets)&set(job2.targets) and (not grant_id or other.provider_settings.get('grant_id')==grant_id):
+                    tried+=other.dispatch_count
+            if not grant_id and tried>=target_limit:raise InvalidInput('shared target attempt ceiling exhausted')
+            cap=os.environ.get('FRAMEBOUND_SPEND_CEILING','')
+            if cap.startswith('calls-') and project_calls>=int(cap[6:]):
+                raise InvalidInput('project call ceiling exhausted')
+            from .provider_grants import reserve_in, DispatchPermit
+            reserve_in(con,job2,simulation_mode)
+            import secrets, hashlib
+            token=secrets.token_hex(24)
+            job2.dispatch_token_sha256=hashlib.sha256(token.encode()).hexdigest()
+            job2.wire_started=False
+            job2.dispatch_inflight = True
+            job2.dispatch_count += 1
+            if not job2.provider_settings.get('grant_id'):
+                job2.reserved_cost = 'reserved:simulation-dispatch-unit:no-provider-charge'
+            job2.updated_at = _utc()
+            run.attempts_used += 1
+            run.updated_at = _utc()
+            nv = S.stage_update(con,'jobs',job2,v2)
+            rver = S.stage_update(con,'runs',run,rv)
+        permit=DispatchPermit(project_dir,job_id,token,job2.frozen_request_sha256,
+                              job2.provider_settings.get('base_url','https://api.meta.ai/v1'),simulation_mode is not False)
+        return run, rver, job2, nv, effective, resolved, permit
     finally:
         con.close()
-    con = S.connect(project_dir)
-    try:
-        job3, v3 = _get_job(con, job_id)
-    finally:
-        con.close()
-    return run, rver, job3, v3, effective, resolved, nv
 
 
 def _mark_dispatched(project_dir: str, job_id: str, expected_version: int) -> int:
@@ -309,8 +317,8 @@ def orchestrator_send(project_dir: str, run_id: str, job_id: str, brief: dict | 
     from . import jobs as J
     from ..providers import image as img
     try:
-        run, rver, job, jver, effective, resolved, _ = _authorize_send(
-            project_dir, run_id, job_id, brief, worker_id, fencing_token, offline)
+        run, rver, job, jver, effective, resolved, permit = _authorize_send(
+            project_dir, run_id, job_id, brief, worker_id, fencing_token, offline, simulation_mode=transport is not None)
     except InvalidInput as e:
         if "already attempted" in str(e):
             con = S.connect(project_dir)
@@ -329,13 +337,12 @@ def orchestrator_send(project_dir: str, run_id: str, job_id: str, brief: dict | 
     # Build the exact wire request pre-send so the intent artifact is the
     # redacted request (never overwritten by the response artifact later).
     # An edit-chain job refines its prior response instead of regenerating.
-    prev = (job.provider_settings or {}).get("previous_response_id")
-    if prev:
-        change = (job.provider_settings or {}).get(
-            "edit_instruction", "bounded patch within the approved scope")
-        req = img.build_edit_request(prev, change, extra_blobs=resolved)
-    else:
-        req = img.build_request(effective, resolved)
+    if not job.frozen_request or not job.frozen_request_sha256:
+        raise InvalidInput('legacy job lacks a frozen wire request: resubmit explicitly')
+    req = dict(job.frozen_request)
+    import hashlib
+    if hashlib.sha256(json.dumps(req,sort_keys=True).encode()).hexdigest() != job.frozen_request_sha256:
+        raise InvalidInput('frozen wire request changed')
     from ..providers import ledger as _ledger
     from ..providers import wire as _W
     intent = _ledger.record_artifact(
@@ -350,25 +357,32 @@ def orchestrator_send(project_dir: str, run_id: str, job_id: str, brief: dict | 
         if v_i != jver:
             raise S.StaleRevisionError(
                 f"stale_revision: jobs/{job_id} changed before intent record")
-        if not job_i.request_artifact:
-            job_i.request_artifact = intent
+        job_i.request_artifact = intent
         job_i.updated_at = _utc()
         jver = S.update_mutable(con, "jobs", job_i, v_i)
     finally:
         con.close()
     jver = _mark_dispatched(project_dir, job_id, jver)
     try:
-        res = img.submit_resolved(effective, resolved, project_dir,
-                                  job.idempotency_key, req=req,
-                                  job_offline=job.offline,
-                                  transport=transport, timeout=timeout)
+        if job.provider=='sam':
+            from ..providers import sam
+            res=sam.submit('',job.provider_settings.get('prompt','figure'),project_dir,
+                    source_width=job.provider_settings['source_width'],source_height=job.provider_settings['source_height'],
+                    req=req,permit=permit,transport=transport,timeout=timeout)
+        else:
+            res = img.submit_resolved(effective, resolved, project_dir,
+                                      job.idempotency_key, req=req,
+                                      job_offline=job.offline,
+                                      transport=transport, timeout=timeout, permit=permit)
     except InvalidInput as e:
+        jver=permit.wire_version or jver
         out = J.job_complete_failure(project_dir, job_id, worker_id=worker_id,
                                      expected_version=jver, error=str(e),
                                      retryable=False, fencing_token=fencing_token)
         _bump_run(project_dir, run_id)
         return {"run_id": run_id, "job_id": job_id, "action": "attempt", **out}
     except Exception as e:
+        jver=permit.wire_version or jver
         from .errors import RateLimited
         if isinstance(e, RateLimited):
             # Explicit provider refusal before acceptance: bounded requeue.
@@ -381,14 +395,19 @@ def orchestrator_send(project_dir: str, run_id: str, job_id: str, brief: dict | 
                                          expected_version=jver, detail=str(e),
                                          fencing_token=fencing_token)
         return {"run_id": run_id, "job_id": job_id, "action": "needs_attention", **out}
+    jver=permit.wire_version or jver
     # Live send succeeded at HTTP level: complete with parsed bytes.
     try:
-        done = J.job_complete_success(
-            project_dir, job_id, worker_id=worker_id, expected_version=jver,
-            image_bytes=res["output_bytes"], mime=res.get("output_mime", "image/png"),
-            provider_response_id=res.get("response_id"),
-            usage=res.get("usage") if isinstance(res.get("usage"), dict) else None,
-            fencing_token=fencing_token)
+        if job.provider=='sam':
+            done=J.job_complete_segmentation(project_dir,job_id,worker_id=worker_id,
+                 expected_version=jver,result=res,fencing_token=fencing_token)
+        else:
+            done = J.job_complete_success(
+                project_dir, job_id, worker_id=worker_id, expected_version=jver,
+                image_bytes=res["output_bytes"], mime=res.get("output_mime", "image/png"),
+                provider_response_id=res.get("response_id"),
+                usage=res.get("usage") if isinstance(res.get("usage"), dict) else None,
+                fencing_token=fencing_token,origin=res.get("origin","unknown"))
     except InvalidInput as e:
         out = J.job_complete_failure(project_dir, job_id, worker_id=worker_id,
                                      expected_version=jver, error=str(e),
@@ -412,7 +431,8 @@ def orchestrator_send(project_dir: str, run_id: str, job_id: str, brief: dict | 
     finally:
         con.close()
     _bump_run(project_dir, run_id)
-    out = {"run_id": run_id, "job_id": job_id, "action": "succeeded", **done}
+    out = {"run_id": run_id, "job_id": job_id,
+           "action": "succeeded" if done.get('status')=='succeeded' else 'failed', **done}
     # Surface the provider response identity for edit chains and receipts,
     # even when the completion envelope omits it.
     if not out.get("response_id"):
@@ -440,7 +460,6 @@ def _bump_run(project_dir: str, run_id: str) -> None:
         except KeyError:
             return
         run = D.Run.model_validate_json(json.dumps(rdata))
-        run.attempts_used = run.attempts_used + 1
         run.updated_at = _utc()
         if run.attempts_used >= run.max_attempts:
             run.status = "halted"
