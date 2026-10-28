@@ -206,14 +206,35 @@ def _resolve_guide_references(project_dir: str, con, contract: D.ClipContractRev
     """
     try:
         from . import approvals as A
-        approval = A.current_approval(project_dir, contract.character_revision_id)
-        if not A.approval_event_is_human(project_dir, approval.event_id):
+        # Stage B: freeze to the contract's declared guide, not the latest
+        # approval. An old contract never silently follows a new guide
+        # approval; new work needs an explicit rebind/new contract.
+        declared = (contract.references or {}).get("motion_guide_revision")
+        if not declared:
+            return {}, {}, {}
+        try:
+            gdata, _ = S.get(con, "motion_guides", declared)
+        except KeyError:
+            return {}, {}, {}
+        # Find the human approval that binds this exact guide (immutable
+        # history, even if superseded by a newer approval for new work).
+        approval = None
+        for r in con.execute("SELECT data FROM reference_approvals").fetchall():
+            try:
+                ap = D.ReferenceApproval.model_validate_json(r["data"])
+            except Exception:
+                continue
+            if ap.character_revision_id == contract.character_revision_id \
+                    and ap.motion_guide_id == declared:
+                if A.approval_event_is_human(project_dir, ap.event_id):
+                    if approval is None or ap.created_at >= approval.created_at:
+                        approval = ap
+        if approval is None:
             return {}, {}, {}
         authority = {"approval_id": approval.id,
                      "approval_event_id": approval.event_id,
-                     "motion_guide_id": approval.motion_guide_id,
+                     "motion_guide_id": declared,
                      "character_revision_id": contract.character_revision_id}
-        gdata, _ = S.get(con, "motion_guides", approval.motion_guide_id)
         guide = D.MotionGuide.model_validate_json(json.dumps(gdata))
         by_phase = {e.phase: e for e in guide.entries}
         refs, hashes = {}, {}
@@ -362,12 +383,14 @@ def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
         if task is None:
             return None
         base_by_slot: dict[int, bytes] = {}
+        base_byte_by_slot: dict[int, str] = {}
         for fid in parent.frame_instance_ids:
             fdata, _ = S.get(con, "frame_instances", fid)
             fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
             adata, _ = S.get(con, "assets", fi.asset_id)
             raw = S.blob_path(project_dir, adata["byte_sha256"]).read_bytes()
             base_by_slot[fi.slot] = _canon(_Image.open(_io.BytesIO(raw)))
+            base_byte_by_slot[fi.slot] = adata["byte_sha256"]
         child_by_slot: dict[int, str] = {}
         for fid in rev.frame_instance_ids:
             fdata, _ = S.get(con, "frame_instances", fid)
@@ -387,10 +410,23 @@ def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
         for slot in range(n):
             region = _M.allowed_region(project_dir, task, slot)
             allowed.append(bytearray(region) if region is not None else bytearray(len(base_by_slot[slot]) // 4))
+        # Stage B: repair identity is part of the evidence key so distinct
+        # support yields distinct context and a narrowed mask cannot reuse an
+        # old PASS. Baseline byte hashes bind the exact parent pixels measured.
+        mask_id = getattr(task, "edit_mask_id", None)
+        try:
+            mdata, _ = S.get(con, "edit_masks", mask_id) if mask_id else (None, None)
+            support_id = json.loads(mdata)["mask_byte_sha256"] if mdata else None
+        except Exception:
+            support_id = None
         return {"baseline": [base_by_slot[s] for s in range(n)],
                 "allowed_mask": allowed,
                 "protected_mask": None,
-                "repaired_slots": repaired}
+                "repaired_slots": repaired,
+                "baseline_byte_sha256": [base_byte_by_slot[s] for s in range(n)],
+                "task_id": getattr(task, "id", None),
+                "mask_id": mask_id,
+                "support_id": support_id or mask_id}
     except Exception:
         return None
 
@@ -547,12 +583,16 @@ def register_candidate(project_dir: str, baseline_revision_id: str, new_revision
                                      registration_id=f"{new_revision_id}-fi-{slot:02d}-reg",
                                      source_drawing_id=use, derivation_recipe=recipe)
                 S.stage(con, fi)
+                # Stage B: candidate asset bytes already contain the verified
+                # translation (see _verify_translation_pixels). Storing the
+                # translation again and re-applying it in playback would shift
+                # pixels twice and also shift unchanged slots. Registration is
+                # therefore [0,0] (already applied exactly once); the typed
+                # TransformSpec is retained for provenance.
                 method = "verified_translate" if transform and transform.ops else "frozen_native"
-                dx = sum(o.dx for o in transform.ops) if transform else 0
-                dy = sum(o.dy for o in transform.ops) if transform else 0
                 S.stage(con, D.Registration(id=fi.registration_id, method=method,
                                             frame_instance_id=fi.id,
-                                            translation_px=[dx, dy],
+                                            translation_px=[0, 0],
                                             transform=transform or D.TransformSpec(),
                                             verified_by="register_candidate"))
                 inst_ids.append(fi.id)
