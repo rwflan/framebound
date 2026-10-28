@@ -126,6 +126,8 @@ class DispatchPermit:
                 if job.provider_settings.get('grant_id'):
                     grant=ProviderGrant.model_validate(S.get(con,'provider_grants',job.provider_settings['grant_id'])[0])
                     if not grant.active:raise InvalidInput('provider grant was revoked before transmission')
+                from .specialist_repair import validate_job_in
+                validate_job_in(con,self.project_dir,job,sending=True,reservation_included=True)
                 job.wire_started=True
                 self.wire_version=S.stage_update(con,'jobs',job,version)
         finally:con.close()

@@ -23,9 +23,9 @@ def build_server(project_dir: str) -> MCPServer:
         return compile_plan(project_dir,contract_id)
 
     @server.tool(name='animation_start', description='Start resumable automatic native animation work')
-    def animation_start(revision_id: str, idempotency_key: str | None = None) -> dict:
+    def animation_start(revision_id: str, idempotency_key: str | None = None, provider_settings: dict | None = None, offline: bool = True) -> dict:
         from ..services.auto_repair import start_run
-        return start_run(project_dir,revision_id,idempotency_key)
+        return start_run(project_dir,revision_id,idempotency_key,provider_settings=provider_settings,offline=offline)
 
     @server.tool(name='animation_step', description='Execute one bounded repair step with persisted attempts')
     def animation_step(run_id: str) -> dict:
