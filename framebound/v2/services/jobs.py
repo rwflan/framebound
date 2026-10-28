@@ -356,7 +356,8 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
                             cost=json.dumps(usage or {})[:200])
             nv = S.stage_update(con, "jobs", job, expected_version)
         return {"job_id": job_id, "status": "succeeded", "asset_id": aid,
-                "version": nv, "size": [w, h]}
+                "version": nv, "size": [w, h],
+                "response_id": provider_response_id}
     finally:
         con.close()
 

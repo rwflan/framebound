@@ -65,10 +65,11 @@ def build_request(image_b64: str, prompt: str, *, mime: str = "image/png",
 
 
 def parse_output_text(text: str, *, source_width: int | None = None,
-                      source_height: int | None = None) -> dict:
+                      source_height: int | None = None,
+                      status: str | None = None) -> dict:
     """Parse SAM special-token output_text into records. See wire module."""
     return W.parse_sam_output_text(text, source_width=source_width,
-                                   source_height=source_height)
+                                   source_height=source_height, status=status)
 
 
 def decode_png_mask(payload_b64: str, width: int, height: int) -> dict:
@@ -181,9 +182,17 @@ def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/
            file_id: str | None = None, offline: bool = False, transport=None,
            timeout: float = 120.0, source_width: int | None = None,
            source_height: int | None = None) -> dict:
-    """Submit a live SAM request and parse the special-token lane."""
-    from .base import _key, http_post, retry_transient
+    """Submit a SAM request and parse the special-token lane.
+
+    Exactly one dispatch: segmentation POSTs are not provably idempotent, so
+    an ambiguous outcome surfaces instead of retrying. Frame-size binding is
+    required: without source dims the size-agreement check would silently pass.
+    """
+    from .base import _key, http_post
     from .ledger import record_artifact
+    if source_width is None or source_height is None:
+        raise InvalidInput("SAM submit needs source_width + source_height: "
+                           "unbound frame sizes cannot validate the returned geometry")
     req = build_request(image_b64, prompt, mime=mime, file_id=file_id, stream=False)
     redacted = W.redact_wire(req)
     if offline or not _key():
@@ -192,14 +201,14 @@ def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/
                                   "offline": bool(offline), "model": req["model"]},
                                  provider="sam", model=req["model"])
         return {"mode": "not_configured", "sent": False, "request_artifact": digest,
-                "note": "Set MODEL_API_KEY to send; alpha stays labeled offline-alpha, never SAM."}
+                "note": "Set MODEL_API_KEY to send; alpha stays labeled offline-alpha, never SAM.",
+                "origin": "not_configured"}
+    origin = "simulated-transport" if transport is not None else "live"
     req_digest = record_artifact(project_dir, "sam_request",
                                  {"request": redacted, "sent": True,
-                                  "model": req["model"]},
+                                  "model": req["model"], "origin": origin},
                                  provider="sam", model=req["model"])
-    def _send():
-        return http_post(W.RESPONSE_PATH, req, timeout=timeout, transport=transport)
-    body, _tries = retry_transient(_send)
+    body = http_post(W.RESPONSE_PATH, req, timeout=timeout, transport=transport)
     # Non-streaming: output_text lane; streaming SSE bodies carry events — both
     # funnel into one text lane before parsing.
     if isinstance(body, dict) and "events" in body:
@@ -219,7 +228,9 @@ def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/
                     elif isinstance(c, str):
                         text += c
         response_id = body.get("id") if isinstance(body, dict) else None
-    parsed = parse_output_text(text, source_width=source_width, source_height=source_height)
+    status = body.get("status") if isinstance(body, dict) else None
+    parsed = parse_output_text(text, source_width=source_width, source_height=source_height,
+                               status=status)
     digest = record_artifact(project_dir, "sam_response",
                              {"request_artifact": req_digest,
                               "request": redacted, "sent": True, "model": req["model"],
@@ -229,7 +240,7 @@ def submit(image_b64: str, prompt: str, project_dir: str, *, mime: str = "image/
                              provider="sam", model=req["model"],
                              request_id=str(response_id or ""))
     out = {"mode": "live", "sent": True, "request_artifact": req_digest,
-           "response_artifact": digest,
+           "response_artifact": digest, "origin": origin,
            "response_id": response_id, **parsed}
     # Strip rasters from the returned envelope? No — callers need geometry, but
     # rasters are bytes; expose foreground counts + boxes, keep rasters under "records".

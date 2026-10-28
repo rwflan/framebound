@@ -94,8 +94,49 @@ if [ "$LIVE" -eq 1 ]; then
     echo "FAIL: --live requires a real MODEL_API_KEY/META_API_KEY (none configured)"
     exit 2
   fi
-  echo "FAIL: --live requested but no authorized participant credential is configured (no live calls ran; R8 owns the live spike)"
-  exit 3
+  # The recorded four-capability workflow is the live gate: it spends through
+  # the real controller only with an explicit spend ceiling, otherwise it
+  # stays pending with the exact executable command (no uncontrolled spend).
+  if [ -z "${FRAMEBOUND_SPEND_CEILING:-}" ]; then
+    echo "PENDING live gate: authorized credential present but no explicit spend ceiling."
+    echo "Run with FRAMEBOUND_SPEND_CEILING set (e.g. FRAMEBOUND_SPEND_CEILING=usd-5) to execute:"
+    echo '  python -m framebound recorded-run --project <proj> --contract <id> --slot 0 \'
+    echo '    --baseline <rev> --new-id <rev> --idempotency-key live-spike-1 --out <bundle.json>' 
+    exit 3
+  fi
+  step recorded-live python - "$WORK" << 'PYEOF2'
+import json, sys
+from pathlib import Path
+from framebound.v2.devseed import build_minimal_project
+from framebound.v2 import recorded_run as RR
+from framebound.v2.services.errors import InvalidInput
+work = Path(sys.argv[1])
+td = work / "live-proj"
+info = build_minimal_project(td)
+try:
+    prepared = RR.prepare(str(td), "contract-devseed-01", 0)
+except InvalidInput as e:
+    print("PENDING live gate: the recorded runner needs one genuine human "
+          "reference approval first (real external input, never synthesized).")
+    print(f"  reason: {e}")
+    print("  next: serve this project on the review desk, approve the char-01 "
+          "references, then re-run with the same idempotency key "
+          "(live-spike-1) to resume without respending.")
+    sys.exit(3)
+out = work / "live-bundle.json"
+bundle = RR.run_recorded(str(td), str(out), contract_id="contract-devseed-01",
+                         slot=0, baseline_revision_id="clip-devseed-bad",
+                         new_revision_id="rev-live-spike",
+                         offline=False, idempotency_key="live-spike-1")
+caps = {c["capability"]: c["status"] for c in bundle.get("capabilities", [])}
+print(json.dumps({"status": bundle["status"], "origin": bundle["origin"],
+                  "capabilities": caps}, indent=2))
+assert bundle["origin"] == "live", bundle
+assert bundle["status"] == "recorded", bundle
+assert set(caps) == {"spark-critique", "image-generation", "image-edit",
+                     "sam-segmentation"}, caps
+assert all(s == "recorded" for s in caps.values()), caps
+PYEOF2
 else
   echo "SKIP live provider spike: offline mode (recorded, not a pass)"
 fi

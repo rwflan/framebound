@@ -274,9 +274,19 @@ def parse_image_response(body: dict) -> dict:
 
 
 def parse_spark_response(body: dict) -> dict:
-    """Split a Spark Responses body into function_calls + text. Raises ResponseInvalid."""
+    """Split a Spark Responses body into function_calls + text. Raises ResponseInvalid.
+
+    Status is enforced first: only `completed` yields a usable turn. Incomplete,
+    failed, truncated, or refused responses are explicit errors, never an empty
+    text or a silent no-call pass.
+    """
     if not isinstance(body, dict):
         raise ResponseInvalid("response_invalid: body must be an object")
+    status = body.get("status")
+    if status != "completed":
+        detail = body.get("error") or body.get("incomplete_details") or status
+        raise ResponseInvalid(f"response_invalid: spark turn status is {status!r}, "
+                              f"not 'completed': {str(detail)[:200]}")
     output = body.get("output", [])
     if not isinstance(output, list):
         raise ResponseInvalid("response_invalid: missing output item list")
@@ -397,14 +407,27 @@ def decode_sam_payload(h: int, w: int, enc: str, payload: str) -> bytes:
 
 
 def parse_sam_output_text(text: str, *, source_width: int | None = None,
-                          source_height: int | None = None) -> dict:
+                          source_height: int | None = None,
+                          status: str | None = None) -> dict:
     """Parse SAM special-token output_text into geometry records.
 
     Returns {outcome, records, ...} where outcome is one of
-    no_match | mask | empty | full | corrupt. Never raises for model content;
-    structural problems are reported as corrupt with a reason.
+    no_match | mask | empty | full | corrupt | failed. Never raises for model
+    content; structural problems are reported as corrupt with a reason. An
+    empty lane is a valid no-match ONLY for a completed response: failed,
+    incomplete, or truncated responses are provider failures, never no-match.
     """
+    if status is not None and status != "completed":
+        return {"outcome": "failed",
+                "reason": f"SAM response status is {status!r}, not 'completed': "
+                          "provider failure, never a valid empty segmentation",
+                "records": []}
     if not isinstance(text, str) or not text.strip():
+        if status is None:
+            return {"outcome": "corrupt",
+                    "reason": "empty output_text lane with unknown response status: "
+                              "completion unconfirmed, refusing a no-match verdict",
+                    "records": []}
         return {"outcome": "no_match", "reason": "empty output_text lane with response.completed",
                 "records": []}
     records = []
@@ -474,5 +497,12 @@ def parse_sam_output_text(text: str, *, source_width: int | None = None,
         return {"outcome": "empty",
                 "reason": "SAM returned all-zero rasters; unmeasured, never pass-by-zero-area",
                 "records": records}
+    dims = {(r["mask"]["width"], r["mask"]["height"]) for r in records}
+    if len(dims) == 1:
+        mw, mh = next(iter(dims))
+        if all(sum(1 for b in r["mask"]["raster"] if b) == mw * mh for r in records):
+            return {"outcome": "full",
+                    "reason": "SAM returned full-frame rasters; not a subject mask",
+                    "records": records}
     return {"outcome": "mask", "reason": f"decoded {len(records)} record(s) across "
             f"{len({r['frame'] for r in records})} frame(s)", "records": records}

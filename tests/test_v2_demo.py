@@ -256,10 +256,12 @@ class RecordedRun(unittest.TestCase):
             self.addCleanup(_os.environ.pop, "MODEL_API_KEY")
             raw = S.blob_path(td, S.get(S.connect(td), "assets", "f0")[0]["byte_sha256"]).read_bytes()
             png_b64 = base64.b64encode(raw).decode()
-            seen = {}
+            seen = []
             def fake(req):
-                seen["n_images"] = sum(1 for m in req["body"]["input"]
-                                       for c in m["content"] if c.get("type") == "input_image")
+                n = sum(1 for m in req["body"]["input"]
+                        for c in m["content"] if c.get("type") == "input_image")
+                seen.append({"model": req["body"].get("model"), "n_images": n,
+                             "has_prev": "previous_response_id" in req["body"]})
                 return {"status": "completed", "id": "resp-sim",
                         "output": [{"type": "image_generation_call", "id": "img-1",
                                     "result": png_b64}], "usage": {"total_tokens": 1}}
@@ -272,8 +274,21 @@ class RecordedRun(unittest.TestCase):
             self.assertEqual(out["origin"], "provider-simulated")
             self.assertNotEqual(out["origin"], "live")
             self.assertEqual(out["acceptance"], "unreviewed")
+            # all four capabilities ran through the controller, each with its
+            # own request/response identity
+            caps = {c["capability"]: c for c in out["capabilities"]}
+            self.assertEqual(set(caps), {"spark-critique", "image-generation",
+                                         "image-edit", "sam-segmentation"})
+            for name, cap in caps.items():
+                self.assertEqual(cap["status"], "recorded", name)
+                self.assertTrue(cap["request_artifact"], name)
+            gen = [s for s in seen if s["model"] == "muse-image-1.0"
+                   and not s["has_prev"]]
+            self.assertEqual(len(gen), 1)
             # identity + style + approved phase-guide pixels
-            self.assertEqual(seen["n_images"], 3)
+            self.assertEqual(gen[0]["n_images"], 3)
+            edit = [s for s in seen if s["has_prev"]]
+            self.assertEqual(len(edit), 1)
             self.assertTrue((Path(td) / "bundle.json.output.png").is_file())
             con = S.connect(td)
             try:
@@ -283,9 +298,11 @@ class RecordedRun(unittest.TestCase):
                 con.close()
             self.assertEqual([d for d in decs if d["action"] == "approve"], [])
             # the recorded revision evaluates through the normal gate
-            self.assertIn(out["technical_status"], ("pass", "fail", "incomplete", "error"))
-            self.assertTrue(out["packet_id"])
-            self.assertTrue(out["request_artifact"] and out["response_artifact"])
+            self.assertIn(out["registration"]["technical_status"],
+                          ("pass", "fail", "incomplete", "error"))
+            self.assertTrue(out["registration"]["packet_id"])
+            self.assertTrue(out["generation"]["request_artifact"]
+                            and out["generation"]["response_artifact"])
 
 
 if __name__ == "__main__":
