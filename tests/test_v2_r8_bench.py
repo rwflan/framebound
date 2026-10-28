@@ -9,7 +9,8 @@ from framebound.v2 import bench_eval
 
 class BenchEval(unittest.TestCase):
     def test_public_service_benchmark_shape(self):
-        rep = bench_eval.run_bench_eval(warm_runs=3, cold_runs=1)
+        rep = bench_eval.run_bench_eval(warm_runs=3, cold_runs=1,
+                                        large_frames=200, large_warm_runs=2)
         self.assertEqual(rep["service"], "services.clips.evaluate (public, persisted, complete required context)")
         self.assertEqual(rep["workload"]["frames"], 8)
         self.assertEqual(rep["workload"]["resolution"], [64, 64])
@@ -17,6 +18,11 @@ class BenchEval(unittest.TestCase):
         for key in ("cold_ms", "warm_ms", "incremental_changed_frame_ms"):
             self.assertGreater(rep[key]["p50"], 0)
             self.assertGreaterEqual(rep[key]["p95"], rep[key]["p50"])
+        self.assertEqual(rep["large_workload"]["frames"], 200)
+        self.assertGreater(rep["large_workload"]["warm_ms"]["p50"], 0)
+        self.assertGreater(rep["playback_ms_per_tick"]["p50"], 0)
+        self.assertEqual(rep["playback_ms_per_tick"]["ticks"], 32)
+        self.assertNotIn("provenance_coverage", rep["workload"]["checks_included"])
         self.assertIn("whole-revision", rep["incremental_changed_frame_ms"]["invalidation"])
         self.assertIn("hardware", rep)
         self.assertIn("checks_included", rep["workload"])
