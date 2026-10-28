@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "gen-types": "npx openapi-typescript ../openapi.json -o src/api-types.ts"
+    "gen-types": "python ../scripts/gen_api_types.py --out src/api-types.ts",
+    "test:unit": "esbuild src/playback.ts --format=esm --outfile=test/playback.bundle.mjs --log-level=error && node --test test/*.test.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

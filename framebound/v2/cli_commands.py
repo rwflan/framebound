@@ -75,6 +75,13 @@ def dispatch(args) -> dict:
     if cmd == "corrections-list-open":
         from .services import corrections
         return corrections.list_tasks(args.project, ["open", "reopened"])
+    if cmd == "correction-claim":
+        from .services import corrections
+        from .services.authz import Actor as _Actor
+        return corrections.claim(args.project, _Actor(type="orchestrator",
+                                id=getattr(args, "actor_id", "cli-worker")),
+                                args.task_id, int(args.expected_version),
+                                lease_minutes=int(getattr(args, "lease_minutes", 30)))
     if cmd == "correction-get":
         from .services import corrections
         return corrections.get_task(args.project, args.task_id)
