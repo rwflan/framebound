@@ -128,6 +128,30 @@ class DispatchPermit:
                     if not grant.active:raise InvalidInput('provider grant was revoked before transmission')
                 from .specialist_repair import validate_job_in
                 validate_job_in(con,self.project_dir,job,sending=True,reservation_included=True)
+                job.origin='simulated-transport' if simulated else 'live'
                 job.wire_started=True
                 self.wire_version=S.stage_update(con,'jobs',job,version)
         finally:con.close()
+
+
+def get_grant(project_dir,grant_id):
+    con=S.connect(project_dir)
+    try:
+        data,version=S.get(con,'provider_grants',grant_id)
+        return {'grant':ProviderGrant.model_validate(data).model_dump(),'version':version}
+    finally:con.close()
+
+
+def revoke(project_dir,grant_id,expected_version,operator_credential):
+    from .sessions import require_operator
+    require_operator(operator_credential)
+    con=S.connect(project_dir)
+    try:
+        with S.atomic(con):
+            con.execute('BEGIN IMMEDIATE')
+            data,version=S.get(con,'provider_grants',grant_id);grant=ProviderGrant.model_validate(data)
+            if not grant.active:return {'grant_id':grant_id,'active':False,'version':version}
+            if version!=expected_version:raise S.StaleRevisionError('grant revocation is stale')
+            grant.active=False;version=S.stage_update(con,'provider_grants',grant,version)
+        return {'grant_id':grant_id,'active':False,'version':version}
+    finally:con.close()

@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "expected_version": {
+      "minimum": 1,
+      "title": "Expected Version",
+      "type": "integer"
+    },
+    "request_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Request Sha256",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "not_accepted",
+        "response",
+        "abandoned"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "receipt_reference": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Receipt Reference",
+      "type": "string"
+    },
+    "evidence_note": {
+      "maxLength": 2000,
+      "minLength": 8,
+      "title": "Evidence Note",
+      "type": "string"
+    },
+    "provider_response": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Response"
+    }
+  },
+  "required": [
+    "id",
+    "expected_version",
+    "request_sha256",
+    "outcome",
+    "receipt_reference",
+    "evidence_note"
+  ],
+  "title": "ProviderReceipt",
+  "type": "object"
+}

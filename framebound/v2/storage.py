@@ -18,7 +18,7 @@ from pathlib import Path
 
 from . import domain as D
 
-MIGRATION_VERSION = 4
+MIGRATION_VERSION = 5
 
 
 class StaleRevisionError(ValueError):
@@ -36,6 +36,7 @@ class ConflictError(ValueError):
 SCHEMA_SQL = """
 PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS provider_reconciliations(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS compiled_animation_plans(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS authorized_operations(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS provider_grants(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
@@ -74,7 +75,7 @@ FROZEN_TABLES = {"assets", "character_revisions", "contract_revisions", "clip_re
                  "review_packets", "review_events", "export_snapshots", "registrations",
                  "edit_masks",
                  "compiled_briefs", "world_traces", "transition_traces",
-                 "motion_guides", "reference_approvals", "compiled_animation_plans"}
+                 "motion_guides", "reference_approvals", "compiled_animation_plans", "provider_reconciliations"}
 
 
 def connect(project_dir: str | Path) -> sqlite3.Connection:
@@ -132,6 +133,7 @@ def _table_for(model: D.Strict) -> str:
             "EditMask": "edit_masks", "CompiledBrief": "compiled_briefs", "WorldTrace": "world_traces",
             "TransitionTrace": "transition_traces",
         "Registration": "registrations", "ProviderGrant": "provider_grants",
+        "ProviderReconciliation":"provider_reconciliations",
         "CompiledAnimationPlan":"compiled_animation_plans", "AuthorizedOperation":"authorized_operations",
     }
     return mapping[type(model).__name__]
