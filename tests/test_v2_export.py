@@ -57,13 +57,19 @@ class ExportSnapshot(unittest.TestCase):
         clips.create_revision(td, "c-export-01", "clip-bad", bad, [f"p{i}" for i in range(8)])
         ev_bad = clips.evaluate(td, "clip-bad")
         self.assertEqual(ev_bad.technical_status.value, "fail")
-        # fix slot 3 as a child revision, evaluate, approve the EXACT fix
+        # fix slot 3 as a child revision, evaluate, approve the EXACT fix through
+        # a comparison packet (explicit pairwise comparison, not descendant approval)
         clips.register_candidate(td, "clip-bad", "clip-fix", {3: "f3"},
                                  recipe="repair:restore-phase-guide")
         ev_fix = clips.evaluate(td, "clip-fix")
         self.assertEqual(ev_fix.technical_status.value, "pass")
+        packets.create_packet(td, "pkt-fix", "clip-fix", ev_fix.artifacts[0]["id"],
+                              "correction review", comparison_revision_id="clip-bad")
         packets.record_review_event(td, REV, {"id": "ap-fix", "action": "approve",
-                                             "clip_revision_id": "clip-fix", "note": "fix accepted"})
+                                             "clip_revision_id": "clip-fix",
+                                             "packet_id": "pkt-fix",
+                                             "expected_evaluation_id": ev_fix.artifacts[0]["id"],
+                                             "note": "fix accepted over clip-bad"})
         return {"meta": meta}
 
     def test_snapshot_round_trip_after_move(self):
@@ -75,15 +81,19 @@ class ExportSnapshot(unittest.TestCase):
                                   "split_policy": "exclude",
                                   # mechanics demo only: fixtures stay labeled procedural-test throughout
                                   "include_procedural_positives": True})
-            # leakage: clip-bad shares source drawings with train → test frames excluded with reason
-            self.assertTrue(any(e.get("context") == "split" for e in man["exclusions"]), man["exclusions"])
-            # preference pair: approved fix chosen, failed frame rejected, named reason
+            # leakage: one character family across train+test → test frames excluded with reason
+            self.assertTrue(any("split" in e.get("context", "") for e in man["exclusions"]), man["exclusions"])
+            # preference pair: explicit human comparison only, named reason
             prefs = [json.loads(l) for l in (out / "preferences.jsonl").read_text().splitlines() if l.strip()]
             self.assertTrue(prefs, "expected at least one eligible preference pair")
             for pr in prefs:
                 self.assertIn("chosen_revision", pr)
                 self.assertEqual(pr["chosen_revision"], "clip-fix")
-                self.assertTrue(pr["rejected_issue"] and pr["reason"])
+                self.assertEqual(pr["origin"], "human-comparison")
+                self.assertTrue(pr["comparison_packet"] and pr["rejected_issue"] and pr["reason"])
+                self.assertTrue(pr["chosen"] and pr["rejected"])
+            weak = [json.loads(l) for l in (out / "weak_preferences.jsonl").read_text().splitlines() if l.strip()]
+            self.assertTrue(all(w["origin"] == "technical-ranking" for w in weak))
             # move the snapshot to a new directory: everything must still load
             moved = Path(td) / "moved"
             shutil.move(str(out), str(moved))
@@ -91,12 +101,17 @@ class ExportSnapshot(unittest.TestCase):
             self.assertTrue(rep["ok"], rep["issues"])
             self.assertEqual(rep["loaders"]["preferences"], len(prefs))
             self.assertGreater(rep["loaders"]["coco_images"], 0)
-            self.assertGreater(rep["loaders"]["imagefolder_rows"], 0)
+            # every positive materialized through the standard loader path
+            self.assertEqual(rep["loaders"]["rows"], man["counts"]["positives"])
+            self.assertGreater(rep["loaders"]["rows"], 0)
+            self.assertGreater(rep["loaders"]["annotations_checked"], 0)
             # durations match contract holds
             temps = [json.loads(l) for l in (moved / "temporal.jsonl").read_text().splitlines()]
             for t in temps:
-                self.assertEqual(t["duration_ticks"], sum(t["holds"]))
+                self.assertEqual(t["total_ticks"], sum(t["holds"]))
                 self.assertEqual(sum(t["holds"]), 32)
+                self.assertIn("missing", t["traces"])
+                self.assertEqual(len(t["frames"]), len(t["holds"]))
 
     def test_strict_split_fails_on_leakage(self):
         with tempfile.TemporaryDirectory() as td:
@@ -109,12 +124,20 @@ class ExportSnapshot(unittest.TestCase):
     def test_rights_and_procedural_exclusions_visible(self):
         with tempfile.TemporaryDirectory() as td:
             self._project(td)
+            # default policy: procedural fixtures are never positives; the empty
+            # positive view succeeds with every frame explained, nothing invented
             man = build_snapshot(td, "s2", ["clip-clean", "clip-bad", "clip-fix"], str(Path(td) / "o2"), {})
+            self.assertEqual(man["counts"]["positives"], 0)
             kinds = {e["context"] for e in man["exclusions"]}
             self.assertIn("positive", kinds, man["exclusions"])
-            # metadata labels every row with an origin; nothing is silently a positive
-            metas = [json.loads(l) for l in (Path(td) / "o2" / "hf" / "metadata.jsonl").read_text().splitlines()]
-            self.assertTrue(metas and all("label_origin" in m for m in metas))
+            rep = validate_snapshot(str(Path(td) / "o2"))
+            self.assertTrue(rep["ok"], rep["issues"])
+            self.assertTrue(any("empty" in s for s in rep["skipped"]), rep["skipped"])
+            # the research archive labels every row; nothing is silently a positive
+            research = [json.loads(l) for l in
+                        (Path(td) / "o2" / "research" / "metadata.jsonl").read_text().splitlines()]
+            self.assertTrue(research and all("label_origin" in m for m in research))
+            self.assertTrue(all(m["label_origin"] != "human-approved" for m in research))
 
 
 if __name__ == "__main__":

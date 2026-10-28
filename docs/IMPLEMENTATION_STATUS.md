@@ -5,6 +5,77 @@ Baseline: `b680d84` (audited main, 2026-10-27). `main` has not advanced since th
 Prior ledger entries below are historical. The earlier "64 passing tests" and "engineering complete except
 for entrant actions" claims are NOT accepted as proof; each remediation package re-proves its gate.
 
+## Current package: R5 — portable training views with pixel-correct masks (done on branch `codex/r5-training-views`, 2026-10-28)
+
+Acceptance gate: the 3x5 mask decodes pixel-exact with independently recomputed bbox/area;
+unknown-rights/procedural/unreviewed/rejected targets absent from default positives with
+reasons; approve->reject and human-vs-system comparisons label correctly; no pair exists
+without a valid comparison or explicit weak origin; a moved snapshot loads images, masks,
+references and sequences without the database or network; genuinely eligible positives
+proven; legitimately empty positives succeed without invented examples. All demonstrated.
+
+### Changed capability
+
+- `exports/snapshot.py` (rewritten): `_rle` fixed — row-major bytes reshape to (h, w) C-order
+  then `asfortranarray` for pycocotools; the old `reshape(order='F')` scramble (F09) is gone.
+  Views: `hf/` positives (eligible-only imagefolder), `research/` labeled archive, `preferences.jsonl`
+  (explicit human comparisons only), `weak_preferences.jsonl` (technical-ranking, labeled weak),
+  `temporal.jsonl` (ordered refs, holds/timing/traces + explicit missing coverage), `closure/`
+  (contracts, characters, guides, reference pixels, evaluations, attempts, events, masks).
+  Policy enforced BEFORE copying: rights allow-list, procedural opt-in, per-revision eligibility
+  (PASS+COMPLETE, fresh evidence, packet-bound exact approval, no blocking tasks) via R4's
+  central rule; approve->reject invalidates (R4 eligibility hardened). Preferences need a
+  comparison packet + reviewer approve on that packet for the chosen revision — descendant
+  approval alone yields only a weak entry. Family/pixel-duplicate split validation with seed;
+  one-family overlap recorded as a held-out-identity limitation, `strict` raises. Atomic
+  publish (temp dir + self-check + rename); `ExportSnapshot` row persists identity/policy/
+  revisions/evaluations/lock/content manifest with same-name-different-content conflict.
+- `exports/validate.py` (rewritten): every COCO annotation decoded pixel-for-pixel against its
+  packaged source alpha with recomputed area + bbox + re-encode round-trip (area-only check gone,
+  8-image cap gone); HF positives materialized through `datasets.load_dataset("imagefolder")`
+  with per-row pixel loads when the interpreter supports it, else a PIL structural fallback
+  with an explicit skip (never a sys.modules lzma shim — the stub is deleted); preferences
+  checked for files/hashes/distinctness/common conditioning/approval origin; temporal counts,
+  timing, ordering, trace disclosure; closure parses; positives-only family/duplicate checks;
+  manifest hash walk + stale/extra file detection + path-escape rejection; empty positives
+  legitimate with exclusions. The `lzma` process-global stub is removed: without `_lzma` the
+  validator returns a capability skip, not masqueraded success.
+- Transports unchanged (export/dataset-validate CLI, devseed round-trip); `test_v2_export.py`
+  updated to corrected semantics (comparison-packet approval, family exclusions, total_ticks).
+- `services/eligibility.py`: later reject/needs_changes/reopen supersedes packet-bound approval.
+
+### Failing repros fixed (reproduced before fixing)
+
+- 3x5 asymmetric mask scrambled by `order='F'` (same area, wrong pixels) → pixel-exact now;
+  the new test fails on the old encoding (pinned).
+- Default export copied all 24 procedural rows into loadable ImageFolder + unknown-rights
+  assets + revoked approvals → positives contain only eligible human-approved rows; everything
+  else explained in `research/` + exclusions (pinned).
+- Descendant approval treated as preference → no pair without an explicit comparison packet
+  + decision; technical rankings kept as a separately labeled weak view (pinned).
+- Area-only validator on 8 images → full pixel/bbox/area validation on every annotation (pinned).
+- Pixel mutations (same dimensions) pass → hash + pixel + pair-hash checks fail (pinned).
+- `requirements.lock datasets==5.1.0` vs declared range → already resolved in R0 (`>=3,<6`);
+  re-verified coherent; full stack proven in a capable interpreter (below).
+
+### Actual commands/results (2026-10-28, Dublin; python 3.11.4 dev / homebrew 3.15 capable env)
+
+- `python -m pytest tests/ -q` → `145 passed, 1 skipped` (134 prior + 11 new R5; the skip is the
+  datasets loader test, which needs `_lzma`).
+- `/tmp/hbvenv/bin/python -m pytest tests/test_v2_r5_export.py tests/test_v2_export.py -q` →
+  `12 + 3 passed`, including `test_datasets_imagefolder_materializes_pixels`: genuine
+  `datasets.load_dataset("imagefolder")` of the moved snapshot, every positive pixel materialized.
+- `sh scripts/verify-local` → `ALL LOCAL CHECKS PASSED`, exit 0 (browser journey + live spike SKIPs).
+- `datasets` 5.1.0 + `pycocotools` + `numpy` verified working in the capable env; dev-interpreter
+  limitation (`_lzma` absent) recorded as skip reason, not worked around.
+
+### Artifacts / limitations / next
+
+- Limitations: desk wiring of eligibility display (R6); demo relabel + transition traces incl.
+  `world_positions`/`planted` (R7, hence traces list them missing); full docs-vs-reality audit incl.
+  `docs/DATASET.md` v1/v2 reconciliation (R8); live spike still needs an authorized participant credential.
+- Next: R6 — the actual review experience (comparison media, durable desk state, browser journey).
+
 ## Current package: R4 — bounded repair and complete correction state (done on branch `codex/r4-bounded-repair`, 2026-10-27)
 
 Acceptance gate: the 1x1-ROI whole-frame probe is rejected with zero partial writes;
