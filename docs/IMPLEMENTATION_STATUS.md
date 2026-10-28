@@ -5,6 +5,57 @@ Baseline: `b680d84` (audited main, 2026-10-27). `main` has not advanced since th
 Prior ledger entries below are historical. The earlier "64 passing tests" and "engineering complete except
 for entrant actions" claims are NOT accepted as proof; each remediation package re-proves its gate.
 
+## Current package: R8 — release re-audit (done on branch `codex/r8-release-audit`, 2026-10-28)
+
+Prior package entries below are point-in-time records (dated 2026-10-27/28); commands
+marked historical were re-verified at each gate. This entry reconciles every deferred
+item instead of assuming a later package delivered it.
+
+### Capability matrix (designed | implemented | negative-tested | integrated | live-verified | human-reviewed)
+
+- Safe writers (refuse/relocate, never delete user data): Y Y Y CLI+services — N/A
+- Reliable verification runner (no masked exits): Y Y Y script — N/A
+- Locked reproducible install: Y Y Y venv+pip-check — N/A (re-proven R8 below)
+- Authority + transactions (sessions, stored approval, atomic writes, idempotency): Y Y Y CLI/MCP/API — boundary documented (filesystem access bypasses HTTP roles by design)
+- Fail-closed evaluation + reproducible evidence: Y Y Y CLI/MCP/API — N/A
+- Provider wire + durable controller/jobs: Y Y Y CLI/MCP/API **live: NO** (no credential; harness + `recorded-run` ready)
+- Bounded repair + correction state: Y Y Y CLI/MCP/API+browser — N/A
+- Training views (rights/approval/procedural policy, pixel-correct COCO, genuine pairs, portable temporal): Y Y Y CLI/API+browser(HF proved in capable env) — N/A
+- Review desk (media, marking, correction, restart, comparison, resolution, export): Y Y Y browser+API (real chromium journey) — N/A
+- Demo as evidence (labels, counts, flight truth, measured traces, no fake approval): Y Y Y CLI — live run NO, human review NO (pkt-run-01 UNREVIEWED)
+- Docs vs reality: audited this package (README/DESIGN/MODEL_TOOLS/DATASET/PROVIDER_CONTRACTS/HACKATHON/DEMO_SCRIPT corrected; portal items stay entrant-owned)
+- Public-service benchmark: Y measured (`benchmark-eval`; primitives kept separate)
+- Submission/portal/receipt: entrant-only, pending (exact blocker recorded, not engineered around)
+
+### Deferred items, reconciled (nothing assumed delivered)
+
+- R3: SAM `include_confidence` still provisional (parser accepts both forms) — kept, documented in code.
+- R3/R6: SSE fan-out still in-memory — the durable path is DB-backed `GET /api/activity` with cursor catch-up (tested across restarts); SSE kept for live ticks only.
+- R5: imported-video review path (analysis-unavailable reduced coverage) not exercised — no fixtures exist; desk shows uncovered coverage honestly rather than claiming it.
+- R5/R7: `world_positions`/`planted`/transition traces absent from presented traces — temporal rows list them under explicit `missing` (validator requires the disclosure).
+- R4/R6: desk shows decision + coverage per packet but not the computed eligibility predicate — the endpoint exists (`GET /api/eligibility/:rev`) and export/publication consume the central rule; desk display is a small follow-up, not a gate failure.
+- R5: this dev interpreter lacks `_lzma`, so `datasets` cannot import here — the validator returns an explicit capability skip; full imagefolder materialization was proven in a capable interpreter (R5 evidence) and re-proven in the R8 fresh env below.
+- Live spike (Spark tool call + image + edit/patch + SAM decode with participant key), authenticated portal check, genuine human review, demo video, submission receipt: all pending on the entrant/credential, each with its exact next step in SUBMISSION_REQUIREMENTS.md. No 'engineering complete except entrant' claim is made: every independent gate above IS demonstrated.
+
+### Fresh verification (R8 evidence, `/tmp/fb-r8-evidence/`)
+
+- `bench-eval` (public service, 8×64×64, registration+area+cadence+provenance): technical pass; cold p50 ≈ 322 ms (fresh interpreter, n=5); warm p50 ≈ 27 ms, p95 ≈ 61 ms (n=25); incremental changed-frame p50 ≈ 37 ms (whole-revision re-evaluation, no incremental cache — reported, not hidden). Full report: `bench-eval.json`.
+- Clean clone of main @ proof-SHA: `git status` clean; fresh capable venv (`python3.15`, working `_lzma`); `pip install .[test,export-validation]` + `pip check` clean; full `pytest` green incl. the live `datasets.load_dataset("imagefolder")` materialization test; `pip wheel --no-deps .` builds (packaging proof, not just checkout success); installed-package `import framebound` + `framebound doctor` + `v2-mcp` handshake; web production build; real browser/process-restart journey; moved-snapshot consumption. Logs kept in the evidence dir (environment-specific, not committed); SHAs + outcomes recorded here.
+- Offline/live semantics: `verify-local` forces bogus keys present and still passes with zero egress (offline neutrality pinned by R0/R3 tests); `--live` without a key exits 2 with an explicit message. A live skip is recorded as pending, never as a pass.
+
+### Changed capability (R8)
+
+- `benchmark-eval` CLI + `framebound/v2/bench_eval.py` (cold/warm/incremental, hardware + checks disclosed).
+- Docs corrected to match implementation (see package notes); no external handoff files committed.
+- `recorded-run` CLI is the exact live-spike command (pending credential).
+
+### Limitations / next (entrant-owned)
+
+- Live provider spike: `MODEL_API_KEY=<participant-key> python -m framebound recorded-run …` (see PROVIDER_CONTRACTS.md). Blocker: no participant credential was ever available in this pass.
+- Portal: exact fields/rules/video limit/hosting/reuse terms need the authenticated portal (SUBMISSION_REQUIREMENTS.md lists each unverified item).
+- Visual decisions: pkt-run-01 (demo) + any desk packet needs a real reviewer; model cannot self-approve.
+- Submission: video + form + receipt by 4 Nov 18:00 Dublin (internal target); only the entrant can complete it.
+
 ## Current package: R7 — demonstration as evidence (done on branch `codex/r7-demo-evidence`, 2026-10-28)
 
 Acceptance gate: the suite still catches controlled faults but emits no human labels;
