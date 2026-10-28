@@ -157,13 +157,21 @@ class TestStoredApprovalAuthority(unittest.TestCase):
             finally:
                 con.close()
             A.approve_reference(td, Actor(type="reviewer", id="human-1"), "char-R1", "mg-R1")
-            # latest approval still points at mg-R1 (complete); re-approving onto the gap guide
-            # then briefing slot 3 must fail
+            # New approval cannot reinterpret the old contract's guide.
             A.approve_reference(td, Actor(type="reviewer", id="human-1"), "char-R1", "mg-gap")
+            self.assertEqual(B.compile_reference_brief(td, "contract-R1", 3)['motion_guide_id'], 'mg-R1')
+            con = S.connect(td)
+            try:
+                gap_contract, _ = S.get(con, 'contract_revisions', 'contract-R1')
+            finally:
+                con.close()
+            gap_contract['id'] = 'contract-gap'
+            gap_contract['references']['motion_guide_revision'] = 'mg-gap'
+            contracts.propose_contract(td, gap_contract)
             with self.assertRaises(InvalidInput):
-                B.compile_reference_brief(td, "contract-R1", 3)
+                B.compile_reference_brief(td, "contract-gap", 3)
             # other slots still resolve against the gap guide's remaining phases
-            ok = B.compile_reference_brief(td, "contract-R1", 0)
+            ok = B.compile_reference_brief(td, "contract-gap", 0)
             self.assertEqual(ok["motion_guide_id"], "mg-gap")
 
 

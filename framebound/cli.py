@@ -79,6 +79,8 @@ def main(argv=None):
     ra.add_argument("--guide", required=True); ra.add_argument("--event-id", required=False, default=None)
     ra.add_argument("--session-token", required=False, default=None)
     for name, helps, args in [
+        ("project-create", "Create or resume a project", [("--project", True), ("--project-id", True), ("--name", False)]),
+        ("character-propose", "Propose an immutable character", [("--project", True), ("--character", True)]),
         ("asset-import", "v2: import an image asset", [("--src", True), ("--asset-id", True), ("--project", True)]),
         ("contract-propose", "v2: validate + store a clip contract", [("--contract", True), ("--project", True)]),
         ("clip-create", "v2: create a clip revision", [("--contract-id", True), ("--revision-id", True), ("--project", True), ("--frames", True), ("--phases", True)]),
@@ -226,7 +228,7 @@ def main(argv=None):
         _s = _bs(args.project)
         _aio.run(_s.run_stdio_async())
         return 0
-    if args.cmd in ("asset-import", "contract-propose", "clip-create", "clip-evaluate",
+    if args.cmd in ("project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
                     "orchestrator-send", "capabilities", "correction-claim", "correction-submit",

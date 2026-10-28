@@ -6,6 +6,13 @@ import json
 
 def dispatch(args) -> dict:
     cmd = args.cmd
+    if cmd == 'project-create':
+        from .services import projects
+        return projects.create_project(args.project, {'id': args.project_id,
+                    'name': args.name or args.project_id}).model_dump()
+    if cmd == 'character-propose':
+        from .services import characters
+        return characters.propose_character(args.project, json.loads(open(args.character).read())).model_dump()
     if cmd == "asset-import":
         from .services import assets
         return assets.import_asset(args.project, args.src, args.asset_id).model_dump()

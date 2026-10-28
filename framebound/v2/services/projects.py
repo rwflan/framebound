@@ -10,11 +10,13 @@ def create_project(project_dir: str, meta: dict) -> D.ResultEnvelope:
         proj = D.Project(id=meta["id"], name=meta.get("name", meta["id"]),
                          owner=meta.get("owner", "entrant"),
                          rights_policy=meta.get("rights_policy", "original-only"))
-        S.insert(con, proj)
+        with S.atomic(con):
+            con.execute('BEGIN IMMEDIATE')
+            S.stage_identical(con, proj, ('creation_time',))
     finally:
         con.close()
     return D.ResultEnvelope(ok=True, operation_id=f"op-create-{proj.id}", revision_id=proj.id,
-                            next_actions=["asset_import", "contract_propose"])
+                            next_actions=["asset_import", "character_propose"])
 
 
 def get_summary(project_dir: str) -> dict:

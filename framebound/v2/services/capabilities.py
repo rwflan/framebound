@@ -8,6 +8,9 @@ pending-reason links.
 from __future__ import annotations
 
 ROWS = [
+    ('cli', 'project-create/character-propose/guide-propose', 'supported', 'public immutable setup; identical replay'),
+    ('mcp', 'project_create/character_propose/guide_propose', 'supported', 'same validated creation services'),
+    ('desk', 'references', 'supported', 'stored proposals, phase pixels and reviewer-only approval'),
     # (transport, operation, status, note)
     ("cli", "asset-import", "supported", "hash-verified import"),
     ("cli", "contract-propose", "supported", "typed validation, unknown checks rejected"),

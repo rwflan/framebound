@@ -17,6 +17,30 @@ from .authz import Actor, require_reviewer
 from .errors import InvalidInput
 
 
+def approval_for_contract(project_dir: str, contract: D.ClipContractRevision,
+                          con=None) -> D.ReferenceApproval:
+    """Resolve the declared guide; later unrelated approvals cannot rebind it."""
+    owned = con is None
+    con = con or S.connect(project_dir)
+    try:
+        matches = []
+        for row in con.execute('SELECT data FROM reference_approvals'):
+            ap = D.ReferenceApproval.model_validate_json(row['data'])
+            if (ap.character_revision_id == contract.character_revision_id
+                    and ap.motion_guide_id == contract.references.get('motion_guide_revision')
+                    and contract.references.get('identity') in ap.identity_asset_ids
+                    and contract.references.get('style') in ap.style_asset_ids):
+                event, _ = S.get(con, 'review_events', ap.event_id)
+                if event['actor_type'] == 'reviewer' and event['action'] == 'approve_reference':
+                    matches.append(ap)
+        if not matches:
+            raise InvalidInput('no human approval for the contract-declared reference guide')
+        return max(matches, key=lambda ap: (ap.created_at, ap.id))
+    finally:
+        if owned:
+            con.close()
+
+
 def _asset_bytes(project_dir: str, con, asset_id: str) -> tuple[D.Asset, bytes]:
     row = con.execute("SELECT data FROM assets WHERE id=?", (asset_id,)).fetchone()
     if row is None:
@@ -51,7 +75,7 @@ def propose_motion_guide(project_dir: str, actor: Actor, guide: dict) -> D.Resul
                 import hashlib as _h
                 if _h.sha256(S.blob_path(project_dir, asset.byte_sha256).read_bytes()).hexdigest() != entry.byte_sha256:
                     raise InvalidInput(f"guide entry {entry.phase}: hash does not match stored asset bytes")
-            S.stage(con, mg)
+            S.stage_identical(con, mg, ('created_at',))
     finally:
         con.close()
     return D.ResultEnvelope(ok=True, operation_id=f"op-guide-{mg.id}", revision_id=mg.id,
@@ -96,6 +120,15 @@ def approve_reference(project_dir: str, actor: Actor, character_revision_id: str
                 if _h.sha256(raw).hexdigest() != entry.byte_sha256:
                     raise InvalidInput(f"guide phase {entry.phase}: bytes changed since proposal")
                 hashes[entry.asset_id] = _h.sha256(raw).hexdigest()
+            if event_id:
+                for row in con.execute('SELECT data FROM reference_approvals'):
+                    prior = D.ReferenceApproval.model_validate_json(row['data'])
+                    if prior.event_id == event_id:
+                        if (prior.character_revision_id != character_revision_id
+                                or prior.motion_guide_id != motion_guide_id
+                                or prior.asset_hashes != hashes):
+                            raise S.ConflictError('approval event already bound to different references')
+                        return _approval_envelope(prior)
             # supersede the previous current approval, if any
             prev = None
             for r in con.execute("SELECT id, data FROM reference_approvals").fetchall():
@@ -125,10 +158,14 @@ def approve_reference(project_dir: str, actor: Actor, character_revision_id: str
             S.stage(con, ap)
     finally:
         con.close()
-    return D.ResultEnvelope(ok=True, operation_id=f"op-approve-ref-{ap.id}", revision_id=character_revision_id,
+    return _approval_envelope(ap)
+
+
+def _approval_envelope(ap: D.ReferenceApproval) -> D.ResultEnvelope:
+    return D.ResultEnvelope(ok=True, operation_id=f"op-approve-ref-{ap.id}", revision_id=ap.character_revision_id,
                             human_acceptance=D.HumanAcceptance.APPROVED,
                             artifacts=[{"id": ap.id, "role": "reference_approval"},
-                                       {"id": eid, "role": "review_event"}],
+                                       {"id": ap.event_id, "role": "review_event"}],
                             next_actions=["brief_compile"])
 
 

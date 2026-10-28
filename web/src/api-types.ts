@@ -32,6 +32,12 @@ export interface CanvasDto {
   units?: string;
 }
 
+export interface CharacterReferenceDto {
+  id: string;
+  identity_asset_ids: string[];
+  style_asset_ids: string[];
+}
+
 export interface FrameRefDto {
   frame_instance_id: string;
   slot: number;
@@ -117,6 +123,17 @@ export interface ExportResultDto {
   exclusions: Record<string, unknown>[];
 }
 
+export interface GuideEntryDto {
+  phase: string;
+  asset_id: string;
+}
+
+export interface GuideReferenceDto {
+  id: string;
+  character_revision_id: string;
+  entries: GuideEntryDto[];
+}
+
 export interface IssueDetailDto {
   event_id: string;
   clip_revision_id: string;
@@ -179,6 +196,24 @@ export interface ProjectSummaryDto {
   summary?: Record<string, unknown>;
 }
 
+export interface ReferenceApprovalDto {
+  character_revision_id: string;
+  motion_guide_id: string;
+}
+
+export interface ReferenceApproveBodyDto {
+  character_revision_id: string;
+  motion_guide_id: string;
+  event_id?: string | null;
+}
+
+export interface ReferencesDto {
+  character_revisions: CharacterReferenceDto[];
+  motion_guides: GuideReferenceDto[];
+  reference_approvals: ReferenceApprovalDto[];
+  assets: Record<string, unknown>[];
+}
+
 export interface TaskStatusDto {
   task: Record<string, unknown>;
   version: number;
@@ -237,6 +272,8 @@ export interface ExportBodyDto { name: string; revisions: string[]; policy: Reco
 
 
 export interface ApiEndpoints {
+  "GET /api/references": { params: Record<string, never>; body: never; result: ReferencesDto };
+  "POST /api/references/approve": { params: Record<string, never>; body: ReferenceApproveBodyDto; result: DecisionResultDto };
   "GET /api/health": { params: Record<string, never>; body: never; result: HealthDto };
   "GET /api/project": { params: Record<string, never>; body: never; result: ProjectSummaryDto };
   "GET /api/packets": { params: Record<string, never>; body: never; result: PacketsDto };
