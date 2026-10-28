@@ -26,11 +26,13 @@ function assert(cond, msg) {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function api(p, { method = 'GET', body = null, token = null, actor = null } = {}) {
+const OPERATOR_SECRET = process.env.FRAMEBOUND_OPERATOR_SECRET ?? 'e2e-operator-secret';
+async function api(p, { method = 'GET', body = null, token = null, actor = null, operator = false } = {}) {
   const headers = {};
   if (body) headers['Content-Type'] = 'application/json';
   if (token) headers['X-Session-Token'] = token;
   else if (actor) headers['X-Actor-Id'] = actor;
+  if (operator) headers['X-Operator-Secret'] = OPERATOR_SECRET;
   const r = await fetch(BASE + p, { method, headers, body: body ? JSON.stringify(body) : null });
   const text = await r.text();
   let json = null;
@@ -58,7 +60,8 @@ async function waitHealth(proc) {
 
 function startApi() {
   const proc = spawn(PY, ['-m', 'framebound', 'serve', '--project', PROJ, '--port', PORT],
-    { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+    { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, FRAMEBOUND_OPERATOR_SECRET: OPERATOR_SECRET } });
   proc.stdout.on('data', () => {});
   proc.stderr.on('data', () => {});
   return proc;
@@ -83,7 +86,7 @@ async function main() {
     await waitHealth(apiProc);
 
     step = 'reviewer-ceremony';
-    const pair = await api('/api/reviewer/pair', { method: 'POST', body: { reviewer_id: 'e2e-human' } });
+    const pair = await api('/api/reviewer/pair', { method: 'POST', body: { reviewer_id: 'e2e-human' }, operator: true });
     assert(pair.status === 201, `pair failed: ${pair.status} ${pair.text.slice(0, 200)}`);
     const open = await api('/api/reviewer/open', { method: 'POST', body: { pairing_code: pair.json.pairing_code } });
     assert(open.status === 201, `open failed: ${open.status}`);

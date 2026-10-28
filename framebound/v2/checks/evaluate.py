@@ -41,12 +41,47 @@ def _code_sha256() -> str:
     return h.hexdigest()
 
 
+def _packaged_lock_digest() -> str | None:
+    """Lock digest from installed package resources (portable, no cwd search)."""
+    try:
+        from importlib import resources as _res
+        for candidate in ("requirements.lock", "requirements-lock.sha256"):
+            try:
+                data = (_res.files("framebound") / candidate).read_bytes()
+                if candidate.endswith(".sha256"):
+                    return data.decode().strip().split()[0]
+                return hashlib.sha256(data).hexdigest()
+            except (FileNotFoundError, ModuleNotFoundError):
+                continue
+    except Exception:
+        pass
+    return None
+
+
 def _lock_digest() -> str | None:
+    digest = _packaged_lock_digest()
+    if digest:
+        return digest
+    # Source-checkout developer fallback: nearest requirements.lock upward.
+    # Installed distributions must provide the packaged resource above;
+    # returning None signals "no packaged lock identity" instead of
+    # silently hashing an unrelated file found via parent search.
     for parent in Path(__file__).resolve().parents:
         lock = parent / "requirements.lock"
         if lock.is_file():
             return hashlib.sha256(lock.read_bytes()).hexdigest()
     return None
+
+
+def lock_identity() -> dict:
+    """Machine-readable lock identity for /api/build-identity and verify."""
+    packaged = _packaged_lock_digest()
+    if packaged:
+        return {"digest": packaged, "source": "packaged"}
+    digest = _lock_digest()
+    if digest:
+        return {"digest": digest, "source": "source-checkout"}
+    return {"digest": None, "source": "missing"}
 
 
 PER_FRAME_CHECKS = {"native_registration", "silhouette_area", "silhouette_width",

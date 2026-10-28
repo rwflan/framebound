@@ -1,5 +1,6 @@
 """WP4 gate: persisted correction round-trip across API restart; reviewer-only writes."""
 import json
+import os as _os
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,12 +13,13 @@ from framebound.v2.api.app import create_app
 from framebound.v2.checks import fixtures as F
 from framebound.v2.services import assets, clips, contracts, packets
 
+_os.environ.setdefault("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret")
 MOD = {"X-Actor-Id": "spark-1"}  # orchestrator: no session token, never a reviewer
 
 
 def _reviewer_headers(client) -> dict:
     """Localhost pairing ceremony: pair a reviewer id, exchange the code for a session."""
-    pr = client.post("/api/reviewer/pair", json={"reviewer_id": "human-1"})
+    pr = client.post("/api/reviewer/pair", json={"reviewer_id": "human-1"}, headers={"X-Operator-Secret": _os.environ.get("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret")})
     assert pr.status_code == 201, pr.text
     op = client.post("/api/reviewer/open", json={"pairing_code": pr.json()["pairing_code"]})
     assert op.status_code == 201, op.text
