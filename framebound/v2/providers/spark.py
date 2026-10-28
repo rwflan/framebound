@@ -132,7 +132,9 @@ def execute_tool_calls(calls: list[dict], *, handlers: dict | None = None) -> li
             outputs.append({"type": "function_call_output", "call_id": call_id,
                             "output": json.dumps({"error": f"invalid arguments: {e}"})})
     # Every output must match its originating call; a mismatch is a 400-class bug.
-    check_follow_up(outputs, calls)
+    # Zero calls is a valid terminal text answer: nothing to match, nothing sent.
+    if calls:
+        check_follow_up(outputs, calls)
     return outputs
 
 
@@ -149,12 +151,26 @@ def check_follow_up(outputs: list[dict], calls: list[dict]) -> None:
                            "calls; the Responses API rejects this with HTTP 400")
 
 
+def _origin(transport) -> str:
+    """Explicit execution origin: injected transports are simulated, never live."""
+    return "simulated-transport" if transport is not None else "live"
+
+
 def submit_critique(contract_summary: str, fault_codes: list[str],
                     frame_blobs: list[dict], project_dir: str, *,
                     offline: bool = False, transport=None,
                     timeout: float = 120.0, handlers: dict | None = None,
                     max_turns: int = 3) -> dict:
-    from .base import _key, http_post, retry_transient
+    """Run the real bounded Spark tool loop and return the terminal critique.
+
+    A completed text-only answer is a valid terminal turn (no empty tool calls
+    are executed). Tool turns are executed locally through allowlisted handlers
+    and their outputs ARE sent back chained via previous_response_id, up to
+    max_turns total requests. Exceeding the turn budget or receiving an
+    incomplete/failed/refused/truncated response is an explicit halt, never a
+    silent pass. Advisory criticism never gates deterministic evaluation.
+    """
+    from .base import _key, http_post
     from .ledger import record_artifact
     req = critique_request(contract_summary, fault_codes, frame_blobs)
     redacted = W.redact_wire(req)
@@ -165,31 +181,98 @@ def submit_critique(contract_summary: str, fault_codes: list[str],
                                  provider="spark", model=req["model"])
         return {"mode": "not_configured", "sent": False, "request_artifact": digest,
                 "note": "Advisory only; deterministic checks remain the gate.",
-                "wire_model": req["model"]}
+                "wire_model": req["model"], "origin": "not_configured"}
+    origin = _origin(transport)
     req_digest = record_artifact(project_dir, "spark_request",
                                  {"request": redacted, "sent": True,
-                                  "model": req["model"]},
+                                  "model": req["model"], "origin": origin},
                                  provider="spark", model=req["model"])
-    def _send():
-        return http_post(W.RESPONSE_PATH, req, timeout=timeout, transport=transport)
-    body, _tries = retry_transient(_send)
+    turns: list[dict] = []
+    # Exactly one dispatch per turn, bounded by max_turns: no auto-retry of a
+    # possibly-accepted request. Transport errors surface to the caller for an
+    # explicit reconcile/abandon decision upstream.
+    body = http_post(W.RESPONSE_PATH, req, timeout=timeout, transport=transport)
     parsed = parse_response(body)
-    outputs = execute_tool_calls(parsed["calls"], handlers=handlers or {})
+    turns.append({"request_artifact": req_digest, "response_id": parsed["response_id"],
+                  "call_count": len(parsed["calls"]), "text_len": len(parsed["text"])})
+    total_calls = list(parsed["calls"])
+    tool_outputs: list[dict] = []
+    text = parsed["text"]
+    response_id = parsed["response_id"]
+    if parsed["calls"]:
+        seen_ids = [c["call_id"] for c in parsed["calls"]]
+        if len(set(seen_ids)) != len(seen_ids):
+            raise InvalidInput("spark turn repeats a call_id: refusing an ambiguous tool turn")
+    while parsed["calls"] and len(turns) < max_turns:
+        outputs = execute_tool_calls(parsed["calls"], handlers=handlers or {})
+        tool_outputs.extend(outputs)
+        follow_up = {"model": _model(), "previous_response_id": parsed["response_id"],
+                     "tool_choice": "auto",
+                     "tools": [ALLOWED_TOOLS["get_deterministic_findings"],
+                               ALLOWED_TOOLS["get_reference_metadata"]],
+                     "input": outputs}
+        fup_digest = record_artifact(project_dir, "spark_request",
+                                     {"request": W.redact_wire(follow_up), "sent": True,
+                                      "model": req["model"],
+                                      "previous_response_id": parsed["response_id"],
+                                      "origin": origin},
+                                     provider="spark", model=req["model"])
+        body = http_post(W.RESPONSE_PATH, follow_up, timeout=timeout, transport=transport)
+        parsed = parse_response(body)
+        turns.append({"request_artifact": fup_digest, "response_id": parsed["response_id"],
+                      "call_count": len(parsed["calls"]), "text_len": len(parsed["text"])})
+        total_calls.extend(parsed["calls"])
+        text = (text + "\n" + parsed["text"]).strip() if parsed["text"] else text
+        response_id = parsed["response_id"]
+        if parsed["calls"]:
+            seen_ids = [c["call_id"] for c in parsed["calls"]]
+            if len(set(seen_ids)) != len(seen_ids):
+                raise InvalidInput("spark turn repeats a call_id: refusing an ambiguous tool turn")
+    halted = bool(parsed["calls"])
     digest = record_artifact(project_dir, "spark_response",
                              {"request_artifact": req_digest,
                               "request": redacted, "sent": True, "model": req["model"],
-                              "response_id": parsed["response_id"],
-                              "call_count": len(parsed["calls"]),
-                              "output_ids": [o["call_id"] for o in outputs]},
+                              "response_id": response_id,
+                              "call_count": len(total_calls),
+                              "turns": len(turns), "halted_on_turn_budget": halted,
+                              "origin": origin},
                              provider="spark", model=req["model"],
-                             request_id=str(parsed["response_id"] or ""))
-    # Follow-up chaining is the caller's choice (needs previous_response_id +
-    # the outputs above); report the prepared follow-up without auto-spending.
-    follow_up = {"previous_response_id": parsed["response_id"],
-                 "input": outputs} if outputs and max_turns > 1 else None
+                             request_id=str(response_id or ""))
+    critique = _final_critique(text)
     return {"mode": "live", "sent": True, "request_artifact": req_digest,
             "response_artifact": digest,
-            "response_id": parsed["response_id"], "calls": parsed["calls"],
-            "text": parsed["text"], "tool_outputs": outputs,
-            "follow_up": follow_up,
+            "response_id": response_id, "calls": total_calls,
+            "text": text, "tool_outputs": tool_outputs,
+            "turns": turns, "halted_on_turn_budget": halted,
+            "origin": origin, "critique": critique,
             "advisory": "critique never gates; deterministic evaluation decides"}
+
+
+def _final_critique(text: str) -> dict:
+    """Integrate structured-critique parsing with the completed live loop.
+
+    A JSON findings body in the terminal text validates into findings with
+    frame/time association and uncertainty; anything else yields a reviewable
+    diagnostic carrying the raw text length. Advisory only: never approval,
+    never a gate override.
+    """
+    import json as _json
+    stripped = (text or "").strip()
+    if not stripped:
+        return {"findings": [], "summary": "",
+                "diagnostic": "empty terminal text: no advisory content to parse",
+                "advisory": True}
+    try:
+        obj = _json.loads(stripped)
+    except Exception:
+        return {"findings": [], "summary": stripped[:500],
+                "diagnostic": "terminal text is not structured JSON: kept as prose advisory",
+                "advisory": True}
+    try:
+        out = parse_structured_critique(obj)
+        out["diagnostic"] = ""
+        return out
+    except Exception as e:
+        return {"findings": [], "summary": stripped[:500],
+                "diagnostic": f"structured parse failed and is reviewable, not fatal: {e}",
+                "advisory": True}
