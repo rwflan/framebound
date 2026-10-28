@@ -13,7 +13,7 @@ import io as _io
 
 from PIL import Image as _Image
 
-from .canonical import canonical_pixels, pixel_sha256
+from .canonical import canonical_pixels, pixel_sha256, load_native_image
 
 
 def render_native(raw_bytes: bytes, translation_px: list[int] | tuple[int, int] | None,
@@ -28,7 +28,7 @@ def render_native(raw_bytes: bytes, translation_px: list[int] | tuple[int, int] 
     dx, dy = 0, 0
     if translation_px:
         dx, dy = int(translation_px[0]), int(translation_px[1])
-    base = _Image.open(_io.BytesIO(raw_bytes)).convert("RGBA")
+    base = load_native_image(raw_bytes)
     w, h = canvas
     if base.size == (w, h) and (dx, dy) == (0, 0):
         canon = canonical_pixels(base)

@@ -85,6 +85,18 @@
       "title": "Method",
       "type": "string"
     },
+    "pixels_baked": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pixels Baked"
+    },
     "frame_instance_id": {
       "minLength": 1,
       "title": "Frame Instance Id",

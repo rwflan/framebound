@@ -75,6 +75,9 @@ def play_clip(project_dir: str, revision_id: str) -> dict:
             dx, dy = 0, 0
             if reg is not None and reg.translation_px:
                 dx, dy = int(reg.translation_px[0]), int(reg.translation_px[1])
+                if dx or dy:
+                    prefix = 'root jump: ' if max(abs(dx),abs(dy)) > contract.allowed_transforms.rigid_translation_budget_px else ''
+                    raise InvalidInput(prefix+'nonzero registration requires explicit native re-materialization')
             w, h = contract.canvas.width, contract.canvas.height
             # Stage B: single shared render path, translation applied exactly once.
             canon, pxh, _ = _render_native(raw, [dx, dy], (w, h))
@@ -135,8 +138,13 @@ def interrupt(project_dir: str, departure_revision_id: str, tick: int,
     policy violation, contact teleport, root jump past the frozen budget, or
     planted entries with no support — never a silent pass.
     """
-    dep = play_clip(project_dir, departure_revision_id)
-    ent = play_clip(project_dir, entry_revision_id)
+    try:
+        dep = play_clip(project_dir, departure_revision_id)
+        ent = play_clip(project_dir, entry_revision_id)
+    except InvalidInput as exc:
+        return {'departure_revision_id':departure_revision_id,'entry_revision_id':entry_revision_id,
+                'tick':tick,'entry_slot':entry_slot,'verdict':'fail','coverage':'unmeasured',
+                'reasons':[str(exc)]}
     if tick < 0 or tick >= dep["total_ticks"]:
         raise InvalidInput(f"interruption tick {tick} outside 0..{dep['total_ticks'] - 1}")
     entry_first_tick = sum(ent["holds"][:entry_slot]) + handoff_delay_ticks
@@ -214,6 +222,8 @@ def interrupt(project_dir: str, departure_revision_id: str, tick: int,
 def record_transition_trace(project_dir: str, record: dict, *,
                             origin: str = "procedural") -> D.TransitionTrace:
     """Persist a measured interruption as a frozen, content-addressed row."""
+    if 'departure' not in record or 'entry' not in record:
+        raise InvalidInput('transition is not measured: ' + '; '.join(record.get('reasons',[])))
     digest = hashlib.sha256(json.dumps(record, sort_keys=True).encode()).hexdigest()
     row = D.TransitionTrace(
         id=f"ttrace-{digest[:24]}",

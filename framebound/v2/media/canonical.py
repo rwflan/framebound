@@ -6,6 +6,7 @@ raster. Byte hash proves the original file; pixel hash identifies canonical pixe
 from __future__ import annotations
 
 import hashlib
+import io
 from pathlib import Path
 
 from PIL import Image
@@ -15,6 +16,16 @@ from .. import storage as S
 
 MAX_PIXELS = 2048 * 2048  # decompression-bomb guard before allocating large buffers
 MAX_DIM = 2048
+
+
+def load_native_image(source) -> Image.Image:
+    """Decode supported native pixels consistently, preserving source files."""
+    im = Image.open(io.BytesIO(source) if isinstance(source, bytes) else source)
+    if im.format != 'PNG' or im.getexif().get(274, 1) != 1:
+        raise ValueError('native rendering requires a non-oriented PNG')
+    if max(im.size) > MAX_DIM or im.width * im.height > MAX_PIXELS:
+        raise ValueError('native raster exceeds supported dimensions')
+    return Image.frombytes('RGBA', im.size, canonical_pixels(im))
 
 
 def canonical_pixels(img: Image.Image) -> bytes:
@@ -47,12 +58,16 @@ def import_asset(project_dir: str | Path, src: str | Path, *, asset_id: str,
         img = Image.open(src)
     except Exception as e:
         raise ValueError(f"malformed media: cannot decode {src}: {e}") from e
+    if img.format != 'PNG':
+        raise ValueError(f'unsupported media format {img.format}: import a PNG at native calibration')
     # dimension guard BEFORE allocating the full raster (decompression-bomb defense)
     w, h = img.size
     if w <= 0 or h <= 0 or w > MAX_DIM or h > MAX_DIM or w * h > MAX_PIXELS:
         raise ValueError(f"media dimensions rejected: {w}x{h}")
     try:
         from PIL import ImageOps as _ImageOps
+        if img.getexif().get(274, 1) != 1:
+            raise ValueError('oriented media requires explicit normalization before PNG import')
         img = _ImageOps.exif_transpose(img)
         w, h = img.size
         if w > MAX_DIM or h > MAX_DIM or w * h > MAX_PIXELS:
@@ -70,5 +85,6 @@ def import_asset(project_dir: str | Path, src: str | Path, *, asset_id: str,
     asset = D.Asset(id=asset_id, byte_sha256=digest, pixel_sha256=pixel_sha256(canon),
                     mime="image/png", width=w, height=h,
                     source_kind=source_kind, rights=rights,
+                    origin='procedural' if source_kind == 'procedural' else 'imported',
                     eligible_roles=eligible_roles or [])
     return asset

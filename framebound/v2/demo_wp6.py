@@ -139,9 +139,6 @@ def run_wp6(out_dir: str | Path, *, replace: bool = False, offline: bool = True)
         aids = [aid_of[r] for r in info["frames"]]
         rid = f"clip-{clip}-01"
         clips.create_revision(proj, contracts_by_clip[clip], rid, aids, info["phases"])
-        ev = clips.evaluate(proj, rid)
-        eval_status[clip] = ev.technical_status.value
-        eval_coverage[clip] = ev.coverage
     # transition contracts: real 2-frame contracts, evaluated like every clip
     trans_status = {}
     for tid, tinfo in man["transitions"].items():
@@ -169,8 +166,6 @@ def run_wp6(out_dir: str | Path, *, replace: bool = False, offline: bool = True)
                                 source_kind="procedural", rights="original")
             taids.append(aid)
         clips.create_revision(proj, tcid, f"clip-{tid}", taids, phases)
-        tev = clips.evaluate(proj, f"clip-{tid}")
-        trans_status[tid] = tev.technical_status.value
     # Procedural world grounding for the interruption harness (labeled
     # procedural: constant stance for planted clips; jump flight ticks
     # unplanted). Measured by the playback harness, never assigned.
@@ -216,6 +211,14 @@ def run_wp6(out_dir: str | Path, *, replace: bool = False, offline: bool = True)
             "world_distance": rec["world_distance"],
             "contact_continuous": rec["verdict"] == "pass",
             "verdict": rec["verdict"], "reasons": rec["reasons"]})
+    # Evaluate only after all frozen world/transition inputs exist.
+    for clip in man['clips']:
+        ev = clips.evaluate(proj, f'clip-{clip}-01')
+        eval_status[clip] = ev.technical_status.value
+        eval_coverage[clip] = ev.coverage
+    for tid in man['transitions']:
+        tev = clips.evaluate(proj, f'clip-{tid}')
+        trans_status[tid] = tev.technical_status.value
     traces_path = out / "transition_traces.json"
     traces_path.write_text(json.dumps({"entry_policy": ENTRY_POLICY,
                                        "interruptions": interruptions}, indent=2) + "\n")

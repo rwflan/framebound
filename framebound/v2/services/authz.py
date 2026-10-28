@@ -23,6 +23,6 @@ class Actor:
 
 
 def require_reviewer(actor: Actor, op: str) -> None:
-    if op in REVIEWER_ONLY_OPS and actor.type != "reviewer":
+    if actor.type != "reviewer":
         raise AuthorizationError(
             f"op {op} requires a reviewer session; actor {actor.type}:{actor.id} is not permitted")

@@ -306,7 +306,8 @@ def _reuse_partial_child(project_dir: str, task: D.CorrectionTask,
             got.append((fdata["slot"], fdata["asset_id"]))
         want = sorted((s, slots.get(s, _base_asset(con, task.baseline_revision_id, s)))
                       for s in range(len(rdata["frame_instance_ids"])))
-        if sorted(got) != sorted(want) or rdata.get("parent_revision_id") != task.baseline_revision_id:
+        if (sorted(got) != sorted(want) or rdata.get("parent_revision_id") != task.baseline_revision_id
+                or rdata.get('repair_task_id') not in (None, task.id)):
             raise S.ConflictError(
                 f"revision id {new_revision_id} already exists with different content: "
                 "refusing to conflate two corrections under one id")
@@ -328,37 +329,30 @@ def _base_asset(con, baseline_revision_id: str, slot: int) -> str | None:
 def _revalidate_before_publish(project_dir: str, task: D.CorrectionTask,
                                actor: Actor, expected_version: int,
                                baseline_evaluation_id: str,
-                               claim_token: str) -> None:
-    """Re-read the task after the long register/evaluate/packet stages.
-
-    A concurrent reopen/resolve/revoke/reclaim or an expired lease invalidates
-    the publication even though the candidate rows remain for reuse.
-    """
-    import hashlib as _h
-    con = S.connect(project_dir)
+                               claim_token: str, *, connection=None) -> None:
+    import hashlib
+    owned = connection is None
+    con = connection if connection is not None else S.connect(project_dir)
     try:
-        data, ver = S.get(con, "correction_tasks", task.id)
-        live = D.CorrectionTask.model_validate_json(json.dumps(data))
+        data, ver = S.get(con, 'correction_tasks', task.id)
+        live = D.CorrectionTask.model_validate(data)
+        if ver != expected_version:
+            raise S.StaleRevisionError('correction authority changed during submit')
+        if live.status not in (D.CorrectionStatus.CLAIMED,D.CorrectionStatus.ATTEMPTING):
+            raise InvalidInput('task is no longer claimed for publication')
+        if live.claim_holder != actor.id or hashlib.sha256(claim_token.encode()).hexdigest() != live.claim_token_sha256:
+            raise InvalidInput('claim holder/token changed during submit')
+        if not _lease_valid(live):
+            raise InvalidInput('claim lease expired during submit')
+        base = P.latest_evaluation(con, live.baseline_revision_id)
+        if base is None or base.id != baseline_evaluation_id:
+            raise InvalidInput('baseline evidence superseded during submit')
+        from .evidence import verify_evidence_in
+        valid, issues = verify_evidence_in(con, project_dir, live.baseline_revision_id, base)
+        if not valid:
+            raise InvalidInput('baseline evidence changed during submit: ' + '; '.join(issues))
     finally:
-        con.close()
-    if ver != expected_version:
-        raise S.StaleRevisionError(
-            f"stale_revision: correction_tasks/{task.id} changed during submit "
-            f"(now version {ver}): re-read before publishing")
-    if live.status not in (D.CorrectionStatus.CLAIMED, D.CorrectionStatus.ATTEMPTING):
-        raise InvalidInput(f"task {task.id} is now {live.status.value}: publication refused")
-    if live.claim_holder != actor.id:
-        raise InvalidInput(f"task {task.id} reclaimed by {live.claim_holder}: publication refused")
-    if not live.claim_token_sha256 or \
-            _h.sha256(claim_token.encode()).hexdigest() != live.claim_token_sha256:
-        raise InvalidInput("claim token rotated during submit: publication refused")
-    if not _lease_valid(live):
-        raise InvalidInput("claim lease lapsed during submit: re-claim, then retry "
-                           "with the same operation key to reuse the candidate")
-    base = P.latest_evaluation(S.connect(project_dir), live.baseline_revision_id)
-    S.connect(project_dir).close()
-    if base is None or base.id != baseline_evaluation_id:
-        raise InvalidInput("baseline evidence superseded during submit: re-claim first")
+        if owned: con.close()
 
 
 def submit_correction(project_dir: str, actor: Actor, task_id: str, *,
@@ -460,7 +454,7 @@ def submit_correction(project_dir: str, actor: Actor, task_id: str, *,
         try:
             _clips.register_candidate(project_dir, task.baseline_revision_id,
                                       new_revision_id, slots, recipe,
-                                      transform=transform)
+                                      transform=transform, repair_task_id=task.id)
         except S.ConflictError as e:
             raise InvalidInput(f"candidate registration refused: {e}")
     cand_env = _clips.evaluate(project_dir, new_revision_id)
@@ -486,13 +480,6 @@ def submit_correction(project_dir: str, actor: Actor, task_id: str, *,
                                 baseline_contract=base_contract,
                                 candidate_contract=cand_contract)
     pkt = None
-    if sel.get("selected"):
-        # Idempotent on its own transaction: retries converge instead of
-        # conflicting, and no nested connection ever blocks the atomic block.
-        pkt = P.create_packet(project_dir, f"pkt-{new_revision_id}", new_revision_id,
-                              cand_ev_id,
-                              f"correction for {task_id}: {task.desired_outcome[:120]}",
-                              comparison_revision_id=task.baseline_revision_id)
     # Revalidate the original authority after the long operation: a concurrent
     # reopen/resolve/revoke/claim or a lapsed lease must not be overwritten by
     # reading the latest version and proceeding. The candidate rows stay (they
@@ -502,6 +489,13 @@ def submit_correction(project_dir: str, actor: Actor, task_id: str, *,
     con = S.connect(project_dir)
     try:
         with S.atomic(con):
+            con.execute('BEGIN IMMEDIATE')
+            _revalidate_before_publish(project_dir, task, actor, expected_version,
+                                       baseline_evaluation_id, claim_token, connection=con)
+            if sel.get('selected'):
+                pkt = P.create_packet(project_dir, f'pkt-{new_revision_id}', new_revision_id,
+                    cand_ev_id, f'correction for {task_id}: {task.desired_outcome[:120]}',
+                    comparison_revision_id=task.baseline_revision_id, connection=con)
             att = D.Attempt(id=att_id, baseline_revision_id=task.baseline_revision_id,
                             brief_id=task_id, provider="repair",
                             request_sha256=payload_hash[:64] if len(payload_hash) >= 64

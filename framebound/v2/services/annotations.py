@@ -11,7 +11,7 @@ import json
 
 from .. import domain as D
 from .. import storage as S
-from .authz import Actor
+from .authz import Actor, require_reviewer
 from .errors import InvalidInput
 
 
@@ -21,6 +21,9 @@ def propose(project_dir: str, actor: Actor, annotation: dict) -> D.ResultEnvelop
         ann = D.AnnotationRevision.model_validate(annotation)
     except Exception as e:
         raise InvalidInput(f"annotation invalid: {e}") from e
+    if ann.annotator_type == 'human_reviewed' or ann.reviewer or ann.review_event_id:
+        require_reviewer(actor, 'review_annotation')
+        ann.reviewer = actor.id
     con = S.connect(project_dir)
     try:
         with S.atomic(con):

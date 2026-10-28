@@ -107,6 +107,48 @@
       },
       "title": "Eligible Roles",
       "type": "array"
+    },
+    "parent_asset_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Parent Asset Ids",
+      "type": "array"
+    },
+    "operation_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Operation Id"
+    },
+    "derivation": {
+      "additionalProperties": true,
+      "title": "Derivation",
+      "type": "object"
+    },
+    "origin": {
+      "default": "unknown",
+      "maxLength": 64,
+      "title": "Origin",
+      "type": "string"
+    },
+    "source_job_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Job Id"
     }
   },
   "required": [
