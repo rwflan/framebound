@@ -53,11 +53,15 @@ python -m framebound clip-evaluate --project proj --revision-id clip-01
 python -m framebound brief-compile --project proj --contract-id c-01 --slot 2   # needs stored human approval
 python -m framebound job-submit --project proj --brief brief.json --idempotency-key k1 [--offline]
 python -m framebound job-get --project proj --job-id job-xxx
+python -m framebound job-claim --project proj --job-id job-xxx --worker-id w --expected-version 1  # returns fencing token
+python -m framebound orchestrator-run --project proj --jobs job-xxx
+python -m framebound orchestrator-send --project proj --run-id run-xxx --job-id job-xxx --worker-id w --fencing-token tok  # brief optional: stored request is authoritative
 python -m framebound correction-submit --project proj --task-id t --claim-token tok --new-id r2 --slots 3=a --recipe "repair:bounded-patch" --baseline-evaluation ev --idempotency-key k2
 python -m framebound mask-approve --project proj --issue evt --mask-asset m --slots 3   # reviewer session required
 python -m framebound export --project proj --snapshot s1 --out build/s1 --revisions clip-01
 python -m framebound dataset-validate --snapshot build/s1
-python -m framebound recorded-run --project proj --contract c-01 --slot 0 --baseline clip-01 --new-id gen-01 --out run.json --offline
+python -m framebound recorded-run --project proj --contract c-01 --slot 0 --baseline clip-01 --new-id gen-01 --out run.json --offline  # four capabilities (Spark loop, generation, chained edit, SAM) via the controller
+FRAMEBOUND_OPERATOR_SECRET=... python -m framebound reviewer-pair --project proj --reviewer-id human-1   # operator console only; desk login redeems the printed code (browsers never pair)
 python -m framebound v2-mcp --project proj     # MCP stdio, official SDK (mcp==2.3.0), real handshake tested
 python -m framebound serve --project proj --port 8765   # FastAPI review desk + typed DTOs (api/dto.py)
 python -m framebound benchmark-eval --report bench.json   # public-service latency (cold/warm/incremental)
@@ -66,5 +70,10 @@ python -m framebound benchmark-eval --report bench.json   # public-service laten
 Rules the v2 tools enforce on the model (tested at the transport boundary):
 unknown check codes are rejected at proposal; missing required inputs/authority can
 never yield pass; evidence binds real pixels + code; reviewer identity comes from
-sessions, never headers; repairs obey ROI/mask scope, leases, matrix equivalence and
-no-regression selection; failures land as attempts, never orphaned revisions.
+operator-issued sessions, never headers or anonymous pairing; generation briefs must
+reference a frozen compiled brief and transmit phase-guide pixels; offline jobs can
+never flip live at send; one dispatch per reservation with fencing; ambiguous outcomes
+reconcile instead of retrying; repairs obey ROI/mask scope, composed transform bounds
+with pixel proof, leases, matrix equivalence and no-regression selection; failures land
+as attempts, never orphaned revisions; exports publish only selected, rights-checked,
+split-safe closures that the validator accepts from a moved directory.

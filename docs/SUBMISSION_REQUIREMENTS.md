@@ -1,7 +1,11 @@
-# Submission requirements — status 2026-10-27 (Europe/Dublin)
+# Submission requirements — status 2026-10-28 (Europe/Dublin)
 
 Checked: public event page + public overview pages via web search on 2026-10-27. The authenticated
 details/rules portal was NOT accessible in this pass (details URL redirects to login; waiver text not exposed).
+Rechecked 2026-10-28: no authenticated portal access from this session either — all UNVERIFIED items below
+still stand and still require the entrant's authenticated check. Engineering gates that needed no portal
+are complete (second remediation PRs #21–#27 + S8: install/authority/conditioning/controller/providers/
+corrections/exports/runtime, full suite green, browser journey green, installed-wheel proof).
 
 ## Verified from public sources (re-check before submitting)
 

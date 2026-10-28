@@ -19,7 +19,17 @@ Meta models in the loop: Muse Image generates under briefs, SAM 3.1 supplies mas
 
 ## Quick start
 
-Python 3.11+. Core: `pip install -e .` (pydantic, Pillow, numpy, mcp, fastapi, uvicorn). Export validation: `pip install -e '.[export-validation]'` (datasets, pycocotools). Desk: `cd web && npm install`.
+Python 3.11+. Reproducible install (no machine-specific URLs; the lock stays portable):
+
+```sh
+python -m venv .venv && . .venv/bin/activate
+pip install -r requirements.lock
+pip install --no-deps -e '.[test,export-validation]'
+pip check                                            # must report no broken requirements
+npm --prefix web ci --ignore-scripts && npm --prefix web run build
+python scripts/sync_desk_build.py                    # stage the desk into the package
+python -m framebound doctor                          # project + dependency self-check
+```
 
 ```sh
 sh scripts/verify-local                        # offline P0 checks (live providers opt-in, skipped honestly)
@@ -28,6 +38,11 @@ python -m framebound serve --project build/wip6/project --port 8765  # desk at h
 # desk dev: cd web && npm install && npm run dev   (proxies /api to :8765)
 # v1 prototype still works: python -m framebound demo --out build/demo
 ```
+
+Reviewer bootstrap is operator-issued: `FRAMEBOUND_OPERATOR_SECRET=... framebound reviewer-pair --project ... --reviewer-id ...`
+prints a single-use code; the human exchanges it via the desk login (pairing code only — the browser never mints
+reviewer authority). Live provider calls need `MODEL_API_KEY` plus an explicit `FRAMEBOUND_SPEND_CEILING`, otherwise
+`scripts/verify-local --live` stays pending with the exact command.
 
 Open http://127.0.0.1:8765 for the review desk.
 

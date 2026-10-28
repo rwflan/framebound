@@ -510,8 +510,10 @@ class TestCapabilityAndTransportParity(unittest.TestCase):
     def test_capability_table_honest_and_transports_share_services(self):
         from framebound.v2.services import capabilities as C
         rows = {(r["transport"], r["operation"]): r for r in C.table()["rows"]}
-        self.assertEqual(rows[("desk", "compare")]["status"], "unsupported")
+        self.assertEqual(rows[("desk", "playback/compare/issues/corrections/export")]["status"],
+                         "supported")
         self.assertEqual(rows[("cli", "job-cancel")]["status"], "supported")
+        self.assertEqual(rows[("providers", "live-spike")]["status"], "unsupported")
         # CLI/MCP/API parity: job submit/get/cancel over HTTP
         from fastapi.testclient import TestClient
         from framebound.v2.api.app import create_app
