@@ -78,7 +78,67 @@ def _p(frac: float, data: list[float]) -> float:
     return s[min(len(s) - 1, int(frac * len(s)))]
 
 
-def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5) -> dict:
+def _build_large_project(td: str, frames: int = 200) -> dict:
+    """Representative workload: many held frames with guides and holds."""
+    from .services import approvals as A
+    from .services import assets, clips, contracts
+    from .services.authz import Actor
+    from . import domain as D
+    from . import storage as S
+    src = Path(td) / "big"
+    from .checks import fixtures as _F
+    meta = _F.build_cycle(src)
+    for n in range(frames):
+        assets.import_asset(td, str(src / meta["clean"][n % 8]), f"g{n}",
+                            source_kind="procedural", rights="original")
+    assets.import_asset(td, str(src / meta["clean"][0]), "id-big",
+                        source_kind="original", rights="original")
+    assets.import_asset(td, str(src / meta["clean"][1]), "st-big",
+                        source_kind="original", rights="original")
+    con = S.connect(td)
+    try:
+        S.insert(con, D.CharacterRevision(
+            id="char-big", project_id="p", identity_asset_ids=["id-big"],
+            style_asset_ids=["st-big"], view_set=["side"],
+            canvas={"width": 64, "height": 64}, scale_ruler="x"))
+    finally:
+        con.close()
+    con = S.connect(td)
+    try:
+        hashes = {f"g{n}": S.get(con, "assets", f"g{n}")[0]["byte_sha256"]
+                  for n in range(frames)}
+    finally:
+        con.close()
+    A.propose_motion_guide(td, Actor(type="orchestrator", id="bench"),
+                           {"schema_version": "2.0", "id": "mg-big",
+                            "character_revision_id": "char-big",
+                            "entries": [{"phase": f"p{n % 8}", "asset_id": f"g{n}",
+                                         "byte_sha256": hashes[f"g{n}"]}
+                                        for n in range(frames)]})
+    A.approve_reference(td, Actor(type="reviewer", id="human-bench"), "char-big", "mg-big")
+    contracts.propose_contract(td, {
+        "schema_version": "2.0", "id": "c-big", "character_revision_id": "char-big",
+        "action": {"name": "run", "view": "side", "facing": "right", "loop": True},
+        "canvas": {"width": 64, "height": 64, "units": "native_px"},
+        "timing": {"ticks_per_second": 60, "holds": [4] * frames},
+        "references": {"identity": "id-big", "style": "st-big",
+                       "motion_guide_revision": "mg-big"},
+        "phase_schedule": [{"slot": n, "phase": f"p{n % 8}", "motion_reference_id": f"pose-{n}"}
+                           for n in range(frames)],
+        "constraints": [
+            {"id": "registration", "check": "native_registration", "required": True},
+            {"id": "area", "check": "silhouette_area", "required": True,
+             "params": {"max_fraction": 0.35}},
+            {"id": "cadence", "check": "locked_cadence", "required": True}],
+        "allowed_transforms": {"per_pose_scale": False,
+                               "rigid_translation_budget_px": 2}})
+    clips.create_revision(td, "c-big", "rev-big",
+                          [f"g{n}" for n in range(frames)], [f"p{n % 8}" for n in range(frames)])
+    return {"project": td, "frames": frames}
+
+
+def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5,
+                         large_frames: int = 200, large_warm_runs: int = 5) -> dict:
     from .services import assets, clips
     td = tempfile.mkdtemp(prefix="fb-bench-")
     _build_project(td)
@@ -134,6 +194,32 @@ def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5) -> dict:
         if r.returncode != 0:
             raise RuntimeError(f"cold evaluation failed: {r.stderr[-500:]}")
         cold.append(dt)
+    # representative workload: many held frames, same public path (no cold
+    # subprocess here: cold interpreter cost is covered by the small workload;
+    # the large workload measures warm evaluation scaling)
+    big = _build_large_project(td, frames=large_frames)
+    big_warm = []
+    for _ in range(large_warm_runs):
+        t0 = time.perf_counter()
+        clips.evaluate(td, "rev-big")
+        big_warm.append((time.perf_counter() - t0) * 1000)
+    # playback timing is runtime presentation, independent from verification
+    # latency and (unmeasured offline) provider generation latency
+    from . import playback as _play
+    play_ticks = sum([4] * 8)
+    play_ms = []
+    for _ in range(10):
+        t0 = time.perf_counter()
+        _play.play_clip(td, "rev-bench")
+        play_ms.append((time.perf_counter() - t0) * 1000 / play_ticks)
+    # enabled checks derived from the executed contract, not a static list
+    from . import storage as _S
+    con = _S.connect(td)
+    try:
+        cdata, _ = _S.get(con, "contract_revisions", "c-bench")
+    finally:
+        con.close()
+    included = sorted({c["check"] for c in cdata["constraints"]})
     import multiprocessing
     return {
         "service": "services.clips.evaluate (public, persisted, complete required context)",
@@ -141,8 +227,7 @@ def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5) -> dict:
                      "python": platform.python_version(),
                      "cpu_count": multiprocessing.cpu_count()},
         "workload": {"frames": 8, "resolution": [64, 64], "holds": [4] * 8,
-                     "checks_included": ["native_registration", "silhouette_area",
-                                         "locked_cadence"],
+                     "checks_included": included,
                      "checks_excluded": "provenance_coverage is not enabled by this "
                      "contract and is never reported as executed; guide-dependent "
                      "appearance/phase checks need independent guides (unmeasured "
@@ -156,8 +241,26 @@ def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5) -> dict:
                                          "p95": round(_p(0.95, inc), 2),
                                          "invalidation": "whole-revision re-evaluation; "
                                          "no incremental frame cache"},
+        "large_workload": {"frames": big["frames"], "resolution": [64, 64],
+                           "holds_per_frame": 4,
+                           "checks_included": ["locked_cadence",
+                                               "native_registration",
+                                               "silhouette_area"],
+                           "warm_ms": {"n": len(big_warm),
+                                       "p50": round(_p(0.5, big_warm), 1),
+                                       "p95": round(_p(0.95, big_warm), 1)}},
+        "playback_ms_per_tick": {"n": len(play_ms),
+                                 "p50": round(_p(0.5, play_ms), 3),
+                                 "p95": round(_p(0.95, play_ms), 3),
+                                 "ticks": play_ticks,
+                                 "note": "runtime presentation only; verification "
+                                 "(above) and provider generation (unmeasured "
+                                 "offline; recorded-run bundles carry provider "
+                                 "response IDs, not latency claims) are separate"},
         "note": "primitive raster microbenchmarks (run_benchmark) are separate and must "
-                "not be presented as full-framework latency",
+                "not be presented as full-framework latency; realtime playback claims "
+                "require the playback numbers above on stated hardware, never the "
+                "evaluator or provider timings",
     }
 
 
