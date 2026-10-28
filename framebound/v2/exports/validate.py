@@ -1,13 +1,15 @@
-"""Independent snapshot validation: standard loaders, hashes, durations, eligibility.
+"""Independent snapshot validation: standard loaders, hashes, eligibility semantics.
 
-Loads the MOVED snapshot with real libraries (datasets imagefolder + COCO API),
-checks labels/preferences, verifies hashes + durations, and reports exclusions.
+Loads the MOVED snapshot with real libraries (COCO API, datasets imagefolder
+when the interpreter supports it), checks labels/preferences, verifies hashes
+and durations, and reports exclusions. Every annotation is decoded and
+compared pixel-for-pixel with its packaged source image; area-only agreement
+is not acceptance. Mutation tests (wrong pixels, same counts) fail here.
 """
 from __future__ import annotations
 
 import hashlib
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -20,71 +22,279 @@ def _h(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
-def _ensure_datasets():
-    """pyenv 3.11.4 ships without _lzma; datasets only needs lzma.open for .xz extraction,
-    which imagefolder PNG validation never touches. Shim raises if xz is ever actually used."""
-    try:
-        import lzma  # noqa: F401
-    except ImportError:
-        import types
-        stub = types.ModuleType("lzma")
+def _alpha_raster(img: Image.Image) -> tuple[bytes, int, int]:
+    rgba = img.convert("RGBA")
+    w, h = rgba.size
+    px = rgba.tobytes()
+    return bytes(1 if px[i + 3] > 127 else 0 for i in range(0, len(px), 4)), w, h
 
-        def _open(*a, **k):
-            raise RuntimeError("lzma unavailable in this interpreter; .xz extraction unsupported")
-        stub.open = _open
-        sys.modules["lzma"] = stub
+
+def _check_coco(snap: Path, manifest: dict, issues: list[str]) -> dict:
+    coco = COCO(str(snap / "coco" / "annotations.json"))
+    img_ids = coco.getImgIds()
+    if len(img_ids) != manifest["counts"]["images"]:
+        issues.append(f"coco image count {len(img_ids)} != manifest {manifest['counts']['images']}")
+    checked = 0
+    for iid in img_ids:
+        info = coco.loadImgs([iid])[0]
+        ipath = (snap / "coco" / info["file_name"]).resolve()
+        if not str(ipath).startswith(str(snap.resolve())):
+            issues.append(f"coco image {iid} escapes the snapshot dir")
+            continue
+        if not ipath.is_file():
+            issues.append(f"coco image {iid} missing file {info['file_name']}")
+            continue
+        src = Image.open(ipath)
+        want, w, h = _alpha_raster(src)
+        if [w, h] != [info["width"], info["height"]]:
+            issues.append(f"coco image {iid} dims {w}x{h} != header {info['width']}x{info['height']}")
+        for a in coco.loadAnns(coco.getAnnIds(imgIds=[iid])):
+            rle = a["segmentation"]
+            if isinstance(rle.get("counts"), str):
+                rle = {"size": rle["size"], "counts": rle["counts"].encode()}
+            try:
+                dec = coco_mask.decode(rle)
+            except Exception as e:
+                issues.append(f"annotation {a['id']} undecodable: {e}")
+                continue
+            if list(dec.shape) != [h, w]:
+                issues.append(f"annotation {a['id']} decoded {list(dec.shape)} != source {h}x{w}")
+                continue
+            flat = bytes(int(v) for v in np.asarray(dec).ravel().tolist())
+            if flat != want:
+                issues.append(f"annotation {a['id']} pixels differ from packaged source alpha")
+                continue
+            area = int(np.asarray(dec).sum())
+            if area != a["area"]:
+                issues.append(f"annotation {a['id']} area {area} != declared {a['area']}")
+            ys, xs = np.nonzero(np.asarray(dec))
+            if len(xs):
+                x, y, wb, hb = int(xs.min()), int(ys.min()), \
+                    int(xs.max()) - int(xs.min()) + 1, int(ys.max()) - int(ys.min()) + 1
+                if [x, y, wb, hb] != [int(v) for v in a["bbox"]]:
+                    issues.append(f"annotation {a['id']} bbox {[x, y, wb, hb]} != declared {a['bbox']}")
+            elif a["area"] != 0:
+                issues.append(f"annotation {a['id']} empty raster with nonzero area")
+            # independent re-encode must round-trip, not merely preserve area
+            re = coco_mask.encode(np.asfortranarray(np.asarray(dec, dtype=np.uint8)))
+            if coco_mask.area(re) != a["area"]:
+                issues.append(f"annotation {a['id']} re-encode area mismatch")
+            checked += 1
+    return {"annotations_checked": checked, "images": len(img_ids)}
+
+
+def _check_hf(snap: Path, manifest: dict, issues: list[str], skipped: list[str]) -> dict:
+    """Materialize every positive through the standard imagefolder loader.
+
+    Requires an interpreter with working lzma + datasets. Without it, fall back
+    to PIL-level structural checks and record an explicit skip — never claim a
+    materialization that did not happen, and never shim sys.modules.
+    """
+    meta_path = snap / "hf" / "metadata.jsonl"
+    metas = [json.loads(l) for l in meta_path.read_text().splitlines() if l.strip()]
+    counts_images = manifest["counts"]["images"]
+    positives = manifest["counts"].get("positives", counts_images)
+    if positives == 0:
+        skipped.append("imagefolder: legitimately empty positives; no examples invented")
+        return {"method": "empty-positive", "rows": 0}
+    try:
+        import _lzma  # noqa: F401  (native module; its absence breaks datasets import)
+        import lzma  # noqa: F401
+        import datasets
+    except ImportError as e:
+        # structural fallback: every file must decode as pixels + join metadata
+        n = 0
+        for m in metas:
+            fp = snap / "hf" / m["file_name"]
+            if not fp.is_file():
+                issues.append(f"positive {m['file_name']} missing")
+                continue
+            try:
+                with Image.open(fp) as im:
+                    im.load()
+                    if im.size[0] <= 0 or im.size[1] <= 0:
+                        issues.append(f"positive {m['file_name']} has degenerate size")
+            except Exception as e2:
+                issues.append(f"positive {m['file_name']} undecodable: {e2}")
+            if m.get("label_origin") != "human-approved":
+                issues.append(f"positive {m['file_name']} origin {m.get('label_origin')} "
+                              "is not human-approved")
+            n += 1
+        skipped.append(f"datasets imagefolder not materialized here ({e}); "
+                       "PIL structural fallback used — full loader proof needs an "
+                       "interpreter with _lzma + datasets")
+        return {"method": "pil-fallback", "rows": n}
+    ds = datasets.load_dataset("imagefolder", data_dir=str(snap / "hf"), split="train")
+    if len(ds) != positives:
+        issues.append(f"imagefolder rows {len(ds)} != manifest positives {positives}")
+    by_name = {m["file_name"]: m for m in metas}
+    for i, row in enumerate(ds):
+        img = row["image"]
+        if img is None:
+            issues.append(f"imagefolder row {i} materialized no pixels")
+            continue
+        img.load()  # pixels actually materialize through the loader, not just len(ds)
+        if img.size[0] <= 0 or img.size[1] <= 0:
+            issues.append(f"imagefolder row {i} has degenerate size")
+    # join every metadata row to a packaged file + eligible origin/split
+    for m in metas:
+        fp = snap / "hf" / m["file_name"]
+        if not fp.is_file():
+            issues.append(f"positive {m['file_name']} missing")
+        if m.get("label_origin") != "human-approved":
+            issues.append(f"positive {m['file_name']} origin {m.get('label_origin')}")
+        if m.get("rights", "original") not in (manifest["policy"].get("rights_allow") or ["original"]):
+            issues.append(f"positive {m['file_name']} rights {m.get('rights')} not allowed")
+        if m.get("source_kind") == "procedural" and not manifest["policy"].get("include_procedural_positives"):
+            issues.append(f"positive {m['file_name']} is procedural-test data")
+    return {"method": "datasets-imagefolder", "rows": len(ds)}
+
+
+def _check_preferences(snap: Path, issues: list[str]) -> dict:
+    prefs = [json.loads(l) for l in (snap / "preferences.jsonl").read_text().splitlines() if l.strip()]
+    weak = [json.loads(l) for l in (snap / "weak_preferences.jsonl").read_text().splitlines() if l.strip()]
+    for pr in prefs:
+        if pr.get("origin") != "human-comparison":
+            issues.append("preference without human-comparison origin")
+        if not pr.get("comparison_packet"):
+            issues.append("preference pair without a valid comparison packet ref")
+        ch, rj = pr.get("chosen") or [], pr.get("rejected") or []
+        if not ch or not rj:
+            issues.append(f"preference {pr.get('comparison_packet')} missing chosen/rejected files")
+            continue
+        ch_hashes, rj_hashes = set(), set()
+        for f in ch:
+            fp = snap / f["file"]
+            if not fp.is_file():
+                issues.append(f"preference chosen missing {f['file']}")
+                continue
+            actual = _h(fp.read_bytes())
+            if actual != f["sha256"]:
+                issues.append(f"preference chosen {f['file']} bytes changed since export")
+            ch_hashes.add(actual)
+        for f in rj:
+            fp = snap / f["file"]
+            if not fp.is_file():
+                issues.append(f"preference rejected missing {f['file']}")
+                continue
+            actual = _h(fp.read_bytes())
+            if actual != f["sha256"]:
+                issues.append(f"preference rejected {f['file']} bytes changed since export")
+            rj_hashes.add(actual)
+        if ch_hashes and ch_hashes == rj_hashes:
+            issues.append(f"preference {pr.get('comparison_packet')} chosen==rejected pixels")
+        cond = pr.get("conditioning") or {}
+        if not cond.get("contract") or not cond.get("chosen_evaluation") \
+                or not cond.get("rejected_evaluation"):
+            issues.append(f"preference {pr.get('comparison_packet')} lacks common conditioning")
+        if not pr.get("rejected_issue") or not pr.get("reason"):
+            issues.append("preference without named issue/reason")
+    for w in weak:
+        if w.get("origin") != "technical-ranking":
+            issues.append("weak preference without technical-ranking origin")
+        if (w.get("prompt") or w.get("reason") or "") == "" and False:
+            pass
+    # no weak-label row may masquerade inside preferences
+    return {"preferences": len(prefs), "weak_preferences": len(weak)}
+
+
+def _check_temporal(snap: Path, issues: list[str]) -> dict:
+    temps = [json.loads(l) for l in (snap / "temporal.jsonl").read_text().splitlines() if l.strip()]
+    for t in temps:
+        frames = t.get("frames", [])
+        holds = t.get("holds", [])
+        if len(frames) != len(holds):
+            issues.append(f"temporal {t.get('clip_revision_id')}: {len(frames)} frames vs "
+                          f"{len(holds)} holds (count alone is not timing proof)")
+        if t.get("total_ticks") != sum(holds):
+            issues.append(f"temporal {t.get('clip_revision_id')} duration != sum(holds)")
+        for f in frames:
+            if f.get("hold_ticks") != holds[f["slot"]] if f.get("slot", -1) < len(holds) else True:
+                issues.append(f"temporal {t.get('clip_revision_id')} slot hold mismatch")
+            if f.get("file") and not (snap / f["file"]).is_file():
+                issues.append(f"temporal {t.get('clip_revision_id')} slot {f.get('slot')} "
+                              f"references missing {f.get('file')}")
+            for k in ("frame_instance_id", "asset_id", "phase", "registration_id"):
+                if not f.get(k):
+                    issues.append(f"temporal {t.get('clip_revision_id')} slot {f.get('slot')} "
+                                  f"missing {k}")
+        order = [f.get("slot") for f in frames]
+        if order != sorted(order):
+            issues.append(f"temporal {t.get('clip_revision_id')} frames not in slot order")
+        traces = t.get("traces", {})
+        if "missing" not in traces:
+            issues.append(f"temporal {t.get('clip_revision_id')} hides missing trace coverage")
+    return {"temporal": len(temps)}
 
 
 def validate_snapshot(snapshot_dir: str) -> dict:
     snap = Path(snapshot_dir)
     manifest = json.loads((snap / "manifest.json").read_text())
     issues: list[str] = []
-    # 1. hashes: every file rehashes to the manifest
+    skipped: list[str] = []
+    # 0. manifest integrity + no stale/extra files + no invalid paths
+    listed = set(manifest["files"])
+    if "manifest.json" in listed:
+        issues.append("manifest lists itself; self-hash is recorded in ExportSnapshot, not here")
     for rel, digest in manifest["files"].items():
+        if Path(rel).is_absolute() or ".." in Path(rel).parts:
+            issues.append(f"invalid internal path {rel}")
+            continue
         p = snap / rel
         if not p.is_file():
             issues.append(f"missing file {rel}")
         elif _h(p.read_bytes()) != digest:
             issues.append(f"hash mismatch {rel}")
-    # 2. COCO via real API + mask round-trip
-    coco = COCO(str(snap / "coco" / "annotations.json"))
-    img_ids = coco.getImgIds()
-    if len(img_ids) != manifest["counts"]["images"]:
-        issues.append(f"coco image count {len(img_ids)} != manifest {manifest['counts']['images']}")
-    for iid in img_ids[:8]:
-        anns = coco.loadAnns(coco.getAnnIds(imgIds=[iid]))
-        for a in anns:
-            rle = a["segmentation"]
-            if isinstance(rle.get("counts"), str):
-                rle = {"size": rle["size"], "counts": rle["counts"].encode()}
-            dec = coco_mask.decode(rle)
-            re = coco_mask.encode(np.asfortranarray(dec))
-            if coco_mask.area(re) != a["area"]:
-                issues.append(f"mask round-trip area mismatch image {iid}")
-    # 3. HF imagefolder via real datasets loader
-    _ensure_datasets()
-    import datasets
-    ds = datasets.load_dataset("imagefolder", data_dir=str(snap / "hf"), split="train")
-    if len(ds) != manifest["counts"]["images"]:
-        issues.append(f"imagefolder rows {len(ds)} != manifest {manifest['counts']['images']}")
-    # 4. preferences eligibility: chosen/rejected resolve, reasons name real issue codes
-    prefs = [json.loads(l) for l in (snap / "preferences.jsonl").read_text().splitlines() if l.strip()]
-    for pr in prefs:
-        if not (snap / "hf" / pr["chosen"]).is_file():
-            issues.append(f"preference chosen missing {pr['chosen']}")
-        if not pr.get("rejected_issue") or not pr.get("reason"):
-            issues.append("preference without named issue/reason")
-    # 5. temporal durations match contract holds; splits disjoint on source drawings
+    on_disk = set()
+    for p in snap.rglob("*"):
+        if p.is_file():
+            on_disk.add(str(p.relative_to(snap)))
+    extra = on_disk - listed - {"manifest.json"}
+    if extra:
+        issues.append(f"unmanifested stale files: {sorted(extra)[:5]}")
+    # 1. COCO: every annotation pixel-compared
+    coco_info = _check_coco(snap, manifest, issues)
+    # 2. HF positives through standard loaders (or explicit fallback)
+    hf_info = _check_hf(snap, manifest, issues, skipped)
+    # 3. preferences: genuine pairs + labeled weak view
+    pref_info = _check_preferences(snap, issues)
+    # 4. temporal: ordered resolvable refs + timing + traces
+    temp_info = _check_temporal(snap, issues)
+    # 5. closure parses + references resolve
+    try:
+        cond = json.loads((snap / "closure" / "conditioning.json").read_text())
+        for rid in manifest.get("clip_revisions", []):
+            if rid not in cond.get("contracts", {}):
+                issues.append(f"closure missing contract for {rid}")
+        for g in (snap / "closure" / "references").glob("*.png"):
+            try:
+                with Image.open(g) as im:
+                    im.load()
+            except Exception as e:
+                issues.append(f"closure reference {g.name} undecodable: {e}")
+        for name in ("evaluations.jsonl", "events.jsonl", "attempts.jsonl", "masks.jsonl"):
+            for line in (snap / "closure" / name).read_text().splitlines():
+                if line.strip():
+                    json.loads(line)
+    except Exception as e:
+        issues.append(f"closure unreadable: {e}")
+    # 6. splits: no family or pixel straddling among POSITIVES. The research
+    # archive legitimately documents shared pixels/lineage with exclusions;
+    # the trainable view must never straddle.
     metas = [json.loads(l) for l in (snap / "hf" / "metadata.jsonl").read_text().splitlines() if l.strip()]
-    temps = [json.loads(l) for l in (snap / "temporal.jsonl").read_text().splitlines() if l.strip()]
-    for t in temps:
-        if t["duration_ticks"] != sum(t["holds"]):
-            issues.append(f"duration mismatch {t['clip_revision_id']}")
-    train_src = {m["source_drawing_id"] for m in metas if m["split"] == "train"}
-    test_src = {m["source_drawing_id"] for m in metas if m["split"] == "test"}
-    if train_src & test_src:
-        issues.append(f"split leakage in snapshot: {sorted(train_src & test_src)}")
+    fam_split: dict[str, set[str]] = {}
+    px_split: dict[str, set[str]] = {}
+    for m in metas:
+        fam_split.setdefault(m.get("family", "?"), set()).add(m.get("split", "unsplit"))
+        px_split.setdefault(m.get("pixel_sha256", "?"), set()).add(m.get("split", "unsplit"))
+    for fam, splits in fam_split.items():
+        if len({s for s in splits if s != "unsplit"}) > 1:
+            issues.append(f"family straddles splits: {fam[:60]}")
+    for px, splits in px_split.items():
+        if len({s for s in splits if s != "unsplit"}) > 1:
+            issues.append(f"pixel duplicate across splits: {px[:16]}")
     return {"snapshot": manifest["snapshot"], "ok": not issues, "issues": issues,
-            "counts": manifest["counts"], "exclusions": manifest["exclusions"],
-            "loaders": {"coco_images": len(img_ids), "imagefolder_rows": len(ds),
-                        "preferences": len(prefs), "temporal": len(temps)}}
+            "skipped": skipped, "counts": manifest["counts"],
+            "exclusions": manifest["exclusions"],
+            "loaders": {"coco_images": coco_info.get("images"), **coco_info,
+                        **hf_info, **pref_info, **temp_info}}

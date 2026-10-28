@@ -69,8 +69,11 @@ def release_eligibility(project_dir: str, revision_id: str) -> dict:
             if stale:
                 eligible = False
                 reasons.append("evidence stale: " + "; ".join(stale[:4]))
-        # exact-revision + exact-evaluation human approval through a packet
+        # exact-revision + exact-evaluation human approval through a packet.
+        # A later reject/needs_changes/reopen for this revision invalidates it:
+        # approval is current acceptance, not a historical event.
         approved = False
+        approved_at = ""
         for r in con.execute("SELECT data FROM review_events").fetchall():
             try:
                 ev = D.ReviewEvent.model_validate_json(r["data"])
@@ -87,10 +90,24 @@ def release_eligibility(project_dir: str, revision_id: str) -> dict:
             pkt = D.ReviewPacket.model_validate_json(json.dumps(pdata))
             if pkt.clip_revision_id == revision_id and pkt.evaluation_id == latest.id:
                 approved = pkt.id
+                approved_at = ev.created_at
                 break
         if not approved:
             eligible = False
             reasons.append("no reviewer approval binds this exact revision+evaluation via a packet")
+        else:
+            for r in con.execute("SELECT data FROM review_events").fetchall():
+                try:
+                    ev = D.ReviewEvent.model_validate_json(r["data"])
+                except Exception:
+                    continue
+                if ev.clip_revision_id != revision_id:
+                    continue
+                if ev.action in ("reject", "needs_changes", "reopen_issue") \
+                        and ev.created_at > approved_at:
+                    eligible = False
+                    reasons.append(f"{ev.action} at {ev.created_at} supersedes the approval")
+                    break
         # unresolved blocking tasks (baseline or attempt references this revision)
         blocking = []
         for r in con.execute("SELECT data FROM correction_tasks").fetchall():
