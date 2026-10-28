@@ -46,7 +46,7 @@ from .. import domain as D
 from .. import storage as S
 from ..checks.raster import alpha_mask, silhouette
 
-DATASET_VERSION = "2.2"
+DATASET_VERSION = "2.3"
 
 _SAFE_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
@@ -226,7 +226,7 @@ def _inputs_digest(snapshot_name: str, clip_revision_ids: list[str],
 
 
 def _explicit_pairs(con, revs: dict, evals: dict, states: dict,
-                    eligible_assets: dict[str, bool]) -> tuple[list[dict], list[dict]]:
+                    eligible_assets: dict[str, bool], trainable_assets: dict[str,bool] | None = None) -> tuple[list[dict], list[dict]]:
     """Explicit CURRENT human comparisons vs technical-ranking weak view.
 
     Explicit: a comparison packet binding chosen+rejected (both selected, same
@@ -285,6 +285,8 @@ def _explicit_pairs(con, revs: dict, evals: dict, states: dict,
         elif not eligible_assets.get(pkt.clip_revision_id, False):
             ok, reason = False, ("chosen revision fails positive asset policy "
                                  "(rights/origin/procedural)")
+        if ok and trainable_assets is not None and not trainable_assets.get(pkt.comparison_revision_id,False):
+            ok,reason=False,'rejected pixels fail training rights/origin/ancestry policy'
         if ok:
             fails = sorted({x.constraint_id for x in rejected_ev.results
                             if x.outcome in ("fail", "error")})
@@ -319,59 +321,12 @@ def build_snapshot(project_dir: str, snapshot_name: str, clip_revision_ids: list
            "seed": 0}
     pol.update(policy or {})
     digest = _inputs_digest(snapshot_name, list(clip_revision_ids), pol)
-    out = Path(out_dir)
-    existing = out / "manifest.json" if out.is_dir() else None
-    if existing and existing.is_file():
-        try:
-            prior = json.loads(existing.read_text())
-            if prior.get("inputs_digest") == digest:
-                return prior
-        except Exception:
-            pass
-    from ..safe_output import prepare_output_dir
-    out = prepare_output_dir(out_dir, replace=bool(pol.get("replace", False)),
-                             tool="framebound-export-snapshot", refuse_inside=project_dir)
-    tmp = out.parent / f"{out.name}.tmp-{uuid.uuid4().hex[:12]}"
-    tmp.mkdir(parents=True)
-    try:
-        manifest = _build_into(project_dir, snapshot_name, clip_revision_ids, tmp, pol,
-                               digest)
-        _self_check(tmp, manifest)
-        # full semantic validation on staging BEFORE publication: never
-        # publish a snapshot our own validator rejects. The completion
-        # marker is staged first so the validator proves atomic
-        # publication, not just file presence.
-        from .validate import validate_snapshot as _validate
-        (tmp / "manifest.json").write_text(json.dumps(manifest, indent=2))
-        marker = {"snapshot": snapshot_name, "inputs_digest": digest,
-                  "manifest_sha256": _h((tmp / "manifest.json").read_bytes()),
-                  "dataset_version": DATASET_VERSION}
-        (tmp / "COMPLETE").write_text(json.dumps(marker, indent=2) + "\n")
-        rep = _validate(str(tmp))
-        if not rep["ok"]:
-            raise ValueError("snapshot failed pre-publish semantic validation: "
-                             + "; ".join(rep["issues"][:6]))
-        manifest["inspection"] = {"imagefolder": rep["loaders"].get("method", "unknown"),
-                                  "skipped": rep.get("skipped", [])}
-        (tmp / "manifest.json").write_text(json.dumps(manifest, indent=2))
-        marker["manifest_sha256"] = _h((tmp / "manifest.json").read_bytes())
-        (tmp / "COMPLETE").write_text(json.dumps(marker, indent=2) + "\n")
-        # atomic publication: out is empty+marked; swap tmp (marker moves too)
-        for child in out.iterdir():
-            if child.is_file() or child.is_symlink():
-                child.unlink()
-            else:
-                shutil.rmtree(child)
-        for child in tmp.iterdir():
-            shutil.move(str(child), str(out / child.name))
-        _record_snapshot(project_dir, snapshot_name, clip_revision_ids, pol, manifest)
-        return manifest
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    from .publication import publish
+    return publish(project_dir,snapshot_name,list(clip_revision_ids),out_dir,pol,digest)
 
 
 def _record_snapshot(project_dir: str, name: str, rids: list[str],
-                     pol: dict, manifest: dict) -> None:
+                     pol: dict, manifest: dict, *, manifest_sha256: str | None = None) -> None:
     from ..checks import evaluate as _EV
     digest = _EV.lock_identity().get("digest") or ""
     pol_summary = json.dumps({"rights_allow": pol.get("rights_allow"),
@@ -382,15 +337,12 @@ def _record_snapshot(project_dir: str, name: str, rids: list[str],
     row = D.ExportSnapshot(id=f"snap-{name}", clip_revision_ids=rids,
                            policy=pol_summary[:500],
                            dependency_lock_id=f"requirements:{digest[:16]}" if digest else "no-lock",
-                           byte_manifest={k: v for k, v in manifest["files"].items()})
+                           byte_manifest={k: v for k, v in manifest["files"].items()},manifest_sha256=manifest_sha256)
     con = S.connect(project_dir)
     try:
-        try:
-            S.insert(con, row)
-        except S.ConflictError:
-            old, ver = S.get(con, "export_snapshots", row.id)
-            if json.loads(json.dumps(old))["byte_manifest"] != row.byte_manifest:
-                raise S.ConflictError(f"snapshot {row.id} already recorded with different content")
+        with S.atomic(con):
+            con.execute('BEGIN IMMEDIATE')
+            S.stage_identical(con,row,('created_at',))
     finally:
         con.close()
 
@@ -405,7 +357,7 @@ def _self_check(tmp: Path, manifest: dict) -> None:
 
 
 def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[str],
-                out: Path, pol: dict, digest: str) -> dict:
+                out: Path, pol: dict, digest: str, connection=None) -> dict:
     from ..services import eligibility as EL
     from ..services import review_state as _RS
     (out / "hf" / "data").mkdir(parents=True, exist_ok=True)
@@ -418,9 +370,10 @@ def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[st
     (out / "closure" / "masks").mkdir(parents=True, exist_ok=True)
     (out / "closure" / "blobs").mkdir(parents=True, exist_ok=True)
     used_names: set[str] = set()
-    con = S.connect(project_dir)
+    owned = connection is None
+    con = connection if connection is not None else S.connect(project_dir)
     try:
-        con.execute("BEGIN IMMEDIATE")
+        con.execute("BEGIN")
         try:
             revs, contracts, evals, states = {}, {}, {}, {}
             for rid in clip_revision_ids:
@@ -457,11 +410,17 @@ def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[st
                         for rid in clip_revision_ids}
             for rid in clip_revision_ids:
                 states[rid] = _RS.current_state_in(con, project_dir, rid)
+            from ..services.provenance import ancestry_in,provenance_index_in
+            family_index=provenance_index_in(con)
             frame_pixels = {}
             for rid in clip_revision_ids:
                 frame_pixels[rid] = {frames[fid]["asset"].pixel_sha256
                                      for fid in revs[rid].frame_instance_ids
                                      if frames[fid]["asset"].pixel_sha256}
+                for fid in revs[rid].frame_instance_ids:
+                    for aid in ancestry_in(con,frames[fid]['asset'].id,index=family_index)['asset_ids']:
+                        parent=family_index[0][aid]
+                        if parent.get('pixel_sha256'):frame_pixels[rid].add(parent['pixel_sha256'])
             families = _union_families(revs, {rid: c.model_dump(mode="json")
                                               for rid, c in contracts.items()},
                                        frame_pixels)
@@ -470,17 +429,17 @@ def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[st
             selected_set = set(clip_revision_ids)
             closure_rows = _collect_closure_rows(con, revs, contracts, evals,
                                                 selected_set, project_dir)
-            eligible_assets = {rid: (eligible[rid]["eligible"]
-                                     and all(frames[f]["asset"].rights in pol["rights_allow"]
-                                             and frames[f]["asset"].id not in simulated
-                                             and (frames[f]["asset"].source_kind != "procedural"
-                                                  or pol["include_procedural_positives"])
-                                             for f in revs[rid].frame_instance_ids))
-                               for rid in revs}
-            pairs, weak = _explicit_pairs(con, revs, evals, states,
-                                          eligible_assets)
+            def trainable_asset(asset):
+                graph=ancestry_in(con,asset.id,index=family_index)
+                origins=set(graph['origins'])
+                return (not graph['issues'] and set(graph['rights'])<=set(pol['rights_allow'])
+                    and not origins & {'simulated-transport','provider-simulated'}
+                    and (pol['include_procedural_positives'] or 'procedural' not in origins))
+            trainable_assets={rid:all(trainable_asset(frames[fid]['asset']) for fid in rev.frame_instance_ids) for rid,rev in revs.items()}
+            eligible_assets={rid:eligible[rid]['eligible'] and trainable_assets[rid] for rid in revs}
+            pairs,weak=_explicit_pairs(con,revs,evals,states,eligible_assets,trainable_assets)
         finally:
-            con.commit()
+            pass  # retain this logical read snapshot through all closure/media reads
         # split membership + family/pixel leakage among POSITIVE candidates
         split_of: dict[str, set[str]] = {}
         for s, ids in (pol["split"] or {}).items():
@@ -700,7 +659,7 @@ def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[st
                               "phase": fi.phase,
                               "registration_id": fi.registration_id,
                               "derivation_recipe": fi.derivation_recipe})
-            trace = _trace_for(project_dir, rid)
+            trace = _trace_for(con, rid)
             temp_rows.append({
                 "clip_revision_id": rid, "contract_revision_id": rev.contract_revision_id,
                 "frames": order, "holds": contract.timing.holds,
@@ -717,7 +676,7 @@ def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[st
                 "evaluation_id": ev.id if ev else None,
                 "technical_status": ev.technical_status.value if ev else "unevaluated"})
         _write_closure(out, manifest_files, exclusions, closure_rows, pol,
-                       used_names, project_dir)
+                       used_names, project_dir,con)
         # write data files
         (out / "coco" / "annotations.json").write_text(json.dumps(
             {"images": coco_images, "annotations": coco_anns,
@@ -766,20 +725,14 @@ def _build_into(project_dir: str, snapshot_name: str, clip_revision_ids: list[st
         (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
         return manifest
     finally:
-        try:
+        if owned:
             con.close()
-        except Exception:
-            pass
 
 
+def _trace_for(con, revision_id: str) -> dict | None:
+    row = con.execute("SELECT data FROM world_traces WHERE id=?",
+                      (f"wtrace-{revision_id}",)).fetchone()
 
-def _trace_for(project_dir: str, revision_id: str) -> dict | None:
-    con = S.connect(project_dir)
-    try:
-        row = con.execute("SELECT data FROM world_traces WHERE id=?",
-                          (f"wtrace-{revision_id}",)).fetchone()
-    finally:
-        con.close()
     if row is None:
         return None
     try:
@@ -795,6 +748,22 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
                           selected: set[str], project_dir: str) -> dict:
     """Selected dependency graph only: every referenced object must resolve
     inside the snapshot or be explicitly recorded as external/nonportable."""
+    revs=dict(revs);contracts=dict(contracts);evals=dict(evals)
+    pending=list(revs)
+    while pending:
+        rid=pending.pop();rev=revs[rid]
+        links=[rev.parent_revision_id]
+        links += [json.loads(r['data']).get('comparison_revision_id') for r in con.execute('SELECT data FROM review_packets')
+                  if json.loads(r['data']).get('clip_revision_id')==rid]
+        for parent in links:
+            if not parent or parent in revs:continue
+            if len(revs)>2048:raise ValueError('closure revision traversal exceeds bound')
+            rv=D.ClipRevision.model_validate(S.get(con,'clip_revisions',parent)[0]);revs[parent]=rv;pending.append(parent)
+            contracts[parent]=D.ClipContractRevision.model_validate(S.get(con,'contract_revisions',rv.contract_revision_id)[0])
+            from ..services.packets import latest_evaluation
+            ev=latest_evaluation(con,parent)
+            if ev:evals[parent]=ev
+    selected=set(revs)
     rows: dict[str, list] = {"contracts": {}, "characters": {},
                              "approvals": {}, "guides": {}, "events": [],
                              "packets": [], "attempts": [], "tasks": [],
@@ -832,7 +801,8 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
             continue
         if ap.get("character_revision_id") not in char_ids:
             continue
-        if ap.get("id") in wanted_approvals or _is_current_approval(con, ap):
+        declared={c.references.get('motion_guide_revision') for c in contracts.values()}
+        if ap.get("id") in wanted_approvals or ap.get('motion_guide_id') in declared:
             rows["approvals"][ap["id"]] = ap
     guide_ids = {ap.get("motion_guide_id") for ap in rows["approvals"].values() if ap.get("motion_guide_id")}
     for r in con.execute("SELECT id, data FROM motion_guides").fetchall():
@@ -848,7 +818,7 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
             e = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
         except Exception:
             continue
-        if e.get("clip_revision_id") in selected or e.get("clip_revision_id") in char_ids:
+        if e.get("clip_revision_id") in selected or e.get('id') in {a['event_id'] for a in rows['approvals'].values()}:
             rows["events"].append(e)
     # packets + tasks + attempts + masks for the selected lineage
     task_ids = set()
@@ -886,12 +856,14 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
             rows["masks"].append(mdata)
     # annotations bound to selected frames/assets
     frame_ids = {fid for rev in revs.values() for fid in rev.frame_instance_ids}
+    frame_assets={S.get(con,'frame_instances',fid)[0]['asset_id'] for fid in frame_ids}
+    annotation_ids={c.annotation_revision_id for contract in contracts.values() for c in contract.constraints if c.annotation_revision_id}
     for r in con.execute("SELECT id, data FROM annotation_revisions").fetchall():
         try:
             adata = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
         except Exception:
             continue
-        if adata.get("frame_instance_id") in frame_ids:
+        if (adata.get('annotator_type')=='human_reviewed' or adata.get('id') in annotation_ids) and (adata.get('frame_instance_id') in frame_ids or adata.get('source_asset_id') in frame_assets):
             rows["annotations"].append(adata)
     for r in con.execute("SELECT id, data FROM world_traces").fetchall():
         try:
@@ -920,6 +892,7 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
             continue
         if bdata.get("contract_revision_id") in {contracts[rid].id for rid in revs}:
             rows["briefs"].append(bdata)
+    _collect_asset_graph(con,rows,revs)
     return rows
 
 
@@ -941,7 +914,7 @@ def _is_current_approval(con, ap: dict) -> bool:
 
 def _write_closure(out: Path, manifest_files: dict, exclusions: list,
                    rows: dict, pol: dict, used_names: set[str],
-                   project_dir: str) -> None:
+                   project_dir: str, con) -> None:
     (out / "closure" / "conditioning.json").write_text(json.dumps(
         {"contracts": rows["contracts"], "characters": rows["characters"],
          "approvals": rows["approvals"], "motion_guides": rows["guides"]},
@@ -958,7 +931,11 @@ def _write_closure(out: Path, manifest_files: dict, exclusions: list,
                        ("masks.jsonl", "masks"), ("packets.jsonl", "packets"),
                        ("tasks.jsonl", "tasks"), ("annotations.jsonl", "annotations"),
                        ("traces.jsonl", "traces"), ("briefs.jsonl", "briefs"),
-                       ("transition_traces.jsonl", "transitions")):
+                       ("transition_traces.jsonl", "transitions"),
+                       ('assets.jsonl','asset_rows'),('jobs.jsonl','jobs'),
+                       ('revisions.jsonl','revisions'),('frames.jsonl','frames'),
+                       ('registrations.jsonl','registrations'),('operations.jsonl','operations'),
+                       ('animation_plans.jsonl','plans'),('provider_grants.jsonl','grants')):
         items = rows.get(key, [])
         (out / "closure" / fname).write_text(
             "\n".join(json.dumps(r, sort_keys=True) for r in items)
@@ -976,37 +953,24 @@ def _write_closure(out: Path, manifest_files: dict, exclusions: list,
             if e.get("asset_id"):
                 ref_aids[e["asset_id"]] = "guide"
     for aid, role in sorted(ref_aids.items()):
-        con = S.connect(project_dir)
-        try:
-            try:
-                adata, _ = S.get(con, "assets", aid)
-            except KeyError:
-                exclusions.append({"asset": aid, "reason": f"{role} asset missing",
-                                   "context": "closure"})
-                continue
-            if adata.get("rights") not in pol["rights_allow"]:
-                exclusions.append({"asset": aid,
-                                   "reason": f"closure {role} rights {adata.get('rights')!r} "
-                                             "not allowed: bytes withheld, metadata kept",
-                                   "context": "closure-rights"})
-                continue
-            dest = out / "closure" / "references" / f"{_safe_name(aid, used_names)}.png"
-            dest.write_bytes(S.blob_path(project_dir, adata["byte_sha256"]).read_bytes())
-        finally:
-            con.close()
+        adata=rows['assets'].get(aid)
+        if adata is None:
+            exclusions.append({'asset':aid,'reason':f'{role} asset missing','context':'closure'})
+            continue
+        if adata.get('rights') not in pol['rights_allow']:
+            exclusions.append({'asset':aid,'reason':'reference rights: bytes withheld from reference view','context':'closure-rights'})
+            continue
+        dest=out/'closure'/'references'/f"{_safe_name(aid,used_names)}.png"
+        dest.write_bytes(S.blob_path(project_dir,adata['byte_sha256']).read_bytes())
+
     for p in sorted((out / "closure" / "references").glob("*.png")):
         manifest_files[f"closure/references/{p.name}"] = _h(p.read_bytes())
-    for m in rows["masks"]:
-        con = S.connect(project_dir)
-        try:
-            try:
-                adata, _ = S.get(con, "assets", m["mask_asset_id"])
-            except KeyError:
-                continue
-            dest = out / "closure" / "masks" / f"{_safe_name(m['id'], used_names)}.png"
-            dest.write_bytes(S.blob_path(project_dir, adata["byte_sha256"]).read_bytes())
-        finally:
-            con.close()
+    for m in rows['masks']:
+        adata=rows['assets'].get(m['mask_asset_id'])
+        if adata is None:continue
+        dest=out/'closure'/'masks'/f"{_safe_name(m['id'],used_names)}.png"
+        dest.write_bytes(S.blob_path(project_dir,adata['byte_sha256']).read_bytes())
+
     for p in sorted((out / "closure" / "masks").glob("*.png")):
         manifest_files[f"closure/masks/{p.name}"] = _h(p.read_bytes())
     # evidence + provider blobs: every referenced object resolves in-snapshot
@@ -1020,30 +984,11 @@ def _copy_closure_blobs(out: Path, manifest_files: dict, exclusions: list,
         digest = ev.get("evidence_manifest_sha256")
         if digest:
             wanted[digest] = "evidence-manifest"
-    for adata in rows.get("attempts", []):
-        for key in ("request_sha256",):
-            pass
-    # provider request/response artifacts linked from generating jobs are
-    # recorded here when the job row names them; jobs themselves are not
-    # portable rows, so link by digest reference collected below.
-    con = S.connect(project_dir)
-    try:
-        try:
-            job_rows = con.execute("SELECT data FROM jobs").fetchall()
-        except Exception:
-            job_rows = []
-        for r in job_rows:
-            try:
-                job = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
-            except Exception:
-                continue
-            names = set(job.get("output_asset_ids") or [])
-            for digest_key in ("request_artifact", "response_artifact"):
-                d = job.get(digest_key)
-                if d:
-                    wanted[d] = f"provider-{digest_key}"
-    finally:
-        con.close()
+    for asset in rows.get('assets',{}).values():
+        wanted[asset['byte_sha256']]='asset'
+    for job in rows.get('jobs',[]):
+        for key in ('request_artifact','response_artifact'):
+            if job.get(key):wanted[job[key]]='provider-'+key
     # evaluation objects referenced by preferences/packets resolve via
     # evaluations.jsonl already staged above; blobs carry the bytes.
     for digest, role in sorted(wanted.items()):
@@ -1054,7 +999,9 @@ def _copy_closure_blobs(out: Path, manifest_files: dict, exclusions: list,
                                "context": "closure"})
             continue
         dest = out / "closure" / "blobs" / digest
-        dest.write_bytes(blob.read_bytes())
+        raw=blob.read_bytes()
+        if _h(raw)!=digest:raise ValueError('closure blob address mismatch: '+digest)
+        dest.write_bytes(raw)
         manifest_files[f"closure/blobs/{digest}"] = _h(dest.read_bytes())
 
 
@@ -1098,3 +1045,44 @@ def _rev_files(out: Path, rid: str, frames: dict,
         if p.is_file():
             rows.append({"file": rel, "sha256": _h(p.read_bytes())})
     return rows
+
+
+def _collect_asset_graph(con,rows,revs):
+    """Walk selected frame/control/operation parents; never copy the project job table."""
+    frames=[];registrations=[];roots=set()
+    for rev in revs.values():
+        for fid in rev.frame_instance_ids:
+            fi=S.get(con,'frame_instances',fid)[0];frames.append(fi);roots.add(fi['asset_id'])
+            try:registrations.append(S.get(con,'registrations',fi['registration_id'])[0])
+            except KeyError:pass
+    for c in rows['characters'].values():roots.update(c.get('identity_asset_ids',[])+c.get('style_asset_ids',[]))
+    for g in rows['guides'].values():
+        for entry in g.get('entries',[]):
+            roots.update(entry.get(k) for k in ('asset_id','editable_mask_asset_id','protected_mask_asset_id') if entry.get(k))
+    for m in rows['masks']:roots.add(m['mask_asset_id'])
+    for ann in rows['annotations']:
+        roots.add(ann['source_asset_id'])
+        if ann.get('mask_asset_id'):roots.add(ann['mask_asset_id'])
+    assets={};pending=list(roots)
+    all_jobs={r['id']:json.loads(r['data']) for r in con.execute('SELECT id,data FROM jobs')}
+    jobs={}
+    while pending:
+        aid=pending.pop()
+        if aid in assets:continue
+        asset=S.get(con,'assets',aid)[0];assets[aid]=asset
+        if len(assets)>100000:raise ValueError('asset closure exceeds bound')
+        pending.extend(asset.get('parent_asset_ids',[]))
+        for jid,job in all_jobs.items():
+            if jid==asset.get('source_job_id') or aid in job.get('output_asset_ids',[]):
+                jobs[jid]=job
+                source=(job.get('provider_settings') or {}).get('source_asset_id')
+                if source:pending.append(source)
+    rows['assets']=assets;rows['asset_rows']=list(assets.values());rows['jobs']=list(jobs.values())
+    grant_ids={(j.get('provider_settings') or {}).get('grant_id') for j in jobs.values()}
+    rows['grants']=[json.loads(r['data']) for r in con.execute('SELECT id,data FROM provider_grants') if r['id'] in grant_ids]
+    rows['frames']=frames;rows['registrations']=registrations
+    rows['revisions']=[r.model_dump(mode='json') for r in revs.values()]
+    op_ids={a.get('operation_id') for a in assets.values() if a.get('operation_id')}
+    rows['operations']=[json.loads(r['data']) for r in con.execute('SELECT id,data FROM authorized_operations') if r['id'] in op_ids]
+    plan_ids={o['compiled_plan_id'] for o in rows['operations']}
+    rows['plans']=[json.loads(r['data']) for r in con.execute('SELECT id,data FROM compiled_animation_plans') if r['id'] in plan_ids]

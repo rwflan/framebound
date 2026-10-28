@@ -150,7 +150,7 @@ def main(argv=None):
     ex.add_argument("--out", required=True); ex.add_argument("--revisions", required=True)
     ex.add_argument("--policy", required=False, default=None)
     ex.add_argument("--replace", action="store_true", default=False,
-                    help="replace a previous framework-owned snapshot output (refuses unmarked dirs)")
+                    help="legacy flag; immutable snapshots require a new name and destination")
     dv = sub.add_parser("dataset-validate", help="v2: validate a snapshot with standard loaders")
     dv.add_argument("--snapshot", required=True)
     rr = sub.add_parser("recorded-run", help="v2: DEPRECATED historical provider bundle (retired Spark gate; use offline check/repair + explicit providers)")
