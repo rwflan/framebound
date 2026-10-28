@@ -166,13 +166,18 @@ def submit_critique(contract_summary: str, fault_codes: list[str],
         return {"mode": "not_configured", "sent": False, "request_artifact": digest,
                 "note": "Advisory only; deterministic checks remain the gate.",
                 "wire_model": req["model"]}
+    req_digest = record_artifact(project_dir, "spark_request",
+                                 {"request": redacted, "sent": True,
+                                  "model": req["model"]},
+                                 provider="spark", model=req["model"])
     def _send():
         return http_post(W.RESPONSE_PATH, req, timeout=timeout, transport=transport)
     body, _tries = retry_transient(_send)
     parsed = parse_response(body)
     outputs = execute_tool_calls(parsed["calls"], handlers=handlers or {})
     digest = record_artifact(project_dir, "spark_response",
-                             {"request": redacted, "sent": True, "model": req["model"],
+                             {"request_artifact": req_digest,
+                              "request": redacted, "sent": True, "model": req["model"],
                               "response_id": parsed["response_id"],
                               "call_count": len(parsed["calls"]),
                               "output_ids": [o["call_id"] for o in outputs]},
@@ -182,7 +187,8 @@ def submit_critique(contract_summary: str, fault_codes: list[str],
     # the outputs above); report the prepared follow-up without auto-spending.
     follow_up = {"previous_response_id": parsed["response_id"],
                  "input": outputs} if outputs and max_turns > 1 else None
-    return {"mode": "live", "sent": True, "response_artifact": digest,
+    return {"mode": "live", "sent": True, "request_artifact": req_digest,
+            "response_artifact": digest,
             "response_id": parsed["response_id"], "calls": parsed["calls"],
             "text": parsed["text"], "tool_outputs": outputs,
             "follow_up": follow_up,

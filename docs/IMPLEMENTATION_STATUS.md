@@ -5,6 +5,73 @@ Baseline: `b680d84` (audited main, 2026-10-27). `main` has not advanced since th
 Prior ledger entries below are historical. The earlier "64 passing tests" and "engineering complete except
 for entrant actions" claims are NOT accepted as proof; each remediation package re-proves its gate.
 
+## Current package: R7 — demonstration as evidence (done on branch `codex/r7-demo-evidence`, 2026-10-28)
+
+Acceptance gate: the suite still catches controlled faults but emits no human labels;
+declared flight/support semantics exercised through presented pixels; all eight run phases
+plus held-tick boundaries covered by measured (not assigned) traces; a recorded-run
+harness produces reference inputs, request/response/output bytes, failures, repair
+evidence, a review packet and honest unreviewed status — or a pending bundle naming the
+exact blocker. All demonstrated.
+
+### Changed capability
+
+- `demo_character.py`: far-foot lift per phase; jump rise/apex/fall genuinely airborne
+  (support pixels 0,0,0) while crouch/launch/land stay planted; run/attack/idle keep a
+  planted foot in every phase per their continuous-contact schedule. `build_character`
+  returns scoped counts that never double-count (22 independent clip rasters, 6 transition
+  drawings, 24 presented samples) with explicit identity/style and transition overlaps.
+- `demo_wp6.py`: imports as source_kind=procedural/rights=original (no more original-
+  masquerade around the procedural policy); real evaluated transition contracts (all pass);
+  16 measured interruption traces over every slot interior + every held-tick boundary with
+  per-trace departure/entry hashes, entry-policy verification, preserved flags computed
+  from pixels, and contact-continuity counts (`transition_traces.json` persisted); check
+  profile documented with coverage per clip (palette/phase checks excluded for lack of
+  independent guides — recorded, not silently skipped); NO scripted reviewer approval —
+  packet pkt-run-01 stays UNREVIEWED with a pending-decision note; export reflects the
+  unreviewed state (research, 0 positives, exclusions explain).
+- `recorded_run.py` (new) + `recorded-run` CLI: one genuine generated-character workflow.
+  Offline/keyless → pending bundle naming MODEL_API_KEY + prepared brief/references, zero
+  network, zero invented rows. Live/fake transport → generated asset import, registered
+  candidate revision, evaluation, comparison packet; failures recorded with status
+  recorded-failure, never retried or cherry-picked; origin labeled live vs
+  provider-simulated; acceptance always unreviewed. Spark/SAM live paths now also persist
+  the redacted request artifact (R3 capture rule completed).
+- `tests/test_v2_demo.py` rewritten to evidence semantics: scoped counts, evaluated
+  transitions, no-approval assertion (fails on any approve event), procedural labeling,
+  run-contact/jump-flight pixel truth, measured 16-trace interruption coverage, injected
+  pulse fault failing `torso_span` as a labeled regression with demo totals untouched,
+  offline-pending and simulated-bundle recorded-run cases.
+
+### Failing repros fixed (reproduced before fixing)
+
+- Scripted `Actor(type='reviewer')` self-approval + "human decision recorded" claim →
+  removed; suite asserts zero approve events and UNREVIEWED status (pinned).
+- One far foot grounded in every jump phase with flight waivers → genuinely airborne
+  rise/apex/fall (0 support px) verified per slot (pinned).
+- `preserved=True`/always-attack:0 assigned booleans + 7-tick phase gaps →
+  16 measured traces over all slots + boundaries with computed flags (pinned).
+- Mixed incompatible totals (24 vs 22, transitions uncounted) → scoped counts with
+  explicit overlaps; injected faults kept out of demo totals (pinned).
+- Procedural art as `source_kind=original` bypassing positive policy → procedural +
+  rights=original; export correctly yields research-only positives=0 (pinned).
+
+### Actual commands/results (2026-10-28, Dublin; python 3.11.4)
+
+- `python -m pytest tests/ -q` → `156 passed, 1 skipped` (151 prior + 12 new R7 − 7 rewritten).
+- `sh scripts/verify-local` → `ALL LOCAL CHECKS PASSED`, exit 0 (incl. browser journey).
+- Demo: clips run/jump/attack/idle all pass with coverage; transitions all pass;
+  snapshot research-only (0 positives, exclusions explain; approval pending).
+
+### Artifacts / limitations / next
+
+- Limitations: the recorded LIVE run (origin=live) still needs an authorized participant
+  credential — the harness is ready, the pending bundle names the exact blocker; genuine
+  visual decisions need a real reviewer on pkt-run-01; `world_positions`/`planted` traces
+  remain explicitly missing (temporal schema); docs-vs-reality audit + public-service
+  benchmark + submission/portal work remain R8.
+- Next: R8 — re-audit the release and handle real external blockers.
+
 ## Current package: R6 — the actual review experience (done on branch `codex/r6-review-desk`, 2026-10-28)
 
 Acceptance gate (browser, real services/transports, disposable data): packet opens with
