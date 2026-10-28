@@ -217,8 +217,16 @@ class TestDocumentedWire(unittest.TestCase):
         rec = parsed["records"][0]
         self.assertEqual(rec["box"]["x1"], 2)
         self.assertEqual(bytes(rec["mask"]["raster"]), raster)
+        # empty lane + completed response = valid no-match; anything else
+        # (failed status, or unconfirmed completion) is never a no-match
         self.assertEqual(W.parse_sam_output_text("", source_width=8,
-                                                 source_height=8)["outcome"], "no_match")
+                                                 source_height=8,
+                                                 status="completed")["outcome"], "no_match")
+        self.assertEqual(W.parse_sam_output_text("", source_width=8,
+                                                 source_height=8,
+                                                 status="failed")["outcome"], "failed")
+        self.assertEqual(W.parse_sam_output_text("", source_width=8,
+                                                 source_height=8)["outcome"], "corrupt")
         bad_box = _sam_line(0, [(0, (6, 6, 4, 4, 8, 8), (8, 8, "~", payload))])
         self.assertEqual(SAM.parse_output_text(bad_box)["outcome"], "corrupt")
         self.assertEqual(SAM.parse_output_text("<bad line")["outcome"], "corrupt")

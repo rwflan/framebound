@@ -269,7 +269,14 @@ def orchestrator_send(project_dir: str, run_id: str, job_id: str, brief: dict | 
         raise
     # Build the exact wire request pre-send so the intent artifact is the
     # redacted request (never overwritten by the response artifact later).
-    req = img.build_request(effective, resolved)
+    # An edit-chain job refines its prior response instead of regenerating.
+    prev = (job.provider_settings or {}).get("previous_response_id")
+    if prev:
+        change = (job.provider_settings or {}).get(
+            "edit_instruction", "bounded patch within the approved scope")
+        req = img.build_edit_request(prev, change, extra_blobs=resolved)
+    else:
+        req = img.build_request(effective, resolved)
     from ..providers import ledger as _ledger
     from ..providers import wire as _W
     intent = _ledger.record_artifact(
@@ -293,7 +300,8 @@ def orchestrator_send(project_dir: str, run_id: str, job_id: str, brief: dict | 
     jver = _mark_dispatched(project_dir, job_id, jver)
     try:
         res = img.submit_resolved(effective, resolved, project_dir,
-                                  job.idempotency_key, job_offline=job.offline,
+                                  job.idempotency_key, req=req,
+                                  job_offline=job.offline,
                                   transport=transport, timeout=timeout)
     except InvalidInput as e:
         out = J.job_complete_failure(project_dir, job_id, worker_id=worker_id,
@@ -334,6 +342,10 @@ def orchestrator_send(project_dir: str, run_id: str, job_id: str, brief: dict | 
         # Response evidence lives in its own link; the pre-send intent keeps
         # the request slot. Neither overwrites the other.
         job3.response_artifact = res.get("response_artifact")
+        # Explicit execution origin travels with the job: simulated transports
+        # are never live provider evidence (exports enforce this).
+        if res.get("origin"):
+            job3.origin = res["origin"]
         job3.cost_actual = json.dumps(res.get("usage") or {})[:200]
         if job3.payload_sha256 not in job3.no_progress_signatures:
             job3.no_progress_signatures = [*job3.no_progress_signatures, job3.payload_sha256]
@@ -341,7 +353,24 @@ def orchestrator_send(project_dir: str, run_id: str, job_id: str, brief: dict | 
     finally:
         con.close()
     _bump_run(project_dir, run_id)
-    return {"run_id": run_id, "job_id": job_id, "action": "succeeded", **done}
+    out = {"run_id": run_id, "job_id": job_id, "action": "succeeded", **done}
+    # Surface the provider response identity for edit chains and receipts,
+    # even when the completion envelope omits it.
+    if not out.get("response_id"):
+        con = S.connect(project_dir)
+        try:
+            job4, _ = _get_job(con, job_id)
+        finally:
+            con.close()
+        if job4.response_artifact:
+            from ..providers import ledger as _ledger
+            try:
+                payload = _ledger.load_artifact(project_dir,
+                                                job4.response_artifact).get("payload", {})
+                out["response_id"] = payload.get("request_id") or payload.get("response_id")
+            except Exception:
+                pass
+    return out
 
 
 def _bump_run(project_dir: str, run_id: str) -> None:

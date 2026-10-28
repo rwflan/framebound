@@ -485,6 +485,7 @@ class Job(Strict):
     no_progress_signatures: list[str] = Field(default_factory=list)
     request_brief: dict[str, Any] = Field(default_factory=dict)
     provider_settings: dict[str, Any] = Field(default_factory=dict)
+    origin: str = Field(default="unknown", max_length=64)
     fencing_token_sha256: str = ""
     dispatch_count: int = Field(default=0, ge=0)
     reserved_cost: str = Field(default="unbounded-note", max_length=200)
