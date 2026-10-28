@@ -166,11 +166,32 @@ def create_app(project_dir: str) -> FastAPI:
         return {"ok": True, "schema_version": "2.0"}
 
     @app.post("/api/reviewer/pair", status_code=201)
-    def reviewer_pair(body: PairBody):
-        """Local operator pairs a human reviewer id; returns a single-use code."""
+    def reviewer_pair(body: PairBody,
+                      x_operator_secret: str | None = Header(default=None)):
+        """Operator-only pairing: requires FRAMEBOUND_OPERATOR_SECRET.
+
+        Anonymous HTTP clients and model grants cannot mint reviewer codes.
+        The operator console uses `framebound reviewer-pair` (same gate).
+        """
         from ..services import sessions as SN
         try:
-            return SN.pair_reviewer(project_dir, body.reviewer_id)
+            return SN.pair_reviewer(project_dir, body.reviewer_id,
+                                    operator_credential=x_operator_secret or "")
+        except AuthorizationError as e:
+            raise HTTPException(403, str(e))
+        except InvalidInput as e:
+            raise HTTPException(422, str(e))
+
+    @app.post("/api/reviewer/revoke", status_code=200)
+    def reviewer_revoke(body: dict,
+                        x_operator_secret: str | None = Header(default=None)):
+        """Operator revokes a reviewer session token so it stops authorizing."""
+        from ..services import sessions as SN
+        try:
+            return SN.revoke_session(project_dir, str(body.get("session_token", "")),
+                                     operator_credential=x_operator_secret or "")
+        except AuthorizationError as e:
+            raise HTTPException(403, str(e))
         except InvalidInput as e:
             raise HTTPException(422, str(e))
 
@@ -782,9 +803,37 @@ def create_app(project_dir: str) -> FastAPI:
                 app.state.subscribers.remove(q)
         return StreamingResponse(gen(), media_type="text/event-stream")
 
+    @app.get("/api/build-identity")
+    def build_identity():
+        from ..checks import evaluate as _EV
+        ident = _EV.lock_identity()
+        desk = _desk_dir() is not None
+        return {"lock": ident, "desk_build_present": desk,
+                "schema_version": "2.0"}
+
     # Serve the built review desk LAST so the "/" mount cannot shadow /api routes.
-    dist = Path(__file__).resolve().parents[3] / "web" / "dist"
-    if dist.is_dir():
+    dist = _desk_dir()
+    if dist is not None:
         from fastapi.staticfiles import StaticFiles
         app.mount("/", StaticFiles(directory=str(dist), html=True), name="desk")
     return app
+
+
+def _desk_dir():
+    """Resolve the review-desk build without searching unrelated parents.
+
+    Order: installed package resource `framebound/desk` (wheel), then the
+    source-checkout `web/dist` next to the repository root. Returns None when
+    neither exists so / returns 404 JSON instead of an unrelated directory.
+    """
+    try:
+        from importlib import resources as _res
+        desk = _res.files("framebound") / "desk" / "index.html"
+        if desk.is_file():
+            return desk.parent
+    except Exception:
+        pass
+    candidate = Path(__file__).resolve().parents[3] / "web" / "dist"
+    if (candidate / "index.html").is_file():
+        return candidate
+    return None

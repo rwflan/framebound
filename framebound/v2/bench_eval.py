@@ -92,12 +92,24 @@ def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5) -> dict:
     # incremental: one changed frame as a new revision (full-matrix re-run;
     # invalidation is whole-revision — the evaluator does not do incremental
     # frame caching, reported honestly here, not hidden)
+    from PIL import Image as _Image
     src = Path(td) / "src"
     from .checks import fixtures as F  # noqa: F401 (fixtures already built)
-    import shutil
     var_src = src / "frames" / "clean-0.png"
-    var_bytes = Path(var_src).read_bytes()
-    Path(td, "variant.png").write_bytes(var_bytes)
+    with _Image.open(var_src).convert("RGBA") as im:
+        from PIL import ImageDraw as _Draw
+        # Genuine pixel change: paint an opaque red square over the center so
+        # the canonical pixel hash differs (transparent-corner edits would be
+        # normalized away by canonical transparent-RGB handling).
+        d = _Draw.Draw(im)
+        w, h = im.size
+        d.rectangle([w // 4, h // 4, w // 4 + 16, h // 4 + 16], fill=(255, 0, 0, 255))
+        im.save(Path(td) / "variant.png")
+    from .media.canonical import pixel_sha256 as _pxh, canonical_pixels as _canon
+    with _Image.open(var_src).convert("RGBA") as _orig, \
+            _Image.open(Path(td) / "variant.png").convert("RGBA") as _var:
+        assert _pxh(_canon(_orig)) != _pxh(_canon(_var)), \
+            "benchmark variant must change actual pixels (pixel hash must differ)"
     assets.import_asset(td, str(Path(td) / "variant.png"), "f0-variant",
                         source_kind="procedural", rights="original")
     clips.create_revision(td, "c-bench", "rev-bench-inc",
@@ -130,9 +142,11 @@ def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5) -> dict:
                      "cpu_count": multiprocessing.cpu_count()},
         "workload": {"frames": 8, "resolution": [64, 64], "holds": [4] * 8,
                      "checks_included": ["native_registration", "silhouette_area",
-                                         "locked_cadence", "provenance_coverage"],
-                     "checks_excluded": "guide-dependent appearance/phase checks need "
-                     "independent guides (unmeasured here, honestly reported)"},
+                                         "locked_cadence"],
+                     "checks_excluded": "provenance_coverage is not enabled by this "
+                     "contract and is never reported as executed; guide-dependent "
+                     "appearance/phase checks need independent guides (unmeasured "
+                     "here, honestly reported)"},
         "technical_status": tech,
         "cold_ms": {"n": len(cold), "p50": round(_p(0.5, cold), 1),
                     "p95": round(_p(0.95, cold), 1)},
