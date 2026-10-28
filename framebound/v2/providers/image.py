@@ -158,6 +158,10 @@ def submit(brief: dict, reference_blobs: list[dict], project_dir: str,
                 "wire_image_parts": sum(1 for m in req["input"] for c in m["content"]
                                         if c.get("type") == "input_image")}
     payload = req
+    req_digest = record_artifact(project_dir, "image_request",
+                                 {"idempotency_key": idempotency_key, "request": redacted,
+                                  "sent": True, "model": req["model"]},
+                                 provider="image", model=req["model"])
     (body, _tries) = (None, 0)
     from .base import retry_transient
     def _send():
@@ -172,6 +176,7 @@ def submit(brief: dict, reference_blobs: list[dict], project_dir: str,
     blob_digest = S.store_blob(project_dir, first["bytes"])
     digest = record_artifact(project_dir, "image_response",
                              {"idempotency_key": idempotency_key,
+                              "request_artifact": req_digest,
                               "request": redacted, "sent": True,
                               "model": req["model"],
                               "response_id": parsed["response_id"],
@@ -183,7 +188,8 @@ def submit(brief: dict, reference_blobs: list[dict], project_dir: str,
                               "image_items": len(parsed["images"])},
                              provider="image", model=req["model"],
                              request_id=str(parsed["response_id"] or ""))
-    return {"mode": "live", "sent": True, "response_artifact": digest,
+    return {"mode": "live", "sent": True, "request_artifact": req_digest,
+            "response_artifact": digest,
             "response_id": parsed["response_id"], "usage": parsed["usage"],
             "output_blob": blob_digest, "output_mime": meta["mime"],
             "output_size": [meta["width"], meta["height"]],
