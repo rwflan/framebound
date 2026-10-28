@@ -100,6 +100,7 @@ def main(argv=None):
         ("mask-approve", "v2: reviewer-approve an edit mask (needs session token)", [("--project", True), ("--issue", True), ("--mask-asset", True), ("--slots", True), ("--session-token", False)]),
         ("issue-reopen", "v2: reviewer-reopen a resolved issue (needs session token)", [("--project", True), ("--issue", True), ("--session-token", False)]),
         ("eligibility", "v2: release eligibility for a revision", [("--project", True), ("--revision-id", True)]),
+        ("world-trace-record", "v2: store frozen per-tick world grounding", [("--project", True), ("--revision-id", True), ("--positions", True), ("--planted", True)]),
         ("packet-create", "v2: curate a review packet", [("--packet-id", True), ("--revision-id", True), ("--evaluation-id", True), ("--project", True), ("--intent", False)]),
         ("corrections-list", "v2: list open correction tasks", [("--project", True)]),
     ]:

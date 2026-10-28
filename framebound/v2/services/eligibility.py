@@ -12,20 +12,11 @@ needs a decision bound to the exact revision+evaluation through a packet.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 
 from .. import domain as D
 from .. import storage as S
 from . import packets as P
-
-
-def _manifest_bytes(project_dir: str, ev: D.Evaluation) -> dict | None:
-    try:
-        raw = S.blob_path(project_dir, ev.evidence_manifest_sha256).read_bytes()
-        return json.loads(raw.decode())
-    except Exception:
-        return None
 
 
 def release_eligibility(project_dir: str, revision_id: str) -> dict:
@@ -48,27 +39,14 @@ def release_eligibility(project_dir: str, revision_id: str) -> dict:
         if latest.coverage_status != D.CoverageStatus.COMPLETE:
             eligible = False
             reasons.append(f"coverage is {latest.coverage_status.value}, not complete")
-        manifest = _manifest_bytes(project_dir, latest)
-        if manifest is None:
+        # One shared verifier: manifest address, candidate/reference bytes +
+        # pixels, relevant annotations, analyzer and lock identity. A stored
+        # JSON flag or a matching status field never substitutes for it.
+        from . import evidence as _EV
+        verdict, problems = _EV.verify_evidence(project_dir, revision_id, latest)
+        if not verdict:
             eligible = False
-            reasons.append("evidence manifest blob missing from the store")
-        else:
-            stale = []
-            frames = manifest.get("frames", [])
-            for i, fid in enumerate(rev.frame_instance_ids):
-                try:
-                    fdata, _ = S.get(con, "frame_instances", fid)
-                    fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
-                    adata, _ = S.get(con, "assets", fi.asset_id)
-                except KeyError:
-                    stale.append(f"slot {i}: record missing")
-                    continue
-                want = (frames[i].get("byte_sha256") if i < len(frames) else None)
-                if adata["byte_sha256"] != want:
-                    stale.append(f"slot {i}: bytes changed since evaluation")
-            if stale:
-                eligible = False
-                reasons.append("evidence stale: " + "; ".join(stale[:4]))
+            reasons.append("evidence invalid: " + "; ".join(problems[:4]))
         # exact-revision + exact-evaluation human approval through a packet.
         # A later reject/needs_changes/reopen for this revision invalidates it:
         # approval is current acceptance, not a historical event.

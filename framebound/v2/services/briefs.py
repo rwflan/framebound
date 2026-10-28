@@ -59,7 +59,56 @@ def compile_reference_brief(project_dir: str, contract_id: str, slot: int) -> di
         approvals_map = {aid: {"approved": True, "event_id": approval.event_id}
                          for aid in assets}
         bundle = compile_brief(contract, slot, assets, approvals_map, phase_authority)
+        # Bind the phase guide pixels into the bundle itself (asset identity +
+        # hashes, not just the text label) so every consumer sees which exact
+        # approved pixels condition this slot.
+        for item in bundle.bundle.get("inputs", []):
+            if item.get("role") == "phase_authority" and not item.get("asset_id"):
+                item["asset_id"] = gentry.asset_id
+                item["byte_sha256"] = gentry.byte_sha256
+                item["pixel_sha256"] = gasset.pixel_sha256
+        # Freeze the exact authority binding: the stored CompiledBrief is the
+        # only submittable request. It pins approval/guide/phase-asset hashes
+        # so a later re-approval cannot silently reinterpret this conditioning,
+        # and a caller-authored dict can never confer authority.
+        import hashlib as _h2
+        brief_digest = _h2.sha256(
+            json.dumps(bundle.bundle, sort_keys=True).encode()).hexdigest()
+        cb = D.CompiledBrief(
+            id=f"cbrief-{brief_digest[:24]}",
+            contract_revision_id=contract.id,
+            character_revision_id=contract.character_revision_id,
+            approval_id=approval.id, approval_event_id=approval.event_id,
+            motion_guide_id=guide.id, slot=slot, phase=entry.phase,
+            phase_asset_id=gentry.asset_id, phase_byte_sha256=gentry.byte_sha256,
+            identity_asset_id=contract.references["identity"],
+            style_asset_id=contract.references["style"],
+            brief_digest=brief_digest, brief=bundle.bundle)
+        with S.atomic(con):
+            try:
+                S.stage(con, cb)
+            except S.ConflictError:
+                pass  # identical conditioning already frozen; reuse it
     finally:
         con.close()
+    bundle.bundle["compiled_brief_id"] = cb.id
     return {"conditioning_sha256": bundle.conditioning_sha256, "brief": bundle.bundle,
-            "approval_id": approval.id, "motion_guide_id": approval.motion_guide_id}
+            "approval_id": approval.id, "motion_guide_id": approval.motion_guide_id,
+            "compiled_brief_id": cb.id, "phase_asset_id": gentry.asset_id,
+            "phase_byte_sha256": gentry.byte_sha256}
+
+
+def load_compiled_brief(project_dir: str, compiled_brief_id: str) -> D.CompiledBrief:
+    """Load the frozen conditioning a submission must reference."""
+    con = S.connect(project_dir)
+    try:
+        try:
+            data, _ = S.get(con, "compiled_briefs", compiled_brief_id)
+        except KeyError:
+            raise InvalidInput(
+                f"unknown compiled brief {compiled_brief_id}: compile against stored "
+                "human approval first; caller-authored briefs confer no authority")
+        return D.CompiledBrief.model_validate_json(json.dumps(data))
+    finally:
+        con.close()
+

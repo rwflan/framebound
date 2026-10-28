@@ -162,7 +162,9 @@ class TestDocumentedWire(unittest.TestCase):
             self.assertIn("approved_identity", text)
             self.assertIn("approved_style", text)
             imgs = [c for c in user["content"] if c["type"] == "input_image"]
-            self.assertEqual(len(imgs), 2)
+            # identity + style + approved phase-guide pixels (F02: the model
+            # receives guide pixels, not just a text label)
+            self.assertEqual(len(imgs), 3)
             for part, r in zip(imgs, resolved):
                 raw = base64.b64decode(part["image_url"].split(",", 1)[1])
                 self.assertEqual(hashlib.sha256(raw).hexdigest(), r["byte_sha256"])
@@ -331,7 +333,8 @@ class TestDurableJobs(unittest.TestCase):
                 # the transmitted pixels were the stored approved pixels
                 sent_images = [c for m in seen2["body"]["input"] for c in m["content"]
                                if c.get("type") == "input_image"]
-                self.assertEqual(len(sent_images), 2)
+                # identity + style + approved phase-guide pixels
+                self.assertEqual(len(sent_images), 3)
 
     def test_idempotency_and_payload_conflict(self):
         from framebound.v2.services import jobs as J

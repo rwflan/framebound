@@ -395,6 +395,23 @@ def create_app(project_dir: str) -> FastAPI:
         return C.reopen_issue(project_dir, actor(x_session_token, x_actor_id),
                               event_id, body.note)
 
+    @app.post("/api/world-trace", status_code=201)
+    def world_trace(body: dict):
+        """Store frozen per-tick world grounding (positions + planted per tick).
+
+        Length must equal the contract's total held ticks; evaluation binds
+        it to world_sliding/declared_contacts instead of passing silently.
+        """
+        from ..services import clips as _CL
+        try:
+            wt = _CL.record_world_trace(
+                project_dir, str(body.get("revision_id", "")),
+                list(body.get("positions", [])), list(body.get("planted", [])),
+                str(body.get("units", "world_units")))
+        except InvalidInput as e:
+            raise HTTPException(422, str(e))
+        return json.loads(wt.model_dump_json())
+
     @app.get("/api/eligibility/{revision_id}", response_model=EligibilityDto)
     def eligibility(revision_id: str):
         from ..services import eligibility as E

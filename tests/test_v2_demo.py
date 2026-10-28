@@ -272,7 +272,8 @@ class RecordedRun(unittest.TestCase):
             self.assertEqual(out["origin"], "provider-simulated")
             self.assertNotEqual(out["origin"], "live")
             self.assertEqual(out["acceptance"], "unreviewed")
-            self.assertEqual(seen["n_images"], 2)
+            # identity + style + approved phase-guide pixels
+            self.assertEqual(seen["n_images"], 3)
             self.assertTrue((Path(td) / "bundle.json.output.png").is_file())
             con = S.connect(td)
             try:
