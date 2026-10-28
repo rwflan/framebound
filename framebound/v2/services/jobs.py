@@ -21,6 +21,8 @@ from .. import domain as D
 from .. import storage as S
 from .errors import InvalidInput
 
+MAX_TARGET_ATTEMPTS = 3
+
 TERMINAL = {D.JobStatus.SUCCEEDED, D.JobStatus.FAILED,
             D.JobStatus.CANCELLED}
 
@@ -140,28 +142,66 @@ def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict]
     if not isinstance(max_attempts, int) or isinstance(max_attempts, bool) \
             or not (1 <= max_attempts <= 10):
         raise InvalidInput("max_attempts must be an int in 1..10")
+    allowed_settings={'model','transport','base_url','grant_id','previous_response_id','edit_instruction',
+                      'max_spend_usd','provider','source_asset_id','prompt'}
+    if provider_settings is not None:
+        if not isinstance(provider_settings,dict) or set(provider_settings)-allowed_settings:
+            raise InvalidInput('unknown provider settings; credentials never belong in a job')
+        if provider_settings.get('max_spend_usd') is not None:
+            from decimal import Decimal,InvalidOperation
+            try:amount=Decimal(str(provider_settings['max_spend_usd']).removeprefix('usd-'))
+            except InvalidOperation as exc:raise InvalidInput('invalid money ceiling') from exc
+            if not amount.is_finite() or amount<=0:raise InvalidInput('invalid/zero money ceiling')
     resolved = _resolve_references(project_dir, brief, reference_blobs or [])
     from ..providers import image as _imgmod
+    provider=(provider_settings or {}).get('provider','image')
+    if provider not in ('image','sam'):raise InvalidInput('unsupported specialist provider')
+    from ..providers import sam
+    import os
+    default_model=(os.environ.get('FRAMEBOUND_SAM_MODEL') or sam.MODEL) if provider=='sam' else _imgmod._model()
+    settings = {"model": default_model, "transport": "responses", **(provider_settings or {})}
+    from ..providers.base import _base
+    settings.setdefault('base_url', _base())
+    if not isinstance(settings['model'],str) or not settings['model'].strip() or settings['transport']!='responses':
+        raise InvalidInput('invalid frozen provider model/transport')
+    if provider=='sam':
+        con=S.connect(project_dir)
+        try:
+            try:source=D.Asset.model_validate(S.get(con,'assets',settings.get('source_asset_id',''))[0])
+            except KeyError as exc:raise InvalidInput('SAM needs a stored source_asset_id') from exc
+            raw=S.blob_path(project_dir,source.byte_sha256).read_bytes()
+            if hashlib.sha256(raw).hexdigest()!=source.byte_sha256:raise InvalidInput('SAM source changed')
+        finally:con.close()
+        settings.update(source_byte_sha256=source.byte_sha256,source_width=source.width,source_height=source.height)
+        request=sam.build_request(base64.b64encode(raw).decode(),settings.get('prompt','figure'))
+    else:
+        request = (img.build_edit_request(settings['previous_response_id'],
+                    settings.get('edit_instruction','bounded patch within approved support'),extra_blobs=resolved)
+                   if settings.get('previous_response_id') else img.build_request(brief,resolved))
+    request['model'] = settings['model']
+    request_digest = hashlib.sha256(json.dumps(request,sort_keys=True).encode()).hexdigest()
     con = S.connect(project_dir)
     try:
         digest = hashlib.sha256(idempotency_key.encode()).hexdigest()[:12]
-        job = D.Job(id=f"job-{digest}", kind="generation",
+        job = D.Job(id=f"job-{digest}", kind="segmentation" if provider=="sam" else "generation",
                     idempotency_key=idempotency_key,
                     payload_sha256=_payload_hash(brief, resolved),
-                    provider="image", targets=_targets(brief),
+                    provider=provider, targets=_targets(brief),
                     max_attempts=max_attempts,
                     budget_reserved=f"max_attempts={max_attempts}",
                     # The complete executable request is frozen at submit time:
                     # a restarted worker resumes from this row alone and no
                     # caller can substitute a different brief at send time.
-                    request_brief={**dict(brief),
-                                   "_frozen_provider_settings": {"model": _imgmod._model(), "transport": "responses",
-                                                                 **(dict(provider_settings) if provider_settings else {})}},
-                    provider_settings={"model": _imgmod._model(), "transport": "responses",
-                                       **(dict(provider_settings) if provider_settings else {})},
+                    request_brief={**dict(brief), '_frozen_provider_settings': settings},
+                    provider_settings=settings, frozen_request=request,
+                    frozen_request_sha256=request_digest,
                     offline=bool(offline))
         job, created = S.create_job_idempotent(con, job)
         if not created:
+            if job.offline != bool(offline) or job.max_attempts != max_attempts:
+                raise S.ConflictError('job retry changed offline/attempt authority')
+            if any(job.provider_settings.get(k) != v for k,v in (provider_settings or {}).items()):
+                raise S.ConflictError('job retry changed frozen provider settings')
             return D.ResultEnvelope(ok=True, operation_id=f"op-{job.id}", revision_id=None,
                                      next_actions=["job_get"],
                                      artifacts=[{"id": job.id, "role": "job", "deduped": True,
@@ -170,8 +210,11 @@ def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict]
         offline_req = bool(offline)
         from ..providers import base as _base
         if offline_req or not _base._key():
-            res = img.submit(brief, resolved, project_dir, idempotency_key,
-                             offline=offline_req, job_offline=bool(offline))
+            from ..providers import ledger,wire
+            res={'note':'Offline or credentials absent; no provider request sent.',
+                 'request_artifact':ledger.record_artifact(project_dir,'provider_request_pending',
+                    {'idempotency_key':idempotency_key,'request':wire.redact_wire(request),
+                     'sent':False,'offline':bool(offline)},provider=provider,model=settings['model'])}
             job.request_artifact = res.get("request_artifact")
             S.update_mutable(con, "jobs", job, 1)
             return D.ResultEnvelope(ok=True, operation_id=f"op-{job.id}",
@@ -303,7 +346,7 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
                          expected_version: int, image_bytes: bytes,
                          mime: str, provider_response_id: str | None,
                          usage: dict | None, output_asset_id: str | None = None,
-                         fencing_token: str | None = None) -> dict:
+                         fencing_token: str | None = None, origin: str = 'unknown') -> dict:
     """Persist provider output as a generated asset and mark SUCCEEDED.
 
     Fenced: holder + token + live lease + RUNNING status, all enforced.
@@ -332,12 +375,18 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
         aid = output_asset_id or f"{job_id}-out-{job.attempt_count + 1:02d}"
         raw_digest = S.store_blob(project_dir, image_bytes)
         from .. import domain as _D
+        rights='unknown'
+        if job.provider_settings.get('grant_id'):
+            rights=S.get(con,'provider_grants',job.provider_settings['grant_id'])[0].get('output_rights','unknown')
         asset = _D.Asset(id=aid, byte_sha256=raw_digest, pixel_sha256=pix,
                          mime=mime or "image/png", width=w, height=h,
-                         source_kind="generated", rights="original",
+                         source_kind="generated", rights=rights,source_job_id=job.id,origin=origin,
                          eligible_roles=[])
         with S.atomic(con):
             S.stage(con, asset)
+            job.dispatch_inflight = False
+            job.provider_response_id=provider_response_id
+            job.provider_outcome='image'
             job.status = D.JobStatus.SUCCEEDED
             job.output_asset_ids = [*job.output_asset_ids, aid]
             # request_artifact is the pre-send intent; the response link lives
@@ -366,6 +415,63 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
         con.close()
 
 
+def job_complete_segmentation(project_dir: str, job_id: str, *, worker_id: str,
+                              expected_version: int, result: dict,
+                              fencing_token: str | None) -> dict:
+    """Commit source-bound model proposals and the one reserved attempt together."""
+    from PIL import Image
+    from ..media.canonical import canonical_pixels,pixel_sha256
+    import io
+    con=S.connect(project_dir)
+    try:
+        with S.atomic(con):
+            con.execute('BEGIN IMMEDIATE')
+            data,version=S.get(con,'jobs',job_id);job=D.Job.model_validate(data)
+            if version!=expected_version:raise S.StaleRevisionError('segmentation completion is stale')
+            _check_fencing(job,job_id,worker_id,fencing_token)
+            source=D.Asset.model_validate(S.get(con,'assets',job.provider_settings['source_asset_id'])[0])
+            if source.byte_sha256!=job.provider_settings['source_byte_sha256']:
+                raise InvalidInput('SAM source no longer matches the frozen request')
+            outcome=result.get('outcome');usable=outcome=='mask'
+            records=result.get('records',[])
+            if len(records)>32:raise InvalidInput('segmentation exceeds 32 native parts')
+            ids=[];annotations=[]
+            grant=(S.get(con,'provider_grants',job.provider_settings['grant_id'])[0]
+                   if job.provider_settings.get('grant_id') else {})
+            rights='original' if source.rights=='original' and grant.get('output_rights')=='original' else 'unknown'
+            if usable:
+                cb=D.CompiledBrief.model_validate(S.get(con,'compiled_briefs',job.request_brief['compiled_brief_id'])[0])
+                contract=S.get(con,'contract_revisions',cb.contract_revision_id)[0]
+                for index,record in enumerate(records):
+                    mask=record['mask'];w,h=mask['width'],mask['height'];raster=bytes(mask['raster'])
+                    if record['frame']!=0 or (w,h)!=(source.width,source.height) or len(raster)!=w*h:
+                        raise InvalidInput('segmentation geometry differs from frozen source')
+                    image=Image.frombytes('L',(w,h),bytes(255 if v else 0 for v in raster)).convert('RGBA')
+                    buf=io.BytesIO();image.save(buf,format='PNG');aid=f'{job_id}-mask-{index}'
+                    asset=D.Asset(id=aid,byte_sha256=S.store_blob(project_dir,buf.getvalue()),
+                        pixel_sha256=pixel_sha256(canonical_pixels(image)),mime='image/png',width=w,height=h,
+                        source_kind='derived',rights=rights,parent_asset_ids=[source.id],source_job_id=job_id,
+                        origin=result.get('origin','unknown'),derivation={'operator':'segmentation','response':result.get('response_id')})
+                    S.stage_identical(con,asset);ids.append(aid)
+                    ann=D.AnnotationRevision(id=f'{aid}-annotation',source_asset_id=source.id,
+                        source_pixel_sha256=source.pixel_sha256 or source.byte_sha256,
+                        view=contract['action']['view'],mask_asset_id=aid,annotator_type='model_proposed')
+                    S.stage_identical(con,ann);annotations.append(ann.id)
+            job.origin=result.get('origin','unknown');job.provider_outcome=outcome
+            job.provider_response_id=result.get('response_id');job.response_artifact=result.get('response_artifact')
+            job.status=D.JobStatus.SUCCEEDED if outcome in ('mask','no_match') else D.JobStatus.FAILED
+            job.output_asset_ids=ids;job.output_annotation_ids=annotations
+            job.dispatch_inflight=False;job.attempt_count+=1
+            job.lease_holder=None;job.lease_expires=None;job.fencing_token_sha256=''
+            job.error=None if job.status==D.JobStatus.SUCCEEDED else str(result.get('reason',outcome))
+            _record_attempt(project_dir,con,job,result=f'SAM {outcome}',request_sha=job.payload_sha256,
+                response_ref=result.get('response_id'),candidate_ids=ids,signature=None)
+            new_version=S.stage_update(con,'jobs',job,version)
+            return {'job_id':job_id,'status':job.status.value,'version':new_version,
+                    'asset_ids':ids,'annotation_ids':annotations,'outcome':outcome,'usable':usable}
+    finally:con.close()
+
+
 def job_complete_failure(project_dir: str, job_id: str, *, worker_id: str,
                          expected_version: int, error: str,
                          retryable: bool = False,
@@ -388,6 +494,7 @@ def job_complete_failure(project_dir: str, job_id: str, *, worker_id: str,
                             request_sha=job.payload_sha256, response_ref=None,
                             candidate_ids=[], signature=sig)
             job.no_progress_signatures = [*job.no_progress_signatures, sig]
+            job.dispatch_inflight = False
             job.error = error[:2000]
             job.lease_holder = None
             job.lease_expires = None

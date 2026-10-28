@@ -1,0 +1,127 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "targets": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Targets",
+      "type": "array"
+    },
+    "models": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Models",
+      "type": "array"
+    },
+    "endpoints": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Endpoints",
+      "type": "array"
+    },
+    "limit_kind": {
+      "default": "dispatch_units",
+      "enum": [
+        "dispatch_units",
+        "usd"
+      ],
+      "title": "Limit Kind",
+      "type": "string"
+    },
+    "max_dispatches": {
+      "maximum": 1000,
+      "minimum": 1,
+      "title": "Max Dispatches",
+      "type": "integer"
+    },
+    "dispatches_reserved": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Dispatches Reserved",
+      "type": "integer"
+    },
+    "ceiling_microusd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ceiling Microusd"
+    },
+    "quote_microusd": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Quote Microusd"
+    },
+    "reserved_microusd": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Reserved Microusd",
+      "type": "integer"
+    },
+    "pricing_reference": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pricing Reference"
+    },
+    "output_rights": {
+      "default": "unknown",
+      "enum": [
+        "unknown",
+        "original"
+      ],
+      "title": "Output Rights",
+      "type": "string"
+    },
+    "active": {
+      "default": true,
+      "title": "Active",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "targets",
+    "models",
+    "max_dispatches"
+  ],
+  "title": "ProviderGrant",
+  "type": "object"
+}

@@ -6,6 +6,11 @@ import json
 
 def dispatch(args) -> dict:
     cmd = args.cmd
+    if cmd == 'provider-grant':
+        import os
+        from .services import provider_grants
+        return provider_grants.issue(args.project,json.loads(open(args.grant).read()),
+            args.operator_secret or os.environ.get('FRAMEBOUND_OPERATOR_SECRET',''))
     if cmd == 'project-create':
         from .services import projects
         return projects.create_project(args.project, {'id': args.project_id,
@@ -36,6 +41,7 @@ def dispatch(args) -> dict:
         return jobs.submit_generation(
             args.project, brief, refs, args.idempotency_key,
             offline=bool(getattr(args, "offline", False)),
+            provider_settings=json.loads(getattr(args,'provider_settings','{}')),
             max_attempts=int(getattr(args, "max_attempts", 3))).model_dump()
     if cmd == "job-get":
         from .services import jobs
