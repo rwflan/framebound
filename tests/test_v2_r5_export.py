@@ -144,6 +144,11 @@ def _fix_flow(td: str) -> dict:
     packets.record_decision(td, REV, {"action": "approve", "clip_revision_id": "rev-fix",
                                       "packet_id": pkt.revision_id and "pkt-fix",
                                       "expected_evaluation_id": ev_fix.id})
+    # The corrected candidate is releasable only once its task is resolved
+    # against the published candidate (an approved-but-unresolved candidate
+    # stays blocked by design).
+    C.resolve_issue(td, REV, task.source_issue_event_id, "rev-fix",
+                    packet_id="pkt-fix")
     return {"task": task, "ev_fix": ev_fix}
 
 
