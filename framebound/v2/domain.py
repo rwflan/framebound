@@ -210,6 +210,30 @@ class CharacterRevision(Strict):
         return v
 
 
+class RepairPolicy(Strict):
+    operators: list[Literal['translate','protected_restore','scoped_redraw']] = Field(default_factory=lambda:['translate','protected_restore'])
+    translation_budget_px: float = Field(default=2,ge=0,le=32)
+    max_local_attempts: StrictInt = Field(default=3,ge=1,le=100)
+    max_compute_steps: StrictInt = Field(default=8,ge=1,le=256)
+    generation_allowed: bool = False
+    max_provider_dispatches: StrictInt = Field(default=0,ge=0,le=100)
+
+
+class SourceCalibration(Strict):
+    source_width: StrictInt = Field(ge=1,le=2048)
+    source_height: StrictInt = Field(ge=1,le=2048)
+    crop: list[StrictInt] = Field(min_length=4,max_length=4)
+    resampling: Literal['nearest'] = 'nearest'
+    formats: list[Literal['PNG','JPEG']] = Field(default_factory=lambda:['PNG'])
+
+    @model_validator(mode='after')
+    def valid_crop(self):
+        l,t,r,b=self.crop
+        if not 0<=l<r<=self.source_width or not 0<=t<b<=self.source_height:
+            raise ValueError('calibration crop exceeds frozen source dimensions')
+        return self
+
+
 class ClipContractRevision(Strict):
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
@@ -225,6 +249,7 @@ class ClipContractRevision(Strict):
     transition_contract_ids: list[str] = Field(default_factory=list)
     supersedes: str | None = None
     change_reason: str | None = Field(default=None, max_length=1000)
+    repair_policy: RepairPolicy | None = None
 
     @model_validator(mode="after")
     def _schedule_covers_holds(self) -> "ClipContractRevision":
@@ -531,6 +556,16 @@ class Run(Strict):
     halt_reason: str | None = Field(default=None, max_length=1000)
     created_at: str = Field(default_factory=utcnow)
     updated_at: str = Field(default_factory=utcnow)
+    kind: Literal['provider','animation'] = 'provider'
+    baseline_revision_id: str | None = None
+    current_revision_id: str | None = None
+    compiled_plan_id: str | None = None
+    idempotency_key: str | None = None
+    input_sha256: str | None = None
+    operation_ids: list[str] = Field(default_factory=list)
+    local_attempts_used: int = Field(default=0,ge=0)
+    compute_steps_used: int = Field(default=0,ge=0)
+    result: dict[str,Any] | None = None
 
 
 class ExportSnapshot(Strict):
@@ -547,6 +582,8 @@ class MotionGuideEntry(Strict):
     phase: str = Field(min_length=1, max_length=64)
     asset_id: str = Field(min_length=1, max_length=128)
     byte_sha256: str = Field(**HEX64)
+    editable_mask_asset_id: str | None = None
+    protected_mask_asset_id: str | None = None
 
 
 class MotionGuide(Strict):
@@ -557,6 +594,62 @@ class MotionGuide(Strict):
     entries: list[MotionGuideEntry] = Field(min_length=1)
     supersedes: str | None = None
     created_at: str = Field(default_factory=utcnow)
+    repair_policy: RepairPolicy | None = None
+    source_calibration: SourceCalibration | None = None
+
+    @model_validator(mode='after')
+    def unique_phases(self):
+        if len({e.phase for e in self.entries})!=len(self.entries):
+            raise ValueError('motion guide phases must be unique')
+        return self
+
+
+class FrameControl(Strict):
+    slot: StrictInt = Field(ge=0)
+    phase: str
+    baseline_asset_id: str
+    baseline_byte_sha256: str = Field(**HEX64)
+    editable_mask_asset_id: str | None = None
+    editable_mask_byte_sha256: str | None = None
+    protected_mask_asset_id: str | None = None
+    protected_mask_byte_sha256: str | None = None
+    scope_sha256: str = Field(**HEX64)
+
+
+class CompiledAnimationPlan(Strict):
+    schema_version: Literal['2.0'] = '2.0'
+    id: str
+    contract_revision_id: str
+    reference_approval_id: str
+    inputs_sha256: str = Field(**HEX64)
+    profile: Literal['native_sprite_v1'] = 'native_sprite_v1'
+    policy: RepairPolicy
+    source_calibration: SourceCalibration | None = None
+    controls: list[FrameControl]
+    required_matrix: list[list[str]]
+
+
+class AuthorizedOperation(Strict):
+    schema_version: Literal['2.0'] = '2.0'
+    id: str
+    run_id: str
+    compiled_plan_id: str
+    input_revision_id: str
+    input_evaluation_id: str
+    input_evidence_sha256: str = Field(**HEX64)
+    target_constraint_id: str
+    task_id: str
+    slot: StrictInt = Field(ge=0)
+    operator: Literal['translate','protected_restore','scoped_redraw']
+    input_asset_id: str
+    output_asset_id: str
+    output_revision_id: str
+    scope_sha256: str = Field(**HEX64)
+    transform: TransformSpec = Field(default_factory=TransformSpec)
+    status: Literal['reserved','rendered','evaluated','committed','failed','awaiting_provider'] = 'reserved'
+    evaluation_id: str | None = None
+    job_id: str | None = None
+    error: str | None = None
 
 
 class ReferenceApproval(Strict):

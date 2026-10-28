@@ -1,0 +1,207 @@
+{
+  "$defs": {
+    "TransformOp": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "translate",
+          "default": "translate",
+          "title": "Op",
+          "type": "string"
+        },
+        "dx": {
+          "maximum": 512,
+          "minimum": -512,
+          "title": "Dx",
+          "type": "integer"
+        },
+        "dy": {
+          "maximum": 512,
+          "minimum": -512,
+          "title": "Dy",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dx",
+        "dy"
+      ],
+      "title": "TransformOp",
+      "type": "object"
+    },
+    "TransformSpec": {
+      "additionalProperties": false,
+      "description": "Typed recorded transform: the only thing that can authorize pixel movement.\n\nA free-text recipe string never authorizes a transform; it is documentation.\nmirror/per_pose_scale are checked against the character + contract at use time.",
+      "properties": {
+        "ops": {
+          "items": {
+            "$ref": "#/$defs/TransformOp"
+          },
+          "title": "Ops",
+          "type": "array"
+        },
+        "mirror": {
+          "default": false,
+          "title": "Mirror",
+          "type": "boolean"
+        },
+        "per_pose_scale": {
+          "default": false,
+          "title": "Per Pose Scale",
+          "type": "boolean"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "title": "TransformSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "compiled_plan_id": {
+      "title": "Compiled Plan Id",
+      "type": "string"
+    },
+    "input_revision_id": {
+      "title": "Input Revision Id",
+      "type": "string"
+    },
+    "input_evaluation_id": {
+      "title": "Input Evaluation Id",
+      "type": "string"
+    },
+    "input_evidence_sha256": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Input Evidence Sha256",
+      "type": "string"
+    },
+    "target_constraint_id": {
+      "title": "Target Constraint Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "slot": {
+      "minimum": 0,
+      "title": "Slot",
+      "type": "integer"
+    },
+    "operator": {
+      "enum": [
+        "translate",
+        "protected_restore",
+        "scoped_redraw"
+      ],
+      "title": "Operator",
+      "type": "string"
+    },
+    "input_asset_id": {
+      "title": "Input Asset Id",
+      "type": "string"
+    },
+    "output_asset_id": {
+      "title": "Output Asset Id",
+      "type": "string"
+    },
+    "output_revision_id": {
+      "title": "Output Revision Id",
+      "type": "string"
+    },
+    "scope_sha256": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Scope Sha256",
+      "type": "string"
+    },
+    "transform": {
+      "$ref": "#/$defs/TransformSpec"
+    },
+    "status": {
+      "default": "reserved",
+      "enum": [
+        "reserved",
+        "rendered",
+        "evaluated",
+        "committed",
+        "failed",
+        "awaiting_provider"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "evaluation_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evaluation Id"
+    },
+    "job_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Job Id"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    }
+  },
+  "required": [
+    "id",
+    "run_id",
+    "compiled_plan_id",
+    "input_revision_id",
+    "input_evaluation_id",
+    "input_evidence_sha256",
+    "target_constraint_id",
+    "task_id",
+    "slot",
+    "operator",
+    "input_asset_id",
+    "output_asset_id",
+    "output_revision_id",
+    "scope_sha256"
+  ],
+  "title": "AuthorizedOperation",
+  "type": "object"
+}

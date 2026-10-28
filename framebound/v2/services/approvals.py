@@ -120,6 +120,15 @@ def approve_reference(project_dir: str, actor: Actor, character_revision_id: str
                 if _h.sha256(raw).hexdigest() != entry.byte_sha256:
                     raise InvalidInput(f"guide phase {entry.phase}: bytes changed since proposal")
                 hashes[entry.asset_id] = _h.sha256(raw).hexdigest()
+                from ..media.canonical import load_native_image
+                for mask_id in (entry.editable_mask_asset_id,entry.protected_mask_asset_id):
+                    if mask_id:
+                        ma,mraw=_asset_bytes(project_dir,con,mask_id)
+                        if _h.sha256(mraw).hexdigest()!=ma.byte_sha256:
+                            raise InvalidInput('control mask bytes changed')
+                        if load_native_image(mraw).size != (char.canvas.width,char.canvas.height):
+                            raise InvalidInput('control mask dimensions differ from character canvas')
+                        hashes[mask_id]=ma.byte_sha256
             if event_id:
                 for row in con.execute('SELECT data FROM reference_approvals'):
                     prior = D.ReferenceApproval.model_validate_json(row['data'])

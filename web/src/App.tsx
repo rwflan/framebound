@@ -669,6 +669,14 @@ function ReferencesView() {
       const approved=data.reference_approvals.some(a=>a.character_revision_id===guide.character_revision_id && a.motion_guide_id===guide.id);
       return <article key={guide.id} style={{borderTop:'1px solid #ccc',padding:'20px 0'}}>
         <h3>{guide.character_revision_id} · {guide.id}</h3>
+        <h4>Automatic repair authority</h4>
+        <pre>{guide.repair_policy ? JSON.stringify(guide.repair_policy,null,2) : 'Manual work only'}</pre>
+        {guide.source_calibration && <pre>{JSON.stringify(guide.source_calibration,null,2)}</pre>}
+        {guide.entries.map(entry => <div key={'scope-'+entry.phase}>
+          <span>{entry.phase}: editable / protected support</span>
+          {entry.editable_mask_asset_id && <img width={128} height={128} src={api.assetUrl(entry.editable_mask_asset_id)} alt={entry.phase+' editable mask'} />}
+          {entry.protected_mask_asset_id && <img width={128} height={128} src={api.assetUrl(entry.protected_mask_asset_id)} alt={entry.phase+' protected mask'} />}
+        </div>)}
         <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
           {char && [['Identity',char.identity_asset_ids],['Style',char.style_asset_ids]].map(([label,ids]) =>
             <div key={String(label)}><h4>{String(label)}</h4>{(ids as string[]).map(id =>

@@ -126,12 +126,16 @@ export interface ExportResultDto {
 export interface GuideEntryDto {
   phase: string;
   asset_id: string;
+  editable_mask_asset_id?: string | null;
+  protected_mask_asset_id?: string | null;
 }
 
 export interface GuideReferenceDto {
   id: string;
   character_revision_id: string;
   entries: GuideEntryDto[];
+  repair_policy?: Record<string, unknown> | null;
+  source_calibration?: Record<string, unknown> | null;
 }
 
 export interface IssueDetailDto {

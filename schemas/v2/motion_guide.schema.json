@@ -19,6 +19,30 @@
           "pattern": "^[0-9a-fA-F]{64}$",
           "title": "Byte Sha256",
           "type": "string"
+        },
+        "editable_mask_asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Editable Mask Asset Id"
+        },
+        "protected_mask_asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protected Mask Asset Id"
         }
       },
       "required": [
@@ -27,6 +51,108 @@
         "byte_sha256"
       ],
       "title": "MotionGuideEntry",
+      "type": "object"
+    },
+    "RepairPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "operators": {
+          "items": {
+            "enum": [
+              "translate",
+              "protected_restore",
+              "scoped_redraw"
+            ],
+            "type": "string"
+          },
+          "title": "Operators",
+          "type": "array"
+        },
+        "translation_budget_px": {
+          "default": 2,
+          "maximum": 32,
+          "minimum": 0,
+          "title": "Translation Budget Px",
+          "type": "number"
+        },
+        "max_local_attempts": {
+          "default": 3,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Local Attempts",
+          "type": "integer"
+        },
+        "max_compute_steps": {
+          "default": 8,
+          "maximum": 256,
+          "minimum": 1,
+          "title": "Max Compute Steps",
+          "type": "integer"
+        },
+        "generation_allowed": {
+          "default": false,
+          "title": "Generation Allowed",
+          "type": "boolean"
+        },
+        "max_provider_dispatches": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Max Provider Dispatches",
+          "type": "integer"
+        }
+      },
+      "title": "RepairPolicy",
+      "type": "object"
+    },
+    "SourceCalibration": {
+      "additionalProperties": false,
+      "properties": {
+        "source_width": {
+          "maximum": 2048,
+          "minimum": 1,
+          "title": "Source Width",
+          "type": "integer"
+        },
+        "source_height": {
+          "maximum": 2048,
+          "minimum": 1,
+          "title": "Source Height",
+          "type": "integer"
+        },
+        "crop": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "title": "Crop",
+          "type": "array"
+        },
+        "resampling": {
+          "const": "nearest",
+          "default": "nearest",
+          "title": "Resampling",
+          "type": "string"
+        },
+        "formats": {
+          "items": {
+            "enum": [
+              "PNG",
+              "JPEG"
+            ],
+            "type": "string"
+          },
+          "title": "Formats",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_width",
+        "source_height",
+        "crop"
+      ],
+      "title": "SourceCalibration",
       "type": "object"
     }
   },
@@ -73,6 +199,28 @@
     "created_at": {
       "title": "Created At",
       "type": "string"
+    },
+    "repair_policy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RepairPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "source_calibration": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourceCalibration"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

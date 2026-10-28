@@ -184,4 +184,14 @@ def dispatch(args) -> dict:
         return A.approve_reference(args.project, _Actor(type="reviewer", id=reviewer),
                                    args.character, args.guide,
                                    getattr(args, "event_id", None)).model_dump()
+    if cmd.startswith('animation-'):
+        from .services import auto_repair as A
+        if cmd=='animation-compile':return A.compile_plan(args.project,args.contract_id)
+        if cmd=='animation-run':return A.run_automatic(args.project,args.revision_id,args.idempotency_key)
+        if cmd=='animation-start':return A.start_run(args.project,args.revision_id,args.idempotency_key)
+        if cmd=='animation-step':return A.step_run(args.project,args.run_id)
+        if cmd=='animation-get':return A.get_run(args.project,args.run_id)
+    if cmd=='source-calibrate':
+        from .services.animation_context import calibrate_source
+        return calibrate_source(args.project,args.contract_id,args.source_asset_id,args.output_asset_id).model_dump()
     raise ValueError(f"unknown v2 command {cmd}")
