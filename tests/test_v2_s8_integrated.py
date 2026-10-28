@@ -34,7 +34,8 @@ from framebound.v2.services.authz import Actor
 from framebound.v2.services.errors import InvalidInput
 
 import sys
-sys.path.insert(0, "/Volumes/datadisk0/data/appdata/repositories/framebound/tests")
+from pathlib import Path as _TestPath
+sys.path.insert(0, str(_TestPath(__file__).resolve().parent))
 from test_v2_r3_providers import _EnvKey, _png_bytes  # noqa: E402
 
 ORCH = Actor(type="orchestrator", id="spark-1")

@@ -30,8 +30,7 @@
       "type": "string"
     },
     "request_sha256": {
-      "maxLength": 64,
-      "minLength": 64,
+      "pattern": "^[0-9a-fA-F]{64}$",
       "title": "Request Sha256",
       "type": "string"
     },

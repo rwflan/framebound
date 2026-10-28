@@ -14,6 +14,10 @@ MODELS = {
     "review_packet": D.ReviewPacket, "review_event": D.ReviewEvent,
     "correction_task": D.CorrectionTask, "job": D.Job, "export_snapshot": D.ExportSnapshot,
     "result_envelope": D.ResultEnvelope,
+    "run": D.Run, "compiled_brief": D.CompiledBrief, "world_trace": D.WorldTrace,
+    "transition_trace": D.TransitionTrace, "motion_guide": D.MotionGuide,
+    "reference_approval": D.ReferenceApproval, "registration": D.Registration,
+    "edit_mask": D.EditMask,
 }
 
 

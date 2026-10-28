@@ -35,9 +35,34 @@
       "type": "string"
     },
     "baseline_revision_id": {
+      "maxLength": 128,
       "minLength": 1,
       "title": "Baseline Revision Id",
       "type": "string"
+    },
+    "baseline_evaluation_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Baseline Evaluation Id"
+    },
+    "edit_mask_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Edit Mask Id"
     },
     "desired_outcome": {
       "maxLength": 1000,
@@ -54,6 +79,33 @@
     "status": {
       "$ref": "#/$defs/CorrectionStatus",
       "default": "open"
+    },
+    "claim_holder": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Claim Holder"
+    },
+    "claim_token_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Claim Token Sha256"
     },
     "claim_lease": {
       "anyOf": [
@@ -85,6 +137,19 @@
       ],
       "default": null,
       "title": "Resolution Event Id"
+    },
+    "last_error": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Error"
     },
     "created_at": {
       "title": "Created At",

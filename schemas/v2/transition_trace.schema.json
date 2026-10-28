@@ -1,0 +1,129 @@
+{
+  "additionalProperties": false,
+  "description": "Measured interruption handoff: presented departure/entry observations,\nworld contact comparison, and the pass/fail verdict (frozen).",
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "departure_revision_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Departure Revision Id",
+      "type": "string"
+    },
+    "departure_tick": {
+      "minimum": 0,
+      "title": "Departure Tick",
+      "type": "integer"
+    },
+    "entry_revision_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Entry Revision Id",
+      "type": "string"
+    },
+    "entry_slot": {
+      "minimum": 0,
+      "title": "Entry Slot",
+      "type": "integer"
+    },
+    "entry_first_tick": {
+      "minimum": 0,
+      "title": "Entry First Tick",
+      "type": "integer"
+    },
+    "departure_pixel_sha256": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Departure Pixel Sha256",
+      "type": "string"
+    },
+    "entry_pixel_sha256": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Entry Pixel Sha256",
+      "type": "string"
+    },
+    "world_distance": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "World Distance"
+    },
+    "planted_departure": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Planted Departure"
+    },
+    "planted_entry": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Planted Entry"
+    },
+    "verdict": {
+      "default": "pass",
+      "enum": [
+        "pass",
+        "fail"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    },
+    "reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+    },
+    "origin": {
+      "default": "procedural",
+      "maxLength": 64,
+      "title": "Origin",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "departure_revision_id",
+    "departure_tick",
+    "entry_revision_id",
+    "entry_slot",
+    "entry_first_tick",
+    "departure_pixel_sha256",
+    "entry_pixel_sha256"
+  ],
+  "title": "TransitionTrace",
+  "type": "object"
+}
