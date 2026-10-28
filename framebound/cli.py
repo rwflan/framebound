@@ -116,6 +116,9 @@ def main(argv=None):
         c = sub.add_parser(name, help=helps)
         for flag, req in args:
             c.add_argument(flag, required=req)
+        if name in ('animation-start','animation-run'):
+            c.add_argument('--provider-settings',default='{}')
+            c.add_argument('--live',action='store_true',help='Explicitly queue provider work with a live restriction (requires approved policy and operator grant)')
         if name == "job-submit":
             c.add_argument('--provider-settings',default='{}',help='JSON settings including an operator-issued grant_id')
             c.add_argument("--offline", action="store_true", default=False,

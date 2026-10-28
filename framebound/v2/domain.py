@@ -562,6 +562,8 @@ class Run(Strict):
     compiled_plan_id: str | None = None
     idempotency_key: str | None = None
     input_sha256: str | None = None
+    provider_settings: dict[str,Any] = Field(default_factory=dict)
+    provider_offline: bool = True
     operation_ids: list[str] = Field(default_factory=list)
     local_attempts_used: int = Field(default=0,ge=0)
     compute_steps_used: int = Field(default=0,ge=0)
