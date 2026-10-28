@@ -14,20 +14,17 @@ Event: Meta Global AI Developer Hackathon (Meta × Cerebral Valley), virtual, 26
 
 - **Impact.** Every solo dev and small team using image models for game animation hits this wall. The framework is engine-agnostic, dependency-free, and exports training data that improves the underlying models — useful after the hackathon, designed to become unnecessary.
 - **Meta tooling.** Muse Image generates under hash-bound briefs; SAM 3.1 supplies masks for shape measurement; Muse Spark/Wonder orchestrate via MCP tools and act as advisory visual critics. This is a division of labour, not a single API call: deterministic checks gate, models create and critique.
-- **Technical depth.** Frozen contracts, hash-bound evidence, phase descriptors, feature-span metrology, bounded repair with pixel protection, fail-closed unmeasured handling, and a failure knowledge base generalised from a real production QA system. Pure-stdlib core: runs anywhere, ~20 ms/frame at demo scale.
-- **Demo.** `python -m framebound demo` builds a procedural character, passes its clean cycle, fails four injected faults with four named codes, and selects a bounded repair — then the review desk and dataset export run live. No API key needed for the demo; keys turn generation and critique live.
+- **Technical depth.** Frozen contracts, hash-bound evidence, phase descriptors, feature-span metrology, bounded repair with pixel protection, fail-closed unmeasured handling, and a failure knowledge base generalised from a real production QA system. Deterministic core (pydantic/Pillow/numpy): the public 8-frame 64×64 evaluation service runs warm p50 ≈ 27 ms on Apple Silicon (`benchmark-eval` report); raster primitives are microbenchmarked separately and never presented as framework latency.
+- **Demo.** `python -m framebound demo --profile wp6 --offline` replays Pip (4 clips + 3 evaluated transitions, all pass, badged `[replay/procedural-original]`); injected faults fail with named codes as labeled regressions, never demo totals; the review packet stays UNREVIEWED for a real reviewer. No API key needed for the replay; a key plus the `recorded-run` path turns one real generation live (still pending).
 
-## Ten-day plan
+## What actually happened (replaces the ten-day sketch above)
 
-| Days | Work |
+| Dates | Work |
 |---|---|
-| 1 (26 Oct) | Foundation: contract, checks, brief, repair, review desk, dataset export, procedural demo. Public repo. |
-| 2–3 | Live Meta integration: Muse Image generation under briefs with real character art; SAM 3.1 masks replacing alpha where needed; Muse Spark critique in the loop. Tune tolerances on real frames. |
-| 4–5 | Real project: one game character, 3+ clips (run, jump, attack), end-to-end generation with fault/repair history recorded. |
-| 6–7 | Review-desk polish from real use; video/GIF import; batch clips; dataset export from the real project; first preference-pair count. |
-| 8 | Hardening: edge cases (occlusion, aliases), performance pass, docs, empty-state and error handling. |
-| 9 | Demo video: problem, live loop, fault caught, repair, human correction round-trip, dataset. Submission draft. |
-| 10 (4 Nov) | Final checks, submission before 9:00 PM ET. |
+| 26–27 Oct | Prototype foundation (v1 checks/brief/repair/desk/export/demo). |
+| 27 Oct | Corrective implementation pass R0–R7 against an independent audit: safe outputs + reliable verification + locked install (R0); real authority/transactions (R1); fail-closed evaluation + reproducible evidence (R2); documented provider wire + durable jobs (R3); bounded repair + correction state (R4); portable training views with pixel-correct masks (R5); actual review experience + browser journey (R6); demonstration as evidence (R7). Nine merged PRs, every gate green. |
+| 28 Oct | R8: release re-audit (this document set), public-service benchmark, clean-clone + fresh-environment proof, live/offline semantics check. |
+| Remaining | Live provider spike (needs participant credential), authenticated portal check, genuine human review of the demo packet, demo video, submission. See ENTRANT ACTIONS in SUBMISSION_REQUIREMENTS.md. |
 
 ## Submission checklist
 

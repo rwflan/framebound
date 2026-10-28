@@ -15,7 +15,7 @@ Built for the Meta Global AI Developer Hackathon (Indie track, Build for Your Wo
 5. **Review.** A persistent web desk for the human: playback at true holds, frame metrics, issue marking, approve/reject. Open issues become machine-readable correction tasks for the model.
 6. **Export.** COCO annotations, a Hugging Face imagefolder dataset, chosen/rejected preference pairs, and clip timing — the training data that makes this framework obsolete.
 
-Meta models in the loop: Muse Image generates under briefs, SAM 3.1 supplies masks, Muse Spark/Wonder orchestrate and critique. Deterministic checks remain the gate; model opinion never overrides a failed bound. See [docs/DESIGN.md](docs/DESIGN.md).
+Meta models in the loop: Muse Image generates under briefs, SAM 3.1 supplies masks, Muse Spark orchestrates and critiques (advisory only). Deterministic checks remain the gate; model opinion never overrides a failed bound. See [docs/DESIGN.md](docs/DESIGN.md) and [docs/PROVIDER_CONTRACTS.md](docs/PROVIDER_CONTRACTS.md).
 
 ## Quick start
 
@@ -34,6 +34,8 @@ Open http://127.0.0.1:8765 for the review desk.
 ## Model-facing tools
 
 CLI (JSON in/out) and MCP (stdio) expose the same operations: `check`, `brief`, `preflight`, `repair-plan`, `repair-evaluate`, `record-failure`, `export-dataset`. See [docs/MODEL_TOOLS.md](docs/MODEL_TOOLS.md).
+
+v2 adds typed services on the same pattern (`asset-import`, `contract-propose`, `clip-create`, `clip-evaluate`, `brief-compile`, `job-submit`, `correction-submit`, `export`, …), an MCP server (`v2-mcp`), and a FastAPI review desk (`serve`). See [docs/MODEL_TOOLS.md](docs/MODEL_TOOLS.md).
 
 ```sh
 python -m framebound doctor
