@@ -73,7 +73,8 @@
         "needs_changes",
         "mark_issue",
         "resolve_issue",
-        "reopen_issue"
+        "reopen_issue",
+        "approve_mask"
       ],
       "title": "Action",
       "type": "string"
@@ -121,6 +122,13 @@
       ],
       "default": null,
       "title": "Frame Range"
+    },
+    "category": {
+      "default": "general",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Category",
+      "type": "string"
     },
     "roi": {
       "anyOf": [

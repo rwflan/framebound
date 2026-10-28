@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "description": "Stored per-tick world grounding for one clip revision (frozen).\n\npositions/planted cover every held tick in order; evaluation binds them to\nworld_sliding/declared_contacts instead of passing silently. Length must\nequal the contract's total held ticks.",
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "clip_revision_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Clip Revision Id",
+      "type": "string"
+    },
+    "positions": {
+      "items": {
+        "items": {
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "minItems": 1,
+      "title": "Positions",
+      "type": "array"
+    },
+    "planted": {
+      "items": {
+        "type": "boolean"
+      },
+      "minItems": 1,
+      "title": "Planted",
+      "type": "array"
+    },
+    "units": {
+      "default": "world_units",
+      "maxLength": 64,
+      "title": "Units",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "clip_revision_id",
+    "positions",
+    "planted"
+  ],
+  "title": "WorldTrace",
+  "type": "object"
+}

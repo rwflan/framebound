@@ -1,4 +1,11 @@
-"""Muse Spark adapter: structured tool loop + advisory critique. Critique never gates.
+"""DEPRECATED (Stage A corrected handoff): Muse Spark advisory critique adapter.
+
+Retired from the active animation workflow, default demo, readiness gates and
+completion requirements. The runtime core makes zero general-purpose model calls;
+the external orchestrator may be any tool-capable model. This module remains for
+historical wire-validation and recorded-bundle compatibility only. New work must use
+deterministic checks, frozen contracts and the explicit image/edit/segmentation
+providers. Critique never gates.
 
 Wire: POST {BASE}/responses, model muse-spark-1.3, input messages with
 `input_text` + `input_image` (data URL/file_id — never bare asset IDs), flat
@@ -16,6 +23,9 @@ from . import wire as W
 
 MODEL_ENV = "FRAMEBOUND_VISION_MODEL"
 DEFAULT_MODEL = "muse-spark-1.3"
+
+RETIRED_FROM_ACTIVE_WORKFLOW = True
+"""True: retired from the active workflow per the corrected design handoff."""
 
 # Allowlisted local tools the critic may invoke. Anything else is refused and
 # reported back as an error string the model can recover from.
@@ -161,7 +171,10 @@ def submit_critique(contract_summary: str, fault_codes: list[str],
                     offline: bool = False, transport=None,
                     timeout: float = 120.0, handlers: dict | None = None,
                     max_turns: int = 3) -> dict:
-    """Run the real bounded Spark tool loop and return the terminal critique.
+    """Run the bounded Spark tool loop (DEPRECATED: not part of the active workflow).
+
+    Preserved for historical bundles and wire-validation tests only. New automatic
+    work must not call this; deterministic evaluation decides.
 
     A completed text-only answer is a valid terminal turn (no empty tool calls
     are executed). Tool turns are executed locally through allowlisted handlers
@@ -170,6 +183,8 @@ def submit_critique(contract_summary: str, fault_codes: list[str],
     incomplete/failed/refused/truncated response is an explicit halt, never a
     silent pass. Advisory criticism never gates deterministic evaluation.
     """
+    import warnings as _warnings
+    _warnings.warn("spark.submit_critique is retired from the active workflow", DeprecationWarning, stacklevel=2)
     from .base import _key, http_post
     from .ledger import record_artifact
     req = critique_request(contract_summary, fault_codes, frame_blobs)

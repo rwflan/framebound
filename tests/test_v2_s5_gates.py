@@ -18,7 +18,8 @@ from framebound.v2.services.authz import Actor
 from framebound.v2.services.errors import AuthorizationError, InvalidInput
 
 import sys
-sys.path.insert(0, "/Volumes/datadisk0/data/appdata/repositories/framebound/tests")
+from pathlib import Path as _TestPath
+sys.path.insert(0, str(_TestPath(__file__).resolve().parent))
 from test_v2_r4_repair import _seed, _open_issue, _claim, _mask, _submit  # noqa: E402
 
 REV = Actor(type="reviewer", id="human-1")

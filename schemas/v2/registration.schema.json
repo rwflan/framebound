@@ -1,0 +1,123 @@
+{
+  "$defs": {
+    "TransformOp": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "translate",
+          "default": "translate",
+          "title": "Op",
+          "type": "string"
+        },
+        "dx": {
+          "maximum": 512,
+          "minimum": -512,
+          "title": "Dx",
+          "type": "integer"
+        },
+        "dy": {
+          "maximum": 512,
+          "minimum": -512,
+          "title": "Dy",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dx",
+        "dy"
+      ],
+      "title": "TransformOp",
+      "type": "object"
+    },
+    "TransformSpec": {
+      "additionalProperties": false,
+      "description": "Typed recorded transform: the only thing that can authorize pixel movement.\n\nA free-text recipe string never authorizes a transform; it is documentation.\nmirror/per_pose_scale are checked against the character + contract at use time.",
+      "properties": {
+        "ops": {
+          "items": {
+            "$ref": "#/$defs/TransformOp"
+          },
+          "title": "Ops",
+          "type": "array"
+        },
+        "mirror": {
+          "default": false,
+          "title": "Mirror",
+          "type": "boolean"
+        },
+        "per_pose_scale": {
+          "default": false,
+          "title": "Per Pose Scale",
+          "type": "boolean"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "title": "TransformSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Persisted verified recipe: how a frame's pixels sit on the frozen canvas.",
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "method": {
+      "default": "frozen_native",
+      "enum": [
+        "frozen_native",
+        "verified_translate"
+      ],
+      "title": "Method",
+      "type": "string"
+    },
+    "frame_instance_id": {
+      "minLength": 1,
+      "title": "Frame Instance Id",
+      "type": "string"
+    },
+    "translation_px": {
+      "items": {
+        "type": "integer"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "title": "Translation Px",
+      "type": "array"
+    },
+    "transform": {
+      "$ref": "#/$defs/TransformSpec"
+    },
+    "verified_by": {
+      "default": "import",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Verified By",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "frame_instance_id"
+  ],
+  "title": "Registration",
+  "type": "object"
+}

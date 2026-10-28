@@ -133,8 +133,7 @@
       "type": "string"
     },
     "evidence_manifest_sha256": {
-      "maxLength": 64,
-      "minLength": 64,
+      "pattern": "^[0-9a-fA-F]{64}$",
       "title": "Evidence Manifest Sha256",
       "type": "string"
     },
@@ -161,6 +160,18 @@
     },
     "coverage_status": {
       "$ref": "#/$defs/CoverageStatus"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes"
     },
     "created_at": {
       "title": "Created At",

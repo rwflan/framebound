@@ -1,0 +1,115 @@
+{
+  "additionalProperties": false,
+  "description": "Immutable frozen conditioning: the ONLY submittable generation request.\n\nBinds contract/character revisions, the exact human approval + motion guide\n(ids + asset hashes), slot/phase/timing, the full brief dict digest, and\nthe per-role asset byte/pixel hashes the provider must receive. Versioned;\nlegacy dict-only briefs are rejected at submission, never recompiled from\ncaller claims.",
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "contract_revision_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Contract Revision Id",
+      "type": "string"
+    },
+    "character_revision_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Character Revision Id",
+      "type": "string"
+    },
+    "approval_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Approval Id",
+      "type": "string"
+    },
+    "approval_event_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Approval Event Id",
+      "type": "string"
+    },
+    "motion_guide_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Motion Guide Id",
+      "type": "string"
+    },
+    "slot": {
+      "minimum": 0,
+      "title": "Slot",
+      "type": "integer"
+    },
+    "phase": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Phase",
+      "type": "string"
+    },
+    "phase_asset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Phase Asset Id",
+      "type": "string"
+    },
+    "phase_byte_sha256": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Phase Byte Sha256",
+      "type": "string"
+    },
+    "identity_asset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Identity Asset Id",
+      "type": "string"
+    },
+    "style_asset_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Style Asset Id",
+      "type": "string"
+    },
+    "brief_digest": {
+      "pattern": "^[0-9a-fA-F]{64}$",
+      "title": "Brief Digest",
+      "type": "string"
+    },
+    "brief": {
+      "additionalProperties": true,
+      "minProperties": 1,
+      "title": "Brief",
+      "type": "object"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "contract_revision_id",
+    "character_revision_id",
+    "approval_id",
+    "approval_event_id",
+    "motion_guide_id",
+    "slot",
+    "phase",
+    "phase_asset_id",
+    "phase_byte_sha256",
+    "identity_asset_id",
+    "style_asset_id",
+    "brief_digest",
+    "brief"
+  ],
+  "title": "CompiledBrief",
+  "type": "object"
+}
