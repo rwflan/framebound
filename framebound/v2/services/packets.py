@@ -166,11 +166,15 @@ def _validate_relationships(con, project_dir: str, ev: D.ReviewEvent, raw: dict)
 
 def _stage_event(con, project_dir: str, actor: Actor, event: dict) -> D.ReviewEvent:
     action = event.get("action", "mark_issue")
-    require_reviewer(actor, action)
+    # Stage D: machine-detected faults are system/orchestrator events, never
+    # fabricated human issues. They authorize bounded automatic work under the
+    # frozen contract, not artistic acceptance.
+    if action != "machine_fault":
+        require_reviewer(actor, action)
     if action == "approve_reference":
         raise InvalidInput("reference approval requires the stored-approval flow, not a bare event")
     if action not in ("approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue",
-                        "approve_mask"):
+                        "approve_mask", "machine_fault"):
         raise InvalidInput(f"unknown review action {action!r}")
     ev = _build_event(event, actor)
     _validate_relationships(con, project_dir, ev, event)
