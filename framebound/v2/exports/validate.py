@@ -277,6 +277,8 @@ def validate_snapshot(snapshot_dir: str) -> dict:
     else:
         try:
             done = json.loads(marker.read_text())
+            if done.get('snapshot')!=manifest['snapshot'] or done.get('inputs_digest')!=manifest['inputs_digest'] or done.get('dataset_version')!=manifest['dataset_version']:
+                issues.append('COMPLETE identity differs from manifest')
             if done.get("manifest_sha256") != _h((snap / "manifest.json").read_bytes()):
                 issues.append("COMPLETE marker manifest hash does not match manifest.json")
         except Exception as e:
@@ -356,6 +358,12 @@ def validate_snapshot(snapshot_dir: str) -> dict:
                 issues.append("closure manifest blob " + digest[:16] + " address mismatch")
     except Exception as e:
         issues.append(f"closure unreadable: {e}")
+    graph_info={}
+    try:
+        from .portable_graph import check_graph
+        graph_info=check_graph(snap,manifest,issues)
+    except Exception as exc:
+        issues.append('portable provenance invalid: '+str(exc))
     # 6. splits: no family or pixel straddling among POSITIVES. The research
     # archive legitimately documents shared pixels/lineage with exclusions;
     # the trainable view must never straddle.
@@ -375,4 +383,4 @@ def validate_snapshot(snapshot_dir: str) -> dict:
             "skipped": skipped, "counts": manifest["counts"],
             "exclusions": manifest["exclusions"],
             "loaders": {"coco_images": coco_info.get("images"), **coco_info,
-                        **hf_info, **pref_info, **temp_info}}
+                        **hf_info, **pref_info, **temp_info, 'provenance':graph_info}}

@@ -171,15 +171,17 @@ class TestIntegratedWorkflow(unittest.TestCase):
                                      str(snap_out),
                                      {"include_procedural_positives": True,
                                       "split": {"train": ["rev-fix"], "test": []}})
-                self.assertGreaterEqual(man["counts"]["preferences"], 1)
+                self.assertEqual(man['counts']['preferences'],0)
+                self.assertGreaterEqual(man['counts']['weak_preferences'],1)
                 moved = Path(td) / "moved"
                 shutil.move(str(snap_out), str(moved))
                 rep = validate_snapshot(str(moved))
                 self.assertTrue(rep["ok"], rep["issues"])
                 rows = load_preferences(str(moved))
-                self.assertTrue(rows)
-                for row in rows:
-                    self.assertTrue(row["chosen_images"] and row["rejected_images"])
+                # A simulated/unknown-rights rejected image cannot become
+                # positive training data merely because a real reviewer chose
+                # an independently permitted replacement.
+                self.assertEqual(rows,[])
 
     def test_negative_variants_refuse_before_spend(self):
         with tempfile.TemporaryDirectory() as td:

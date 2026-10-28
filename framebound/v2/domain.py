@@ -569,6 +569,7 @@ class Run(Strict):
 
 
 class ExportSnapshot(Strict):
+    manifest_sha256: str | None = Field(default=None,**HEX64)
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
     clip_revision_ids: list[str] = Field(min_length=1)
