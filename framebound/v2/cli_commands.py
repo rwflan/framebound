@@ -187,8 +187,8 @@ def dispatch(args) -> dict:
     if cmd.startswith('animation-'):
         from .services import auto_repair as A
         if cmd=='animation-compile':return A.compile_plan(args.project,args.contract_id)
-        if cmd=='animation-run':return A.run_automatic(args.project,args.revision_id,args.idempotency_key)
-        if cmd=='animation-start':return A.start_run(args.project,args.revision_id,args.idempotency_key)
+        if cmd=='animation-run':return A.run_automatic(args.project,args.revision_id,args.idempotency_key,provider_settings=json.loads(args.provider_settings),offline=not args.live)
+        if cmd=='animation-start':return A.start_run(args.project,args.revision_id,args.idempotency_key,provider_settings=json.loads(args.provider_settings),offline=not args.live)
         if cmd=='animation-step':return A.step_run(args.project,args.run_id)
         if cmd=='animation-get':return A.get_run(args.project,args.run_id)
     if cmd=='source-calibrate':

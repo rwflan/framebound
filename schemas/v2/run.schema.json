@@ -130,6 +130,16 @@
       "default": null,
       "title": "Input Sha256"
     },
+    "provider_settings": {
+      "additionalProperties": true,
+      "title": "Provider Settings",
+      "type": "object"
+    },
+    "provider_offline": {
+      "default": true,
+      "title": "Provider Offline",
+      "type": "boolean"
+    },
     "operation_ids": {
       "items": {
         "type": "string"

@@ -66,8 +66,8 @@ def _authorized(project,operation_id,operator):
         rev,_=_load(con,'clip_revisions',op.input_revision_id,D.ClipRevision)
         contract,_=_load(con,'contract_revisions',rev.contract_revision_id,D.ClipContractRevision)
         plan,context=resolve_in(con,project,contract)
-        if (op.operator!=operator or op.compiled_plan_id!=plan.id or op.status not in ('reserved','rendered')
-            or run.status!='running' or op.id not in run.operation_ids or run.current_revision_id!=op.input_revision_id
+        if (op.operator!=operator or op.compiled_plan_id!=plan.id or op.status not in ('reserved','rendered','awaiting_provider')
+            or run.status not in ('running','awaiting_provider') or op.id not in run.operation_ids or run.current_revision_id!=op.input_revision_id
             or op.scope_sha256!=plan.controls[op.slot].scope_sha256):
             raise InvalidInput('stale, foreign or completed automatic operation')
         from .evidence import verify_evidence_in
@@ -145,7 +145,9 @@ def get_run(project_dir,run_id):
     finally:con.close()
 
 
-def start_run(project_dir,revision_id,idempotency_key=None):
+def start_run(project_dir,revision_id,idempotency_key=None,*,provider_settings=None,offline=True):
+    settings=dict(provider_settings or {})
+    if set(settings)-{'model','grant_id','base_url','transport','max_spend_usd'}:raise InvalidInput('unsupported automatic provider settings')
     con=S.connect(project_dir)
     try:
         rev,_=_load(con,'clip_revisions',revision_id,D.ClipRevision)
@@ -153,7 +155,7 @@ def start_run(project_dir,revision_id,idempotency_key=None):
         plan,_=resolve_in(con,project_dir,contract)
         key=idempotency_key or 'automatic:'+revision_id
         rid='animation-'+digest(key)[:32]
-        identity=digest({'revision':rev.model_dump(mode='json'),'plan':plan.id})
+        identity=digest({'revision':rev.model_dump(mode='json'),'plan':plan.id,'provider_settings':settings,'offline':offline})
         with S.atomic(con):
             con.execute('BEGIN IMMEDIATE')
             try:
@@ -163,7 +165,7 @@ def start_run(project_dir,revision_id,idempotency_key=None):
             except KeyError:pass
             S.stage_identical(con,plan)
             run=D.Run(id=rid,kind='animation',baseline_revision_id=revision_id,current_revision_id=revision_id,
-                compiled_plan_id=plan.id,idempotency_key=key,input_sha256=identity)
+                compiled_plan_id=plan.id,idempotency_key=key,input_sha256=identity,provider_settings=settings,provider_offline=offline)
             S.stage(con,run)
         return _run_result(run)
     finally:con.close()
@@ -206,6 +208,10 @@ def _choose(con,project,rev,contract,plan,ev):
             if any(abs(v-round(v))>1e-8 for v in raw):continue
             delta=[round(v) for v in raw]
             if delta==[0,0] or max(map(abs,delta))>plan.policy.translation_budget_px:continue
+        elif (plan.policy.generation_allowed and plan.policy.max_provider_dispatches>0
+              and constraint.check in ('appearance_palette','phase_correspondence','silhouette_area','silhouette_width','silhouette_height')
+              and result.scope.startswith('slot ')):
+            operator='scoped_redraw';slot=int(result.scope.split()[1]);delta=[0,0]
         else:continue
         if operator not in plan.policy.operators:continue
         fi,_=_load(con,'frame_instances',rev.frame_instance_ids[slot],D.FrameInstance)
@@ -232,7 +238,7 @@ def _step_locked(project,run_id):
     try:
         run,version=_load(con,'runs',run_id,D.Run)
         if run.kind!='animation':raise InvalidInput('not an animation run')
-        if run.status!='running':return _run_result(run)
+        if run.status not in ('running','awaiting_provider'):return _run_result(run)
         rev,_=_load(con,'clip_revisions',run.current_revision_id,D.ClipRevision)
         contract,_=_load(con,'contract_revisions',rev.contract_revision_id,D.ClipContractRevision)
         plan,context=resolve_in(con,project,contract)
@@ -266,8 +272,10 @@ def _step_locked(project,run_id):
                     S.stage_update(con,'runs',run,version);return _run_result(run)
                 result,slot,fi,operator,delta=choice
                 consumed=[D.AuthorizedOperation.model_validate_json(r['data']) for r in con.execute('SELECT data FROM authorized_operations')]
-                used=[o for o in consumed if o.compiled_plan_id==plan.id and o.slot==slot]
-                if len(used)>=plan.policy.max_local_attempts or sum(o.compiled_plan_id==plan.id for o in consumed)>=plan.policy.max_compute_steps:
+                plans={row['id']:D.CompiledAnimationPlan.model_validate_json(row['data']) for row in con.execute('SELECT id,data FROM compiled_animation_plans')}
+                granted=[o for o in consumed if plans[o.compiled_plan_id].reference_approval_id==plan.reference_approval_id]
+                used=[o for o in granted if plans[o.compiled_plan_id].controls[o.slot].phase==plan.controls[slot].phase]
+                if len(used)>=plan.policy.max_local_attempts or len(granted)>=plan.policy.max_compute_steps:
                     run.status='blocked';run.halt_reason='approved stable-target attempt or compute grant exhausted'
                     S.stage_update(con,'runs',run,version);return _run_result(run)
                 # Composed translation is bounded across all selected ancestors.
@@ -301,7 +309,11 @@ def _step_locked(project,run_id):
     _checkpoint('reserved')
     try:
         op,plan,ctx=_authorized(project,pending.id,pending.operator)
-        _execute(project,op,plan,ctx)
+        if op.operator=='scoped_redraw':
+            from .specialist_repair import progress_redraw
+            if not progress_redraw(project,op,plan,ctx):return get_run(project,run_id)
+        else:
+            _execute(project,op,plan,ctx)
         _checkpoint('rendered')
         con=S.connect(project)
         try:
@@ -328,14 +340,14 @@ def _step_locked(project,run_id):
                 stored.status='committed' if progressed else 'failed';stored.evaluation_id=candidate.id
                 stored.error=None if progressed else f'no measured progress or regression: {regressions}'
                 S.stage_update(con,'authorized_operations',stored,ov)
-                attempt=D.Attempt(id='attempt-'+op.id,baseline_revision_id=op.input_revision_id,brief_id=plan.id,provider='deterministic',
-                    request_sha256=digest(op.model_dump(mode='json')),candidate_asset_ids=[op.output_asset_id],cost='zero provider dispatches',
+                attempt=D.Attempt(id='attempt-'+op.id,baseline_revision_id=op.input_revision_id,brief_id=plan.id,provider='image' if op.operator=='scoped_redraw' else 'deterministic',
+                    request_sha256=digest(op.model_dump(mode='json')),candidate_asset_ids=[op.output_asset_id],cost='provider usage retained in linked job' if op.operator=='scoped_redraw' else 'zero provider dispatches',
                     targeted_issue_ids=[op.task_id],result='internal_progress' if progressed else 'no_progress')
                 S.stage_identical(con,attempt)
                 task,tv=_load(con,'correction_tasks',op.task_id,D.CorrectionTask)
                 task.attempt_ids=[attempt.id];task.status=D.CorrectionStatus.RESOLVED if progressed else D.CorrectionStatus.BLOCKED
                 S.stage_update(con,'correction_tasks',task,tv)
-                if progressed:run.current_revision_id=op.output_revision_id
+                if progressed:run.current_revision_id=op.output_revision_id;run.status='running'
                 else:run.status='blocked';run.halt_reason=stored.error
                 run.result={'evaluation_id':candidate.id,'internal_progress':progressed,'acceptance':'unreviewed'}
                 S.stage_update(con,'runs',run,version)
@@ -362,12 +374,14 @@ def open_machine_tasks(project_dir,revision_id):
 
 
 def construct_redraw_request(project_dir,task_id,slot,*,operation_id=None):
-    if not operation_id:raise InvalidInput('redraw requires a stored bounded authorized operation')
-    raise InvalidInput('scoped specialist execution is not enabled for this operation')
+    op,plan,ctx=_authorized(project_dir,operation_id,'scoped_redraw')
+    if op.task_id!=task_id or op.slot!=slot:raise InvalidInput('redraw scope differs from stored operation')
+    from .specialist_repair import compile_redraw
+    return compile_redraw(project_dir,op,plan,ctx)
 
 
-def run_automatic(project_dir,revision_id,idempotency_key=None):
-    try:result=start_run(project_dir,revision_id,idempotency_key)
+def run_automatic(project_dir,revision_id,idempotency_key=None,*,provider_settings=None,offline=True):
+    try:result=start_run(project_dir,revision_id,idempotency_key,provider_settings=provider_settings,offline=offline)
     except InvalidInput as exc:return {'status':'blocked','revision_id':revision_id,'blocker':str(exc)}
     # One call may finish a bounded local run. Every step is independently resumable.
     for _ in range(257):
