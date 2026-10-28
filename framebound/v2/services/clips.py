@@ -344,6 +344,30 @@ def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
     is the parent's stored frames and the allowed support is the union of the
     task's approved mask/ROI per repaired slot.
     """
+    contract=D.ClipContractRevision.model_validate(S.get(con,'contract_revisions',rev.contract_revision_id)[0])
+    try:
+        guide=D.MotionGuide.model_validate(S.get(con,'motion_guides',contract.references.get('motion_guide_revision'))[0])
+    except KeyError:
+        guide=None
+    if guide and guide.repair_policy:
+        from .animation_context import resolve_in
+        _,context=resolve_in(con,project_dir,contract)
+        if rev.repair_task_id:
+            task=D.CorrectionTask.model_validate(S.get(con,'correction_tasks',rev.repair_task_id)[0])
+            if task.origin=='human':
+                from .masks import allowed_region
+                parent=D.ClipRevision.model_validate(S.get(con,'clip_revisions',task.baseline_revision_id)[0])
+                from ..media.canonical import canonical_pixels
+                for slot,fid in enumerate(parent.frame_instance_ids):
+                    fi=D.FrameInstance.model_validate(S.get(con,'frame_instances',fid)[0])
+                    adata,_=S.get(con,'assets',fi.asset_id)
+                    raw=S.blob_path(project_dir,adata['byte_sha256']).read_bytes()
+                    context['baseline'][slot]=canonical_pixels(load_native_image(raw))
+                    context['baseline_byte_sha256'][slot]=adata['byte_sha256']
+                    scope=allowed_region(project_dir,task,slot)
+                    context['allowed_mask'][slot]=bytes(a and bool(scope and scope[i]) for i,a in enumerate(context['allowed_mask'][slot]))
+                context['task_id']=task.id;context['mask_id']=task.edit_mask_id
+        return context
     if not rev.parent_revision_id:
         return None
     try:

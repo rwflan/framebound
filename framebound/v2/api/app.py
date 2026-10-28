@@ -212,6 +212,21 @@ def create_app(project_dir: str) -> FastAPI:
         from ..services import projects
         return {"summary": projects.get_summary(project_dir)}
 
+    @app.post('/api/animation/runs')
+    def animation_start(body: dict):
+        from ..services.auto_repair import start_run
+        return start_run(project_dir,body['revision_id'],body.get('idempotency_key'))
+
+    @app.post('/api/animation/runs/{run_id}/step')
+    def animation_step(run_id: str):
+        from ..services.auto_repair import step_run
+        return step_run(project_dir,run_id)
+
+    @app.get('/api/animation/runs/{run_id}')
+    def animation_get(run_id: str):
+        from ..services.auto_repair import get_run
+        return get_run(project_dir,run_id)
+
     @app.get('/api/references', response_model=ReferencesDto)
     def references():
         con = S.connect(project_dir)

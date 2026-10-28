@@ -31,12 +31,16 @@ class CharacterReferenceDto(Strict):
 class GuideEntryDto(Strict):
     phase: str
     asset_id: str
+    editable_mask_asset_id: str | None = None
+    protected_mask_asset_id: str | None = None
 
 
 class GuideReferenceDto(Strict):
     id: str
     character_revision_id: str
     entries: list[GuideEntryDto]
+    repair_policy: dict[str,Any] | None = None
+    source_calibration: dict[str,Any] | None = None
 
 
 class ReferenceApprovalDto(Strict):

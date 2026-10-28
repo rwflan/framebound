@@ -168,7 +168,7 @@ class TestTrainingPublication(unittest.TestCase):
             # Interrupted publish leaves recoverable staging, never half COMPLETE.
             self.assertTrue((moved / "manifest.json").is_file())
 
-    def test_offline_end_to_end_makes_zero_model_calls(self):
+    def test_manual_project_does_not_authorize_automatic_operations(self):
         calls = []
         def _explode(*a, **k):
             calls.append((a, k))
@@ -177,8 +177,11 @@ class TestTrainingPublication(unittest.TestCase):
             _public_seed(td)
             env = clips.evaluate(td, "rev-FGH")
             self.assertEqual(env.technical_status.value, "pass")
-            auto = AR.run_automatic(td, "rev-FGH")
-            self.assertEqual(auto["status"], "technically_ready")
+            from unittest.mock import patch
+            with patch('socket.socket.connect',side_effect=_explode):
+                auto = AR.run_automatic(td, "rev-FGH")
+            self.assertEqual(auto['status'],'blocked')
+            self.assertIn('no human-approved automatic repair policy',auto['blocker'])
             self.assertEqual(calls, [])
 
 

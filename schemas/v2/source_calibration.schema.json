@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "source_width": {
+      "maximum": 2048,
+      "minimum": 1,
+      "title": "Source Width",
+      "type": "integer"
+    },
+    "source_height": {
+      "maximum": 2048,
+      "minimum": 1,
+      "title": "Source Height",
+      "type": "integer"
+    },
+    "crop": {
+      "items": {
+        "type": "integer"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "title": "Crop",
+      "type": "array"
+    },
+    "resampling": {
+      "const": "nearest",
+      "default": "nearest",
+      "title": "Resampling",
+      "type": "string"
+    },
+    "formats": {
+      "items": {
+        "enum": [
+          "PNG",
+          "JPEG"
+        ],
+        "type": "string"
+      },
+      "title": "Formats",
+      "type": "array"
+    }
+  },
+  "required": [
+    "source_width",
+    "source_height",
+    "crop"
+  ],
+  "title": "SourceCalibration",
+  "type": "object"
+}
