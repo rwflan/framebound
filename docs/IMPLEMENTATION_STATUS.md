@@ -58,7 +58,7 @@ item instead of assuming a later package delivered it.
 
 ### Changed capability (R8)
 
-- `benchmark-eval` CLI + `framebound/v2/bench_eval.py` (cold/warm/incremental, hardware + checks disclosed).
+- `benchmark-eval` CLI + `framebound/v2/bench_eval.py` (cold/warm/incremental, hardware + checks disclosed) + `tests/test_v2_r8_bench.py` locking its shape.
 - Docs corrected to match implementation (see package notes); no external handoff files committed.
 - `recorded-run` CLI is the exact live-spike command (pending credential).
 
