@@ -14,16 +14,14 @@
       "type": "string"
     },
     "byte_sha256": {
-      "maxLength": 64,
-      "minLength": 64,
+      "pattern": "^[0-9a-fA-F]{64}$",
       "title": "Byte Sha256",
       "type": "string"
     },
     "pixel_sha256": {
       "anyOf": [
         {
-          "maxLength": 64,
-          "minLength": 64,
+          "pattern": "^[0-9a-fA-F]{64}$",
           "type": "string"
         },
         {

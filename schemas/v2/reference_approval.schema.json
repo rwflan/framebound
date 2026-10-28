@@ -1,0 +1,92 @@
+{
+  "additionalProperties": false,
+  "description": "Stored human approval binding a character revision's references + motion guide.",
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "character_revision_id": {
+      "minLength": 1,
+      "title": "Character Revision Id",
+      "type": "string"
+    },
+    "motion_guide_id": {
+      "minLength": 1,
+      "title": "Motion Guide Id",
+      "type": "string"
+    },
+    "identity_asset_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Identity Asset Ids",
+      "type": "array"
+    },
+    "style_asset_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Style Asset Ids",
+      "type": "array"
+    },
+    "asset_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "minProperties": 1,
+      "title": "Asset Hashes",
+      "type": "object"
+    },
+    "reviewer_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "event_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Event Id",
+      "type": "string"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "character_revision_id",
+    "motion_guide_id",
+    "identity_asset_ids",
+    "style_asset_ids",
+    "asset_hashes",
+    "reviewer_id",
+    "event_id"
+  ],
+  "title": "ReferenceApproval",
+  "type": "object"
+}

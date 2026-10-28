@@ -143,7 +143,7 @@ def main(argv=None):
                     help="replace a previous framework-owned snapshot output (refuses unmarked dirs)")
     dv = sub.add_parser("dataset-validate", help="v2: validate a snapshot with standard loaders")
     dv.add_argument("--snapshot", required=True)
-    rr = sub.add_parser("recorded-run", help="v2: one recorded provider workflow (or honest pending bundle)")
+    rr = sub.add_parser("recorded-run", help="v2: DEPRECATED historical provider bundle (retired Spark gate; use offline check/repair + explicit providers)")
     rr.add_argument("--project", required=True)
     rr.add_argument("--contract", required=True)
     rr.add_argument("--slot", required=True)

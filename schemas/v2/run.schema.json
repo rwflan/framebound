@@ -1,0 +1,70 @@
+{
+  "additionalProperties": false,
+  "description": "Durable orchestrator run: budget + halt state survive restarts.",
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "status": {
+      "default": "running",
+      "maxLength": 64,
+      "title": "Status",
+      "type": "string"
+    },
+    "job_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Job Ids",
+      "type": "array"
+    },
+    "attempts_used": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Attempts Used",
+      "type": "integer"
+    },
+    "max_attempts": {
+      "default": 3,
+      "maximum": 10,
+      "minimum": 1,
+      "title": "Max Attempts",
+      "type": "integer"
+    },
+    "halt_reason": {
+      "anyOf": [
+        {
+          "maxLength": 1000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Halt Reason"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ],
+  "title": "Run",
+  "type": "object"
+}

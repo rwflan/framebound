@@ -1,3 +1,5 @@
+> Stage A (corrected handoff): the runtime core makes zero general-purpose model calls. Image/edit/segmentation are explicit optional providers returning proposed artifacts; the internal Spark critique is retired from the workflow, demo and gates. Historical wire shapes below remain for compatibility.
+
 # Provider contracts — spike 2026-10-27 (offline, no key)
 
 Environment: no `MODEL_API_KEY`/`META_API_KEY` set. All calls below ran offline and sent nothing.

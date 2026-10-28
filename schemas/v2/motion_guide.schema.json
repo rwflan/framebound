@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "MotionGuideEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Phase",
+          "type": "string"
+        },
+        "asset_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "byte_sha256": {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "title": "Byte Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "phase",
+        "asset_id",
+        "byte_sha256"
+      ],
+      "title": "MotionGuideEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Independent phase authority: reviewed reference art per phase, not candidate-derived.",
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "character_revision_id": {
+      "minLength": 1,
+      "title": "Character Revision Id",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/MotionGuideEntry"
+      },
+      "minItems": 1,
+      "title": "Entries",
+      "type": "array"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "character_revision_id",
+    "entries"
+  ],
+  "title": "MotionGuide",
+  "type": "object"
+}

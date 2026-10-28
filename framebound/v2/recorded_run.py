@@ -1,4 +1,11 @@
-"""Four-capability recorded workflow through the real durable controller.
+"""DEPRECATED (Stage A corrected handoff): four-capability recorded workflow.
+
+Retired from the active workflow and completion gates. Historical bundles remain
+readable; new automatic work uses the deterministic offline check/repair path plus
+explicit image/edit/segmentation providers through the durable controller.
+The Spark critique capability is advisory-only and never a readiness gate.
+
+Four-capability recorded workflow through the real durable controller (historical).
 
 Unlike the procedural replay (demo_wp6), this path exercises the actual
 provider stack bound to stored human approval: a Spark tool-loop critique,
@@ -310,8 +317,8 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
                  offline: bool = True, transport=None,
                  idempotency_key: str = "recorded-run-1",
                  spark_transport=None, sam_transport=None,
-                 timeout: float = 120.0) -> dict:
-    """Execute the four-capability recorded workflow through the controller.
+                 timeout: float = 120.0, include_spark: bool = False) -> dict:
+    """Execute the recorded provider workflow through the controller (DEPRECATED).
 
     Capabilities: Spark tool-loop critique, reference-conditioned generation,
     an actual chained image edit, and SAM segmentation — each with its own
@@ -374,11 +381,18 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
     contract_summary = f"{contract_id} slot {slot} ({canvas[0]}x{canvas[1]} {view})"
     frame_blobs = [{"slot": slot, "asset_id": fdata["asset_id"], "mime": "image/png",
                     "bytes_b64": base64.b64encode(base_raw).decode()}]
-    # Capability 1: Spark critique loop.
-    capabilities.append(_capability_spark(
-        project_dir, contract_summary, frame_blobs, f"{idempotency_key}-spark",
-        transport=spark_transport if spark_transport is not None else transport,
-        timeout=timeout))
+    # Capability 1 (DEPRECATED advisory-only): Spark critique loop.
+    # Never gates the bundle verdict; recorded only when explicitly requested.
+    if include_spark or spark_transport is not None:
+        import warnings as _warnings
+        _warnings.warn("recorded-run spark capability is retired; advisory only", DeprecationWarning, stacklevel=2)
+        capabilities.append(_capability_spark(
+            project_dir, contract_summary, frame_blobs, f"{idempotency_key}-spark",
+            transport=spark_transport if spark_transport is not None else transport,
+            timeout=timeout))
+    else:
+        capabilities.append({"capability": "spark-critique", "status": "skipped-retired",
+                             "note": "retired from active workflow; advisory only, never a gate"})
     # Capability 2: reference-conditioned generation through the controller.
     try:
         gen = _controller_send(project_dir, prepared["brief"], f"{idempotency_key}-gen",
@@ -476,7 +490,8 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
                               transport=sam_transport if sam_transport is not None
                               else transport, timeout=timeout)
     capabilities.append(sam_cap)
-    failed = [c for c in capabilities if c.get("status") != "recorded"]
+    # Stage A corrected handoff: spark-critique is advisory-only and never gates.
+    failed = [c for c in capabilities if c.get("capability") != "spark-critique" and c.get("status") != "recorded"]
     status = "recorded" if not failed and ev.technical_status == D.TechnicalStatus.PASS \
         else "recorded-failure"
     bundle = {
