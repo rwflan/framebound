@@ -71,20 +71,30 @@ PYEOF
 
 if [ -f web/package.json ] && command -v npm >/dev/null 2>&1; then
   step web-typecheck npm --prefix web run typecheck
+  step api-types-fresh python scripts/gen_api_types.py --check
+  step web-unit npm --prefix web run test:unit
   step web-build npm --prefix web run build
 else
   echo "SKIP web typecheck/build: npm or web/package.json unavailable (recorded, not a pass)"
 fi
 
-# Browser journey gate lands in R6; record its absence instead of passing silently.
-echo "SKIP browser/process-restart journey: not implemented until R6 (recorded, not a pass)"
+# R6 browser/process-restart journey: real API + real browser, separate OS
+# processes, disposable data. No screenshots-count criteria; every check in
+# web/e2e/journey.mjs is a throwing assertion on served pixels, stored
+# geometry, persisted bytes, or exact events.
+E2E_PORT="${E2E_PORT:-8766}"
+if [ -f web/package.json ] && command -v npm >/dev/null 2>&1 && [ -d web/node_modules ]; then
+  step browser-journey env E2E_PORT="$E2E_PORT" E2E_WORK="$WORK/e2e" E2E_SHOTS="$WORK/e2e-shots" node web/e2e/journey.mjs
+else
+  echo "SKIP browser/process-restart journey: web toolchain unavailable (recorded, not a pass)"
+fi
 
 if [ "$LIVE" -eq 1 ]; then
   if [ "$HAD_KEY" -eq 0 ]; then
     echo "FAIL: --live requires a real MODEL_API_KEY/META_API_KEY (none configured)"
     exit 2
   fi
-  echo "FAIL: --live requested but the live provider spike runner is not implemented until R3 (no live calls ran)"
+  echo "FAIL: --live requested but no authorized participant credential is configured (no live calls ran; R8 owns the live spike)"
   exit 3
 else
   echo "SKIP live provider spike: offline mode (recorded, not a pass)"

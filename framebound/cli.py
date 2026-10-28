@@ -88,6 +88,7 @@ def main(argv=None):
         ("capabilities", "v2: audited transport x operation table", [("--project", True)]),
         ("candidate-register", "v2: register replacements as a child revision", [("--baseline", True), ("--new-id", True), ("--project", True), ("--slots", True), ("--recipe", True)]),
         ("correction-submit", "v2: gated repair submit (holder+token+lease+scope+matrix)", [("--project", True), ("--task-id", True), ("--claim-token", True), ("--new-id", True), ("--slots", True), ("--recipe", True), ("--baseline-evaluation", True), ("--idempotency-key", True)]),
+        ("correction-claim", "v2: claim an open correction task (worker holder)", [("--project", True), ("--task-id", True), ("--expected-version", True)]),
         ("correction-get", "v2: explicit correction task status", [("--project", True), ("--task-id", True)]),
         ("corrections-list-open", "v2: list open correction tasks", [("--project", True)]),
         ("mask-approve", "v2: reviewer-approve an edit mask (needs session token)", [("--project", True), ("--issue", True), ("--mask-asset", True), ("--slots", True), ("--session-token", False)]),
@@ -111,6 +112,10 @@ def main(argv=None):
         if name == "correction-submit":
             c.add_argument("--transform", default=None)
             c.add_argument("--expected-version", default="1")
+            c.add_argument("--actor-id", default="cli")
+        if name == "correction-claim":
+            c.add_argument("--actor-id", default="cli-worker")
+            c.add_argument("--lease-minutes", default="30")
         if name == "issue-reopen":
             c.add_argument("--note", default="")
 
@@ -132,6 +137,8 @@ def main(argv=None):
     vf = sub.add_parser("verify", help="v2: verify stored revisions, blobs and evidence freshness")
     vf.add_argument("--project", required=True)
     vf.add_argument("--report", help="Write the verification report JSON here")
+    oj = sub.add_parser("openapi", help="v2: regenerate the committed OpenAPI schema")
+    oj.add_argument("--out", required=True, help="Write the OpenAPI JSON schema here")
 
     args = p.parse_args(argv)
     if args.cmd == "doctor":
@@ -162,6 +169,14 @@ def main(argv=None):
         rep = _val(args.snapshot)
         _print(rep)
         return 0 if rep["ok"] else 1
+    if args.cmd == "openapi":
+        import json as _json
+        import tempfile as _tf
+        from .v2.api.app import create_app as _create
+        schema = _create(_tf.mkdtemp()).openapi()
+        Path(args.out).write_text(_json.dumps(schema, indent=2) + "\n")
+        _print({"paths": len(schema.get("paths", {})), "out": args.out})
+        return 0
     if args.cmd == "verify":
         from .v2.verify import run_verify
         rep = run_verify(args.project)
@@ -189,7 +204,7 @@ def main(argv=None):
     if args.cmd in ("asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
-                    "orchestrator-send", "capabilities", "correction-submit",
+                    "orchestrator-send", "capabilities", "correction-claim", "correction-submit",
                     "correction-get", "corrections-list-open", "mask-approve",
                     "issue-reopen", "eligibility", "candidate-register",
                     "packet-create", "corrections-list", "reviewer-pair", "reviewer-open",

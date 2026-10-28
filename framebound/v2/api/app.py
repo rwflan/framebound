@@ -27,6 +27,7 @@ from pydantic import Field
 from .. import domain as D
 from .. import storage as S
 from ..services.authz import Actor
+from .dto import (ActivityPageDto, CompareBundleDto, CorrectionsListDto, EligibilityDto, ExportResultDto, IssueDetailDto, PacketBundleDto, TaskStatusDto)
 from ..services.errors import AuthorizationError, InvalidInput, StaleRevision as SvcStale
 
 
@@ -198,7 +199,7 @@ def create_app(project_dir: str) -> FastAPI:
         finally:
             con.close()
 
-    @app.get("/api/packet/{packet_id}")
+    @app.get("/api/packet/{packet_id}", response_model=PacketBundleDto)
     def packet(packet_id: str):
         con = S.connect(project_dir)
         try:
@@ -210,7 +211,8 @@ def create_app(project_dir: str) -> FastAPI:
                 f, _ = S.get(con, "frame_instances", fid)
                 fi = D.FrameInstance.model_validate(f)
                 aids.append({"frame_instance_id": fi.id, "slot": fi.slot, "asset_id": fi.asset_id,
-                             "phase": fi.phase, "hold_ticks": fi.hold_ticks})
+                             "phase": fi.phase, "hold_ticks": fi.hold_ticks,
+                             "asset_url": f"/api/asset/{fi.asset_id}"})
             contract, _ = S.get(con, "contract_revisions", rev["contract_revision_id"])
         except KeyError as e:
             raise HTTPException(404, str(e))
@@ -238,10 +240,16 @@ def create_app(project_dir: str) -> FastAPI:
         return Response(content=raw, media_type="image/png",
                         headers={"Cache-Control": "immutable, max-age=31536000", "X-Asset-ID": asset_id})
 
-    @app.get("/api/corrections")
-    def corrections():
+    @app.get("/api/corrections", response_model=CorrectionsListDto)
+    def corrections(status: str = "open"):
+        """Correction queue. Default stays open-only; status=all (or a CSV) keeps
+        awaiting-comparison and blocked tasks visible instead of disappearing."""
         from ..services import corrections as C
-        return C.list_open(project_dir)
+        if status == "open":
+            return C.list_open(project_dir)
+        if status == "all":
+            return C.list_tasks(project_dir)
+        return C.list_tasks(project_dir, [s.strip() for s in status.split(",")])
 
     @app.post("/api/issues", status_code=201)
     def mark_issue(body: IssueBody, x_session_token: str | None = Header(default=None),
@@ -341,7 +349,7 @@ def create_app(project_dir: str) -> FastAPI:
             return out
         return JSONResponse(status_code=200, content=out)
 
-    @app.get("/api/corrections/{task_id}")
+    @app.get("/api/corrections/{task_id}", response_model=TaskStatusDto)
     def correction_get(task_id: str):
         from ..services import corrections as C
         return C.get_task(project_dir, task_id)
@@ -366,7 +374,7 @@ def create_app(project_dir: str) -> FastAPI:
         return C.reopen_issue(project_dir, actor(x_session_token, x_actor_id),
                               event_id, body.note)
 
-    @app.get("/api/eligibility/{revision_id}")
+    @app.get("/api/eligibility/{revision_id}", response_model=EligibilityDto)
     def eligibility(revision_id: str):
         from ..services import eligibility as E
         return E.release_eligibility(project_dir, revision_id)
@@ -447,6 +455,318 @@ def create_app(project_dir: str) -> FastAPI:
     def capabilities():
         from ..services import capabilities as C
         return C.table()
+
+    @app.get("/api/compare", response_model=CompareBundleDto)
+    def compare(base: str, other: str):
+        """Side-by-side comparison bundle: both immutable revisions, media, evals, timing.
+
+        Same contract required (comparison packets enforce it). Frame index
+        equality is synchronization only when holds match; otherwise the desk
+        must map by elapsed authored time (see timing_note).
+        """
+        from ..services import packets as _P
+        from . import dto as _DTO
+        con = S.connect(project_dir)
+        try:
+            brev, bcontract = _P._resolve_revision(con, base)
+            orev, ocontract = _P._resolve_revision(con, other)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        finally:
+            con.close()
+        if bcontract.character_revision_id != ocontract.character_revision_id:
+            raise HTTPException(422, "comparison needs one character: "
+                                    f"{bcontract.character_revision_id} vs "
+                                    f"{ocontract.character_revision_id}")
+        if (bcontract.action.name, bcontract.action.view) != (ocontract.action.name, ocontract.action.view):
+            raise HTTPException(422, "comparison needs the same action/view: "
+                                    f"{bcontract.action.name}/{bcontract.action.view} vs "
+                                    f"{ocontract.action.name}/{ocontract.action.view}")
+        def side(rev, contract):
+            con2 = S.connect(project_dir)
+            try:
+                latest = _P.latest_evaluation(con2, rev.id)
+                frames = []
+                for fid in rev.frame_instance_ids:
+                    fdata, _ = S.get(con2, "frame_instances", fid)
+                    fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
+                    frames.append({"frame_instance_id": fi.id, "slot": fi.slot,
+                                   "asset_id": fi.asset_id, "phase": fi.phase,
+                                   "hold_ticks": fi.hold_ticks,
+                                   "asset_url": f"/api/asset/{fi.asset_id}"})
+            finally:
+                con2.close()
+            return {"revision_id": rev.id, "contract_id": contract.id,
+                    "evaluation_id": latest.id if latest else None,
+                    "technical_status": latest.technical_status.value if latest else "unevaluated",
+                    "frames": sorted(frames, key=lambda f: f["slot"]),
+                    "holds": contract.timing.holds,
+                    "ticks_per_second": contract.timing.ticks_per_second,
+                    "loop": contract.action.loop}
+        b, o = side(brev, bcontract), side(orev, ocontract)
+        equal = (b["holds"] == o["holds"] and
+                 b["ticks_per_second"] == o["ticks_per_second"] and b["loop"] == o["loop"])
+        return _DTO.CompareBundleDto.model_validate({
+            "base": b, "other": o,
+            "same_contract": bcontract.id == ocontract.id, "timing_equal": equal,
+            "timing_note": ("identical timing: frame index equality is synchronization"
+                            if equal else
+                            "RETIMED: holds differ; map by elapsed authored time, "
+                            f"base total {sum(b['holds'])} vs other total {sum(o['holds'])}")}).model_dump()
+
+    @app.get("/api/issues", response_model=list[IssueDetailDto])
+    def issues(revision: str | None = None, packet: str | None = None):
+        """Full issue detail: category/ROI/range, attempts, findings, coverage, decision."""
+        from ..services import corrections as _C
+        from ..services import packets as _P
+        from ..services import review_state as _RS
+        from . import dto as _DTO
+        con = S.connect(project_dir)
+        try:
+            rows = con.execute(
+                "SELECT data FROM review_events ORDER BY data").fetchall()
+        finally:
+            con.close()
+        out = []
+        for r in rows:
+            raw = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
+            if raw.get("action") != "mark_issue":
+                continue
+            if revision and raw.get("clip_revision_id") != revision:
+                continue
+            if packet and raw.get("packet_id") != packet:
+                continue
+            ev = D.ReviewEvent.model_validate(raw)
+            task = None
+            con2 = S.connect(project_dir)
+            try:
+                for trow in con2.execute("SELECT data FROM correction_tasks").fetchall():
+                    t = D.CorrectionTask.model_validate(
+                        json.loads(trow["data"]) if isinstance(trow["data"], str) else trow["data"])
+                    if t.source_issue_event_id == ev.id:
+                        task = t
+                        break
+                base_ev = _P.latest_evaluation(con2, ev.clip_revision_id)
+            finally:
+                con2.close()
+            attempts = _C._attempts_for(project_dir, task.id) if task else []
+            cands = []
+            for a in attempts:
+                for cid in a.candidate_asset_ids or []:
+                    con3 = S.connect(project_dir)
+                    try:
+                        try:
+                            _P._resolve_revision(con3, cid)
+                        except Exception:
+                            continue
+                        latest = _P.latest_evaluation(con3, cid)
+                    finally:
+                        con3.close()
+                    cands.append({"revision_id": cid,
+                                  "technical_status": latest.technical_status.value if latest else "unevaluated",
+                                  "evaluation_id": latest.id if latest else None,
+                                  "attempt_id": a.id, "attempt_result": a.result})
+            findings = [x for x in (base_ev.results if base_ev else [])
+                        if x.outcome.value in ("fail", "error", "unmeasured")]
+            st = _RS.current_state(project_dir, ev.clip_revision_id)
+            out.append(_DTO.IssueDetailDto.model_validate({
+                "event_id": ev.id, "clip_revision_id": ev.clip_revision_id,
+                "packet_id": ev.packet_id, "frame_instance_id": ev.frame_instance_id,
+                "frame_range": ev.frame_range,
+                "roi": ev.roi.model_dump() if ev.roi else None,
+                "category": ev.category, "note": ev.note, "actor_id": ev.actor_id,
+                "created_at": ev.created_at,
+                "task_id": task.id if task else None,
+                "task_status": task.status.value if task else None,
+                "lease_valid": _C._lease_valid(task) if task and task.status in (
+                    D.CorrectionStatus.CLAIMED, D.CorrectionStatus.ATTEMPTING) else False,
+                "attempts": [{"id": a.id, "result": a.result,
+                              "candidates": a.candidate_asset_ids or []} for a in attempts],
+                "baseline_evaluation_id": task.baseline_evaluation_id if task else None,
+                "candidate_revisions": cands,
+                "findings": [{"constraint_id": x.constraint_id, "scope": x.scope,
+                              "outcome": x.outcome.value, "reason": x.reason} for x in findings],
+                "coverage": base_ev.coverage_status.value if base_ev else "unevaluated",
+                "current_acceptance": st["acceptance"],
+                "resolution_event_id": task.resolution_event_id if task else None}).model_dump())
+        return out
+
+    @app.get("/api/packet/{packet_id}/contact-sheet")
+    def contact_sheet(packet_id: str):
+        """Deterministic contact sheet PNG for a packet's revision (immutable bytes)."""
+        import hashlib as _h
+        from PIL import Image as _Image
+        con = S.connect(project_dir)
+        try:
+            try:
+                pdata, _ = S.get(con, "review_packets", packet_id)
+            except KeyError:
+                raise HTTPException(404, f"unknown packet {packet_id}")
+            pkt = D.ReviewPacket.model_validate_json(json.dumps(pdata))
+            rev, _ = S.get(con, "clip_revisions", pkt.clip_revision_id)
+            rev = D.ClipRevision.model_validate_json(json.dumps(rev))
+            imgs = []
+            for fid in rev.frame_instance_ids:
+                fdata, _ = S.get(con, "frame_instances", fid)
+                fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
+                adata, _ = S.get(con, "assets", fi.asset_id)
+                raw = S.blob_path(project_dir, adata["byte_sha256"]).read_bytes()
+                imgs.append((_Image.open(__import__("io").BytesIO(raw)).convert("RGBA"),
+                             fi.slot, fi.asset_id))
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        finally:
+            con.close()
+        imgs.sort(key=lambda t: t[1])
+        cols = 4
+        rows = (len(imgs) + cols - 1) // cols
+        cw, chh = imgs[0][0].size
+        sheet = _Image.new("RGBA", (cols * cw, rows * chh), (0, 0, 0, 0))
+        for i, (im, slot, aid) in enumerate(imgs):
+            sheet.paste(im, ((i % cols) * cw, (i // cols) * chh))
+        buf = __import__("io").BytesIO()
+        sheet.save(buf, format="PNG")
+        raw = buf.getvalue()
+        return Response(content=raw, media_type="image/png",
+                        headers={"Cache-Control": "immutable, max-age=31536000",
+                                 "X-Content-SHA256": _h.sha256(raw).hexdigest(),
+                                 "X-Revision-ID": rev.id, "X-Slots": str(len(imgs))})
+
+    @app.post("/api/packet/{packet_id}/preview", status_code=201)
+    def packet_preview(packet_id: str):
+        """Deterministic frame->time video preview (PNG sequence is source truth).
+
+        Holds expand to repeated frames at the contract tick rate. 501 when no
+        ffmpeg binary is available; never a fake video.
+        """
+        import shutil as _sh, subprocess as _sp, tempfile as _tf
+        if _sh.which("ffmpeg") is None:
+            raise HTTPException(501, "ffmpeg unavailable: video preview unsupported here")
+        from ..services import packets as _P
+        con = S.connect(project_dir)
+        try:
+            try:
+                pdata, _ = S.get(con, "review_packets", packet_id)
+            except KeyError:
+                raise HTTPException(404, f"unknown packet {packet_id}")
+            pkt = D.ReviewPacket.model_validate_json(json.dumps(pdata))
+            rev, contract = _P._resolve_revision(con, pkt.clip_revision_id)
+            seq = []
+            for fid in rev.frame_instance_ids:
+                fdata, _ = S.get(con, "frame_instances", fid)
+                fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
+                adata, _ = S.get(con, "assets", fi.asset_id)
+                seq.append((fi.slot, adata["byte_sha256"], fi.hold_ticks))
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        finally:
+            con.close()
+        seq.sort(key=lambda t: t[0])
+        work = Path(_tf.mkdtemp(prefix="fb-preview-"))
+        try:
+            n = 0
+            for slot, digest, hold in seq:
+                raw = S.blob_path(project_dir, digest).read_bytes()
+                for _ in range(hold):
+                    (work / f"f{n:05d}.png").write_bytes(raw)
+                    n += 1
+            tps = contract.timing.ticks_per_second
+            out = work / "preview.mp4"
+            cmd = ["ffmpeg", "-y", "-framerate", str(tps), "-i", str(work / "f%05d.png"),
+                   "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                   "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out)]
+            r = _sp.run(cmd, capture_output=True, timeout=180)
+            if r.returncode != 0 or not out.is_file():
+                raise HTTPException(502, f"ffmpeg failed: {r.stderr.decode()[-500:]}")
+            data = out.read_bytes()
+            import hashlib as _h
+            dest_dir = Path(project_dir) / "previews"
+            dest_dir.mkdir(exist_ok=True)
+            dest = dest_dir / f"{packet_id}.mp4"
+            dest.write_bytes(data)
+            (dest_dir / f"{packet_id}.json").write_text(json.dumps(
+                {"packet_id": packet_id, "revision_id": rev.id, "frames": n,
+                 "ticks_per_second": tps, "total_ticks": n,
+                 "ffmpeg_command": " ".join(cmd),
+                 "content_sha256": _h.sha256(data).hexdigest()}) + "\n")
+        finally:
+            __import__("shutil").rmtree(work, ignore_errors=True)
+        import hashlib as _hh
+        return {"packet_id": packet_id, "revision_id": rev.id,
+                "artifact": f"previews/{packet_id}.mp4",
+                "video_url": f"/api/previews/{packet_id}.mp4",
+                "frames": n, "ticks_per_second": tps, "total_ticks": n,
+                "ffmpeg_command": " ".join(cmd),
+                "content_sha256": _hh.sha256(data).hexdigest()}
+
+    @app.get("/api/previews/{packet_id}.mp4")
+    def preview_file(packet_id: str):
+        p = Path(project_dir) / "previews" / f"{packet_id}.mp4"
+        if not p.is_file():
+            raise HTTPException(404, f"no preview for packet {packet_id}")
+        return Response(content=p.read_bytes(), media_type="video/mp4",
+                        headers={"Cache-Control": "immutable, max-age=31536000"})
+
+    @app.get("/api/activity", response_model=ActivityPageDto)
+    def activity(since: str = "", limit: int = 200):
+        """DB-backed activity log with cursor catch-up (survives restarts; SSE does not)."""
+        from . import dto as _DTO
+        con = S.connect(project_dir)
+        try:
+            rows = con.execute("SELECT data FROM review_events").fetchall()
+        finally:
+            con.close()
+        evs = []
+        for r in rows:
+            raw = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
+            try:
+                evs.append(D.ReviewEvent.model_validate(raw))
+            except Exception:
+                continue
+        evs.sort(key=lambda e: (e.created_at, e.id))
+        if since:
+            idx = next((i for i, e in enumerate(evs) if e.id == since), None)
+            evs = evs[idx + 1:] if idx is not None else evs
+        page = evs[:max(1, min(limit, 500))]
+        return _DTO.ActivityPageDto.model_validate({
+            "events": [{"id": e.id, "action": e.action, "actor_type": e.actor_type,
+                        "actor_id": e.actor_id, "clip_revision_id": e.clip_revision_id,
+                        "packet_id": e.packet_id, "created_at": e.created_at,
+                        "note": e.note} for e in page],
+            "cursor": page[-1].id if page else (since or None)}).model_dump()
+
+    @app.post("/api/exports", status_code=201, response_model=ExportResultDto)
+    def exports_build(body: dict):
+        """Build a portable training snapshot through the desk (R5 semantics)."""
+        from ..exports import build_snapshot, validate_snapshot
+        name = str(body.get("name") or "").strip()
+        revs = body.get("revisions") or []
+        policy = body.get("policy") or {}
+        if not name or not revs:
+            raise HTTPException(422, "exports needs a name and a revision list")
+        out = str(Path(project_dir) / "exports" / name)
+        try:
+            man = build_snapshot(project_dir, name, list(revs), out, dict(policy))
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        except (S.ConflictError, FileExistsError, ValueError) as e:
+            raise HTTPException(409, str(e))
+        rep = validate_snapshot(out)
+        return {"name": name, "ok": rep["ok"], "issues": rep["issues"],
+                "skipped": rep.get("skipped", []), "counts": rep["counts"],
+                "exclusions": rep["exclusions"]}
+
+    @app.get("/api/exports/{name}", response_model=ExportResultDto)
+    def exports_get(name: str):
+        """Revalidate a desk-built export in place."""
+        from ..exports import validate_snapshot
+        out = Path(project_dir) / "exports" / name
+        if not (out / "manifest.json").is_file():
+            raise HTTPException(404, f"unknown export {name}")
+        rep = validate_snapshot(str(out))
+        return {"name": name, "ok": rep["ok"], "issues": rep["issues"],
+                "skipped": rep.get("skipped", []), "counts": rep["counts"],
+                "exclusions": rep["exclusions"]}
 
     @app.get("/api/events")
     async def events():
