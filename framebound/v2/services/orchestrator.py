@@ -263,6 +263,8 @@ def _authorize_send(project_dir: str, run_id: str, job_id: str,
             cap=os.environ.get('FRAMEBOUND_SPEND_CEILING','')
             if cap.startswith('calls-') and project_calls>=int(cap[6:]):
                 raise InvalidInput('project call ceiling exhausted')
+            from .specialist_repair import validate_job_in
+            validate_job_in(con,project_dir,job2,sending=True)
             from .provider_grants import reserve_in, DispatchPermit
             reserve_in(con,job2,simulation_mode)
             import secrets, hashlib

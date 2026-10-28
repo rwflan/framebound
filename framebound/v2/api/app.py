@@ -215,7 +215,7 @@ def create_app(project_dir: str) -> FastAPI:
     @app.post('/api/animation/runs')
     def animation_start(body: dict):
         from ..services.auto_repair import start_run
-        return start_run(project_dir,body['revision_id'],body.get('idempotency_key'))
+        return start_run(project_dir,body['revision_id'],body.get('idempotency_key'),provider_settings=body.get('provider_settings'),offline=body.get('offline',True))
 
     @app.post('/api/animation/runs/{run_id}/step')
     def animation_step(run_id: str):

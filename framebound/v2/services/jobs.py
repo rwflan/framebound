@@ -93,6 +93,15 @@ def _resolve_references(project_dir: str, brief: dict,
         plan = [("approved_identity", cb.identity_asset_id),
                 ("approved_style", cb.style_asset_id),
                 ("approved_phase", cb.phase_asset_id)]
+        controls=cb.brief.get('repair_controls')
+        if controls:
+            from .animation_context import resolve_in
+            contract=D.ClipContractRevision.model_validate(S.get(con,'contract_revisions',cb.contract_revision_id)[0])
+            approved,_=resolve_in(con,project_dir,contract)
+            op=D.AuthorizedOperation.model_validate(S.get(con,'authorized_operations',cb.brief['automatic_operation_id'])[0])
+            if approved.id!=op.compiled_plan_id or controls['scope_sha256']!=approved.controls[op.slot].scope_sha256:
+                raise InvalidInput('compiled redraw controls differ from approved operation')
+            plan += [(role,controls[key]) for role,key in (('source_candidate','source_asset_id'),('editable_support','editable_mask_asset_id'),('protected_support','protected_mask_asset_id')) if controls.get(key)]
         for role, aid in plan:
             try:
                 adata, _ = S.get(con, "assets", aid)
@@ -196,6 +205,8 @@ def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict]
                     provider_settings=settings, frozen_request=request,
                     frozen_request_sha256=request_digest,
                     offline=bool(offline))
+        from .specialist_repair import validate_job_in
+        validate_job_in(con,project_dir,job)
         job, created = S.create_job_idempotent(con, job)
         if not created:
             if job.offline != bool(offline) or job.max_attempts != max_attempts:
@@ -378,9 +389,19 @@ def job_complete_success(project_dir: str, job_id: str, *, worker_id: str,
         rights='unknown'
         if job.provider_settings.get('grant_id'):
             rights=S.get(con,'provider_grants',job.provider_settings['grant_id'])[0].get('output_rights','unknown')
+        parents=[]
+        cbid=job.request_brief.get('compiled_brief_id')
+        if cbid:
+            cb=D.CompiledBrief.model_validate(S.get(con,'compiled_briefs',cbid)[0])
+            parents=[cb.identity_asset_id,cb.style_asset_id,cb.phase_asset_id]
+            controls=cb.brief.get('repair_controls') or {}
+            parents += [controls[key] for key in ('source_asset_id','editable_mask_asset_id','protected_mask_asset_id') if controls.get(key)]
+            parents=list(dict.fromkeys(parents))
+            inherited={rights}|{S.get(con,'assets',parent)[0].get('rights','unknown') for parent in parents}
+            rights=next(iter(inherited)) if len(inherited)==1 else 'unknown' if 'unknown' in inherited else 'mixed'
         asset = _D.Asset(id=aid, byte_sha256=raw_digest, pixel_sha256=pix,
                          mime=mime or "image/png", width=w, height=h,
-                         source_kind="generated", rights=rights,source_job_id=job.id,origin=origin,
+                         source_kind="generated", rights=rights,source_job_id=job.id,origin=origin,parent_asset_ids=parents,
                          eligible_roles=[])
         with S.atomic(con):
             S.stage(con, asset)
