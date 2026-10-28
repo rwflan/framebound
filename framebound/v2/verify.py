@@ -146,28 +146,17 @@ def _check_sequences(con, issues: list[str]) -> None:
 
 
 def _check_evidence_freshness(con, project_dir: str, issues: list[str]) -> None:
+    # One shared verifier: manifest address, candidate/reference bytes +
+    # pixels, relevant annotations, analyzer and lock identity.
+    from .services import evidence as _EV
     for r in con.execute("SELECT id, data FROM evaluations").fetchall():
         try:
-            ev = json.loads(r["data"])
+            ev = D.Evaluation.model_validate_json(r["data"])
         except Exception:
             continue
-        manifest_blob = S.blob_path(project_dir, ev.get("evidence_manifest_sha256", ""))
-        if not manifest_blob.is_file():
-            issues.append(f"evaluations/{r['id']}: canonical manifest artifact missing from blob store")
-            continue
-        try:
-            manifest = json.loads(manifest_blob.read_text())
-        except Exception as e:
-            issues.append(f"evaluations/{r['id']}: manifest artifact undecodable: {e}")
-            continue
-        if manifest.get("evidence_sha_mismatch"):
-            issues.append(f"evaluations/{r['id']}: manifest integrity flag set")
-        # reference bytes still present and unchanged?
-        for slot, ref in (manifest.get("references") or {}).items():
-            bh = (ref or {}).get("byte_sha256")
-            if bh and not S.blob_path(project_dir, bh).is_file():
-                issues.append(f"evaluations/{r['id']}: reference bytes for slot {slot} gone; "
-                              "evidence is stale")
+        _, problems = _EV.verify_evidence(project_dir, ev.clip_revision_id, ev)
+        for problem in problems:
+            issues.append(f"evaluations/{r['id']}: {problem}")
     # superseded approvals referenced by newer briefs are history, not authority:
     # flag approvals whose event is not a reviewer decision
     for r in con.execute("SELECT id, data FROM reference_approvals").fetchall():

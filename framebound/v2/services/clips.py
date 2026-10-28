@@ -120,22 +120,44 @@ def evaluate(project_dir: str, revision_id: str, dep_lock_id: str | None = None)
             character: dict | None = chdata
         except KeyError:
             character = None
-        references, ref_byte_hashes = _resolve_guide_references(project_dir, con, contract)
-        annotation_hashes = []
-        for r in con.execute("SELECT data FROM annotation_revisions").fetchall():
+        references, ref_byte_hashes, authority = _resolve_guide_references(
+            project_dir, con, contract)
+        # Relevant annotations only: bound to this revision's frames or source
+        # assets. Unrelated project annotations never validate or invalidate
+        # this evidence.
+        frame_id_set = set(rev.frame_instance_ids)
+        asset_id_set = set(aids)
+        relevant = []
+        for r in con.execute("SELECT id, data FROM annotation_revisions").fetchall():
             try:
-                annotation_hashes.append(hashlib.sha256(r["data"].encode()).hexdigest())
+                ad = json.loads(r["data"])
             except Exception:
                 continue
+            if ad.get("frame_instance_id") in frame_id_set \
+                    or ad.get("source_asset_id") in asset_id_set:
+                relevant.append({"id": r["id"],
+                                 "sha256": hashlib.sha256(r["data"].encode()).hexdigest()})
+        relevant.sort(key=lambda a: a["id"])
+        world_positions, planted = _resolve_world_trace(project_dir, con, rev, contract)
+        repair = _resolve_repair_context(project_dir, con, rev)
+        rctx = dict(repair) if repair else {}
+        if world_positions is not None:
+            rctx.setdefault("world_trace_revision_ids", [])
         ctx = {"frame_byte_hashes": byte_hashes, "reference_byte_hashes": ref_byte_hashes,
                "character": character, "character_absent": character is None,
                "registration": {"records": reg_records,
                                 "complete": all(x is not None for x in reg_records)},
-               "annotation_hashes": sorted(annotation_hashes),
+               "annotation_hashes": sorted(a["sha256"] for a in relevant),
+               "annotations": relevant,
+               "authority": authority,
                "presented_holds": presented,
                "byte_hashes_complete": True, "origin": "stored-service"}
+        if repair:
+            ctx["repair"] = repair
         lock = dep_lock_id or _default_lock_id()
-        ev = EV.evaluate_frames(contract, frames, references, dep_lock_id=lock, context=ctx)
+        ev = EV.evaluate_frames(contract, frames, references, dep_lock_id=lock,
+                                world_positions=world_positions, planted=planted,
+                                context=ctx)
         manifest = EV.manifest_of(ev) or {}
         assert manifest, "evaluator must return its canonical manifest"
         # stable record identity: same revision + same evidence returns stored
@@ -176,13 +198,19 @@ def _resolve_guide_references(project_dir: str, con, contract: D.ClipContractRev
 
     Any gap (no character, no approval, guide mismatch, missing bytes) yields an
     empty map: reference-needing checks then report UNMEASURED instead of
-    measuring against fabricated authority.
+    measuring against fabricated authority. The returned authority binding
+    freezes which exact approval/guide conditioned this evaluation, so a later
+    re-approval cannot silently reinterpret old evidence.
     """
     try:
         from . import approvals as A
         approval = A.current_approval(project_dir, contract.character_revision_id)
         if not A.approval_event_is_human(project_dir, approval.event_id):
-            return {}, {}
+            return {}, {}, {}
+        authority = {"approval_id": approval.id,
+                     "approval_event_id": approval.event_id,
+                     "motion_guide_id": approval.motion_guide_id,
+                     "character_revision_id": contract.character_revision_id}
         gdata, _ = S.get(con, "motion_guides", approval.motion_guide_id)
         guide = D.MotionGuide.model_validate_json(json.dumps(gdata))
         by_phase = {e.phase: e for e in guide.entries}
@@ -190,19 +218,19 @@ def _resolve_guide_references(project_dir: str, con, contract: D.ClipContractRev
         for entry in contract.phase_schedule:
             ge = by_phase.get(entry.phase)
             if ge is None:
-                return {}, {}
+                return {}, {}, {}
             row = con.execute("SELECT data FROM assets WHERE id=?", (ge.asset_id,)).fetchone()
             if row is None:
-                return {}, {}
+                return {}, {}, {}
             blob = S.blob_path(project_dir, json.loads(row["data"])["byte_sha256"])
             if not blob.is_file():
-                return {}, {}
+                return {}, {}, {}
             from PIL import Image as _Image
             refs[entry.slot] = _Image.open(blob).convert("RGBA")
             hashes[entry.slot] = json.loads(row["data"])["byte_sha256"]
-        return refs, hashes
+        return refs, hashes, authority
     except Exception:
-        return {}, {}
+        return {}, {}, {}
 
 
 def _envelope_for(contract: D.ClipContractRevision, revision_id: str,
@@ -219,6 +247,130 @@ def _envelope_for(contract: D.ClipContractRevision, revision_id: str,
                                        {"id": ev.evidence_manifest_sha256, "role": "evidence_manifest"}],
                             next_actions=["review_packet_create"] if ev.technical_status == D.TechnicalStatus.PASS
                             else ["repair_plan"])
+
+
+def record_world_trace(project_dir: str, revision_id: str,
+                       positions: list[list[float]], planted: list[bool],
+                       units: str = "world_units") -> D.WorldTrace:
+    """Store frozen per-tick world grounding for one revision (operator/model tool).
+
+    Length must equal the contract's total held ticks; evaluation binds the
+    trace to world_sliding/declared_contacts instead of passing silently.
+    """
+    con = S.connect(project_dir)
+    try:
+        try:
+            rdata, _ = S.get(con, "clip_revisions", revision_id)
+        except KeyError:
+            raise InvalidInput(f"unknown clip revision {revision_id}")
+        rev = D.ClipRevision.model_validate_json(json.dumps(rdata))
+        cdata, _ = S.get(con, "contract_revisions", rev.contract_revision_id)
+        contract = D.ClipContractRevision.model_validate_json(json.dumps(cdata))
+        total = contract.timing.total_ticks()
+        if len(positions) != total or len(planted) != total:
+            raise InvalidInput(
+                f"world trace covers {len(positions)} ticks vs {total} held: "
+                "a partial trace can never ground sliding/contact checks")
+        for pos in positions:
+            if not isinstance(pos, (list, tuple)) or len(pos) != 2 \
+                    or any(not isinstance(v, (int, float)) or isinstance(v, bool)
+                           or v != v or abs(v) == float("inf") for v in pos):
+                raise InvalidInput("world positions must be finite [x, y] pairs")
+        if any(not isinstance(b, bool) for b in planted):
+            raise InvalidInput("planted flags must be booleans, one per tick")
+        wt = D.WorldTrace(id=f"wtrace-{revision_id}", clip_revision_id=revision_id,
+                          positions=[[float(v) for v in pos] for pos in positions],
+                          planted=list(planted), units=units)
+        with S.atomic(con):
+            try:
+                S.stage(con, wt)
+            except S.ConflictError:
+                raise S.ConflictError(
+                    f"world trace for {revision_id} already recorded (frozen)")
+    finally:
+        con.close()
+    return wt
+
+
+def _resolve_world_trace(project_dir: str, con, rev: D.ClipRevision,
+                         contract: D.ClipContractRevision):
+    """Load the stored per-tick grounding for this revision, if exactly one exists."""
+    rows = con.execute("SELECT data FROM world_traces WHERE id=?",
+                       (f"wtrace-{rev.id}",)).fetchall()
+    if not rows:
+        return None, None
+    wt = D.WorldTrace.model_validate_json(rows[0]["data"])
+    total = contract.timing.total_ticks()
+    if len(wt.positions) != total or len(wt.planted) != total:
+        return None, None  # malformed legacy trace: checks stay UNMEASURED, loudly
+    return [tuple(p) for p in wt.positions], list(wt.planted)
+
+
+def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
+    """Bind baseline pixels + approved edit support for a repaired revision.
+
+    Returns None for non-repaired revisions (repair_protection then stays
+    UNMEASURED when required). For a child of a repaired baseline, the baseline
+    is the parent's stored frames and the allowed support is the union of the
+    task's approved mask/ROI per repaired slot.
+    """
+    if not rev.parent_revision_id:
+        return None
+    try:
+        from . import masks as _M
+        from ..media.canonical import canonical_pixels as _canon
+        from PIL import Image as _Image
+        import io as _io
+        parent = None
+        try:
+            pdata, _ = S.get(con, "clip_revisions", rev.parent_revision_id)
+            parent = D.ClipRevision.model_validate_json(json.dumps(pdata))
+        except KeyError:
+            return None
+        task = None
+        for r in con.execute("SELECT data FROM correction_tasks").fetchall():
+            try:
+                # row data is already a JSON string; never double-encode it.
+                cand = D.CorrectionTask.model_validate_json(r["data"])
+            except Exception:
+                continue
+            if cand.baseline_revision_id == rev.parent_revision_id and cand.edit_mask_id:
+                task = cand
+                break
+        if task is None:
+            return None
+        base_by_slot: dict[int, bytes] = {}
+        for fid in parent.frame_instance_ids:
+            fdata, _ = S.get(con, "frame_instances", fid)
+            fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
+            adata, _ = S.get(con, "assets", fi.asset_id)
+            raw = S.blob_path(project_dir, adata["byte_sha256"]).read_bytes()
+            base_by_slot[fi.slot] = _canon(_Image.open(_io.BytesIO(raw)))
+        child_by_slot: dict[int, str] = {}
+        for fid in rev.frame_instance_ids:
+            fdata, _ = S.get(con, "frame_instances", fid)
+            fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
+            child_by_slot[fi.slot] = fi.asset_id
+        parent_by_slot: dict[int, str] = {}
+        for fid in parent.frame_instance_ids:
+            fdata, _ = S.get(con, "frame_instances", fid)
+            fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
+            parent_by_slot[fi.slot] = fi.asset_id
+        repaired = sorted(s for s, aid in child_by_slot.items()
+                          if parent_by_slot.get(s) != aid)
+        if not repaired:
+            return None
+        allowed = []
+        n = max(child_by_slot) + 1
+        for slot in range(n):
+            region = _M.allowed_region(project_dir, task, slot)
+            allowed.append(bytearray(region) if region is not None else bytearray(len(base_by_slot[slot]) // 4))
+        return {"baseline": [base_by_slot[s] for s in range(n)],
+                "allowed_mask": allowed,
+                "protected_mask": None,
+                "repaired_slots": repaired}
+    except Exception:
+        return None
 
 
 def _validate_transform(contract: D.ClipContractRevision, transform: dict | None,
@@ -245,9 +397,61 @@ def _validate_transform(contract: D.ClipContractRevision, transform: dict | None
     for op in spec.ops:
         if abs(op.dx) > budget or abs(op.dy) > budget:
             raise InvalidInput(f"translate ({op.dx},{op.dy}) exceeds frozen budget {budget}px")
+    # Composed displacement is what actually moves pixels: six dx=2 steps
+    # under a 2px budget compose to a 12px translation and are refused here.
+    total_dx = sum(op.dx for op in spec.ops)
+    total_dy = sum(op.dy for op in spec.ops)
+    if abs(total_dx) > budget or abs(total_dy) > budget:
+        raise InvalidInput(
+            f"composed translation ({total_dx},{total_dy}) exceeds frozen budget "
+            f"{budget}px: per-operation limits do not compose past the bound")
     if spec.per_pose_scale and contract.allowed_transforms.per_pose_scale is not True:
         raise InvalidInput("per-pose scale is frozen off by this contract")
     return spec
+
+
+def _verify_translation_pixels(project_dir: str, con, contract: D.ClipContractRevision,
+                                base_by_slot: list[tuple[int, str, str]],
+                                slot_asset_ids: dict[int, str],
+                                spec: D.TransformSpec | None) -> None:
+    """Independently verify the recorded transform against canonical pixels.
+
+    For every replaced slot carrying a translation record, applying the
+    composed translation to the baseline slot image must reproduce the
+    candidate pixels exactly. A schema-shaped record that disagrees with the
+    rendered pixels is refused; the registration keeps its `verified_translate`
+    label only when measurement agrees.
+    """
+    if spec is None or not spec.ops:
+        return
+    from PIL import Image as _Image
+    from ..media.canonical import canonical_pixels as _canon, pixel_sha256 as _pxh
+    import io as _io
+    dx = sum(op.dx for op in spec.ops)
+    dy = sum(op.dy for op in spec.ops)
+    w, h = contract.canvas.width, contract.canvas.height
+    for slot, _, _ in base_by_slot:
+        if slot not in slot_asset_ids:
+            continue
+        base_aid = next(aid for s, aid, _ in base_by_slot if s == slot)
+        try:
+            bdata, _ = S.get(con, "assets", base_aid)
+            cdata, _ = S.get(con, "assets", slot_asset_ids[slot])
+        except KeyError:
+            raise InvalidInput("missing_input: translation verification needs stored assets")
+        braw = S.blob_path(project_dir, bdata["byte_sha256"]).read_bytes()
+        craw = S.blob_path(project_dir, cdata["byte_sha256"]).read_bytes()
+        base = _Image.open(_io.BytesIO(braw)).convert("RGBA")
+        if base.size != (w, h):
+            raise InvalidInput(
+                f"slot {slot}: baseline {base.size} != frozen canvas {(w, h)}: "
+                "translation is measured on the native canvas only, never resampled")
+        moved = _Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        moved.paste(base, (dx, dy))
+        if _pxh(_canon(moved)) != _pxh(_canon(_Image.open(_io.BytesIO(craw)).convert("RGBA"))):
+            raise InvalidInput(
+                f"slot {slot}: recorded translation ({dx},{dy}) does not reproduce "
+                "the candidate pixels; the transform record is not verified")
 
 
 def _check_mirror_policy(con, contract: D.ClipContractRevision, recipe: str,
@@ -302,6 +506,11 @@ def register_candidate(project_dir: str, baseline_revision_id: str, new_revision
             fdata, _ = S.get(con, "frame_instances", fid)
             f = D.FrameInstance.model_validate_json(json.dumps(fdata))
             base_aids.append((f.slot, f.asset_id, f.phase))
+        # The `verified_translate` registration label is earned by measurement,
+        # not by the record's shape: the composed translation must reproduce
+        # the candidate pixels exactly.
+        _verify_translation_pixels(project_dir, con, contract, base_aids,
+                                    slot_asset_ids, transform)
         with S.atomic(con):
             inst_ids = []
             for slot, aid, phase in base_aids:

@@ -189,6 +189,13 @@ def build_server(project_dir: str) -> MCPServer:
                                    baseline_evaluation_id=baseline_evaluation_id,
                                    idempotency_key=idempotency_key)
 
+    @server.tool(name="world_trace_record", description="Store frozen per-tick world grounding for a revision")
+    def world_trace_record(revision_id: str, positions: list[list[float]],
+                           planted: list[bool]) -> dict:
+        from ..services import clips
+        return clips.record_world_trace(project_dir, revision_id, positions,
+                                        planted).model_dump()
+
     @server.tool(name="eligibility_get", description="Release eligibility for a revision")
     def eligibility_get(revision_id: str) -> dict:
         from ..services import eligibility as E
