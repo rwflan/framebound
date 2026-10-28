@@ -127,6 +127,30 @@
       "title": "Dispatch Count",
       "type": "integer"
     },
+    "dispatch_run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dispatch Run Id"
+    },
+    "settlement": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Settlement"
+    },
     "dispatch_inflight": {
       "default": false,
       "title": "Dispatch Inflight",

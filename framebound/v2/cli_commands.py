@@ -184,6 +184,17 @@ def dispatch(args) -> dict:
         return A.approve_reference(args.project, _Actor(type="reviewer", id=reviewer),
                                    args.character, args.guide,
                                    getattr(args, "event_id", None)).model_dump()
+    if cmd=='provider-reconcile':
+        from .services.provider_recovery import reconcile
+        import os
+        return reconcile(args.project,args.job_id,json.loads(open(args.receipt).read()),args.operator_secret or os.environ.get('FRAMEBOUND_OPERATOR_SECRET',''))
+    if cmd=='provider-grant-get':
+        from .services.provider_grants import get_grant
+        return get_grant(args.project,args.grant_id)
+    if cmd=='provider-grant-revoke':
+        from .services.provider_grants import revoke
+        import os
+        return revoke(args.project,args.grant_id,int(args.expected_version),args.operator_secret or os.environ.get('FRAMEBOUND_OPERATOR_SECRET',''))
     if cmd.startswith('animation-'):
         from .services import auto_repair as A
         if cmd=='animation-compile':return A.compile_plan(args.project,args.contract_id)

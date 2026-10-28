@@ -271,6 +271,8 @@ def _authorize_send(project_dir: str, run_id: str, job_id: str,
             token=secrets.token_hex(24)
             job2.dispatch_token_sha256=hashlib.sha256(token.encode()).hexdigest()
             job2.wire_started=False
+            job2.dispatch_run_id=run_id
+            job2.settlement='reserved'
             job2.dispatch_inflight = True
             job2.dispatch_count += 1
             if not job2.provider_settings.get('grant_id'):

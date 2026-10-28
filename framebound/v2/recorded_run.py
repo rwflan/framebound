@@ -1,25 +1,11 @@
-"""DEPRECATED (Stage A corrected handoff): four-capability recorded workflow.
+"""Persistent optional image/edit/SAM probe through the durable controller.
 
-Retired from the active workflow and completion gates. Historical bundles remain
-readable; new automatic work uses the deterministic offline check/repair path plus
-explicit image/edit/segmentation providers through the durable controller.
-The Spark critique capability is advisory-only and never a readiness gate.
-
-Four-capability recorded workflow through the real durable controller (historical).
-
-Unlike the procedural replay (demo_wp6), this path exercises the actual
-provider stack bound to stored human approval: a Spark tool-loop critique,
-reference-conditioned image generation, an actual image edit chained from
-the generation response, and SAM segmentation — each through the real
-controller/adapter path with its own request/response IDs, verified
-artifacts, dependencies, status, and usage. Without credentials it records
-a pending bundle naming the blocker — it never fabricates output, approval,
-or a live loop. Human acceptance stays UNREVIEWED until a real reviewer acts.
-
-Restart/idempotency: per-capability idempotency keys make a re-run with the
-same key return the same bundle (no second spend). Post-provider import
-failure preserves the paid response and retries without another provider
-call. A skipped capability can never yield an overall pass.
+It is separate from automatic native repair and requires approved references.
+Pending stages resume with their original keys and exact requests; completed
+jobs reuse persisted output. Bundle history is immutable and an offline
+workflow cannot silently become live. The legacy explicit critique option
+exists only for historical adapter compatibility and never gates readiness.
+No critic is called by the CLI, live verifier or automatic engine.
 """
 from __future__ import annotations
 
@@ -64,7 +50,18 @@ def _inputs_digest(contract_id: str, slot: int, baseline_revision_id: str,
 def _write_bundle(out_path: Path, bundle: dict) -> dict:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(bundle, indent=2) + "\n")
+    import os,uuid
+    encoded=json.dumps(bundle,indent=2)+'\n'
+    if out_path.is_file():
+        previous=out_path.read_bytes()
+        if previous==encoded.encode():return bundle
+        history=out_path.with_name(out_path.name+'.history');history.mkdir(exist_ok=True)
+        archived=history/(hashlib.sha256(previous).hexdigest()+'.json')
+        if not archived.exists():archived.write_bytes(previous)
+    temporary=out_path.with_name(out_path.name+'.new-'+uuid.uuid4().hex)
+    with temporary.open('x') as stream:
+        stream.write(encoded);stream.flush();os.fsync(stream.fileno())
+    os.replace(temporary,out_path)
     return bundle
 
 
@@ -189,6 +186,8 @@ def _controller_send(project_dir: str, brief: dict, idem: str, *,
                 "response_artifact": data.get("response_artifact"),
                 "request_artifact": data.get("request_artifact"),
                 "usage": {}, "origin": data.get("origin", "unknown")}
+    if data['status']!='queued':
+        raise RuntimeError(f"controller job {job_id} is {data['status']}; inspect/reconcile its existing outcome before retry")
     run = O.start_run(project_dir, [job_id])
     step = O.run_once(project_dir, run["run_id"], worker_id="recorded-run")
     if step["action"] != "send_ready":
@@ -346,6 +345,19 @@ def _capability_sam(project_dir: str, image_bytes: bytes, prompt: str,
             "proposals": proposals, "origin": res.get("origin")}
 
 
+def _exclusive_bundle(function):
+    from functools import wraps
+    from filelock import FileLock
+    @wraps(function)
+    def wrapped(project_dir,out_path,*args,**kwargs):
+        Path(out_path).parent.mkdir(parents=True,exist_ok=True)
+        with FileLock(str(out_path)+'.lock'):
+            result=function(project_dir,out_path,*args,**kwargs)
+            return result
+    return wrapped
+
+
+@_exclusive_bundle
 def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int,
                  baseline_revision_id: str, new_revision_id: str,
                  offline: bool = True, transport=None,
@@ -367,14 +379,32 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
     digest = _inputs_digest(contract_id, slot, baseline_revision_id,
                             new_revision_id, idempotency_key)
     prior = _read_bundle(Path(out_path))
-    if prior and prior.get("inputs_digest") == digest and prior.get("status") in (
-            "recorded", "recorded-failure", "blocked"):
-        return prior
-    if Path(out_path).exists():
+    if prior and prior.get('inputs_digest')==digest:
+        if prior.get('status')=='recorded':return prior
+        if prior.get('status')=='recorded-failure':
+            con=S.connect(project_dir)
+            try:
+                for capability in prior.get('capabilities',[]):
+                    jid=capability.get('job_id')
+                    if jid and capability.get('status')=='failed':
+                        current=S.get(con,'jobs',jid)[0]
+                        if current['status'] in ('failed','cancelled','succeeded') and current.get('response_artifact')==capability.get('response_artifact'):
+                            return prior  # known terminal outcome, including no-match; no blind retry
+            finally:con.close()
+        if prior.get('offline') is True and not offline:
+            raise S.ConflictError('persisted offline workflow cannot become live; authorize a new workflow key/path')
+    elif Path(out_path).exists():
         raise S.ConflictError(
             f"refusing to overwrite {out_path} with different inputs: recorded "
             "bundles are non-destructive (use a new idempotency key)")
     prepared = prepare(project_dir, contract_id, slot)
+    if prior:
+        previous_brief=(prior.get('prepared') or {}).get('compiled_brief_id')
+        if previous_brief and previous_brief!=prepared['compiled_brief_id']:
+            raise S.ConflictError('recorded workflow reference authority changed; use a new explicit workflow')
+        previous_conditioning=prior.get('conditioning_sha256')
+        if previous_conditioning and previous_conditioning!=prepared['conditioning_sha256']:
+            raise S.ConflictError('recorded workflow conditioning changed')
     try:
         _check_baseline_contract(project_dir, contract_id, baseline_revision_id)
     except InvalidInput as e:
@@ -390,7 +420,7 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
     if offline or (transport is None and spark_transport is None
                    and sam_transport is None and not live_key):
         return _write_bundle(Path(out_path), {
-            "origin": "blocked", "status": "blocked",
+            "origin": "blocked", "status": "blocked", "offline":bool(offline),
             "blocker": "no live provider call: offline mode or MODEL_API_KEY absent; "
                        "configure an authorized participant credential for the live spike",
             "contract_id": contract_id, "slot": slot,
@@ -424,9 +454,6 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
             project_dir, contract_summary, frame_blobs, f"{idempotency_key}-spark",
             transport=spark_transport if spark_transport is not None else transport,
             timeout=timeout))
-    else:
-        capabilities.append({"capability": "spark-critique", "status": "skipped-retired",
-                             "note": "retired from active workflow; advisory only, never a gate"})
     # Capability 2: reference-conditioned generation through the controller.
     try:
         gen = _controller_send(project_dir, prepared["brief"], f"{idempotency_key}-gen",
@@ -442,10 +469,7 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
             "capabilities": capabilities,
             "inputs_digest": digest, "idempotency_key": idempotency_key,
             "note": "generation failed; recorded, not retried, not cherry-picked"})
-    gen_asset = _materialize_generated(
-        project_dir, gen["output_bytes"], f"{new_revision_id}-gen",
-        gen["output_mime"], gen["output_size"][0], gen["output_size"][1],
-        origin=gen.get("origin", origin),parent_asset_id=gen["output_asset_id"],source_job_id=gen["job_id"])
+    gen_asset=_native_output(project_dir,gen,contract_id,f'{new_revision_id}-gen',canvas)
     if (gen_asset.width, gen_asset.height) != canvas:
         return _write_bundle(Path(out_path), {
             "origin": origin, "status": "recorded-failure",
@@ -474,10 +498,7 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
                                "edit_instruction": "bounded patch: keep canvas, "
                                "calibration and protected regions; adjust the "
                                "faulted phase within the approved scope"})
-        edit_asset = _materialize_generated(
-            project_dir, edit["output_bytes"], f"{new_revision_id}-edit",
-            edit["output_mime"], edit["output_size"][0], edit["output_size"][1],
-            origin=edit.get("origin", origin),parent_asset_id=edit["output_asset_id"],source_job_id=edit["job_id"])
+        edit_asset=_native_output(project_dir,edit,contract_id,f'{new_revision_id}-edit',canvas)
         if (edit_asset.width, edit_asset.height) != canvas:
             raise RuntimeError(f"edit {(edit_asset.width, edit_asset.height)} != canvas")
         capabilities.append({"capability": "image-edit", "status": "recorded",
@@ -495,15 +516,28 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
         edit_asset, edit_bytes = None, None
     # Register + evaluate the generated revision (edit is auxiliary evidence).
     try:
-        env = clips.register_candidate(project_dir, baseline_revision_id, new_revision_id,
-                                       {slot: gen_asset.id}, f"recorded-run:{origin}")
+        con=S.connect(project_dir)
+        try:
+            try:
+                existing,_=S.get(con,'clip_revisions',new_revision_id)
+                existing_asset=S.get(con,'frame_instances',existing['frame_instance_ids'][slot])[0]['asset_id']
+                if existing.get('parent_revision_id')!=baseline_revision_id or existing_asset!=gen_asset.id:
+                    raise S.ConflictError('recorded revision id is already bound to different pixels')
+                exists=True
+            except KeyError:exists=False
+        finally:con.close()
+        if not exists:
+            clips.register_candidate(project_dir,baseline_revision_id,new_revision_id,{slot:gen_asset.id},f'recorded-run:{origin}')
         ev = clips.evaluate(project_dir, new_revision_id)
+        con=S.connect(project_dir)
+        try:stored_evaluation=D.Evaluation.model_validate(S.get(con,'evaluations',ev.artifacts[0]['id'])[0])
+        finally:con.close()
         pkt = packets.create_packet(project_dir, f"pkt-{new_revision_id}", new_revision_id,
                                     ev.artifacts[0]["id"],
                                     f"recorded {origin} run for {contract_id} slot {slot}",
                                     comparison_revision_id=baseline_revision_id)
         reg = {"revision_id": new_revision_id, "evaluation_id": ev.artifacts[0]["id"],
-               "technical_status": ev.technical_status.value,
+               "technical_status": ev.technical_status.value,"coverage_status":stored_evaluation.coverage_status.value,
                "packet_id": pkt.artifacts[0]["id"], "status": "recorded"}
     except Exception as e:
         return _write_bundle(Path(out_path), {
@@ -520,7 +554,7 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
             "inputs_digest": digest, "idempotency_key": idempotency_key,
             "note": "truthful partial bundle: spend happened, import did not"})
     # Capability 4: SAM segmentation of the generated pixels.
-    sam_cap = _capability_sam(project_dir, gen["output_bytes"], "figure",
+    sam_cap = _capability_sam(project_dir, S.blob_path(project_dir,gen_asset.byte_sha256).read_bytes(), "figure",
                               canvas[0], canvas[1], gen_asset, view,
                               f"{new_revision_id}-prop",
                               transport=sam_transport if sam_transport is not None
@@ -529,8 +563,8 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
     capabilities.append(sam_cap)
     # Stage A corrected handoff: spark-critique is advisory-only and never gates.
     failed = [c for c in capabilities if c.get("capability") != "spark-critique" and c.get("status") != "recorded"]
-    status = "recorded" if not failed and ev.technical_status == D.TechnicalStatus.PASS \
-        else "recorded-failure"
+    from .services.auto_repair import technically_ready
+    status='recorded' if not failed and technically_ready(stored_evaluation) else 'recorded-failure'
     bundle = {
         "origin": origin,
         "status": status,
@@ -563,3 +597,15 @@ def run_recorded(project_dir: str, out_path: str, *, contract_id: str, slot: int
     except Exception:
         pass
     return out
+
+
+def _native_output(project_dir,result,contract_id,asset_id,canvas):
+    from .media.canonical import load_native_image
+    try:
+        image=load_native_image(result['output_bytes'])
+    except ValueError:image=None
+    if image is not None and image.size==canvas:
+        return _materialize_generated(project_dir,result['output_bytes'],asset_id,'image/png',*canvas,
+            origin=result.get('origin'),parent_asset_id=result['output_asset_id'],source_job_id=result['job_id'])
+    from .services.animation_context import calibrate_source
+    return calibrate_source(project_dir,contract_id,result['output_asset_id'],asset_id)

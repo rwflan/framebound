@@ -7,6 +7,7 @@ from pathlib import Path
 from . import domain as D
 
 from .services.provider_grants import ProviderGrant
+from .services.provider_recovery import ProviderReceipt
 
 MODELS = {
     "project": D.Project, "asset": D.Asset, "character_revision": D.CharacterRevision,
@@ -21,6 +22,7 @@ MODELS = {
     "reference_approval": D.ReferenceApproval, "registration": D.Registration,
     "compiled_animation_plan":D.CompiledAnimationPlan,"authorized_operation":D.AuthorizedOperation,
     "repair_policy":D.RepairPolicy,"source_calibration":D.SourceCalibration,
+    "provider_reconciliation":D.ProviderReconciliation,"provider_receipt":ProviderReceipt,
     "edit_mask": D.EditMask, "provider_grant": ProviderGrant,
 }
 
