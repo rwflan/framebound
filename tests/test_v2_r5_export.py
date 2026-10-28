@@ -263,7 +263,7 @@ class TestPreferences(unittest.TestCase):
             _fix_flow(td)
             out = Path(td) / "snap"
             man = build_snapshot(td, "pref", ["rev-good", "rev-bad", "rev-fix"],
-                                 str(out), {})
+                                 str(out), {'include_procedural_positives':True})
             prefs = [json.loads(l) for l in
                      (out / "preferences.jsonl").read_text().splitlines() if l.strip()]
             self.assertEqual(len(prefs), 1)
