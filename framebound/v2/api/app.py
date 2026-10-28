@@ -670,7 +670,8 @@ def create_app(project_dir: str) -> FastAPI:
                 fi = D.FrameInstance.model_validate_json(json.dumps(fdata))
                 adata, _ = S.get(con, "assets", fi.asset_id)
                 raw = S.blob_path(project_dir, adata["byte_sha256"]).read_bytes()
-                imgs.append((_Image.open(__import__("io").BytesIO(raw)).convert("RGBA"),
+                from ..media.canonical import load_native_image
+                imgs.append((load_native_image(raw),
                              fi.slot, fi.asset_id))
         except KeyError as e:
             raise HTTPException(404, str(e))

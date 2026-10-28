@@ -146,4 +146,12 @@ def verify_evidence_in(con, project_dir: str, revision_id: str,
         # --- contract binding
         if (manifest.get("contract") or {}).get("id") != contract.id:
             issues.append("manifest contract does not match stored revision contract")
+        if not issues:
+            from .clips import compute_evaluation_in
+            try:
+                _, current, _ = compute_evaluation_in(con, project_dir, revision_id)
+                if current.evidence_manifest_sha256 != evaluation.evidence_manifest_sha256:
+                    issues.append('applicable evidence context changed: re-evaluate')
+            except Exception as exc:
+                issues.append(f'current evidence inputs unavailable: {exc}')
     return (not issues), issues
