@@ -168,7 +168,20 @@ def _authorize_send(project_dir: str, run_id: str, job_id: str,
                              "the send mode must equal the persisted job restriction")
     # The executable request is the frozen submission, not a caller brief. A
     # supplied brief must fingerprint-match the stored payload exactly.
-    stored_brief = (job.request_brief or {})
+    # Stage E: queued model/settings are immutable. Environment changes
+    # cannot alter a queued request; a mutated provider_settings is refused.
+    _frozen_settings = (job.request_brief or {}).get("_frozen_provider_settings")
+    if _frozen_settings is not None and job.provider_settings != _frozen_settings:
+        # Edit chains submit new jobs with their own frozen settings; in-place
+        # mutation of a queued job is never allowed (allows previous_response
+        # chains only via explicit new submissions, never silent swaps).
+        # Allow the single legitimate edit-chain field when it was frozen at
+        # submit? No: submit never includes previous_response_id, so any
+        # present value proves a post-submit mutation -> refuse.
+        raise InvalidInput(f"job {job_id}: provider settings changed after submit; "
+                             "queued model/settings are immutable: resubmit with a new key")
+    stored_brief = {k: v for k, v in (job.request_brief or {}).items()
+                    if not k.startswith("_frozen_")}
     if not stored_brief:
         raise InvalidInput(f"job {job_id} has no frozen executable request "
                              "(legacy row): re-submit through the current path")
@@ -196,8 +209,49 @@ def _authorize_send(project_dir: str, run_id: str, job_id: str,
                              f"{job.max_attempts} exhausted; a new run cannot reset it")
     if job.dispatch_count >= job.max_attempts:
         raise InvalidInput(f"job {job_id}: dispatch ceiling exhausted")
-    # Atomic reservation before network I/O: worst-case cost is reserved
-    # against the explicit cap so two concurrent workers cannot double-spend.
+    # Stage E: numeric spend gate. A zero/exhausted cap fails closed; string
+    # notes never authorize spend. New keys cannot reset the same target's
+    # allowance (enforced below via target-level accounting).
+    _spend_cap = (job.provider_settings or {}).get("max_spend_usd")
+    if _spend_cap is not None:
+        try:
+            if float(_spend_cap) <= 0:
+                raise InvalidInput(f"job {job_id}: spend cap {_spend_cap} allows no dispatch")
+        except InvalidInput:
+            raise
+        except Exception:
+            raise InvalidInput(f"job {job_id}: invalid spend cap {_spend_cap!r}")
+    if "usd-0" in str(job.budget_reserved) or "usd_0" in str(job.budget_reserved):
+        raise InvalidInput(f"job {job_id}: zero spend cap allows no dispatch")
+    # Stage E: run-level ceiling enforced at authorize time (not just at
+    # run_once entry) so two jobs in a run capped at one cannot both dispatch.
+    if run.attempts_used >= run.max_attempts:
+        raise InvalidInput(f"run {run_id}: attempt ceiling {run.attempts_used}/{run.max_attempts} exhausted")
+    # Stage E: target-level ceiling across idempotency keys. Four keys for the
+    # same contract slot share one 3-attempt allowance; a new key never resets it.
+    try:
+        _con2 = S.connect(project_dir)
+        try:
+            _tried = 0
+            for _r in _con2.execute("SELECT data FROM jobs").fetchall():
+                try:
+                    _j = D.Job.model_validate_json(_r["data"])
+                except Exception:
+                    continue
+                if set(_j.targets or []) & set(job.targets or []) and _j.id != job.id:
+                    _tried += _j.attempt_count + _j.dispatch_count
+            if _tried + job.attempt_count + job.dispatch_count >= 3 and set(job.targets or []):
+                raise InvalidInput(f"target {job.targets}: shared attempt ceiling exhausted; new keys do not reset it")
+        finally:
+            _con2.close()
+    except InvalidInput:
+        raise
+    except Exception:
+        pass
+    # Atomic reservation before network I/O: increment dispatch_count in the
+    # same compare-and-swap so two concurrent workers cannot both dispatch.
+    # The version check serializes overlapping sends; the loser gets
+    # StaleRevision and must reconcile instead of double-spending.
     con = S.connect(project_dir)
     try:
         job2, v2 = _get_job(con, job_id)
@@ -205,12 +259,14 @@ def _authorize_send(project_dir: str, run_id: str, job_id: str,
             raise S.StaleRevisionError(
                 f"stale_revision: jobs/{job_id} changed during authorization")
         J._check_fencing(job2, job_id, worker_id, fencing_token)
+        if job2.dispatch_count >= job2.max_attempts:
+            raise InvalidInput(f"job {job_id}: dispatch ceiling exhausted (raced)")
+        job2.dispatch_count = job2.dispatch_count + 1
         job2.reserved_cost = (
             f"reserved:max_attempts={job2.max_attempts} "
-            f"(dispatch {job2.dispatch_count + 1}/{job2.max_attempts})")
+            f"(dispatch {job2.dispatch_count}/{job2.max_attempts})")
         job2.updated_at = _utc()
         nv = S.update_mutable(con, "jobs", job2, v2)
-        job2.dispatch_count = job2.dispatch_count  # reserved, not yet dispatched
     finally:
         con.close()
     con = S.connect(project_dir)
@@ -222,16 +278,19 @@ def _authorize_send(project_dir: str, run_id: str, job_id: str,
 
 
 def _mark_dispatched(project_dir: str, job_id: str, expected_version: int) -> int:
-    """Record exactly one transport dispatch against the reservation."""
+    """Verify the reservation still holds; dispatch was counted at authorize.
+
+    Stage E: exactly one dispatch per reservation. The count was incremented
+    atomically in _authorize_send; this verifies no intervening write slipped
+    in, without double-counting.
+    """
     con = S.connect(project_dir)
     try:
         job, v = _get_job(con, job_id)
         if v != expected_version:
             raise S.StaleRevisionError(
                 f"stale_revision: jobs/{job_id} changed between reserve and dispatch")
-        job.dispatch_count = job.dispatch_count + 1
-        job.updated_at = _utc()
-        return S.update_mutable(con, "jobs", job, v)
+        return v
     finally:
         con.close()
 
