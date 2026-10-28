@@ -19,6 +19,29 @@ from .. import storage as S
 from . import packets as P
 
 
+def _lineage(con, revision_id: str) -> list[str]:
+    """Revision plus its parent chain: an unresolved task on an ancestor
+    blocks descendants under the documented correction policy, without
+    blocking unrelated siblings."""
+    chain = [revision_id]
+    seen = {revision_id}
+    cur = revision_id
+    for _ in range(64):
+        row = con.execute("SELECT data FROM clip_revisions WHERE id=?", (cur,)).fetchone()
+        if row is None:
+            break
+        try:
+            parent = D.ClipRevision.model_validate_json(row["data"]).parent_revision_id
+        except Exception:
+            break
+        if not parent or parent in seen:
+            break
+        chain.append(parent)
+        seen.add(parent)
+        cur = parent
+    return chain
+
+
 def release_eligibility(project_dir: str, revision_id: str) -> dict:
     reasons: list[str] = []
     eligible = True
@@ -47,47 +70,35 @@ def release_eligibility(project_dir: str, revision_id: str) -> dict:
         if not verdict:
             eligible = False
             reasons.append("evidence invalid: " + "; ".join(problems[:4]))
-        # exact-revision + exact-evaluation human approval through a packet.
-        # A later reject/needs_changes/reopen for this revision invalidates it:
-        # approval is current acceptance, not a historical event.
-        approved = False
-        approved_at = ""
-        for r in con.execute("SELECT data FROM review_events").fetchall():
-            try:
-                ev = D.ReviewEvent.model_validate_json(r["data"])
-            except Exception:
-                continue
-            if ev.action != "approve" or ev.actor_type != "reviewer":
-                continue
-            if ev.clip_revision_id != revision_id or not ev.packet_id:
-                continue
-            try:
-                pdata, _ = S.get(con, "review_packets", ev.packet_id)
-            except KeyError:
-                continue
-            pkt = D.ReviewPacket.model_validate_json(json.dumps(pdata))
-            if pkt.clip_revision_id == revision_id and pkt.evaluation_id == latest.id:
-                approved = pkt.id
-                approved_at = ev.created_at
-                break
-        if not approved:
+        # Current human acceptance comes from the single ordered reducer
+        # (approve -> reject -> approve reduces to approved). Release then
+        # needs that decision bound to this exact revision+evaluation through
+        # a packet: packetless decisions are acceptance signal, not release.
+        from . import review_state as _RS
+        state = _RS.current_state(project_dir, revision_id)
+        if state["acceptance"] != D.HumanAcceptance.APPROVED.value:
             eligible = False
-            reasons.append("no reviewer approval binds this exact revision+evaluation via a packet")
+            reasons.append(f"current human acceptance is {state['acceptance']}, not approved")
         else:
-            for r in con.execute("SELECT data FROM review_events").fetchall():
+            pkt_id = state.get("decided_packet_id")
+            bound = False
+            if pkt_id:
                 try:
-                    ev = D.ReviewEvent.model_validate_json(r["data"])
-                except Exception:
-                    continue
-                if ev.clip_revision_id != revision_id:
-                    continue
-                if ev.action in ("reject", "needs_changes", "reopen_issue") \
-                        and ev.created_at > approved_at:
-                    eligible = False
-                    reasons.append(f"{ev.action} at {ev.created_at} supersedes the approval")
-                    break
-        # unresolved blocking tasks (baseline or attempt references this revision)
+                    pdata, _ = S.get(con, "review_packets", pkt_id)
+                    pkt = D.ReviewPacket.model_validate_json(json.dumps(pdata))
+                    bound = (pkt.clip_revision_id == revision_id
+                             and pkt.evaluation_id == latest.id)
+                except KeyError:
+                    bound = False
+            if not bound:
+                eligible = False
+                reasons.append("the current approval is not bound to this exact "
+                               "revision+evaluation via a packet")
+        # Unresolved blocking tasks: the revision's own tasks (baseline or
+        # published candidate) plus tasks on its ancestors. Siblings with
+        # their own lineage are unaffected.
         blocking = []
+        lineage = set(_lineage(con, revision_id))
         for r in con.execute("SELECT data FROM correction_tasks").fetchall():
             try:
                 t = D.CorrectionTask.model_validate_json(r["data"])
@@ -95,7 +106,10 @@ def release_eligibility(project_dir: str, revision_id: str) -> dict:
                 continue
             if t.status in (D.CorrectionStatus.RESOLVED, D.CorrectionStatus.CANCELLED):
                 continue
-            if t.baseline_revision_id == revision_id or revision_id in (t.attempt_ids or []):
+            if t.baseline_revision_id in lineage:
+                blocking.append(t.id)
+                continue
+            if lineage & _RS._candidate_revisions(con, t):
                 blocking.append(t.id)
         if blocking:
             eligible = False
