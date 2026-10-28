@@ -22,6 +22,42 @@ class CanvasDto(Strict):
     units: str = "native_px"
 
 
+class CharacterReferenceDto(Strict):
+    id: str
+    identity_asset_ids: list[str]
+    style_asset_ids: list[str]
+
+
+class GuideEntryDto(Strict):
+    phase: str
+    asset_id: str
+
+
+class GuideReferenceDto(Strict):
+    id: str
+    character_revision_id: str
+    entries: list[GuideEntryDto]
+
+
+class ReferenceApprovalDto(Strict):
+    character_revision_id: str
+    motion_guide_id: str
+
+
+class ReferencesDto(Strict):
+    character_revisions: list[CharacterReferenceDto]
+    motion_guides: list[GuideReferenceDto]
+    reference_approvals: list[ReferenceApprovalDto]
+    assets: list[dict[str, Any]]
+
+
+class ReferenceApproveBodyDto(Strict):
+    model_config = {'extra': 'forbid'}
+    character_revision_id: str
+    motion_guide_id: str
+    event_id: str | None = None
+
+
 class TimingDto(Strict):
     ticks_per_second: int = 60
     holds: list[int] = Field(default_factory=list)

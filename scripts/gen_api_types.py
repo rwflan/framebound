@@ -29,6 +29,8 @@ HEADER = """/**
 """
 
 ENDPOINTS: list[tuple[str, str, str, str | None, str]] = [
+    ('GET', '/api/references', 'Record<string, never>', None, 'ReferencesDto'),
+    ('POST', '/api/references/approve', 'Record<string, never>', 'ReferenceApproveBodyDto', 'DecisionResultDto'),
     # (method, path, params_type, body_type, result_type)
     ("GET", "/api/health", "Record<string, never>", None, "HealthDto"),
     ("GET", "/api/project", "Record<string, never>", None, "ProjectSummaryDto"),

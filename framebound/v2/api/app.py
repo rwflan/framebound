@@ -29,6 +29,7 @@ from .. import storage as S
 from ..services.authz import Actor
 from .dto import (ActivityPageDto, CompareBundleDto, CorrectionsListDto, EligibilityDto, ExportResultDto, IssueDetailDto, PacketBundleDto, TaskStatusDto)
 from ..services.errors import AuthorizationError, InvalidInput, StaleRevision as SvcStale
+from .dto import ReferencesDto, ReferenceApproveBodyDto as ReferenceBody
 
 
 class IssueBody(D.Strict):
@@ -210,6 +211,23 @@ def create_app(project_dir: str) -> FastAPI:
     def project():
         from ..services import projects
         return {"summary": projects.get_summary(project_dir)}
+
+    @app.get('/api/references', response_model=ReferencesDto)
+    def references():
+        con = S.connect(project_dir)
+        try:
+            return {table:[json.loads(r['data']) for r in con.execute(f'SELECT data FROM {table}')]
+                    for table in ('character_revisions','motion_guides','reference_approvals','assets')}
+        finally:
+            con.close()
+
+    @app.post('/api/references/approve')
+    def approve_references(body: ReferenceBody,
+                           x_session_token: str | None = Header(default=None),
+                           x_actor_id: str | None = Header(default=None)):
+        from ..services import approvals
+        return approvals.approve_reference(project_dir, actor(x_session_token,x_actor_id),
+                    body.character_revision_id,body.motion_guide_id,body.event_id).model_dump()
 
     @app.get("/api/packets")
     def packets():
