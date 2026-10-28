@@ -74,7 +74,8 @@
         "mark_issue",
         "resolve_issue",
         "reopen_issue",
-        "approve_mask"
+        "approve_mask",
+        "machine_fault"
       ],
       "title": "Action",
       "type": "string"

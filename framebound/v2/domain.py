@@ -410,7 +410,7 @@ class ReviewEvent(Strict):
     id: str = Field(min_length=1, max_length=128)
     actor_type: Literal["reviewer", "orchestrator", "system"] = "reviewer"
     actor_id: str = Field(min_length=1, max_length=200)
-    action: Literal["approve_reference", "approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue", "approve_mask"] = "mark_issue"
+    action: Literal["approve_reference", "approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue", "approve_mask", "machine_fault"] = "mark_issue"
     packet_id: str | None = None
     clip_revision_id: str = Field(min_length=1)
     frame_instance_id: str | None = None
@@ -437,6 +437,8 @@ class CorrectionTask(Strict):
     baseline_revision_id: str = Field(min_length=1, max_length=128)
     baseline_evaluation_id: str | None = None
     edit_mask_id: str | None = None
+    origin: Literal["human", "machine"] = "human"
+    repair_operator: str | None = Field(default=None, max_length=64)
     desired_outcome: str = Field(min_length=1, max_length=1000)
     scope: str = Field(min_length=1, max_length=500)
     status: CorrectionStatus = CorrectionStatus.OPEN
