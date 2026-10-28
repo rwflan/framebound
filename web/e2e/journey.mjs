@@ -230,6 +230,29 @@ async function main() {
     assert(submitOut.ok === true, `CLI submit refused: ${JSON.stringify(submitOut).slice(0, 400)}`);
     assert(submitOut.revision_id === 'rev-e2e-fix', 'wrong revision from submit');
 
+    step = 'reject-reapprove-blocked-release-invalid-resolve';
+    {
+      const eligBlocked = await api('/api/eligibility/rev-e2e-fix');
+      assert(eligBlocked.status === 200 && eligBlocked.json.eligible === false,
+        `candidate releasable while task open: ${eligBlocked.text.slice(0, 200)}`);
+      assert(eligBlocked.json.reasons.join(' ').includes('unresolved'),
+        `blocked for the wrong reason: ${eligBlocked.text.slice(0, 200)}`);
+      const badResolve = await api(`/api/issues/${iss.event_id}/resolve`, { method: 'POST',
+        body: { replacement_revision_id: 'rev-e2e-fix', note: 'no packet' }, token: TOKEN });
+      assert(badResolve.status === 422, `packetless resolve not refused: ${badResolve.status} ${badResolve.text.slice(0, 200)}`);
+      const rej = await api('/api/decisions', { method: 'POST', body: {
+        action: 'reject', clip_revision_id: 'rev-e2e-fix', packet_id: 'pkt-rev-e2e-fix' }, token: TOKEN });
+      assert(rej.status === 201, `reject failed: ${rej.status} ${rej.text.slice(0, 200)}`);
+      const eligRej = await api('/api/eligibility/rev-e2e-fix');
+      assert(eligRej.json.eligible === false, 'rejected candidate shows eligible');
+      const reapp = await api('/api/decisions', { method: 'POST', body: {
+        action: 'approve', clip_revision_id: 'rev-e2e-fix', packet_id: 'pkt-rev-e2e-fix' }, token: TOKEN });
+      assert(reapp.status === 201, `reapprove failed: ${reapp.status} ${reapp.text.slice(0, 200)}`);
+      const eligReapp = await api('/api/eligibility/rev-e2e-fix');
+      assert(eligReapp.json.eligible === false, 'reapproved-but-unresolved candidate shows eligible');
+      assert(eligReapp.json.reasons.join(' ').includes('unresolved'), 'reapproval hid the open task');
+    }
+
     step = 'compare-and-resolve-in-browser';
     await page.goto(BASE + '/#/compare?base=rev-base&other=rev-e2e-fix', { waitUntil: 'networkidle' });
     await page.waitForSelector('#compare-other-img', { timeout: 15000 });
@@ -246,6 +269,8 @@ async function main() {
       action: 'approve', clip_revision_id: 'rev-e2e-fix', packet_id: 'pkt-rev-e2e-fix',
       expected_revision_id: 'rev-e2e-fix' }, token: TOKEN });
     assert(dec.status === 201, `approval failed: ${dec.status} ${dec.text.slice(0, 200)}`);
+    const eligFree = await api('/api/eligibility/rev-e2e-fix');
+    assert(eligFree.json.eligible === true, `resolved+approved candidate not releasable: ${eligFree.text.slice(0, 300)}`);
 
     step = 'reopen-path';
     await page.getByRole('button', { name: 'Reopen' }).click();

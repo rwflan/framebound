@@ -768,7 +768,7 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
     rows: dict[str, list] = {"contracts": {}, "characters": {},
                              "approvals": {}, "guides": {}, "events": [],
                              "packets": [], "attempts": [], "tasks": [],
-                             "masks": [], "annotations": [], "traces": [],
+                             "masks": [], "annotations": [], "traces": [], "transitions": [],
                              "briefs": [], "evals": [], "blobs": {},
                              "excluded_blobs": []}
     for rid, ev in evals.items():
@@ -870,6 +870,19 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
             continue
         if wdata.get("clip_revision_id") in selected:
             rows["traces"].append(wdata)
+    rows["transitions"] = []
+    try:
+        trows = con.execute("SELECT id, data FROM transition_traces").fetchall()
+    except Exception:
+        trows = []
+    for r in trows:
+        try:
+            tdata = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
+        except Exception:
+            continue
+        if tdata.get("departure_revision_id") in selected \
+                or tdata.get("entry_revision_id") in selected:
+            rows["transitions"].append(tdata)
     for r in con.execute("SELECT id, data FROM compiled_briefs").fetchall():
         try:
             bdata = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
@@ -914,7 +927,8 @@ def _write_closure(out: Path, manifest_files: dict, exclusions: list,
     for fname, key in (("events.jsonl", "events"), ("attempts.jsonl", "attempts"),
                        ("masks.jsonl", "masks"), ("packets.jsonl", "packets"),
                        ("tasks.jsonl", "tasks"), ("annotations.jsonl", "annotations"),
-                       ("traces.jsonl", "traces"), ("briefs.jsonl", "briefs")):
+                       ("traces.jsonl", "traces"), ("briefs.jsonl", "briefs"),
+                       ("transition_traces.jsonl", "transitions")):
         items = rows.get(key, [])
         (out / "closure" / fname).write_text(
             "\n".join(json.dumps(r, sort_keys=True) for r in items)
