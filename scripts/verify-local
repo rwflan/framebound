@@ -2,10 +2,9 @@
 # Local P0 verification (R0): offline core passes with reliable failure exits.
 # Each step captures a log and checks the real exit status; no `cmd | tail`
 # pipelines that would mask a runner failure with tail's status.
-# Usage: sh scripts/verify-local [--live]
+# Usage: sh scripts/verify-local [--live --work-dir PERSISTENT_DIR]
 #   default: offline gates only; live provider spike is skipped honestly.
-#   --live:  fail unless a key is configured AND live calls actually ran
-#            (live spike runner lands in R3; until then --live fails loudly).
+#   --live: explicit participant configuration, grants and resumable image/edit/SAM spike.
 set -u
 cd "$(dirname "$0")/.."
 # Guard against self-recursion: the propagation tests below invoke this very
@@ -35,7 +34,20 @@ step() {
 }
 
 LIVE=0
-if [ "${1:-}" = "--live" ]; then LIVE=1; fi
+LIVE_WORK=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --live) LIVE=1; shift ;;
+    --work-dir)
+      if [ "$#" -lt 2 ]; then echo "--work-dir requires a persistent path"; exit 2; fi
+      LIVE_WORK="$2"; shift 2 ;;
+    *) echo "unknown verification argument: $1"; exit 2 ;;
+  esac
+done
+if [ "$LIVE" -eq 1 ] && [ -z "$LIVE_WORK" ]; then
+  echo "PENDING: --live requires --work-dir PERSISTENT_DIR; no ephemeral participant project is created"
+  exit 3
+fi
 
 step v1-unittest python -m unittest discover -s tests
 step v2-pytest python -m pytest tests/ -q
@@ -43,10 +55,10 @@ step v2-pytest python -m pytest tests/ -q
 # Offline neutrality: offline gates must not touch providers even when keys exist.
 # Remember real credentials for the --live check, then ensure *some* key value
 # is present so a code path that "helpfully" goes live when keys exist is caught.
-HAD_KEY=0
-if [ -n "${MODEL_API_KEY:-}" ] || [ -n "${META_API_KEY:-}" ]; then HAD_KEY=1; fi
-: "${MODEL_API_KEY:=verify-local-bogus-key}"
-: "${META_API_KEY:=verify-local-bogus-key}"
+ORIGINAL_MODEL_KEY="${MODEL_API_KEY:-}"
+ORIGINAL_META_KEY="${META_API_KEY:-}"
+MODEL_API_KEY=verify-local-bogus-key
+META_API_KEY=verify-local-bogus-key
 export MODEL_API_KEY META_API_KEY
 step demo-v2-offline python -m framebound demo --profile v2 --offline --out "$WORK/verify-v2"
 step demo-wp6-offline python -m framebound demo --profile wp6 --offline --out "$WORK/verify-wp6"
@@ -89,56 +101,13 @@ else
   echo "SKIP browser/process-restart journey: web toolchain unavailable (recorded, not a pass)"
 fi
 
+MODEL_API_KEY="$ORIGINAL_MODEL_KEY"
+META_API_KEY="$ORIGINAL_META_KEY"
+export MODEL_API_KEY META_API_KEY
 if [ "$LIVE" -eq 1 ]; then
-  if [ "$HAD_KEY" -eq 0 ]; then
-    echo "FAIL: --live requires a real MODEL_API_KEY/META_API_KEY (none configured)"
-    exit 2
-  fi
-  # The recorded four-capability workflow is the live gate: it spends through
-  # the real controller only with an explicit spend ceiling, otherwise it
-  # stays pending with the exact executable command (no uncontrolled spend).
-  if [ -z "${FRAMEBOUND_SPEND_CEILING:-}" ]; then
-    echo "PENDING live gate: authorized credential present but no explicit spend ceiling."
-    echo "Run with FRAMEBOUND_SPEND_CEILING set (e.g. FRAMEBOUND_SPEND_CEILING=usd-5) to execute:"
-    echo '  python -m framebound recorded-run --project <proj> --contract <id> --slot 0 \'
-    echo '    --baseline <rev> --new-id <rev> --idempotency-key live-spike-1 --out <bundle.json>' 
-    exit 3
-  fi
-  step recorded-live python - "$WORK" << 'PYEOF2'
-import json, sys
-from pathlib import Path
-from framebound.v2.devseed import build_minimal_project
-from framebound.v2 import recorded_run as RR
-from framebound.v2.services.errors import InvalidInput
-work = Path(sys.argv[1])
-td = work / "live-proj"
-info = build_minimal_project(td)
-try:
-    prepared = RR.prepare(str(td), "contract-devseed-01", 0)
-except InvalidInput as e:
-    print("PENDING live gate: the recorded runner needs one genuine human "
-          "reference approval first (real external input, never synthesized).")
-    print(f"  reason: {e}")
-    print("  next: serve this project on the review desk, approve the char-01 "
-          "references, then re-run with the same idempotency key "
-          "(live-spike-1) to resume without respending.")
-    sys.exit(3)
-out = work / "live-bundle.json"
-bundle = RR.run_recorded(str(td), str(out), contract_id="contract-devseed-01",
-                         slot=0, baseline_revision_id="clip-devseed-bad",
-                         new_revision_id="rev-live-spike",
-                         offline=False, idempotency_key="live-spike-1")
-caps = {c["capability"]: c["status"] for c in bundle.get("capabilities", [])}
-print(json.dumps({"status": bundle["status"], "origin": bundle["origin"],
-                  "capabilities": caps}, indent=2))
-assert bundle["origin"] == "live", bundle
-assert bundle["status"] == "recorded", bundle
-assert set(caps) == {"spark-critique", "image-generation", "image-edit",
-                     "sam-segmentation"}, caps
-assert all(s == "recorded" for s in caps.values()), caps
-PYEOF2
+  step recorded-live python scripts/live_spike.py "$LIVE_WORK"
 else
-  echo "SKIP live provider spike: offline mode (recorded, not a pass)"
+  echo "SKIP live specialist spike: offline mode (recorded, not a pass)"
 fi
 
 echo "ALL LOCAL CHECKS PASSED"

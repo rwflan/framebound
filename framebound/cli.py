@@ -85,6 +85,9 @@ def main(argv=None):
         ('animation-step','Resume one automatic step',[('--project',True),('--run-id',True)]),
         ('animation-get','Read durable animation work',[('--project',True),('--run-id',True)]),
         ('source-calibrate','Apply approved fixed source calibration',[('--project',True),('--contract-id',True),('--source-asset-id',True),('--output-asset-id',True)]),
+        ('provider-grant-get','Read a provider grant',[('--project',True),('--grant-id',True)]),
+        ('provider-grant-revoke','Revoke provider authority',[('--project',True),('--grant-id',True),('--expected-version',True),('--operator-secret',False)]),
+        ('provider-reconcile','Attach an operator receipt to an unknown send',[('--project',True),('--job-id',True),('--receipt',True),('--operator-secret',False)]),
         ('provider-grant', 'Authorize a bounded provider grant (operator only)', [('--project',True),('--grant',True),('--operator-secret',False)]),
         ("project-create", "Create or resume a project", [("--project", True), ("--project-id", True), ("--name", False)]),
         ("character-propose", "Propose an immutable character", [("--project", True), ("--character", True)]),
@@ -156,7 +159,7 @@ def main(argv=None):
                     help="legacy flag; immutable snapshots require a new name and destination")
     dv = sub.add_parser("dataset-validate", help="v2: validate a snapshot with standard loaders")
     dv.add_argument("--snapshot", required=True)
-    rr = sub.add_parser("recorded-run", help="v2: DEPRECATED historical provider bundle (retired Spark gate; use offline check/repair + explicit providers)")
+    rr = sub.add_parser("recorded-run", help="v2: resumable image/edit/SAM specialist probe against approved references")
     rr.add_argument("--project", required=True)
     rr.add_argument("--contract", required=True)
     rr.add_argument("--slot", required=True)
@@ -239,7 +242,7 @@ def main(argv=None):
         _s = _bs(args.project)
         _aio.run(_s.run_stdio_async())
         return 0
-    if args.cmd in ("animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
+    if args.cmd in ("provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
                     "orchestrator-send", "capabilities", "correction-claim", "correction-submit",

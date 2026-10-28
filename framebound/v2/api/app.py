@@ -236,6 +236,21 @@ def create_app(project_dir: str) -> FastAPI:
         finally:
             con.close()
 
+    @app.post('/api/jobs/{job_id}/operator-reconcile')
+    def provider_reconcile(job_id: str, body: dict, x_operator_secret: str | None = Header(default=None)):
+        from ..services.provider_recovery import reconcile
+        return reconcile(project_dir,job_id,body,x_operator_secret or '')
+
+    @app.get('/api/provider-grants/{grant_id}')
+    def provider_grant_get(grant_id: str):
+        from ..services.provider_grants import get_grant
+        return get_grant(project_dir,grant_id)
+
+    @app.post('/api/provider-grants/{grant_id}/revoke')
+    def provider_grant_revoke(grant_id: str,body: dict,x_operator_secret: str | None = Header(default=None)):
+        from ..services.provider_grants import revoke
+        return revoke(project_dir,grant_id,body['expected_version'],x_operator_secret or '')
+
     @app.post('/api/provider-grants', status_code=201)
     def provider_grant(body: dict, x_operator_secret: str | None = Header(default=None)):
         from ..services.provider_grants import issue

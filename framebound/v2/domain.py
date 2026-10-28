@@ -522,6 +522,8 @@ class Job(Strict):
     origin: str = Field(default="unknown", max_length=64)
     fencing_token_sha256: str = ""
     dispatch_count: int = Field(default=0, ge=0)
+    dispatch_run_id: str | None = None
+    settlement: str | None = None
     dispatch_inflight: bool = False
     wire_started: bool = False
     dispatch_token_sha256: str | None = None
@@ -568,6 +570,20 @@ class Run(Strict):
     local_attempts_used: int = Field(default=0,ge=0)
     compute_steps_used: int = Field(default=0,ge=0)
     result: dict[str,Any] | None = None
+
+
+class ProviderReconciliation(Strict):
+    schema_version: Literal['2.0'] = '2.0'
+    id: str = Field(min_length=1,max_length=128)
+    job_id: str
+    input_sha256: str = Field(**HEX64)
+    request_sha256: str = Field(**HEX64)
+    outcome: Literal['not_accepted','response','abandoned']
+    receipt_reference: str = Field(min_length=1,max_length=500)
+    evidence_note: str = Field(min_length=8,max_length=2000)
+    artifact_sha256: str | None = Field(default=None,**HEX64)
+    result: dict[str,Any]
+    created_at: str = Field(default_factory=utcnow)
 
 
 class ExportSnapshot(Strict):
