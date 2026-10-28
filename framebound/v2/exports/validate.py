@@ -183,6 +183,11 @@ def _check_preferences(snap: Path, issues: list[str]) -> dict:
             rj_hashes.add(actual)
         if ch_hashes and ch_hashes == rj_hashes:
             issues.append(f"preference {pr.get('comparison_packet')} chosen==rejected pixels")
+        for f in ch:
+            if not str(f["file"]).startswith("hf/data/"):
+                issues.append(f"preference {pr.get('comparison_packet')} chosen file "
+                              f"{f['file']} is not a positive (research files cannot "
+                              "be positive preferences)")
         cond = pr.get("conditioning") or {}
         if not cond.get("contract") or not cond.get("chosen_evaluation") \
                 or not cond.get("rejected_evaluation"):
@@ -221,6 +226,12 @@ def _check_temporal(snap: Path, issues: list[str]) -> dict:
         order = [f.get("slot") for f in frames]
         if order != sorted(order):
             issues.append(f"temporal {t.get('clip_revision_id')} frames not in slot order")
+        if sorted(order) != list(range(len(holds))):
+            issues.append(f"temporal {t.get('clip_revision_id')} slots {sorted(order)} "
+                          f"do not exactly cover 0..{len(holds) - 1} (duplicated or "
+                          "misordered slots with unchanged counts are rejected)")
+        if len(set(order)) != len(order):
+            issues.append(f"temporal {t.get('clip_revision_id')} has duplicated slots")
         traces = t.get("traces", {})
         if "missing" not in traces:
             issues.append(f"temporal {t.get('clip_revision_id')} hides missing trace coverage")
@@ -249,7 +260,18 @@ def validate_snapshot(snapshot_dir: str) -> dict:
     for p in snap.rglob("*"):
         if p.is_file():
             on_disk.add(str(p.relative_to(snap)))
-    extra = on_disk - listed - {"manifest.json"}
+    extra = on_disk - listed - {"manifest.json", "COMPLETE"}
+    # completion marker: atomic publication proof, verified against the manifest
+    marker = snap / "COMPLETE"
+    if not marker.is_file():
+        issues.append("missing COMPLETE marker: publication did not finish atomically")
+    else:
+        try:
+            done = json.loads(marker.read_text())
+            if done.get("manifest_sha256") != _h((snap / "manifest.json").read_bytes()):
+                issues.append("COMPLETE marker manifest hash does not match manifest.json")
+        except Exception as e:
+            issues.append(f"COMPLETE marker unreadable: {e}")
     if extra:
         issues.append(f"unmanifested stale files: {sorted(extra)[:5]}")
     # 1. COCO: every annotation pixel-compared
@@ -260,7 +282,7 @@ def validate_snapshot(snapshot_dir: str) -> dict:
     pref_info = _check_preferences(snap, issues)
     # 4. temporal: ordered resolvable refs + timing + traces
     temp_info = _check_temporal(snap, issues)
-    # 5. closure parses + references resolve
+    # 5. closure parses + selected references resolve without the DB
     try:
         cond = json.loads((snap / "closure" / "conditioning.json").read_text())
         for rid in manifest.get("clip_revisions", []):
@@ -272,10 +294,48 @@ def validate_snapshot(snapshot_dir: str) -> dict:
                     im.load()
             except Exception as e:
                 issues.append(f"closure reference {g.name} undecodable: {e}")
-        for name in ("evaluations.jsonl", "events.jsonl", "attempts.jsonl", "masks.jsonl"):
+        closure_rows = {}
+        for name in ("evaluations.jsonl", "events.jsonl", "attempts.jsonl",
+                     "masks.jsonl", "packets.jsonl", "tasks.jsonl",
+                     "annotations.jsonl", "traces.jsonl", "briefs.jsonl"):
+            rows = []
             for line in (snap / "closure" / name).read_text().splitlines():
                 if line.strip():
-                    json.loads(line)
+                    rows.append(json.loads(line))
+            closure_rows[name] = rows
+        packet_ids = {q.get("id") for q in closure_rows["packets.jsonl"]}
+        eval_ids = {e.get("id") for e in closure_rows["evaluations.jsonl"]}
+        prefs = [json.loads(l) for l in (snap / "preferences.jsonl").read_text().splitlines()
+                 if l.strip()]
+        for pr in prefs:
+            if pr.get("comparison_packet") not in packet_ids:
+                issues.append("preference packet " + str(pr.get("comparison_packet")) + " "
+                              "missing from closure (unresolvable without the DB)")
+            pr_cond = pr.get("conditioning") or {}
+            for key in ("chosen_evaluation", "rejected_evaluation"):
+                if pr_cond.get(key) and pr_cond[key] not in eval_ids:
+                    issues.append("preference " + str(key) + " " + str(pr_cond[key]) +
+                                  " missing from closure")
+            pkt = next((q for q in closure_rows["packets.jsonl"]
+                        if q.get("id") == pr.get("comparison_packet")), None)
+            if pkt is not None:
+                if pkt.get("clip_revision_id") != pr.get("chosen_revision") \
+                        or pkt.get("comparison_revision_id") != pr.get("rejected_revision"):
+                    issues.append("preference packet " + str(pkt.get("id")) + " addresses a "
+                                  "different pair than the preference row")
+        for e in closure_rows["evaluations.jsonl"]:
+            digest = e.get("evidence_manifest_sha256")
+            if not digest:
+                issues.append("closure evaluation " + str(e.get("id")) +
+                              " has no manifest address")
+                continue
+            blob = snap / "closure" / "blobs" / digest
+            if not blob.is_file():
+                issues.append("closure manifest blob " + digest[:16] + " missing "
+                              "(evaluation " + str(e.get("id")) +
+                              " unresolvable without the DB)")
+            elif _h(blob.read_bytes()) != digest:
+                issues.append("closure manifest blob " + digest[:16] + " address mismatch")
     except Exception as e:
         issues.append(f"closure unreadable: {e}")
     # 6. splits: no family or pixel straddling among POSITIVES. The research

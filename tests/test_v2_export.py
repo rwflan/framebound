@@ -76,13 +76,15 @@ class ExportSnapshot(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             self._project(td)
             out = Path(td) / "snap"
+            # no straddle: the whole selected lineage stays in train, so the
+            # explicit pair survives as a positive preference
             man = build_snapshot(td, "demo-snap", ["clip-clean", "clip-bad", "clip-fix"], str(out),
-                                 {"split": {"train": ["clip-clean", "clip-fix"], "test": ["clip-bad"]},
+                                 {"split": {"train": ["clip-clean", "clip-fix", "clip-bad"]},
                                   "split_policy": "exclude",
                                   # mechanics demo only: fixtures stay labeled procedural-test throughout
                                   "include_procedural_positives": True})
-            # leakage: one character family across train+test → test frames excluded with reason
-            self.assertTrue(any("split" in e.get("context", "") for e in man["exclusions"]), man["exclusions"])
+            self.assertFalse(any(e.get("context", "") == "split-exclude"
+                                 for e in man["exclusions"]), man["exclusions"])
             # preference pair: explicit human comparison only, named reason
             prefs = [json.loads(l) for l in (out / "preferences.jsonl").read_text().splitlines() if l.strip()]
             self.assertTrue(prefs, "expected at least one eligible preference pair")
@@ -120,6 +122,28 @@ class ExportSnapshot(unittest.TestCase):
                 build_snapshot(td, "s", ["clip-clean", "clip-bad"], str(Path(td) / "o"),
                                {"split": {"train": ["clip-clean"], "test": ["clip-bad"]},
                                 "split_policy": "strict"})
+
+    def test_exclude_removes_straddling_positives_and_pairs(self):
+        with tempfile.TemporaryDirectory() as td:
+            self._project(td)
+            out = Path(td) / "snap-ex"
+            man = build_snapshot(td, "demo-ex", ["clip-clean", "clip-bad", "clip-fix"], str(out),
+                                 {"split": {"train": ["clip-clean", "clip-fix"], "test": ["clip-bad"]},
+                                  "split_policy": "exclude",
+                                  "include_procedural_positives": True})
+            # one character family across train+test: leaked positives are
+            # removed (not retained with a logged exclusion) and the affected
+            # pair is withheld with its own exclusion record
+            self.assertTrue(any(e.get("context", "") == "split-exclude"
+                                for e in man["exclusions"]), man["exclusions"])
+            prefs = [json.loads(l) for l in (out / "preferences.jsonl").read_text().splitlines()
+                     if l.strip()]
+            self.assertEqual(prefs, [])
+            hf = [json.loads(l) for l in (out / "hf" / "metadata.jsonl").read_text().splitlines()
+                  if l.strip()]
+            self.assertEqual([m for m in hf if m.get("split") == "train"], [])
+            rep = validate_snapshot(str(out))
+            self.assertTrue(rep["ok"], rep["issues"])
 
     def test_rights_and_procedural_exclusions_visible(self):
         with tempfile.TemporaryDirectory() as td:
