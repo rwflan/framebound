@@ -84,12 +84,27 @@ def _default_sender(provider: str, model: str, payload: dict, *, timeout: float)
 
 def http_post(path: str, payload: dict, *, timeout: float = 120.0,
               idempotency_key: str | None = None,
-              transport=None) -> dict:
+              transport=None, permit=None) -> dict:
     """POST JSON to the Meta Model API with structured error mapping.
 
     `transport` is an injectable callable (http_request -> response dict) used
     by contract tests to simulate 401/404/429/5xx/timeout outcomes.
     """
+    from ..services import errors as E
+    if permit is not None:
+        from ..services.provider_grants import DispatchPermit
+        if type(permit) is not DispatchPermit:raise E.InvalidInput('invalid dispatch permit type')
+        DispatchPermit.consume(permit,payload,simulated=transport is not None)
+    elif transport is None:
+        from ..services.errors import InvalidInput
+        raise InvalidInput('live provider I/O requires a durable dispatch permit')
+    return _http_post_approved(path,payload,timeout=timeout,idempotency_key=idempotency_key,
+                               transport=transport,endpoint=permit.endpoint if permit is not None else _base())
+
+
+def _http_post_approved(path, payload, *, timeout=120.0, idempotency_key=None,
+                        transport=None, endpoint=DEFAULT_BASE):
+    """Wire/error mapping only; the public caller consumes authorization first."""
     from ..services import errors as E
     body = json.dumps(payload).encode()
     headers = {"Content-Type": "application/json",
@@ -106,7 +121,7 @@ def http_post(path: str, payload: dict, *, timeout: float = 120.0,
         except (TimeoutError, ConnectionError) as e:
             raise E.TransportError(f"transport_error: {e}") from e
         return resp
-    req = urllib.request.Request(_base() + path, data=body, headers=headers)
+    req = urllib.request.Request(endpoint + path, data=body, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read().decode()

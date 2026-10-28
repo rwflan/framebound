@@ -378,7 +378,7 @@ class TestAtomicTransactions(unittest.TestCase):
             con = S.connect(td)
             try:
                 ver = con.execute("SELECT v FROM meta WHERE k='migration_version'").fetchone()["v"]
-                self.assertEqual(ver, "2")
+                self.assertEqual(ver, str(S.MIGRATION_VERSION))
                 self.assertEqual(con.execute(
                     "SELECT COUNT(*) AS n FROM clip_revisions").fetchone()["n"], 1)
                 # authority tables exist again and work

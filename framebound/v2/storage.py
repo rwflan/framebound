@@ -18,7 +18,7 @@ from pathlib import Path
 
 from . import domain as D
 
-MIGRATION_VERSION = 2
+MIGRATION_VERSION = 3
 
 
 class StaleRevisionError(ValueError):
@@ -36,6 +36,7 @@ class ConflictError(ValueError):
 SCHEMA_SQL = """
 PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS provider_grants(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS assets(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS character_revisions(id TEXT PRIMARY KEY, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
@@ -127,7 +128,7 @@ def _table_for(model: D.Strict) -> str:
         "MotionGuide": "motion_guides", "ReferenceApproval": "reference_approvals", "Run": "runs",
             "EditMask": "edit_masks", "CompiledBrief": "compiled_briefs", "WorldTrace": "world_traces",
             "TransitionTrace": "transition_traces",
-        "Registration": "registrations",
+        "Registration": "registrations", "ProviderGrant": "provider_grants",
     }
     return mapping[type(model).__name__]
 

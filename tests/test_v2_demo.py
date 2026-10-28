@@ -265,6 +265,16 @@ class RecordedRun(unittest.TestCase):
                         for c in m["content"] if c.get("type") == "input_image")
                 seen.append({"model": req["body"].get("model"), "n_images": n,
                              "has_prev": "previous_response_id" in req["body"]})
+                if req['body'].get('model') == 'sam-3.1':
+                    from test_v2_r3_providers import _pack_bits, _sam_line
+                    raster=bytes(1 if 2<=i%64<6 and 2<=i//64<6 else 0 for i in range(4096))
+                    text=_sam_line(0,[(0,(2,2,6,6,64,64),(64,64,'~',base64.b85encode(_pack_bits(raster)).decode()))])
+                    return {'status':'completed','id':'resp-sam','output':[{'type':'message','content':[{'type':'output_text','text':text}]}]}
+                if req['body'].get('model') == 'sam-3.1':
+                    from test_v2_r3_providers import _pack_bits, _sam_line
+                    raster=bytes(1 if 2<=i%64<6 and 2<=i//64<6 else 0 for i in range(4096))
+                    text=_sam_line(0,[(0,(2,2,6,6,64,64),(64,64,'~',base64.b85encode(_pack_bits(raster)).decode()))])
+                    return {'status':'completed','id':'resp-sam','output':[{'type':'message','content':[{'type':'output_text','text':text}]}]}
                 return {"status": "completed", "id": "resp-sim",
                         "output": [{"type": "image_generation_call", "id": "img-1",
                                     "result": png_b64}], "usage": {"total_tokens": 1}}

@@ -127,6 +127,51 @@
       "title": "Dispatch Count",
       "type": "integer"
     },
+    "dispatch_inflight": {
+      "default": false,
+      "title": "Dispatch Inflight",
+      "type": "boolean"
+    },
+    "wire_started": {
+      "default": false,
+      "title": "Wire Started",
+      "type": "boolean"
+    },
+    "dispatch_token_sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dispatch Token Sha256"
+    },
+    "frozen_request": {
+      "additionalProperties": true,
+      "title": "Frozen Request",
+      "type": "object"
+    },
+    "frozen_request_sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Frozen Request Sha256"
+    },
+    "reserved_microusd": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Reserved Microusd",
+      "type": "integer"
+    },
     "reserved_cost": {
       "default": "unbounded-note",
       "maxLength": 200,
@@ -163,6 +208,37 @@
       },
       "title": "Output Asset Ids",
       "type": "array"
+    },
+    "output_annotation_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Output Annotation Ids",
+      "type": "array"
+    },
+    "provider_response_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Response Id"
+    },
+    "provider_outcome": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Outcome"
     },
     "reconciliation_required": {
       "default": false,
