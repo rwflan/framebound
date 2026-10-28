@@ -131,7 +131,8 @@ def _targets(brief: dict) -> list[str]:
 
 def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict],
                       idempotency_key: str, *, offline: bool = False,
-                      max_attempts: int = 3) -> D.ResultEnvelope:
+                      max_attempts: int = 3,
+                      provider_settings: dict | None = None) -> D.ResultEnvelope:
     """Queue a generation job. Same key + same payload dedupes; different payload conflicts."""
     from ..providers import image as img
     if not isinstance(idempotency_key, str) or not idempotency_key.strip():
@@ -153,8 +154,11 @@ def submit_generation(project_dir: str, brief: dict, reference_blobs: list[dict]
                     # The complete executable request is frozen at submit time:
                     # a restarted worker resumes from this row alone and no
                     # caller can substitute a different brief at send time.
-                    request_brief=dict(brief),
-                    provider_settings={"model": _imgmod._model(), "transport": "responses"},
+                    request_brief={**dict(brief),
+                                   "_frozen_provider_settings": {"model": _imgmod._model(), "transport": "responses",
+                                                                 **(dict(provider_settings) if provider_settings else {})}},
+                    provider_settings={"model": _imgmod._model(), "transport": "responses",
+                                       **(dict(provider_settings) if provider_settings else {})},
                     offline=bool(offline))
         job, created = S.create_job_idempotent(con, job)
         if not created:
