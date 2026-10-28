@@ -66,8 +66,9 @@ def latest_evaluation(con, revision_id: str) -> D.Evaluation | None:
 
 
 def create_packet(project_dir: str, packet_id: str, revision_id: str, evaluation_id: str,
-                  intent: str, comparison_revision_id: str | None = None) -> D.ResultEnvelope:
-    con = S.connect(project_dir)
+                  intent: str, comparison_revision_id: str | None = None, *, connection=None) -> D.ResultEnvelope:
+    owned = connection is None
+    con = connection if connection is not None else S.connect(project_dir)
     try:
         try:
             pdata, _ = S.get(con, "review_packets", packet_id)
@@ -97,10 +98,12 @@ def create_packet(project_dir: str, packet_id: str, revision_id: str, evaluation
         pkt = D.ReviewPacket(id=packet_id, clip_revision_id=revision_id, evaluation_id=evaluation_id,
                              intent=intent, comparison_revision_id=comparison_revision_id,
                              issue_ids=issues, unresolved_coverage=uncovered)
-        with S.atomic(con):
-            S.stage(con, pkt)
+        S.stage(con, pkt)
+        if owned:
+            con.commit()
     finally:
-        con.close()
+        if owned:
+            con.close()
     return D.ResultEnvelope(ok=True, operation_id=f"op-packet-{packet_id}", revision_id=revision_id,
                             technical_status=ev.technical_status,
                             issues=[{"code": c} for c in issues],

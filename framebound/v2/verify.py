@@ -153,12 +153,15 @@ def _check_evidence_freshness(con, project_dir: str, issues: list[str]) -> None:
     # One shared verifier: manifest address, candidate/reference bytes +
     # pixels, relevant annotations, analyzer and lock identity.
     from .services import evidence as _EV
+    from .services.packets import latest_evaluation
     for r in con.execute("SELECT id, data FROM evaluations").fetchall():
         try:
             ev = D.Evaluation.model_validate_json(r["data"])
         except Exception:
             continue
-        _, problems = _EV.verify_evidence(project_dir, ev.clip_revision_id, ev)
+        latest = latest_evaluation(con, ev.clip_revision_id)
+        _, problems = _EV.verify_evidence_in(con, project_dir, ev.clip_revision_id, ev,
+                            require_current=latest is not None and latest.id == ev.id)
         for problem in problems:
             issues.append(f"evaluations/{r['id']}: {problem}")
     # superseded approvals referenced by newer briefs are history, not authority:

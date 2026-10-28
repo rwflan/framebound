@@ -114,7 +114,7 @@ def _materialize_generated(project_dir: str, out_bytes: bytes, asset_id: str,
                     pixel_sha256=pixel_sha256(canonical_pixels(im.convert("RGBA"))),
                     mime=output_mime, width=im.size[0], height=im.size[1],
                     source_kind="generated", rights="original", eligible_roles=[],
-                    lineage=f"recorded-run:{origin}" if origin else "")
+                    lineage=f"recorded-run:{origin}" if origin else "", origin=origin or "unknown")
     con = S.connect(project_dir)
     try:
         S.insert(con, asset)

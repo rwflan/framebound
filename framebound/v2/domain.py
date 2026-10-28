@@ -181,6 +181,11 @@ class Asset(Strict):
     lineage: str = Field(default="", max_length=500)
     rights: str = Field(min_length=1, max_length=200)
     eligible_roles: list[str] = Field(default_factory=list)
+    parent_asset_ids: list[str] = Field(default_factory=list)
+    operation_id: str | None = None
+    derivation: dict[str, Any] = Field(default_factory=dict)
+    origin: str = Field(default='unknown', max_length=64)
+    source_job_id: str | None = None
 
 
 class CharacterRevision(Strict):
@@ -273,6 +278,7 @@ class Registration(Strict):
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
     method: Literal["frozen_native", "verified_translate"] = "frozen_native"
+    pixels_baked: bool | None = None
     frame_instance_id: str = Field(min_length=1)
     translation_px: list[StrictInt] = Field(default_factory=lambda: [0, 0],
                                            min_length=2, max_length=2)
@@ -288,6 +294,7 @@ class ClipRevision(Strict):
     frame_instance_ids: list[str] = Field(min_length=1)
     parent_revision_id: str | None = None
     origin_run_id: str | None = None
+    repair_task_id: str | None = None
     created_at: str = Field(default_factory=utcnow)
 
     @field_validator("frame_instance_ids")

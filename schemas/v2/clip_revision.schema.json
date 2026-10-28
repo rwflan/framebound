@@ -50,6 +50,18 @@
       "default": null,
       "title": "Origin Run Id"
     },
+    "repair_task_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Repair Task Id"
+    },
     "created_at": {
       "title": "Created At",
       "type": "string"

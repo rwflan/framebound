@@ -173,6 +173,10 @@ def _frame_ok(ctx: _Ctx, slot: int) -> D.CheckResult | None:
 def _h_frame(ctx: _Ctx, cid: str, check: str, scope: str) -> D.CheckResult:
     slot = int(scope.split()[1])
     if check == "native_registration":
+        records = (ctx.context.get('registration') or {}).get('records') or []
+        if slot < len(records) and records[slot] and records[slot].get('translation_px') != [0,0]:
+            return D.CheckResult(constraint_id=cid,scope=scope,outcome=D.CheckOutcome.UNMEASURED,
+                reason='nonzero legacy registration requires explicit native re-materialization')
         px = ctx.frames_px[slot]
         w, h = ctx.sizes[slot]
         return C.check_registration(cid, scope, px, w, h, (ctx.W, ctx.H))
@@ -319,6 +323,16 @@ def _h_temporal(ctx: _Ctx, cid: str, check: str, scope: str) -> D.CheckResult:
     raise AssertionError(f"no temporal dispatch for {check}")
 
 
+def _mask_hashes(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (bytes, bytearray)):
+        return [hashlib.sha256(bytes(value)).hexdigest()]
+    if isinstance(value, list):
+        return [hashlib.sha256(bytes(item)).hexdigest() for item in value]
+    raise InvalidInput('raster input must contain row-major bytes')
+
+
 def evaluate_frames(contract: D.ClipContractRevision, frames: list[Image.Image],
                     references: dict[int, Image.Image],
                     dep_lock_id: str = "dev-no-lock",
@@ -411,6 +425,8 @@ def evaluate_frames(contract: D.ClipContractRevision, frames: list[Image.Image],
         "repaired_slots": list(_rep.get("repaired_slots", [])),
         "allowed_mask_sha256": _allowed_h,
         "protected_present": _rep.get("protected_mask") is not None,
+        "protected_mask_sha256": _mask_hashes(_rep.get('protected_mask')),
+        "baseline_pixel_sha256": _mask_hashes(_rep.get('baseline')),
         "baseline_byte_sha256": _rep.get("baseline_byte_sha256", []),
         "task_id": _rep.get("task_id"),
         "mask_id": _rep.get("mask_id"),
