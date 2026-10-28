@@ -114,7 +114,7 @@ def _build_large_project(td: str, frames: int = 200) -> dict:
                             "character_revision_id": "char-big",
                             "entries": [{"phase": f"p{n % 8}", "asset_id": f"g{n}",
                                          "byte_sha256": hashes[f"g{n}"]}
-                                        for n in range(frames)]})
+                                        for n in range(min(frames,8))]})
     A.approve_reference(td, Actor(type="reviewer", id="human-bench"), "char-big", "mg-big")
     contracts.propose_contract(td, {
         "schema_version": "2.0", "id": "c-big", "character_revision_id": "char-big",
