@@ -184,6 +184,7 @@ def submit_resolved(brief: dict, reference_blobs: list[dict], project_dir: str,
                 "Set MODEL_API_KEY to send. No output fabricated; replay labels stay distinct from live.")
         return {"mode": "not_configured", "sent": False, "capability": "image-generation",
                 "request_artifact": digest, "offline": bool(offline), "note": note,
+                "origin": "not_configured",
                 "wire_model": req["model"],
                 "wire_image_parts": sum(1 for m in req["input"] for c in m["content"]
                                         if c.get("type") == "input_image")}
@@ -191,9 +192,10 @@ def submit_resolved(brief: dict, reference_blobs: list[dict], project_dir: str,
         raise InvalidInput("persisted offline restriction: transmission refused; "
                            "authorize an explicit live job instead")
     payload = req
+    origin = "simulated-transport" if transport is not None else "live"
     req_digest = record_artifact(project_dir, "image_request",
                                  {"idempotency_key": idempotency_key, "request": redacted,
-                                  "sent": True, "model": req["model"]},
+                                  "sent": True, "model": req["model"], "origin": origin},
                                  provider="image", model=req["model"])
     # Exactly one dispatch: a generation POST is not provably idempotent, so
     # an ambiguous outcome must surface as unknown (reconcile before another
@@ -211,6 +213,7 @@ def submit_resolved(brief: dict, reference_blobs: list[dict], project_dir: str,
                              {"idempotency_key": idempotency_key,
                               "request_artifact": req_digest,
                               "request": redacted, "sent": True,
+                              "origin": origin,
                               "model": req["model"],
                               "response_id": parsed["response_id"],
                               "usage": parsed["usage"],
@@ -222,7 +225,7 @@ def submit_resolved(brief: dict, reference_blobs: list[dict], project_dir: str,
                              provider="image", model=req["model"],
                              request_id=str(parsed["response_id"] or ""))
     return {"mode": "live", "sent": True, "request_artifact": req_digest,
-            "response_artifact": digest,
+            "response_artifact": digest, "origin": origin,
             "response_id": parsed["response_id"], "usage": parsed["usage"],
             "output_blob": blob_digest, "output_mime": meta["mime"],
             "output_size": [meta["width"], meta["height"]],
