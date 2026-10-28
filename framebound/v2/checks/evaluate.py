@@ -44,6 +44,7 @@ def _code_sha256() -> str:
     # annotations, registration, or pixels are resolved must invalidate old
     # evidence instead of silently reinterpreting it.
     for extra in (here.parent / "services" / "clips.py",
+                  here.parent / "services" / "animation_context.py",
                   here.parent / "media" / "canonical.py",
                   here.parent / "domain.py"):
         h.update(extra.read_bytes())
@@ -179,7 +180,23 @@ def _h_frame(ctx: _Ctx, cid: str, check: str, scope: str) -> D.CheckResult:
                 reason='nonzero legacy registration requires explicit native re-materialization')
         px = ctx.frames_px[slot]
         w, h = ctx.sizes[slot]
-        return C.check_registration(cid, scope, px, w, h, (ctx.W, ctx.H))
+        registration=C.check_registration(cid, scope, px, w, h, (ctx.W, ctx.H))
+        c=ctx.by_check.get(cid)
+        bound=(c.params or {}).get('max_anchor_drift_px') if c else None
+        if registration.outcome==D.CheckOutcome.PASS and bound is not None:
+            ref=ctx.refs_px.get(slot)
+            if ref is None:
+                return D.CheckResult(constraint_id=cid,scope=scope,outcome=D.CheckOutcome.UNMEASURED,reason='no independent phase anchor')
+            def centroid(raster):
+                points=[(i%w,i//w) for i,v in enumerate(alpha_mask(raster,w,h)) if v]
+                return (sum(x for x,y in points)/len(points),sum(y for x,y in points)/len(points)) if points else None
+            a,b=centroid(px),centroid(ref)
+            if a is None or b is None:
+                return D.CheckResult(constraint_id=cid,scope=scope,outcome=D.CheckOutcome.UNMEASURED,reason='empty silhouette cannot measure anchor')
+            delta=max(abs(a[0]-b[0]),abs(a[1]-b[1]))
+            return D.CheckResult(constraint_id=cid,scope=scope,outcome=D.CheckOutcome.PASS if delta<=bound else D.CheckOutcome.FAIL,
+                observed_value=delta,expected_interval=[0,bound],units='native_px',reason=f'alpha centroid displacement {delta:g}px')
+        return registration
     blocked = _frame_ok(ctx, slot)
     if blocked is not None:
         return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.ERROR,
@@ -305,7 +322,7 @@ def _h_temporal(ctx: _Ctx, cid: str, check: str, scope: str) -> D.CheckResult:
                                    (protected[slot] if isinstance(protected, list) else protected)
                                    if protected is not None else None)
             if r.outcome != D.CheckOutcome.PASS:
-                return r
+                return r.model_copy(update={'scope':scope,'reason':f'slot {slot}: {r.reason}'})
         return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.PASS,
             reason="exterior + protected pixels identical across repaired slots", units="pixels")
     if check == "provenance_coverage":

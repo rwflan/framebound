@@ -19,6 +19,8 @@ MODELS = {
     "run": D.Run, "compiled_brief": D.CompiledBrief, "world_trace": D.WorldTrace,
     "transition_trace": D.TransitionTrace, "motion_guide": D.MotionGuide,
     "reference_approval": D.ReferenceApproval, "registration": D.Registration,
+    "compiled_animation_plan":D.CompiledAnimationPlan,"authorized_operation":D.AuthorizedOperation,
+    "repair_policy":D.RepairPolicy,"source_calibration":D.SourceCalibration,
     "edit_mask": D.EditMask, "provider_grant": ProviderGrant,
 }
 

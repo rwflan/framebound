@@ -25,6 +25,7 @@ TABLE_MODEL = {
     "jobs": D.Job, "export_snapshots": D.ExportSnapshot,
     "motion_guides": D.MotionGuide, "reference_approvals": D.ReferenceApproval,
     "registrations": D.Registration, "edit_masks": D.EditMask,
+    "compiled_animation_plans":D.CompiledAnimationPlan,"authorized_operations":D.AuthorizedOperation,
     "provider_grants": ProviderGrant, "compiled_briefs": D.CompiledBrief, "world_traces": D.WorldTrace, "runs": D.Run,
     "transition_traces": D.TransitionTrace,
 }

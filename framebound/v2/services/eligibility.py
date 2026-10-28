@@ -63,6 +63,9 @@ def release_eligibility_in(con, project_dir: str, revision_id: str) -> dict:
         if latest is None:
             return {"revision_id": revision_id, "eligible": False,
                     "reasons": ["no stored evaluation: nothing trustworthy to release"]}
+        from .auto_repair import technically_ready
+        if not technically_ready(latest):
+            eligible=False
         if latest.technical_status != D.TechnicalStatus.PASS:
             eligible = False
             reasons.append(f"technical evidence is {latest.technical_status.value}, not pass")
