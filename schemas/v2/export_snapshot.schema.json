@@ -1,6 +1,19 @@
 {
   "additionalProperties": false,
   "properties": {
+    "manifest_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Manifest Sha256"
+    },
     "schema_version": {
       "const": "2.0",
       "default": "2.0",

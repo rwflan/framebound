@@ -249,7 +249,11 @@ class TestSelectedClosure(unittest.TestCase):
                 for f in files:
                     after.add(str(Path(root) / f))
             outside = {f for f in after - before if not f.startswith(str(out))}
-            self.assertEqual(outside, set())
+            journal=Path(td)/'.snap.framebound-publication'
+            pin=Path(td)/'backups'/('snapshot-'+man['inputs_digest']+'.sqlite3')
+            self.assertEqual(outside,{str(journal/name) for name in ('state.json','.framebound-publication')} | {str(journal)+'.lock',str(pin),str(pin)+'.lock'})
+            # Only fixed publication bookkeeping may live outside the snapshot;
+            # imported record IDs still cannot create arbitrary paths.
             for rel in man["files"]:
                 self.assertNotIn("..", Path(rel).parts)
                 self.assertFalse(Path(rel).is_absolute())
