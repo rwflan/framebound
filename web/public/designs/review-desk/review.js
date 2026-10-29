@@ -11,6 +11,7 @@ window.Review = (() => {
   const state = { id: fixture.default_revision, frame: 3, tick: 12, playing: false, speed: 1, roi: null, range: null, mode: 'candidate', marking: false, step: 0, selectedColumns: [3] };
   const images = new Map();
   const listeners = new Set();
+  let noticeTimer=0;
   let raf = 0, stamp = 0, drag = null, inspectTab = 'film';
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
@@ -31,7 +32,7 @@ window.Review = (() => {
   function emit(full = true) { listeners.forEach(fn => fn(full)); if (full) updateInspector(); paint(); updateTransport(); }
   function nextSequence() { saved.serial+=1;return saved.serial; }
   function persist() { try { localStorage.setItem(storageKey,JSON.stringify(saved)); } catch { notify('Storage unavailable. This review lasts until reload.'); } }
-  function notify(text) { $('[data-announcement]').textContent=text; }
+  function notify(text) { const notice=$('[data-announcement]');notice.textContent=text;if(document.body.dataset.concept==='matrix'){clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>{notice.textContent='';},3200);} }
   function load(url) { if(images.has(url))return; const i=new Image();images.set(url,i);i.onload=()=>{paint();updateTransport();};i.onerror=()=>{paint();updateTransport();};i.src=url; }
   records.forEach(r => { r.frames.forEach(f => load(f.url)); r.references.forEach(f => load(f.url)); });
   [fixture.identity,fixture.style,fixture.editable,fixture.protected].forEach(load);
