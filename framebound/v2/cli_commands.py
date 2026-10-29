@@ -148,20 +148,6 @@ def dispatch(args) -> dict:
     if cmd == "eligibility":
         from .services import eligibility as E
         return E.release_eligibility(args.project, args.revision_id)
-    if cmd == "reviewer-pair":
-        from .services import sessions as SN
-        import os as _os
-        return SN.pair_reviewer(
-            args.project, args.reviewer_id,
-            operator_credential=getattr(args, "operator_secret", None)
-            or _os.environ.get("FRAMEBOUND_OPERATOR_SECRET", ""))
-    if cmd == "reviewer-open":
-        from .services import sessions as SN
-        from .services.errors import AuthorizationError, InvalidInput
-        try:
-            return SN.open_session(args.project, args.code)
-        except (AuthorizationError, InvalidInput) as e:
-            raise SystemExit(f"reviewer-open refused: {e}")
     if cmd == "guide-propose":
         import json as _json
         from .services import approvals as A
@@ -180,7 +166,7 @@ def dispatch(args) -> dict:
         reviewer = SN.resolve_session(args.project, token)
         if reviewer is None:
             raise SystemExit("reviewer session required: set --session-token or "
-                             "FRAMEBOUND_REVIEWER_TOKEN from `reviewer-open`")
+                             "FRAMEBOUND_REVIEWER_TOKEN")
         return A.approve_reference(args.project, _Actor(type="reviewer", id=reviewer),
                                    args.character, args.guide,
                                    getattr(args, "event_id", None)).model_dump()

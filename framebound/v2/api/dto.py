@@ -228,6 +228,14 @@ class ProjectEntryDto(Strict):
     name: str
 
 
+class DeskSessionDto(Strict):
+    ready: bool
+
+
+class ChangesDto(Strict):
+    revision: str
+
+
 class ProjectSummaryDto(Strict):
     summary: dict[str, Any] = Field(default_factory=dict)
     projects: list[ProjectEntryDto] = Field(default_factory=list)

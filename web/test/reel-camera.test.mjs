@@ -83,3 +83,25 @@ test("two-pointer pinch keeps its centroid anchored and releases both captures",
   assert.equal(captures.size, 0);
   c.destroy();
 });
+
+test("lane names remain separated at minimum zoom", () => {
+  const { c } = camera();
+  c.lanes = [
+    { top: 34, height: 190 },
+    { top: 250, height: 190 },
+  ];
+  c.labels = [0, 1].map(() => ({
+    style: {
+      setProperty(key, value) {
+        this[key] = value;
+      },
+    },
+  }));
+  c.zoomTo(0.05, 500, 300, true);
+  const centers = c.labels.map(
+    (n) => parseFloat(n.style.top) + parseFloat(n.style["--label-y"]),
+  );
+  assert.ok(centers[1] - centers[0] >= 28);
+  assert.ok(c.labels.every((n) => n.style.visibility === "visible"));
+  c.destroy();
+});

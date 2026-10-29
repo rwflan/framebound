@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, clearSession, getReviewer, setSession } from "./api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api } from "./api";
 import type {
   ActivityEventDto,
   IssueDetailDto,
@@ -30,6 +30,7 @@ import type { Bundle, DeskEvent } from "./review-model";
 import { Err, Icon, nav, parseHash, stamp, words } from "./shared";
 import { Modal } from "./Modal";
 import "./desk.css";
+import { useAutomaticUpdates } from "./useAutomaticUpdates";
 
 type DeskData = {
   bundles: Bundle[];
@@ -76,12 +77,9 @@ async function loadDesk(): Promise<DeskData> {
 }
 
 export default function App() {
-  const [view, setView] = useState(parseHash),
-    [reviewer, setReviewer] = useState(getReviewer),
-    [pairing, setPairing] = useState(false);
+  const [view, setView] = useState(parseHash);
   const [data, setData] = useState<DeskData | null>(null),
     [error, setError] = useState<unknown>(null),
-    [loading, setLoading] = useState(false),
     [version, setVersion] = useState(0),
     [project, setProject] = useState("all");
   useEffect(() => {
@@ -94,7 +92,6 @@ export default function App() {
   }, []);
   useEffect(() => {
     let live = true;
-    setLoading(true);
     setError(null);
     loadDesk()
       .then((d) => {
@@ -102,15 +99,14 @@ export default function App() {
       })
       .catch((e) => {
         if (live) setError(e);
-      })
-      .finally(() => {
-        if (live) setLoading(false);
       });
+
     return () => {
       live = false;
     };
   }, [version]);
   const refresh = useCallback(() => setVersion((n) => n + 1), []);
+  useAutomaticUpdates(refresh);
   const scoped = useMemo(
     () =>
       data?.bundles.filter(
@@ -193,57 +189,94 @@ export default function App() {
   };
   return (
     <div className="desk-shell">
-      <header className="app-header">
+      <header className="app-header streamlined-header">
         <button
           className="brand"
           onClick={() => nav({ name: "inbox" })}
-          aria-label="Framebound review desk"
+          aria-label="Framebound"
         >
           <Icon name="frame" />
           Framebound
         </button>
-        <span className="desk-label">Review desk</span>
-        <div className="header-end">
-          <details className="workspace-switcher">
-            <summary>
-              Workspace <span>⌄</span>
-            </summary>
-            <nav aria-label="Workspaces">
-              {[
-                ["inbox", "Review"],
-                ["corrections", "Corrections"],
-                ["issues", "Issues"],
-                ["references", "References"],
-                ["export", "Export"],
-                ["status", "Status"],
-              ].map(([name, label]) => (
-                <button
-                  key={name}
-                  onClick={(e) => {
-                    e.currentTarget.closest("details")?.removeAttribute("open");
-                    nav({ name: name as "export" });
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
-          </details>
-          <button
-            className="reel-icon refresh-button"
-            aria-label="Refresh review desk"
-            disabled={loading}
-            onClick={refresh}
+        <label className="project-picker">
+          <Icon name="folder" />
+          <select
+            aria-label="Project"
+            value={project}
+            onChange={(e) => {
+              setProject(e.target.value);
+              if (view.name === "packet") nav({ name: "inbox" });
+            }}
           >
-            <Icon name="refresh" />
+            <option value="all">All projects</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+            {data?.bundles.some(
+              (b) => projectId(b, data.refs) === "unassigned",
+            ) && <option value="unassigned">Unassigned project</option>}
+          </select>
+        </label>
+        <nav className="review-navigation" aria-label="Review views">
+          <button
+            aria-current={
+              view.name !== "activity" &&
+              collection === "interventions" &&
+              inFilm
+                ? "page"
+                : undefined
+            }
+            onClick={() => {
+              setCollection("interventions");
+              nav({ name: "inbox" });
+            }}
+          >
+            Interventions<span>{interventions.length}</span>
           </button>
           <button
-            className={"reviewer-button " + (reviewer ? "paired" : "")}
-            onClick={() => setPairing(true)}
+            aria-current={view.name === "activity" ? "page" : undefined}
+            onClick={() => nav({ name: "activity" })}
           >
-            {reviewer || "Pair reviewer"}
+            Timeline
           </button>
-        </div>
+          <button
+            aria-current={
+              collection === "sequences" && view.name !== "activity" && inFilm
+                ? "page"
+                : undefined
+            }
+            onClick={() => {
+              setCollection("sequences");
+              nav({ name: "inbox" });
+            }}
+          >
+            Sequences
+          </button>
+        </nav>
+        <details className="workspace-switcher">
+          <summary aria-label="More workspaces">•••</summary>
+          <nav aria-label="Workspaces">
+            {[
+              ["corrections", "Corrections"],
+              ["issues", "Issues"],
+              ["references", "References"],
+              ["export", "Export"],
+              ["status", "Status"],
+            ].map(([name, label]) => (
+              <button
+                key={name}
+                onClick={(e) => {
+                  e.currentTarget.closest("details")?.removeAttribute("open");
+                  nav({ name: name as "export" });
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        </details>
       </header>
       <main
         className={inFilm ? "film-desk" : "operations-desk"}
@@ -255,104 +288,33 @@ export default function App() {
               : collection
         }
       >
-        <div className="reel-menus">
-          <label className="reel-project">
-            <Icon name="folder" />
-            <select
-              aria-label="Project"
-              value={project}
-              onChange={(e) => {
-                setProject(e.target.value);
-                if (view.name === "packet") nav({ name: "inbox" });
-              }}
-            >
-              <option value="all">All projects</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-              {data?.bundles.some(
-                (b) => projectId(b, data.refs) === "unassigned",
-              ) && <option value="unassigned">Unassigned project</option>}
-            </select>
-          </label>
-          <nav className="reel-views" aria-label="Review views">
-            <button
-              aria-current={
-                view.name !== "activity" &&
-                collection === "interventions" &&
-                inFilm
-                  ? "page"
-                  : undefined
-              }
-              onClick={() => {
-                setCollection("interventions");
-                nav({ name: "inbox" });
-              }}
-            >
-              Interventions <span>{interventions.length}</span>
-            </button>
-            <button
-              aria-current={view.name === "activity" ? "page" : undefined}
-              onClick={() => nav({ name: "activity" })}
-            >
-              Timeline
-            </button>
-            <button
-              aria-current={
-                collection === "sequences" && view.name !== "activity" && inFilm
-                  ? "page"
-                  : undefined
-              }
-              onClick={() => {
-                setCollection("sequences");
-                nav({ name: "inbox" });
-              }}
-            >
-              Sequences
-            </button>
-          </nav>
-          <div className="reel-menu-tools">
-            {current && (
+        {view.name === "activity" && (
+          <div className="timeline-tools">
+            <span>History</span>
+            <div>
               <select
-                aria-label="Clip revision"
-                value={packetId(current)}
-                onChange={(e) => nav({ name: "packet", id: e.target.value })}
+                aria-label="Activity source"
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
               >
-                {scoped.map((b) => (
-                  <option key={packetId(b)} value={packetId(b)}>
-                    {actionName(b)} · {revisionId(b)}
-                  </option>
-                ))}
+                <option value="all">All activity</option>
+                <option value="framework">Framework</option>
+                <option value="human">Human review</option>
               </select>
-            )}
-            {view.name === "activity" && (
-              <>
-                <select
-                  aria-label="Activity source"
-                  value={source}
-                  onChange={(e) => setSource(e.target.value)}
-                >
-                  <option value="all">All activity</option>
-                  <option value="framework">Framework</option>
-                  <option value="human">Human review</option>
-                </select>
-                <select
-                  aria-label="Chronological order"
-                  value={order}
-                  onChange={(e) => setOrder(e.target.value)}
-                >
-                  <option value="oldest">Oldest first</option>
-                  <option value="newest">Newest first</option>
-                </select>
-                {data?.more && (
-                  <button onClick={loadMore}>Load more history</button>
-                )}
-              </>
-            )}
+              <select
+                aria-label="Chronological order"
+                value={order}
+                onChange={(e) => setOrder(e.target.value)}
+              >
+                <option value="oldest">Oldest first</option>
+                <option value="newest">Newest first</option>
+              </select>
+              {data?.more && (
+                <button onClick={loadMore}>Load more history</button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
         {Boolean(error) && (
           <div className="desk-error">
             <Err e={error} />
@@ -402,9 +364,8 @@ export default function App() {
                   refs={data.refs}
                   issues={data.issues}
                   bundles={data.bundles}
-                  reviewer={reviewer}
+                  choices={scoped}
                   onRefresh={refresh}
-                  onPair={() => setPairing(true)}
                 />
               ) : (
                 <div className="reel-empty">
@@ -415,7 +376,7 @@ export default function App() {
                 </div>
               ))}
             {!inFilm && (
-              <div className="operations-content" key={view.name + reviewer}>
+              <div className="operations-content" key={view.name}>
                 {view.name === "compare" && (
                   <CompareView base={view.base} other={view.other} />
                 )}
@@ -431,79 +392,7 @@ export default function App() {
           </>
         )}
       </main>
-      {pairing && (
-        <Modal
-          title={reviewer ? "Reviewer session" : "Pair reviewer"}
-          onClose={() => setPairing(false)}
-        >
-          {reviewer ? (
-            <>
-              <p>Signed in as {reviewer}</p>
-              <button
-                onClick={() => {
-                  clearSession();
-                  setReviewer(null);
-                  setPairing(false);
-                  refresh();
-                }}
-              >
-                End session
-              </button>
-            </>
-          ) : (
-            <Pairing
-              onPaired={(r) => {
-                setReviewer(r);
-                setPairing(false);
-                refresh();
-              }}
-            />
-          )}
-        </Modal>
-      )}
     </div>
-  );
-}
-
-function Pairing({ onPaired }: { onPaired: (id: string) => void }) {
-  const [code, setCode] = useState(""),
-    [error, setError] = useState<unknown>(null),
-    [busy, setBusy] = useState(false);
-  return (
-    <form
-      className="form-stack"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        setError(null);
-        try {
-          const s = await api.reviewerOpen(code.trim());
-          setSession(s.session_token, s.reviewer_id);
-          onPaired(s.reviewer_id);
-        } catch (e) {
-          setError(e);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <label>
-        Pairing code
-        <input
-          autoComplete="off"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          autoFocus
-        />
-      </label>
-      <p className="muted">
-        Use the single-use code issued by your project operator.
-      </p>
-      <Err e={error} />
-      <button className="primary" disabled={!code.trim() || busy}>
-        {busy ? "Opening…" : "Open session"}
-      </button>
-    </form>
   );
 }
 
@@ -525,12 +414,19 @@ function Collection({
   const controls = useFilm(),
     [index, setIndex] = useState(0),
     [detail, setDetail] = useState<DeskEvent | null>(null);
+  const focusedId = useRef<string | null>(null);
   const items = events
     ? events.map((e) => ({ id: e.id, bundle: e.bundle, event: e }))
     : bundles.map((b) => ({ id: packetId(b), bundle: b, event: undefined }));
-  const selected = Math.min(index, Math.max(0, items.length - 1)),
+  const retained = items.findIndex((item) => item.id === focusedId.current);
+  const selected =
+      retained >= 0 ? retained : Math.min(index, Math.max(0, items.length - 1)),
     item = items[selected];
+  useEffect(() => {
+    if (!focusedId.current && item) focusedId.current = item.id;
+  }, [item]);
   const select = (i: number) => {
+    focusedId.current = items[i]?.id || null;
     setIndex(i);
     controls.film.current?.reveal(i);
   };
