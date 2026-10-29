@@ -16,9 +16,9 @@ Use the numbered links or keys **1–5** to switch. The header discloses procedu
 
 ## Matrix visual design
 
-`matrix.css` refines candidate 5 using [T3 Code](https://t3.codes/) as a style reference: DM Sans, JetBrains Mono for numeric data, near-black surfaces, restrained grey borders and white primary actions. Warm amber is reserved for failed measurements. Its inspector uses the same visual system. Frame alignment, measured evidence, range selection and review semantics are preserved. The other four concepts retain their visual designs.
+Candidate 5 is a self-contained redesign inspired by [T3 Code](https://t3.codes/). It does not load `concepts.css`. DM Sans is the sole family across navigation, frame numbers, measurements, metadata, forms and every inspector tab. It uses larger labels, separate image tiles, outlined frame selection, a selection dock and a concise evidence summary. The inspector has its own matching component styles. Frame alignment, measured evidence, range selection and review semantics are preserved. The other four concepts retain their visual designs.
 
-The two Latin font subsets are locally hosted in `fonts/`, with their SIL Open Font License files. The files were obtained from T3’s public font assets; no T3 brand assets or marketing copy are used.
+The DM Sans Latin subset is locally hosted in `fonts/` with its SIL Open Font License. The font was obtained from T3’s public font assets; no T3 brand assets or marketing copy are used. Monospace fonts are not loaded by the redesigned matrix.
 
 ## Evidence and boundaries
 
