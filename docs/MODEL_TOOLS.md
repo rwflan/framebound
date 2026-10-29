@@ -60,7 +60,7 @@ python -m framebound correction-submit --project proj --task-id t --claim-token 
 python -m framebound mask-approve --project proj --issue evt --mask-asset m --slots 3   # reviewer session required
 python -m framebound export --project proj --snapshot s1 --out build/s1 --revisions clip-01
 python -m framebound dataset-validate --snapshot build/s1
-python -m framebound recorded-run --project proj --contract c-01 --slot 0 --baseline clip-01 --new-id gen-01 --out run.json --offline  # DEPRECATED historical bundle (Stage A retired the Spark-critique gate); new work uses offline check/repair + explicit image/edit/sam providers
+python -m framebound recorded-run --project proj --contract c-01 --slot 0 --baseline clip-01 --new-id gen-01 --out run.json --offline  # persistent optional image/edit/SAM probe; no critic stage
 FRAMEBOUND_OPERATOR_SECRET=... python -m framebound reviewer-pair --project proj --reviewer-id human-1   # operator console only; desk login redeems the printed code (browsers never pair)
 python -m framebound v2-mcp --project proj     # MCP stdio, official SDK (mcp==2.3.0), real handshake tested
 python -m framebound serve --project proj --port 8765   # FastAPI review desk + typed DTOs (api/dto.py)

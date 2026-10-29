@@ -172,7 +172,10 @@ def _stage_event(con, project_dir: str, actor: Actor, event: dict) -> D.ReviewEv
     # Stage D: machine-detected faults are system/orchestrator events, never
     # fabricated human issues. They authorize bounded automatic work under the
     # frozen contract, not artistic acceptance.
-    if action != "machine_fault":
+    if action=='machine_fault':
+        from .errors import AuthorizationError
+        if actor.type!='system':raise AuthorizationError('machine faults must come from measured framework work')
+    else:
         require_reviewer(actor, action)
     if action == "approve_reference":
         raise InvalidInput("reference approval requires the stored-approval flow, not a bare event")
@@ -186,7 +189,7 @@ def _stage_event(con, project_dir: str, actor: Actor, event: dict) -> D.ReviewEv
     except S.ConflictError:
         existing = D.ReviewEvent.model_validate_json(
             json.dumps(S.get(con, "review_events", ev.id)[0]))
-        if existing.action == ev.action and existing.clip_revision_id == ev.clip_revision_id:
+        if existing.model_dump(exclude={'created_at'})==ev.model_dump(exclude={'created_at'}):
             return existing
         raise S.ConflictError(f"event id {ev.id} already recorded with a different action/subject")
     return ev

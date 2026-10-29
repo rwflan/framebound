@@ -88,7 +88,7 @@ brief ──> generate (Muse Image) ──> preflight ──> pass ──> human
 | Muse Image | Generates frames under compiled briefs. |
 | SAM 3.1 | Instance masks for shape measurement where alpha is insufficient. |
 | External orchestrator (Spark or any tool-capable model) | Drives the loop via CLI/MCP tools; proposes authority. Never authors checks, masks, approvals or release claims. |
-| Retired internal Spark critique (historical) | Advisory-only wire validation preserved; NOT in the active workflow, demo, or readiness gates (Stage A). |
+| Specialist providers | Propose bounded image/edit/segmentation artifacts; never grant scope, authority or acceptance. |
 
 Adapters [v1: `meta_api.py`; v2: `framebound/v2/providers/`] use the Meta Model API (`https://api.meta.ai/v1`, `MODEL_API_KEY`). Offline, they return the request they would send and fabricate nothing. At hackathon scale the deterministic core (pydantic/Pillow/numpy, not stdlib) is the fast inner loop and models are the slow outer loop: the public 8-frame 64×64 evaluation service benchmarks at warm p50 ≈ 27 ms (cold ≈ 320 ms), Apple Silicon, `benchmark-eval` report; raster primitives are microbenchmarked separately.
 

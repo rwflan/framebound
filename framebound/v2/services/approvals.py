@@ -35,7 +35,9 @@ def approval_for_contract(project_dir: str, contract: D.ClipContractRevision,
                     matches.append(ap)
         if not matches:
             raise InvalidInput('no human approval for the contract-declared reference guide')
-        return max(matches, key=lambda ap: (ap.created_at, ap.id))
+        chosen=max(matches,key=lambda ap:(ap.created_at,ap.id))
+        require_active_approval_in(con,chosen.id)
+        return chosen
     finally:
         if owned:
             con.close()
@@ -184,6 +186,7 @@ def current_approval(project_dir: str, character_revision_id: str) -> D.Referenc
     try:
         rows = con.execute("SELECT data FROM reference_approvals").fetchall()
         approvals = [D.ReferenceApproval.model_validate_json(r["data"]) for r in rows]
+        revoked=revoked_approval_ids_in(con)
     finally:
         con.close()
     mine = [a for a in approvals if a.character_revision_id == character_revision_id]
@@ -194,6 +197,7 @@ def current_approval(project_dir: str, character_revision_id: str) -> D.Referenc
                            "a reviewer must approve references before briefing generation")
     # latest record wins if several (ordered by creation time)
     current.sort(key=lambda a: a.created_at)
+    if current[-1].id in revoked:raise InvalidInput('current reference approval was revoked')
     return current[-1]
 
 
@@ -207,3 +211,44 @@ def approval_event_is_human(project_dir: str, event_id: str) -> bool:
     finally:
         con.close()
     return D.ReviewEvent.model_validate_json(json.dumps(edata)).actor_type == "reviewer"
+
+
+def revoked_approval_ids_in(con):
+    return {e.reference_approval_id for e in (D.ReviewEvent.model_validate_json(row['data'])
+            for row in con.execute('SELECT data FROM review_events'))
+            if e.action=='revoke_reference' and e.actor_type=='reviewer' and e.reference_approval_id}
+
+
+def require_active_approval_in(con,approval_id):
+    original=D.ReferenceApproval.model_validate(S.get(con,'reference_approvals',approval_id)[0])
+    same=[ap for ap in (D.ReferenceApproval.model_validate_json(r['data']) for r in con.execute('SELECT data FROM reference_approvals'))
+          if ap.motion_guide_id==original.motion_guide_id and ap.character_revision_id==original.character_revision_id]
+    latest=max(same,key=lambda ap:(ap.created_at,ap.id))
+    revoked=revoked_approval_ids_in(con)
+    if approval_id in revoked or latest.id in revoked:raise InvalidInput('reference approval was revoked by a reviewer')
+
+
+def revoke_reference(project_dir,actor,approval_id,event_id=None,note=''):
+    require_reviewer(actor,'revoke_reference')
+    con=S.connect(project_dir)
+    try:
+        with S.atomic(con):
+            con.execute('BEGIN IMMEDIATE')
+            approval=D.ReferenceApproval.model_validate(S.get(con,'reference_approvals',approval_id)[0])
+            event=D.ReviewEvent(id=event_id or 'reference-revocation-'+uuid.uuid4().hex,
+                actor_type=actor.type,actor_id=actor.id,action='revoke_reference',clip_revision_id=approval.character_revision_id,
+                reference_approval_id=approval_id,note=note)
+            S.stage_identical(con,event,('created_at',))
+        return {'ok':True,'event_id':event.id,'approval_id':approval_id,'active':False}
+    finally:con.close()
+
+
+def active_guide_approval_ids_in(con):
+    latest={}
+    for row in con.execute('SELECT data FROM reference_approvals'):
+        approval=D.ReferenceApproval.model_validate_json(row['data'])
+        key=(approval.character_revision_id,approval.motion_guide_id)
+        prior=latest.get(key)
+        if prior is None or (approval.created_at,approval.id)>(prior.created_at,prior.id):latest[key]=approval
+    revoked=revoked_approval_ids_in(con)
+    return sorted(approval.id for approval in latest.values() if approval.id not in revoked)

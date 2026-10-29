@@ -442,11 +442,12 @@ class ReviewEvent(Strict):
     id: str = Field(min_length=1, max_length=128)
     actor_type: Literal["reviewer", "orchestrator", "system"] = "reviewer"
     actor_id: str = Field(min_length=1, max_length=200)
-    action: Literal["approve_reference", "approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue", "approve_mask", "machine_fault"] = "mark_issue"
+    action: Literal["approve_reference", "approve", "reject", "needs_changes", "mark_issue", "resolve_issue", "reopen_issue", "approve_mask", "machine_fault", "revoke_reference"] = "mark_issue"
     packet_id: str | None = None
     clip_revision_id: str = Field(min_length=1)
     frame_instance_id: str | None = None
     frame_range: list[StrictInt] | None = None
+    reference_approval_id: str | None = None
     category: str = Field(default="general", min_length=1, max_length=64)
     roi: Roi | None = None
     note: str = Field(default="", max_length=2000)

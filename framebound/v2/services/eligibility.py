@@ -57,12 +57,18 @@ def release_eligibility_in(con, project_dir: str, revision_id: str) -> dict:
         try:
             rev, contract = P._resolve_revision(con, revision_id)
         except KeyError:
-            return {"revision_id": revision_id, "eligible": False,
+            return {"revision_id": revision_id, "eligible": False,"evaluation_id":None,
                     "reasons": [f"unknown revision {revision_id}"]}
+        if contract.references.get('motion_guide_revision'):
+            from .approvals import approval_for_contract
+            from .errors import InvalidInput
+            try:approval_for_contract(project_dir,contract,con)
+            except InvalidInput as exc:
+                eligible=False;reasons.append('reference authority unavailable: '+str(exc))
         latest = P.latest_evaluation(con, revision_id)
         if latest is None:
-            return {"revision_id": revision_id, "eligible": False,
-                    "reasons": ["no stored evaluation: nothing trustworthy to release"]}
+            return {"revision_id": revision_id, "eligible": False,"evaluation_id":None,
+                    "reasons": reasons+["no stored evaluation: nothing trustworthy to release"]}
         from .auto_repair import technically_ready
         if not technically_ready(latest):
             eligible=False

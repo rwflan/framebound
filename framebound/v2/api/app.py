@@ -30,6 +30,9 @@ from ..services.authz import Actor
 from .dto import (ActivityPageDto, CompareBundleDto, CorrectionsListDto, EligibilityDto, ExportResultDto, IssueDetailDto, PacketBundleDto, TaskStatusDto)
 from ..services.errors import AuthorizationError, InvalidInput, StaleRevision as SvcStale
 from .dto import ReferencesDto, ReferenceApproveBodyDto as ReferenceBody
+from .dto import (AnimationStartBodyDto,AnimationRunDto,ProviderGrantDto,ProviderGrantViewDto,
+                  ProviderGrantRevokeResultDto,ExpectedVersionBodyDto,ProviderReceiptBodyDto,
+                  ProviderReconcileResultDto,ReferenceRevokeBodyDto,ReferenceRevokeResultDto,JobSubmitRequestDto)
 
 
 class IssueBody(D.Strict):
@@ -212,17 +215,17 @@ def create_app(project_dir: str) -> FastAPI:
         from ..services import projects
         return {"summary": projects.get_summary(project_dir)}
 
-    @app.post('/api/animation/runs')
-    def animation_start(body: dict):
+    @app.post('/api/animation/runs',response_model=AnimationRunDto)
+    def animation_start(body: AnimationStartBodyDto):
         from ..services.auto_repair import start_run
-        return start_run(project_dir,body['revision_id'],body.get('idempotency_key'),provider_settings=body.get('provider_settings'),offline=body.get('offline',True))
+        return start_run(project_dir,body.revision_id,body.idempotency_key,provider_settings=body.provider_settings,offline=body.offline)
 
-    @app.post('/api/animation/runs/{run_id}/step')
+    @app.post('/api/animation/runs/{run_id}/step',response_model=AnimationRunDto)
     def animation_step(run_id: str):
         from ..services.auto_repair import step_run
         return step_run(project_dir,run_id)
 
-    @app.get('/api/animation/runs/{run_id}')
+    @app.get('/api/animation/runs/{run_id}',response_model=AnimationRunDto)
     def animation_get(run_id: str):
         from ..services.auto_repair import get_run
         return get_run(project_dir,run_id)
@@ -231,30 +234,38 @@ def create_app(project_dir: str) -> FastAPI:
     def references():
         con = S.connect(project_dir)
         try:
-            return {table:[json.loads(r['data']) for r in con.execute(f'SELECT data FROM {table}')]
-                    for table in ('character_revisions','motion_guides','reference_approvals','assets')}
+            from ..services.approvals import revoked_approval_ids_in,active_guide_approval_ids_in
+            return {**{table:[json.loads(r['data']) for r in con.execute(f'SELECT data FROM {table}')]
+                    for table in ('character_revisions','motion_guides','reference_approvals','assets')},
+                    'revoked_approval_ids':sorted(revoked_approval_ids_in(con)),'active_approval_ids':active_guide_approval_ids_in(con)}
         finally:
             con.close()
 
-    @app.post('/api/jobs/{job_id}/operator-reconcile')
-    def provider_reconcile(job_id: str, body: dict, x_operator_secret: str | None = Header(default=None)):
+    @app.post('/api/jobs/{job_id}/operator-reconcile',response_model=ProviderReconcileResultDto)
+    def provider_reconcile(job_id: str, body: ProviderReceiptBodyDto, x_operator_secret: str | None = Header(default=None)):
         from ..services.provider_recovery import reconcile
-        return reconcile(project_dir,job_id,body,x_operator_secret or '')
+        return reconcile(project_dir,job_id,body.model_dump(),x_operator_secret or '')
 
-    @app.get('/api/provider-grants/{grant_id}')
+    @app.get('/api/provider-grants/{grant_id}',response_model=ProviderGrantViewDto)
     def provider_grant_get(grant_id: str):
         from ..services.provider_grants import get_grant
         return get_grant(project_dir,grant_id)
 
-    @app.post('/api/provider-grants/{grant_id}/revoke')
-    def provider_grant_revoke(grant_id: str,body: dict,x_operator_secret: str | None = Header(default=None)):
+    @app.post('/api/provider-grants/{grant_id}/revoke',response_model=ProviderGrantRevokeResultDto)
+    def provider_grant_revoke(grant_id: str,body: ExpectedVersionBodyDto,x_operator_secret: str | None = Header(default=None)):
         from ..services.provider_grants import revoke
-        return revoke(project_dir,grant_id,body['expected_version'],x_operator_secret or '')
+        return revoke(project_dir,grant_id,body.expected_version,x_operator_secret or '')
 
-    @app.post('/api/provider-grants', status_code=201)
-    def provider_grant(body: dict, x_operator_secret: str | None = Header(default=None)):
+    @app.post('/api/provider-grants', status_code=201,response_model=ProviderGrantDto)
+    def provider_grant(body: ProviderGrantDto, x_operator_secret: str | None = Header(default=None)):
         from ..services.provider_grants import issue
-        return issue(project_dir,body,x_operator_secret or '')
+        return issue(project_dir,body.model_dump(),x_operator_secret or '')
+
+    @app.post('/api/references/{approval_id}/revoke',response_model=ReferenceRevokeResultDto)
+    def revoke_reference(approval_id: str, body: ReferenceRevokeBodyDto,
+                         x_session_token: str | None = Header(default=None),x_actor_id: str | None = Header(default=None)):
+        from ..services.approvals import revoke_reference
+        return revoke_reference(project_dir,actor(x_session_token,x_actor_id),approval_id,body.event_id,body.note)
 
     @app.post('/api/references/approve')
     def approve_references(body: ReferenceBody,
@@ -471,8 +482,9 @@ def create_app(project_dir: str) -> FastAPI:
         return E.release_eligibility(project_dir, revision_id)
 
     @app.post("/api/jobs", status_code=201)
-    def jobs_submit(body: dict):
+    def jobs_submit(body: JobSubmitRequestDto):
         from ..services import jobs as J
+        body=body.model_dump()
         try:
             brief = body.get("brief") or {}
             refs = body.get("references") or brief.get("_reference_blobs", [])

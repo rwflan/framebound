@@ -52,7 +52,7 @@ def check_graph(snap,manifest,issues):
         if plan is None:issues.append('portable operation plan absent: '+op.id);continue
         if op.slot>=len(plan.controls) or plan.controls[op.slot].scope_sha256!=op.scope_sha256:issues.append('portable operation scope differs: '+op.id)
         if plan.reference_approval_id not in approvals:issues.append('portable operation approval absent: '+op.id)
-        if op.input_asset_id not in assets or op.output_asset_id not in assets:issues.append('portable operation pixels absent: '+op.id)
+        if op.input_asset_id not in assets or (op.status in ('committed','rendered','evaluated') and op.output_asset_id not in assets):issues.append('portable operation pixels absent: '+op.id)
     ancestry={}
     def visit(aid,active):
         if aid in active:raise ValueError('cyclic portable ancestry: '+aid)
@@ -116,10 +116,30 @@ def check_graph(snap,manifest,issues):
                 rights,origins,problems=ancestry[frames[fid].asset_id]
                 if not rights<=allowed or problems or origins & {'simulated-transport','provider-simulated'} or ('procedural' in origins and not manifest['policy']['include_procedural_positives']):
                     issues.append('preference pixels violate ancestry policy: '+fid)
+    receipts={}
+    if (snap/'closure'/'reconciliations.jsonl').is_file():
+        receipts={r['id']:D.ProviderReconciliation.model_validate(r) for r in records('reconciliations.jsonl')}
+    for receipt in receipts.values():
+        job=jobs.get(receipt.job_id)
+        if job is None or receipt.request_sha256!=job.frozen_request_sha256:issues.append('portable receipt request differs: '+receipt.id)
+        if receipt.artifact_sha256 and not (snap/'closure'/'blobs'/receipt.artifact_sha256).is_file():issues.append('portable receipt artifact absent: '+receipt.id)
+    annotation_rows={a['id']:a for a in records('annotations.jsonl')}
     for ev in records('evaluations.jsonl'):
         revision=revisions.get(ev['clip_revision_id'])
         if revision is None:issues.append('portable evaluation revision missing');continue
         bound=json.loads((snap/'closure'/'blobs'/ev['evidence_manifest_sha256']).read_text())
+        approval_id=(bound.get('authority') or {}).get('approval_id')
+        revoked={e.get('reference_approval_id') for e in events if e.get('action')=='revoke_reference' and e.get('actor_type')=='reviewer'}
+        # A revoked historical evaluation remains inspectable; current positives
+        # below must use an active captured authority.
+        if approval_id in revoked and any(json.loads(line).get('clip')==revision.id for line in (snap/'hf'/'metadata.jsonl').read_text().splitlines() if line.strip()):
+            issues.append('positive uses revoked reference authority: '+revision.id)
+        for annotation in bound.get('annotations',[]):
+            raw=snap/'closure'/'blobs'/annotation['sha256']
+            if not raw.is_file() or hashlib.sha256(raw.read_bytes()).hexdigest()!=annotation['sha256']:
+                issues.append('portable annotation bytes absent or altered: '+annotation['id'])
+            elif annotation['id'] not in annotation_rows or json.loads(raw.read_bytes())!=annotation_rows[annotation['id']]:
+                issues.append('portable annotation record differs from measured input: '+annotation['id'])
         measured=bound.get('frames',[])
         if len(measured)!=len(revision.frame_instance_ids):issues.append('portable evaluation frame count mismatch');continue
         for index,fid in enumerate(revision.frame_instance_ids):
