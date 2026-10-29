@@ -3,6 +3,8 @@ window.MatrixDesk = (() => {
   const R = window.Review, {esc, label, num, picture} = R;
   const projects = R.fixture.projects || [{id:'design-fixture',name:'Character animation'}];
   const state = {view:'interventions',project:'all',returnView:'interventions',event:null,actor:'all',order:'oldest',timelineScroll:0};
+  const requestedRevision=new URLSearchParams(location.search).get('revision');
+  if(R.records.some(r=>r.id===requestedRevision)){state.view='sequence';R.selectRecord(requestedRevision);}
   let drawSequence, icon;
   const projectId = r => r.project_id || projects[0].id;
   const revisions = () => R.records.filter(r => state.project==='all' || projectId(r)===state.project);
