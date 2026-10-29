@@ -67,6 +67,7 @@ export interface CapabilityEvidenceDto {
 
 export interface CharacterReferenceDto {
   id: string;
+  project_id?: string | null;
   identity_asset_ids: string[];
   style_asset_ids: string[];
 }
@@ -138,6 +139,10 @@ export interface EvalResultDto {
   scope: string;
   outcome: string;
   reason: string;
+  observed_value?: number | string | null;
+  units?: string | null;
+  expected_interval?: number[] | null;
+  evidence_ids?: string[];
 }
 
 export interface EvaluationDto {
@@ -145,6 +150,8 @@ export interface EvaluationDto {
   technical_status: string;
   coverage_status: string;
   results: EvalResultDto[];
+  created_at?: string | null;
+  evidence_manifest_sha256?: string | null;
 }
 
 export interface ExpectedVersionBodyDto {
@@ -242,8 +249,14 @@ export interface PreviewDto {
   content_sha256: string;
 }
 
+export interface ProjectEntryDto {
+  id: string;
+  name: string;
+}
+
 export interface ProjectSummaryDto {
   summary?: Record<string, unknown>;
+  projects?: ProjectEntryDto[];
 }
 
 export interface ProviderGrantDto {

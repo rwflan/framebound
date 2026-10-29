@@ -80,7 +80,7 @@ export const api = {
   revokeReference: (approvalId: string, eventId: string) =>
     req<{ok:boolean}>(`/api/references/${encodeURIComponent(approvalId)}/revoke`,{method:'POST',body:JSON.stringify({event_id:eventId,note:'Reference authority revoked from review desk.'})}),
   health: () => req<{ ok: boolean; schema_version: string }>('/api/health'),
-  project: () => req<{ summary: Record<string, unknown> }>('/api/project'),
+  project: () => req<{ summary: Record<string, unknown>; projects: { id: string; name: string }[] }>('/api/project'),
   packets: () => req<{ packets: Record<string, unknown>[] }>('/api/packets'),
   packet: (id: string) => req<PacketBundleDto>(`/api/packet/${encodeURIComponent(id)}`),
   compare: (base: string, other: string) =>

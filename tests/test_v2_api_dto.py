@@ -6,6 +6,7 @@ DTO, the desk types are stale and this fails before the TypeScript build.
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -13,7 +14,7 @@ from PIL import Image
 from framebound.v2.api import dto as DTO
 from framebound.v2.api.app import create_app
 from framebound.v2.checks import fixtures as F
-from framebound.v2.services import assets, clips, contracts, packets
+from framebound.v2.services import assets, characters, clips, contracts, packets, projects
 from framebound.v2.services import corrections as C
 from framebound.v2.services.authz import Actor
 
@@ -28,6 +29,10 @@ def _seed(td: str) -> dict:
         assets.import_asset(td, str(src / rel), f"f{i}", source_kind="procedural")
     assets.import_asset(td, str(src / meta["clean"][0]), "a-id", source_kind="procedural")
     assets.import_asset(td, str(src / meta["clean"][1]), "a-st", source_kind="procedural")
+    projects.create_project(td, {"id": "project-dto", "name": "Review project"})
+    characters.propose_character(td, {"id": "char-01", "project_id": "project-dto",
+        "identity_asset_ids": ["a-id"], "style_asset_ids": ["a-st"], "view_set": ["side"],
+        "canvas": {"width": 64, "height": 64}, "scale_ruler": "Frozen test canvas"})
     contracts.propose_contract(td, {
         "schema_version": "2.0", "id": "c-dto-01", "character_revision_id": "char-01",
         "action": {"name": "run", "view": "side", "facing": "right", "loop": True},
@@ -55,6 +60,20 @@ def _seed(td: str) -> dict:
 
 
 class DtoConformance(unittest.TestCase):
+    def test_source_desk_build_wins_over_stale_packaging_stage(self):
+        import framebound.v2.api.app as app_module
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / '.git').touch()
+            ((root / 'web' / 'dist').resolve()).mkdir(parents=True)
+            (root / 'web' / 'package.json').write_text('{}')
+            (root / 'web' / 'dist' / 'index.html').write_text('current design')
+            package = root / 'package'
+            (package / 'desk').mkdir(parents=True)
+            (package / 'desk' / 'index.html').write_text('old design')
+            with patch.object(app_module, '__file__', str(root / 'framebound' / 'v2' / 'api' / 'app.py')), patch('importlib.resources.files', return_value=package):
+                self.assertEqual(app_module._desk_dir(), (root / 'web' / 'dist').resolve())
+
     def test_live_responses_match_dtos(self):
         with tempfile.TemporaryDirectory() as td:
             info = _seed(td)
@@ -63,6 +82,17 @@ class DtoConformance(unittest.TestCase):
             self.assertEqual(b.status_code, 200, b.text)
             DTO.PacketBundleDto.model_validate(b.json())
             self.assertTrue(all(f["asset_url"] for f in b.json()["frames"]))
+            evaluation = b.json()["evaluation"]
+            self.assertTrue(evaluation["created_at"])
+            self.assertEqual(len(evaluation["evidence_manifest_sha256"]), 64)
+            self.assertIsNotNone(evaluation["results"][0]["observed_value"])
+            self.assertIn("expected_interval", evaluation["results"][0])
+            project = c.get('/api/project')
+            self.assertEqual(project.status_code, 200)
+            DTO.ProjectSummaryDto.model_validate(project.json())
+            self.assertEqual(project.json()['projects'], [{'id': 'project-dto', 'name': 'Review project'}])
+            references = c.get('/api/references').json()
+            self.assertEqual(references['character_revisions'][0]['project_id'], 'project-dto')
             q = c.get("/api/compare", params={"base": "rev-a", "other": "rev-b"})
             self.assertEqual(q.status_code, 200, q.text)
             DTO.CompareBundleDto.model_validate(q.json())
