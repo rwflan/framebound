@@ -1,125 +1,255 @@
-// UI prototypes: original SVG pose fixtures; all decisions are local to this page.
-const pages = ['index.html', '02-motion.html', '03-compare.html', '04-clips.html', '05-sheet.html'];
-const pageIndex = Math.max(0, pages.indexOf(location.pathname.split('/').pop()));
-const icons = {
-  play: 'M9 5l11 7-11 7z', pause: 'M8 5v14M16 5v14',
-  left: 'M15 5l-7 7 7 7', right: 'M9 5l7 7-7 7',
-  prev: 'M6 5v14M18 5l-9 7 9 7z', next: 'M18 5v14M6 5l9 7-9 7z',
-  check: 'M5 12l5 5L20 6', cross: 'M6 6l12 12M18 6L6 18',
-  layers: 'M12 3L2 8l10 5 10-5zM2 12l10 5 10-5M2 16l10 5 10-5',
-  bounds: 'M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5M12 7v10M7 12h10',
-  pin: 'M8 3h8l-1 7 4 5H5l4-5zM12 15v7',
-  expand: 'M9 3H3v6M15 3h6v6M21 15v6h-6M9 21H3v-6',
-  reset: 'M3 10a9 9 0 1 1 2 9M3 3v7h7',
-  swap: 'M3 7h17l-4-4M21 17H4l4 4',
-};
-function icon(name) { return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[name] || icons.play}" fill="${name === 'play' ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`; }
-document.querySelectorAll('[data-icon]').forEach(el => el.innerHTML = icon(el.dataset.icon));
-document.querySelectorAll('[data-nav]').forEach(el => el.innerHTML = `<a class="nav-arrow" href="${pages[(pageIndex + 4) % 5]}" aria-label="Previous design">${icon('left')}</a>${pages.map((p, i) => `<a href="${p}" aria-label="Design ${i + 1}" ${i === pageIndex ? 'aria-current="page"' : ''}>0${i + 1}</a>`).join('')}<a class="nav-arrow" href="${pages[(pageIndex + 1) % 5]}" aria-label="Next design">${icon('right')}</a>`);
+/* Five candidate interfaces over the same real, procedural framework evidence.
+ * All review writes are local prototypes; no production API or authority is used. */
+const fixture = window.FRAMEBOUND_REVIEW_FIXTURE;
+const pages = ['index.html','02-ledger.html','03-comparison.html','04-triage.html','05-sequence.html'];
+const design = Math.max(0,pages.indexOf(location.pathname.split('/').pop()));
+const key = 'framebound.review-designs.v3';
+let local;
+try { local=JSON.parse(localStorage.getItem(key)||'null'); } catch { local=null; }
+if(!local || !Array.isArray(local.events) || !Array.isArray(local.issues)) local={events:[],issues:[]};
+let record=fixture.records.find(r=>r.id===fixture.default_revision);
+let tick=12, playing=false, speed=1, stamp=0, raf=0, mode=design===2||design===4?'compare':'single';
+let roi=null, dragging=null, allChecks=design===1, rangeDirty=false, marking=false, masks=false;
+const images=new Map();
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const label=s=>String(s||'').replaceAll('_',' ').replaceAll('-',' ');
+const n2=n=>String(n).padStart(2,'0');
+const total=()=>record.contract.timing.holds.reduce((a,b)=>a+b,0);
+const startOf=n=>record.contract.timing.holds.slice(0,n).reduce((a,b)=>a+b,0);
+function slotAt(t){let sum=0;return record.contract.timing.holds.findIndex(h=>{const yes=t>=sum&&t<sum+h;sum+=h;return yes;});}
+const slot=()=>Math.max(0,slotAt(Math.min(total()-1,Math.floor(tick))));
+const baseline=()=>fixture.records.find(r=>r.id===record.baseline);
+const currentDecision=r=>local.events.filter(e=>e.clip_revision_id===r.id&&e.expected_evaluation_id===r.evaluation.id).at(-1);
+const relatedIssues=r=>local.issues.filter(i=>i.clip_revision_id===r.id||i.replacement_revision_id===r.id||r.baseline===i.clip_revision_id);
+const openIssues=r=>relatedIssues(r).filter(i=>i.status!=='resolved');
+const failing=r=>r.evaluation.results.filter(x=>['fail','error'].includes(x.outcome));
+const attention=r=>r.evaluation.results.filter(x=>x.outcome!=='pass');
+const tone=v=>['pass','complete','approve','resolved','fixture-approved'].includes(v)?'good':['fail','error','reject'].includes(v)?'bad':'warn';
+const badge=(text,value=text)=>`<span class="badge ${tone(value)}">${escape(label(text))}</span>`;
+function persist(){try{localStorage.setItem(key,JSON.stringify(local));}catch{announce('Browser storage unavailable; review lasts until this page closes.');}}
+function announce(text){$('[data-message]').textContent=text;}
+function img(url,alt,cls=''){return `<img class="${cls}" src="${url}" alt="${escape(alt)}" loading="eager">`;}
+function load(url){if(!url||images.has(url))return;const i=new Image();images.set(url,i);i.onload=()=>{draw();updateDecisionButtons();};i.onerror=()=>{draw();updateDecisionButtons();};i.src=url;}
+fixture.records.forEach(r=>{r.frames.forEach(f=>load(f.url));r.references.forEach(f=>load(f.url));});
+[fixture.identity,fixture.style,fixture.editable,fixture.protected].forEach(load);
 
-// Hand-authored poses, varied by clip. Coordinates are illustration space.
-const run = [
-  [-65, 52, 0, 22, -24, 1], [-40, 25, 0, 30, -12, 12],
-  [-6, -15, 4, 44, 6, 0], [44, -58, 20, 24, 26, -15],
-  [65, -48, 0, 28, 25, 1], [38, -25, 0, 40, 14, 12],
-  [0, 18, 12, 38, -6, 0], [-44, 60, 24, 15, -26, -15],
-];
-function pose(frame, clip) {
-  if (clip === 'Idle') return [0, 15, 0, 0, 2, [0,2,4,2,0,-2,-4,-2][frame]];
-  if (clip === 'Jump') return [[-12,12,0,0,-10,26],[-30,25,12,10,-30,5],[-48,45,35,38,-36,-40],[-32,30,48,48,-20,-65],[-10,20,45,40,4,-55],[24,-15,32,25,18,-30],[35,-24,0,0,12,18],[8,10,0,0,0,6]][frame];
-  if (clip === 'Attack') return [[-20,24,0,0,-20,0],[-28,25,0,0,-48,4],[-38,28,0,0,-65,8],[40,-25,0,0,70,-4],[48,-20,0,0,82,0],[38,-12,0,0,55,5],[10,10,0,0,16,4],[-10,20,0,0,-12,0]][frame];
-  return run[frame];
-}
-function art(frame = 3, clip = 'Run', previous = false) {
-  const [a, b, liftA, liftB, arm, bob] = pose(frame, clip);
-  const left = 192 + a, right = 201 + b;
-  return `<svg class="pip" viewBox="0 ${clip === 'Jump' ? '-65' : '0'} 400 ${clip === 'Jump' ? '485' : '420'}" aria-hidden="true">
-  <ellipse class="shadow" cx="203" cy="384" rx="90" ry="9" fill="currentColor" opacity=".12"/>
-  <g transform="translate(${previous ? -8 : 0} ${bob})" stroke="#123b39" stroke-width="2" stroke-linejoin="round">
-    <path d="M187 248 Q${190+b} 291 ${right} ${365-liftB} L${right+23} ${370-liftB} Q${right+30} ${375-liftB} ${right+22} ${380-liftB} L${right-10} ${380-liftB} Q${right-14} ${335-liftB} ${180+b/2} 305 L173 259Z" fill="#1d4846"/>
-    <path d="M205 247 Q${203+a/2} 284 ${left} ${362-liftA} L${left+27} ${369-liftA} Q${left+32} ${375-liftA} ${left+23} ${380-liftA} L${left-11} ${380-liftA} Q${left-10} ${329-liftA} ${179+a/2} 297 L179 258Z" fill="#35605b"/>
-    <path d="M${left-11} ${359-liftA}l14 1 2 7 24 4 3 8 -42 1z" fill="#173e3d"/><path d="M${right-10} ${360-liftB}l12 1 2 6 24 6 -2 7 -36 0z" fill="#123532"/>
-    <path d="M175 149 Q113 ${139-arm/3} 48 ${178-arm/2} L76 ${145-arm/2} 52 ${133-arm/2} Q119 ${124-arm/3} 181 133Z" fill="#e65d48" stroke="#b83d33"/>
-    <path d="M168 139 Q114 ${117-arm/3} 68 ${131-arm/2}" fill="none" stroke="#ff9774"/>
-    <path d="M183 141 Q163 160 153 205 L130 265 Q181 290 251 267 Q230 227 229 194 L224 151Z" fill="#478b7d"/>
-    <path d="M180 153 Q175 213 143 264 Q164 274 187 275 L205 159Z" fill="#2f6b63" stroke="none"/>
-    <path d="M218 165 Q${244+arm/2} 191 ${233+arm} 217" fill="none" stroke="#245b54" stroke-width="24" stroke-linecap="round"/>
-    <path d="M${232+arm} 218l11 -6" stroke="#efbb89" stroke-width="14" stroke-linecap="round"/>
-    <path d="M169 141 Q132 102 156 64 Q181 28 213 48 Q246 65 243 106 L227 147 Q198 168 169 141Z" fill="#34756a"/>
-    <path d="M211 63 Q239 74 239 102 L250 115 238 118 234 139 Q218 153 200 135 L186 105 190 79Z" fill="#efc397" stroke="#284d43"/>
-    <path d="M175 138 Q150 117 157 88 Q168 51 201 49 Q226 51 237 75 Q213 65 198 80 Q185 103 201 140 L192 153Z" fill="#184c48"/>
-    <path d="M167 88 Q171 65 192 58" fill="none" stroke="#5b9b83" stroke-width="4" stroke-linecap="round"/>
-    <path d="M230 102h5" stroke="#153b37" stroke-width="3" stroke-linecap="round"/>
-    <path d="M165 143 Q196 156 234 139 L234 154 Q203 173 166 157Z" fill="#f0785c" stroke="#b94635"/>
-    <path d="M209 166L168 248" stroke="#563c2e" stroke-width="9"/>
-    <path d="M136 223 Q157 215 179 228 L172 267 Q148 270 129 257Z" fill="#b77c47" stroke="#674c33"/>
-    <path d="M136 223l43 5 -8 19 -39 -10Z" fill="#d19b5d" stroke="#8c633d"/>
-    <rect x="149" y="237" width="13" height="11" rx="2" fill="#e9c477" stroke="#8b6934"/>
-    <circle cx="213" cy="177" r="10" fill="#e7c675" stroke="#9b7c40"/><path d="M214 170l3 8 -5 6 -2-8z" fill="#486351" stroke="none"/>
-    <path d="M220 199l8 30M196 233l-7 21" fill="none" stroke="#68a68d" stroke-width="3" stroke-linecap="round"/>
-  </g></svg>`;
-}
+$('[data-designs]').innerHTML=pages.map((p,i)=>`<a href="${p}" aria-label="Design ${i+1}" ${i===design?'aria-current="page"':''}>0${i+1}</a>`).join('');
 
-let frame = 3, clip = 'Run', playing = false, timer, speed = 1;
-const holds = [4,4,4,4,4,4,4,4], marks = new Map(), decisions = new Map();
-const stateKey = () => `${clip}:${frame}`;
-const frameLabel = () => `${String(frame+1).padStart(2,'0')} / 08`;
-document.querySelectorAll('[data-art]').forEach(el => el.innerHTML = art(Number(el.dataset.art), el.dataset.clipArt || 'Run', el.hasAttribute('data-previous')));
-document.querySelectorAll('[data-frames]').forEach(el => {
-  el.innerHTML = holds.map((_, i) => `<button class="frame" data-frame="${i}" aria-label="Frame ${i+1}"><span>${String(i+1).padStart(2,'0')}</span>${art(i)}<i class="frame-pin"></i></button>`).join('');
-});
-document.querySelectorAll('[data-panorama]').forEach(el => {
-  el.innerHTML = holds.map((_, i) => `<button class="pose" data-frame="${i}" aria-label="Frame ${i+1}" style="--i:${i}">${art(i)}</button>`).join('');
-});
-document.querySelectorAll('[data-sheet]').forEach(el => {
-  el.innerHTML = holds.map((hold, i) => `<div class="sheet-row" data-row="${i}"><button class="sheet-frame" data-frame="${i}" aria-label="Frame ${i+1}"><span>${String(i+1).padStart(2,'0')}</span>${art(i)}</button><label><input type="number" min="1" max="12" value="${hold}" data-hold="${i}" aria-label="Frame ${i+1} hold in ticks"><span>t</span></label><button class="sheet-mark icon-button" data-pin-frame="${i}" aria-label="Mark frame ${i+1}" aria-pressed="false">${icon('pin')}</button></div>`).join('');
-});
-function update() {
-  document.querySelectorAll('[data-live]').forEach(el => el.innerHTML = art(frame, clip, el.hasAttribute('data-previous')));
-  document.querySelectorAll('[data-count]').forEach(el => el.textContent = frameLabel());
-  document.querySelectorAll('[data-current]').forEach(el => el.textContent = String(frame+1).padStart(2,'0'));
-  document.querySelectorAll('[data-total]').forEach(el => el.textContent = `${holds.reduce((a,b)=>a+b,0)}t`);
-  document.querySelectorAll('[data-frame]').forEach(el => { const n=Number(el.dataset.frame); el.setAttribute('aria-pressed', String(n===frame)); el.classList.toggle('selected',n===frame); el.classList.toggle('marked', marks.has(`${clip}:${n}`)); });
-  document.querySelectorAll('[data-row]').forEach(el => el.classList.toggle('selected',Number(el.dataset.row)===frame));
-  document.querySelectorAll('[data-play]').forEach(el => { el.innerHTML=icon(playing?'pause':'play'); el.setAttribute('aria-label',playing?'Pause':'Play'); el.title=playing?'Pause':'Play'; });
-  document.querySelectorAll('[data-pin]').forEach(el => el.setAttribute('aria-pressed',String(marks.has(stateKey()))));
-  document.querySelectorAll('[data-pin-frame]').forEach(el=>el.setAttribute('aria-pressed',String(marks.has(`${clip}:${el.dataset.pinFrame}`))));
-  document.querySelectorAll('[data-decision]').forEach(el => el.setAttribute('aria-pressed',String(decisions.get(clip)===el.dataset.decision)));
-  document.querySelectorAll('[data-status]').forEach(el => el.textContent = decisions.get(clip)==='approve'?'Approved':decisions.get(clip)==='reject'?'Changes requested':'');
-  document.querySelectorAll('[data-clip-label]').forEach(el=>el.textContent=clip);
-  document.querySelectorAll('[data-scrub]').forEach(el=>el.value=frame);
-  document.body.style.setProperty('--playhead',`${(frame+.5)/8*100}%`);
-  const field = document.querySelector('[data-panorama]');
-  if (field && innerWidth <= 640) {
-    const selected = field.querySelector('.selected');
-    field.scrollLeft = document.body.classList.contains('onion-off') ? 0 : selected.offsetLeft + selected.offsetWidth/2 - field.clientWidth/2;
+function renderQueue(){
+  $('[data-queue-list]').innerHTML=fixture.records.filter(r=>r.id!=='pip-run-r01').map(r=>{
+    const d=currentDecision(r);
+    return `<button class="queue-item ${r.id===record.id?'selected':''}" data-revision="${r.id}" aria-pressed="${r.id===record.id}">${img(r.frames[Math.min(3,r.frames.length-1)].url,r.label+' revision '+r.id)}<span class="queue-copy"><strong>${r.label}<small>${r.id.split('-').at(-1)}</small></strong><span>${badge(r.evaluation.technical_status)}<small>${d?label(d.action):'Unreviewed'}</small></span></span>${failing(r).length?`<b class="queue-count">${failing(r).length}</b>`:''}</button>`;
+  }).join('');
+  $('[data-task-count]').textContent=local.issues.filter(i=>i.status!=='resolved').length;
+}
+function renderSummary(){
+  const d=currentDecision(record);
+  $('[data-summary]').innerHTML=`<div class="revision-title"><span class="eyebrow">Pip / ${escape(record.contract.action.view)} / ${escape(record.contract.action.facing)}</span><h1>${record.label}<span>${record.id}</span></h1></div><dl class="status-grid"><div><dt>Technical</dt><dd>${badge(record.evaluation.technical_status)}</dd></div><div><dt>Coverage</dt><dd>${badge(record.evaluation.coverage_status)}</dd></div><div><dt>Human review</dt><dd>${badge(d?`${label(d.action)} · local`:'Unreviewed',d?.action||'unreviewed')}</dd></div></dl>`;
+  $('[data-bound-revision]').textContent=record.id;
+  $('[data-bound-evaluation]').textContent=record.evaluation.id;
+  $('[data-human-decision]').textContent=d?`${label(d.action)} · saved locally`:'Unreviewed';
+  const blockers=[];
+  if(record.evaluation.technical_status!=='pass')blockers.push('Technical '+label(record.evaluation.technical_status));
+  if(record.evaluation.coverage_status!=='complete')blockers.push('Coverage '+label(record.evaluation.coverage_status));
+  if(openIssues(record).length)blockers.push(`${openIssues(record).length} open correction${openIssues(record).length===1?'':'s'}`);
+  $('[data-release]').textContent=blockers.length?blockers.join(' · '):'Release not verified in local prototype';
+  $$('[data-decide]').forEach(b=>b.setAttribute('aria-pressed',String(d?.action===b.dataset.decide)));
+}
+function value(result){
+  if(result.observed_value===null||result.observed_value===undefined)return '—';
+  if(typeof result.observed_value!=='number')return escape(result.observed_value);
+  const fraction=result.units==='fraction';
+  return `${(result.observed_value*(fraction?100:1)).toFixed(fraction?1:2).replace(/\.00$/,'')}${fraction?'%':result.units==='native_px'?' px':result.units==='pixels'?' px':''}`;
+}
+function bound(result){
+  if(!result.expected_interval)return '—';
+  const scale=result.units==='fraction'?100:1;
+  return result.expected_interval.map(x=>(x*scale).toFixed(1).replace(/\.0$/,'')).join('–')+(scale===100?'%':result.units==='native_px'?' px':'');
+}
+function resultSlot(result){const m=result.scope.match(/^slot (\d+)$/);return m?Number(m[1]):null;}
+function renderEvidence(){
+  const rows=allChecks?[...record.evaluation.results].sort((a,b)=>Number(a.outcome==='pass')-Number(b.outcome==='pass')):attention(record);
+  $('[data-findings-title]').textContent=`Findings · ${attention(record).length}`;
+  $('[data-check-filter]').textContent=allChecks?'Show attention only':`All ${record.evaluation.results.length} checks`;
+  $('[data-evidence]').innerHTML=rows.length?`<div class="evidence-head"><span>Check / frame</span><span>Observed</span><span>Bound</span></div>`+rows.map((r,i)=>{
+    const index=record.evaluation.results.indexOf(r),s=resultSlot(r);
+    return `<button class="finding ${tone(r.outcome)} ${s===slot()?'current':''}" data-finding="${index}" title="${escape(r.reason)}"><span class="finding-name"><i></i><strong>${escape(label(r.constraint_id))}</strong><small>${s===null?escape(r.scope):'Frame '+n2(s+1)} · ${escape(label(r.outcome))}</small></span><b>${value(r)}</b><span class="bound">${bound(r)}</span><p>${escape(r.reason)}</p></button>`;
+  }).join(''):`<div class="no-findings">No failing or unmeasured checks.</div>`;
+}
+function renderTimeline(){
+  $('[data-frames]').style.setProperty('--frames',record.frames.length);
+  $('[data-frames]').innerHTML=record.frames.map((f,i)=>{
+    const outcomes=record.evaluation.results.filter(r=>resultSlot(r)===i&&r.outcome!=='pass');
+    return `<button class="frame ${outcomes.some(r=>r.outcome==='fail')?'has-failure':outcomes.length?'has-gap':''}" data-frame="${i}" aria-label="Frame ${i+1}, ${escape(label(f.phase))}"><span class="frame-top"><b>${n2(i+1)}</b><span>${f.hold_ticks}t</span></span>${img(f.url,'Frame '+(i+1))}<span class="phase">${escape(label(f.phase))}</span></button>`;
+  }).join('');
+  $('[data-timing]').textContent=`${total()} ticks / ${record.contract.timing.ticks_per_second} tps · locked`;
+  $('[data-scrub]').max=total()-1;
+  $('[data-range-from]').max=total()-1;$('[data-range-to]').max=total()-1;
+}
+function renderReferences(){
+  $('[data-references]').innerHTML=`<figure>${img(fixture.identity,'Frozen identity reference')}<figcaption>Identity <span>Fixture approved</span></figcaption></figure><figure>${img(fixture.style,'Frozen style reference')}<figcaption>Style <span>Fixture approved</span></figcaption></figure><figure>${img(record.references[slot()].url,'Matching phase reference','phase-reference')}<figcaption>Phase <span data-reference-phase>${escape(label(record.frames[slot()].phase))}</span></figcaption></figure>`;
+}
+function updateScope(){
+  if(!rangeDirty){$('[data-range-from]').value=startOf(slot());$('[data-range-to]').value=startOf(slot())+record.frames[slot()].hold_ticks-1;}
+  $('[data-roi]').textContent=roi?`${roi.left}, ${roi.top} → ${roi.right}, ${roi.bottom} px`:'Whole frame';
+  $('[data-clear-roi]').disabled=!roi;
+}
+function renderPosition(){
+  const s=slot(),f=record.frames[s];
+  $('[data-position]').textContent=`Frame ${n2(s+1)} / ${n2(record.frames.length)}`;
+  $('[data-phase]').textContent=label(f.phase);
+  $('[data-tick]').textContent=`Tick ${Math.floor(tick)} / ${total()} · hold ${f.hold_ticks}t`;
+  $('[data-scrub]').value=Math.floor(tick);
+  $$('[data-frame]').forEach(el=>{const on=Number(el.dataset.frame)===s;el.classList.toggle('selected',on);el.setAttribute('aria-pressed',String(on));});
+  $$('[data-finding]').forEach(el=>el.classList.toggle('current',resultSlot(record.evaluation.results[Number(el.dataset.finding)])===s));
+  const phase=$('.phase-reference');if(phase&&phase.getAttribute('src')!==record.references[s].url)phase.src=record.references[s].url;
+  if($('[data-reference-phase]'))$('[data-reference-phase]').textContent=label(f.phase);
+  $('[data-play]').textContent=playing?'Pause':'Play';
+  $('[data-current-hash]').textContent=f.asset_id;
+  updateScope();draw();
+}
+function renderRevision(){
+  renderQueue();renderSummary();renderTimeline();renderReferences();renderEvidence();
+  $$('[data-mode]').forEach(b=>{b.disabled=b.dataset.mode!=='single'&&!baseline();b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});
+  $('.viewer').dataset.mode=mode;
+  $('[data-baseline-label]').textContent=baseline()?.id||'No baseline';
+  $('[data-candidate-label]').textContent=record.id;
+  $('[data-contract]').textContent=record.contract.id;
+  renderPosition();resizeStages();
+}
+function selectRevision(id){
+  const next=fixture.records.find(r=>r.id===id);if(!next)return;
+  pause();record=next;tick=Math.min(12,total()-1);roi=null;rangeDirty=false;marking=false;
+  $('[data-mark-region]').setAttribute('aria-pressed','false');
+  if(!baseline())mode='single';else if(design===2||design===4)mode='compare';
+  $('[data-note]').value='';announce('');renderRevision();
+}
+function pause(){playing=false;cancelAnimationFrame(raf);renderPosition();}
+function play(){
+  if(playing){pause();return;}
+  if(!record.contract.action.loop&&tick>=total()-1)tick=0;
+  playing=true;stamp=performance.now();
+  const step=now=>{
+    if(!playing)return;
+    tick+=(now-stamp)/1000*record.contract.timing.ticks_per_second*speed;stamp=now;
+    if(tick>=total()){
+      if(record.contract.action.loop)tick%=total();
+      else{tick=total()-1;playing=false;}
+    }
+    renderPosition();if(playing)raf=requestAnimationFrame(step);
+  };
+  renderPosition();raf=requestAnimationFrame(step);
+}
+function selectFrame(s){pause();s=Math.max(0,Math.min(record.frames.length-1,s));tick=startOf(s);roi=null;rangeDirty=false;renderPosition();}
+function fitCanvas(canvas){
+  const screen=canvas.parentElement;
+  const requested=$('[data-zoom]').value;
+  const max=requested==='fit'?Math.max(1,Math.floor(Math.min(screen.clientWidth-16,screen.clientHeight-16)/96)):Number(requested);
+  canvas.style.width=canvas.style.height=`${96*max}px`;
+  screen.style.alignItems=96*max>screen.clientHeight?'flex-start':'center';
+  screen.style.justifyContent=96*max>screen.clientWidth?'flex-start':'center';
+}
+function resizeStages(){$$('canvas[data-stage],canvas[data-base]').forEach(fitCanvas);}
+function ready(i){return i&&i.complete&&i.naturalWidth>0;}
+function draw(){
+  const f=record.frames[slot()],main=$('[data-stage]'),base=$('[data-base]');
+  if(!main||!base)return;
+  const ctx=main.getContext('2d'),bctx=base.getContext('2d');ctx.clearRect(0,0,96,96);bctx.clearRect(0,0,96,96);
+  const image=images.get(f.url),bf=baseline()?.frames[slot()],bi=bf?images.get(bf.url):null;
+  $('[data-media-error]').textContent=image?.complete&&!image.naturalWidth?'Frame media failed to load.':'';
+  if(ready(bi))bctx.drawImage(bi,0,0);
+  if(ready(image))ctx.drawImage(image,0,0);
+  if(mode==='blink'&&ready(bi)&&Math.floor(performance.now()/450)%2===0){ctx.clearRect(0,0,96,96);ctx.drawImage(bi,0,0);}
+  if(mode==='diff'&&ready(image)&&ready(bi)){
+    try{
+      const a=ctx.getImageData(0,0,96,96),b=bctx.getImageData(0,0,96,96);let count=0;
+      for(let p=0;p<a.data.length;p+=4){const changed=[0,1,2,3].some(k=>a.data[p+k]!==b.data[p+k]);if(changed)count++;a.data[p]=changed?235:0;a.data[p+1]=changed?91:0;a.data[p+2]=changed?65:0;a.data[p+3]=changed?255:0;}
+      ctx.putImageData(a,0,0);$('[data-diff-count]').textContent=`${count} changed pixels`;
+    }catch{$('[data-diff-count]').textContent='Serve over HTTP to inspect pixel differences.';}
+  }else $('[data-diff-count]').textContent='';
+  if(masks&&ready(images.get(fixture.editable))){
+    // Visualise the fixture's actual editable mask, not an invented anatomy overlay.
+    const scratch=document.createElement('canvas');scratch.width=scratch.height=96;
+    const sc=scratch.getContext('2d');sc.drawImage(images.get(fixture.editable),0,0);
+    const data=sc.getImageData(0,0,96,96);
+    for(let p=0;p<data.data.length;p+=4){const a=data.data[p]>127;data.data[p]=a?68:27;data.data[p+1]=a?202:46;data.data[p+2]=a?190:72;data.data[p+3]=a?70:20;}
+    sc.putImageData(data,0,0);ctx.drawImage(scratch,0,0);
   }
+  if(roi){ctx.strokeStyle='#edb332';ctx.lineWidth=1;ctx.strokeRect(roi.left+.5,roi.top+.5,roi.right-roi.left,roi.bottom-roi.top);}
+  main.style.cursor=marking?'crosshair':'default';
+  updateDecisionButtons();
 }
-function pause() { playing=false;clearTimeout(timer);update(); }
-function tick() { if(!playing)return;timer=setTimeout(()=>{frame=(frame+1)%8;update();tick();},holds[frame]*1000/24/speed); }
-function play() { if(playing)return pause();playing=true;update();tick(); }
-function select(n) { pause();frame=(n+8)%8;update(); }
-function pin(n=frame) { const key=`${clip}:${n}`;marks.has(key)?marks.delete(key):marks.set(key,true);update(); }
-document.querySelectorAll('[data-frame]').forEach(el=>el.addEventListener('click',()=>select(Number(el.dataset.frame))));
-document.querySelectorAll('[data-play]').forEach(el=>el.addEventListener('click',play));
-document.querySelectorAll('[data-step]').forEach(el=>el.addEventListener('click',()=>select(frame+Number(el.dataset.step))));
-document.querySelectorAll('[data-scrub]').forEach(el=>el.addEventListener('input',()=>select(Number(el.value))));
-document.querySelectorAll('[data-pin]').forEach(el=>el.addEventListener('click',()=>pin()));
-document.querySelectorAll('[data-pin-frame]').forEach(el=>el.addEventListener('click',()=>pin(Number(el.dataset.pinFrame))));
-document.querySelectorAll('[data-toggle]').forEach(el=>el.addEventListener('click',()=>{const on=document.body.classList.toggle(el.dataset.toggle);el.setAttribute('aria-pressed',String(on));update();}));
-document.querySelectorAll('[data-speed]').forEach(el=>el.addEventListener('click',()=>{speed=speed===1?.5:1;el.textContent=`${speed}×`;if(playing){pause();play();}}));
-document.querySelectorAll('[data-decision]').forEach(el=>el.addEventListener('click',()=>{decisions.set(clip,el.dataset.decision);update();}));
-document.querySelectorAll('[data-hold]').forEach(el=>el.addEventListener('change',()=>{const n=Number(el.value);holds[Number(el.dataset.hold)]=Number.isFinite(n)?Math.min(12,Math.max(1,Math.round(n))):4;el.value=holds[Number(el.dataset.hold)];update();}));
-document.querySelectorAll('[data-open-clip]').forEach(el=>el.addEventListener('click',()=>{clip=el.dataset.openClip;select(0);document.querySelector('[data-dialog]').showModal();}));
-document.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click',()=>{pause();document.querySelector('[data-dialog]').close();}));
-document.querySelector('[data-dialog]')?.addEventListener('close',pause);
-document.querySelectorAll('[data-swap]').forEach(el=>el.addEventListener('click',()=>{document.querySelector('.pair').classList.toggle('swapped');}));
-document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
-document.addEventListener('keydown',e=>{
-  if(e.target.matches('input,textarea,select')||e.metaKey||e.ctrlKey||e.altKey)return;
-  if(/^[1-5]$/.test(e.key)){location.href=pages[Number(e.key)-1];return;}
-  if(e.code==='Space'&&!e.target.closest('button,a')){e.preventDefault();play();}
-  if(e.key==='ArrowRight'){e.preventDefault();select(frame+1);}
-  if(e.key==='ArrowLeft'){e.preventDefault();select(frame-1);}
+function updateDecisionButtons(){if(!record||!$('[data-stage]'))return;const available=ready(images.get(record.frames[slot()].url));$$('[data-decide]').forEach(b=>b.disabled=!available);}
+function nativePoint(e){const b=$('[data-stage]').getBoundingClientRect();return {x:Math.max(0,Math.min(96,(e.clientX-b.left)/b.width*96)),y:Math.max(0,Math.min(96,(e.clientY-b.top)/b.height*96))};}
+const canvas=$('[data-stage]');
+canvas.addEventListener('pointerdown',e=>{if(!marking)return;pause();dragging=nativePoint(e);canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{if(!dragging)return;const p=nativePoint(e);roi={left:Math.floor(Math.min(dragging.x,p.x)),top:Math.floor(Math.min(dragging.y,p.y)),right:Math.ceil(Math.max(dragging.x,p.x)),bottom:Math.ceil(Math.max(dragging.y,p.y))};updateScope();draw();});
+canvas.addEventListener('pointerup',e=>{if(!dragging)return;const p=nativePoint(e);roi={left:Math.floor(Math.min(dragging.x,p.x)),top:Math.floor(Math.min(dragging.y,p.y)),right:Math.ceil(Math.max(dragging.x,p.x)),bottom:Math.ceil(Math.max(dragging.y,p.y))};if(roi.right-roi.left<1||roi.bottom-roi.top<1)roi=null;dragging=null;marking=false;canvas.releasePointerCapture(e.pointerId);$('[data-mark-region]').setAttribute('aria-pressed','false');updateScope();draw();});
+canvas.addEventListener('pointercancel',()=>{dragging=null;});
+
+function replacementFor(issue){
+  return fixture.records.find(r=>r.baseline===issue.clip_revision_id&&r.id!==issue.clip_revision_id&&
+    r.evaluation.technical_status==='pass'&&r.evaluation.coverage_status==='complete');
+}
+function canResolve(issue,replacement){
+  return replacement&&replacementFor(issue)?.id===replacement.id&&currentDecision(replacement)?.action==='approve';
+}
+function renderTasks(){
+  $('[data-task-list]').innerHTML=local.issues.length?local.issues.map(i=>{
+    const replacement=replacementFor(i);
+    const approved=canResolve(i,replacement);
+    return `<article class="task"><header><strong>${escape(label(i.category))}</strong>${badge(i.status)}</header><p>${escape(i.note)}</p><dl><div><dt>Revision</dt><dd>${escape(i.clip_revision_id)}</dd></div><div><dt>Tick range</dt><dd>${i.frame_range.join('–')}</dd></div><div><dt>ROI</dt><dd>${i.roi?Object.values(i.roi).join(', ')+' px':'Whole frame'}</dd></div></dl><div class="task-actions"><button data-inspect-task="${i.id}">Inspect</button>${replacement?`<button data-replacement="${replacement.id}">Compare replacement</button>`:''}${i.status==='resolved'?`<button data-reopen="${i.id}">Reopen</button>`:replacement?`<button data-resolve="${i.id}" ${approved&&replacement.evaluation.technical_status==='pass'?'':'disabled'}>Resolve with ${replacement.id}</button>`:''}</div><small>${escape(i.id)} · local</small></article>`;
+  }).join(''):'<p class="empty">No local correction tasks.</p>';
+}
+function decide(action){
+  pause();
+  local.events.push({id:crypto.randomUUID(),action,clip_revision_id:record.id,packet_id:record.packet.id,
+    expected_revision_id:record.id,expected_evaluation_id:record.evaluation.id,
+    evidence_manifest_sha256:record.evaluation.evidence_manifest_sha256,created_at:new Date().toISOString(),origin:'local-design-prototype'});
+  persist();renderSummary();renderQueue();announce(`${label(action)} saved locally for ${record.id}.`);
+}
+function requestCorrection(e){
+  e.preventDefault();const from=Number($('[data-range-from]').value),to=Number($('[data-range-to]').value),note=$('[data-note]').value.trim();
+  if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<from||to>=total()){announce(`Tick range must be within 0–${total()-1}.`);return;}
+  if(!note){$('[data-note]').focus();return;}
+  const id='local-task-'+crypto.randomUUID().slice(0,8);
+  local.issues.push({id,status:'open',clip_revision_id:record.id,packet_id:record.packet.id,
+    baseline_evaluation_id:record.evaluation.id,frame_instance_id:record.frames[Math.max(0,slotAt(from))].id,
+    frame_range:[from,to],roi,category:$('[data-category]').value,note,created_at:new Date().toISOString(),origin:'local-design-prototype'});
+  persist();renderQueue();renderSummary();$('[data-note]').value='';announce(`Correction queued locally · ${id}`);
+}
+document.addEventListener('click',e=>{
+  const button=e.target.closest('button');if(!button)return;
+  if(button.dataset.revision)selectRevision(button.dataset.revision);
+  if(button.dataset.frame!==undefined)selectFrame(Number(button.dataset.frame));
+  if(button.dataset.finding!==undefined){const r=record.evaluation.results[Number(button.dataset.finding)],s=resultSlot(r);if(s!==null)selectFrame(s);$('[data-category]').value=r.constraint_id.includes('silhouette')?'silhouette':r.constraint_id.includes('span')?'appearance':'general';}
+  if(button.hasAttribute('data-play'))play();
+  if(button.dataset.step){pause();tick=Math.max(0,Math.min(total()-1,Math.floor(tick)+Number(button.dataset.step)));renderPosition();}
+  if(button.dataset.stepFrame)selectFrame(slot()+Number(button.dataset.stepFrame));
+  if(button.dataset.mode){mode=button.dataset.mode;$('.viewer').dataset.mode=mode;$$('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));draw();resizeStages();}
+  if(button.hasAttribute('data-mark-region')){pause();marking=!marking;button.setAttribute('aria-pressed',String(marking));draw();}
+  if(button.hasAttribute('data-clear-roi')){roi=null;updateScope();draw();}
+  if(button.hasAttribute('data-check-filter')){allChecks=!allChecks;renderEvidence();}
+  if(button.dataset.decide)decide(button.dataset.decide);
+  if(button.hasAttribute('data-tasks')){pause();renderTasks();$('[data-tasks-dialog]').showModal();}
+  if(button.hasAttribute('data-close-tasks'))$('[data-tasks-dialog]').close();
+  if(button.dataset.replacement){$('[data-tasks-dialog]').close();selectRevision(button.dataset.replacement);mode='compare';renderRevision();}
+  if(button.dataset.inspectTask){const i=local.issues.find(x=>x.id===button.dataset.inspectTask);$('[data-tasks-dialog]').close();selectRevision(i.clip_revision_id);tick=i.frame_range[0];roi=i.roi;rangeDirty=true;$('[data-range-from]').value=i.frame_range[0];$('[data-range-to]').value=i.frame_range[1];$('[data-note]').value=i.note;$('[data-category]').value=i.category;renderPosition();}
+  if(button.dataset.resolve){const i=local.issues.find(x=>x.id===button.dataset.resolve),replacement=replacementFor(i);if(canResolve(i,replacement)){i.status='resolved';i.replacement_revision_id=replacement.id;i.replacement_evaluation_id=replacement.evaluation.id;persist();renderTasks();renderSummary();renderQueue();}}
+  if(button.dataset.reopen){const i=local.issues.find(x=>x.id===button.dataset.reopen);i.status='reopened';for(const id of [i.clip_revision_id,i.replacement_revision_id].filter(Boolean)){const r=fixture.records.find(r=>r.id===id);local.events.push({id:crypto.randomUUID(),action:'needs_changes',clip_revision_id:id,expected_evaluation_id:r.evaluation.id,packet_id:r.packet.id,origin:'local-design-prototype',created_at:new Date().toISOString()});}persist();renderTasks();renderSummary();renderQueue();}
+  if(button.hasAttribute('data-reset')){pause();local={events:[],issues:[]};persist();renderRevision();announce('Local review reset.');}
+  if(button.hasAttribute('data-download')){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify({schema:'local-review-prototype-1',fixture_schema:fixture.schema,...local},null,2)],{type:'application/json'}));a.href=url;a.download='framebound-local-review.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 });
-update();
+$('[data-correction-form]').addEventListener('submit',requestCorrection);
+$('[data-correction-form]').addEventListener('focusin',()=>{if(playing)pause();});
+[$('[data-range-from]'),$('[data-range-to]')].forEach(el=>el.addEventListener('input',()=>rangeDirty=true));
+$('[data-scrub]').addEventListener('input',e=>{pause();tick=Number(e.target.value);renderPosition();});
+$('[data-speed]').addEventListener('change',e=>{speed=Number(e.target.value);stamp=performance.now();});
+$('[data-zoom]').addEventListener('change',resizeStages);
+$('[data-masks]').addEventListener('change',e=>{masks=e.target.checked;draw();});
+document.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select')||e.ctrlKey||e.metaKey||e.altKey||$('[data-tasks-dialog]').open)return;if(/^[1-5]$/.test(e.key)){location.href=pages[Number(e.key)-1];return;}if(e.code==='Space'&&!e.target.closest('button,a')){e.preventDefault();play();}if(e.key==='ArrowRight'){e.preventDefault();selectFrame(slot()+1);}if(e.key==='ArrowLeft'){e.preventDefault();selectFrame(slot()-1);}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+new ResizeObserver(resizeStages).observe($('.viewer'));
+setInterval(()=>{if(mode==='blink')draw();},450);
+renderRevision();
