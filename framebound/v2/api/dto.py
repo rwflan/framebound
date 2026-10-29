@@ -24,6 +24,7 @@ class CanvasDto(Strict):
 
 class CharacterReferenceDto(Strict):
     id: str
+    project_id: str | None = None
     identity_asset_ids: list[str]
     style_asset_ids: list[str]
 
@@ -84,6 +85,10 @@ class EvalResultDto(Strict):
     scope: str
     outcome: str
     reason: str
+    observed_value: float | str | None = None
+    units: str | None = None
+    expected_interval: list[float] | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
 
 
 class EvaluationDto(Strict):
@@ -91,6 +96,8 @@ class EvaluationDto(Strict):
     technical_status: str
     coverage_status: str
     results: list[EvalResultDto]
+    created_at: str | None = None
+    evidence_manifest_sha256: str | None = None
 
 
 class PacketBundleDto(Strict):
@@ -216,8 +223,14 @@ class EligibilityDto(Strict):
     reasons: list[str]
 
 
+class ProjectEntryDto(Strict):
+    id: str
+    name: str
+
+
 class ProjectSummaryDto(Strict):
     summary: dict[str, Any] = Field(default_factory=dict)
+    projects: list[ProjectEntryDto] = Field(default_factory=list)
 
 
 class PacketsDto(Strict):
