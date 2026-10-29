@@ -1,79 +1,47 @@
 # Model-facing tools
 
-The primary consumer is the orchestrating model. Humans use the review desk; models use these. All commands take and return JSON.
-
-## CLI
+The external orchestrator uses the v2 CLI or MCP stdio server. Humans use the persistent review desk for references, comparisons and decisions. There is no internal general-purpose adviser or critic.
 
 ```sh
-python -m framebound check --contract project/contract.json [--report out.json] [--anchors anchors.json]
-python -m framebound brief --contract project/contract.json --slot 2 --out build/brief
-python -m framebound preflight --contract project/contract.json --manifest candidates.json [--report out.json]
-python -m framebound repair-plan --report report.json --out plan.json
-python -m framebound repair-evaluate --contract project/contract.json --manifest repairs.json --out decision.json
-python -m framebound record-failure --contract project/contract.json --slot 2 --code surface_span_drift --symptom "..." --expected "..." --out case.json
-python -m framebound export-dataset --contract project/contract.json --out build/dataset
-python -m framebound serve --contract project/contract.json --port 8765
-python -m framebound mcp
+framebound v2-mcp --project PROJECT
+framebound capabilities
 ```
 
-Exit codes: `check`/`preflight` return 1 on any error-severity issue; `repair-evaluate` returns 0 only when a batch is `selected_for_review`.
+The MCP server uses the official SDK handshake and actual tool discovery. Enumerate its tools rather than copying a historical catalogue. All transports call the same application services; current capability and pending-evidence states are available at `/api/capabilities`.
 
-## MCP
-
-`framebound mcp` serves line-delimited JSON-RPC on stdio: `check_clip`, `compile_brief`, `preflight_candidate`, `plan_repair`, `evaluate_repair`, `export_dataset`, `list_corrections`. Tool errors are returned as data, not crashes.
-
-## Intended orchestration loop
-
-1. `compile_brief` for the slot. Generate with Muse Image using the brief; keep the request/response ledger.
-2. `preflight_candidate`. On failure, read issue codes — do not retry blind.
-3. `plan_repair` from the report; regenerate only the bounded region; `evaluate_repair`.
-4. When `selected_for_review` is true, stop. Human review is next; poll `list_corrections` (or `GET /api/corrections`) for marked issues.
-5. Apply corrections the same way: brief, generate, preflight. Never promote art yourself; approval is a recorded human decision.
-6. `export_dataset` at milestones so passes, failures, repairs, and decisions accumulate as training data.
-
-## Rules the tools enforce on the model
-
-- A previous edit is never the sole generation reference.
-- Rejected paths are forbidden inputs.
-- No per-pose canvas fitting.
-- Declared-but-unmeasurable anatomy is a warning to surface, not a pass to claim.
-- A technical pass is not approval. Do not report art as accepted.
-
-## v2 services (remediation pass, schema 2.0)
-
-Same pattern — JSON in/out, thin transports over shared services (`framebound/v2/`).
-Transports must not reimplement policy; CLI/MCP/API parity is audited in
-`services/capabilities.py` (`capabilities` command).
+## Public creation
 
 ```sh
-python -m framebound asset-import --project proj --src img.png --asset-id a-01
-python -m framebound contract-propose --project proj --contract contract.json
-python -m framebound clip-create --project proj --contract-id c-01 --revision-id clip-01 --frames a,b,c --phases p0,p1,p2
-python -m framebound clip-evaluate --project proj --revision-id clip-01
-python -m framebound brief-compile --project proj --contract-id c-01 --slot 2   # needs stored human approval
-python -m framebound job-submit --project proj --brief brief.json --idempotency-key k1 [--offline]
-python -m framebound job-get --project proj --job-id job-xxx
-python -m framebound job-claim --project proj --job-id job-xxx --worker-id w --expected-version 1  # returns fencing token
-python -m framebound orchestrator-run --project proj --jobs job-xxx
-python -m framebound orchestrator-send --project proj --run-id run-xxx --job-id job-xxx --worker-id w --fencing-token tok  # brief optional: stored request is authoritative
-python -m framebound correction-submit --project proj --task-id t --claim-token tok --new-id r2 --slots 3=a --recipe "repair:bounded-patch" --baseline-evaluation ev --idempotency-key k2
-python -m framebound mask-approve --project proj --issue evt --mask-asset m --slots 3   # reviewer session required
-python -m framebound export --project proj --snapshot s1 --out build/s1 --revisions clip-01
-python -m framebound dataset-validate --snapshot build/s1
-python -m framebound recorded-run --project proj --contract c-01 --slot 0 --baseline clip-01 --new-id gen-01 --out run.json --offline  # persistent optional image/edit/SAM probe; no critic stage
-FRAMEBOUND_OPERATOR_SECRET=... python -m framebound reviewer-pair --project proj --reviewer-id human-1   # operator console only; desk login redeems the printed code (browsers never pair)
-python -m framebound v2-mcp --project proj     # MCP stdio, official SDK (mcp==2.3.0), real handshake tested
-python -m framebound serve --project proj --port 8765   # FastAPI review desk + typed DTOs (api/dto.py)
-python -m framebound benchmark-eval --report bench.json   # public-service latency (cold/warm/incremental)
+framebound project-create --project PROJECT --project-id PROJECT_ID --name NAME
+framebound asset-import --project PROJECT --src FILE --asset-id ASSET_ID
+framebound character-propose --project PROJECT --character character.json
+framebound guide-propose --project PROJECT --guide guide.json
+framebound contract-propose --project PROJECT --contract contract.json
+framebound clip-create --project PROJECT --contract-id CONTRACT --revision-id REVISION --frames ASSET_IDS --phases PHASES
 ```
 
-Rules the v2 tools enforce on the model (tested at the transport boundary):
-unknown check codes are rejected at proposal; missing required inputs/authority can
-never yield pass; evidence binds real pixels + code; reviewer identity comes from
-operator-issued sessions, never headers or anonymous pairing; generation briefs must
-reference a frozen compiled brief and transmit phase-guide pixels; offline jobs can
-never flip live at send; one dispatch per reservation with fencing; ambiguous outcomes
-reconcile instead of retrying; repairs obey ROI/mask scope, composed transform bounds
-with pixel proof, leases, matrix equivalence and no-regression selection; failures land
-as attempts, never orphaned revisions; exports publish only selected, rights-checked,
-split-safe closures that the validator accepts from a moved directory.
+MCP provides `project_create`, `asset_import`, `character_propose`, `guide_propose`, `contract_propose` and `clip_create`. Create a stored project and character, distinct identity/style inputs, independent phases and an immutable guide. The desk reviewer approves the exact art, support, calibration and repair policy. The orchestrator cannot approve or revoke that authority through a model tool. See [the native sprite profile](NATIVE_SPRITE_PROFILE.md) for the required inputs and unsupported cases.
+
+## Automatic work
+
+```sh
+framebound animation-compile --project PROJECT --contract-id CONTRACT
+framebound animation-start --project PROJECT --revision-id REVISION --idempotency-key WORK
+framebound animation-step --project PROJECT --run-id RUN
+framebound animation-get --project PROJECT --run-id RUN
+framebound animation-run --project PROJECT --revision-id REVISION --idempotency-key WORK
+```
+
+MCP exposes the matching compile/start/step/get operations. `animation-run` is a bounded CLI convenience loop. Consume returned diagnostics and persisted state. Deterministic native operators execute within approved controls. Only a complete passing candidate reaches `technically_ready`; its artistic acceptance remains unreviewed. Unsupported or missing measurements return a specific blocker. Do not replenish grants by renaming contracts or request keys.
+
+A supported per-frame fault may queue scoped redraw and return `awaiting_provider` with its durable job ID. Default work is offline. An authorized live start uses frozen provider settings and an existing operator grant. Use the normal `job_get` / `orchestrator_run` / `orchestrator_send` services, then resume `animation_step`. Reference, source, phase and support images are transmitted; the framework composites the proposed result and independently rechecks it. Optional SAM proposals never grant artistic approval or repair authority.
+
+Unknown upstream outcomes require operator reconciliation, never blind resubmission. Models do not mint grants or recovery receipts. See [provider recovery](PROVIDER_RECOVERY.md) and [provider contracts](PROVIDER_CONTRACTS.md).
+
+## Human feedback and training
+
+The desk's ROI/frame-range issue becomes a durable task. Consume `corrections_list`, claim through `correction_claim`, submit the exact scoped result through `correction_submit`, and retain the returned comparison identity. Claims are fenced and payload replay must be identical. The reviewer compares, resolves or reopens subjective issues. A technical improvement does not resolve artistic feedback automatically.
+
+Export through the desk/API or CLI and validate the moved snapshot. Positive membership requires current eligible decisions, rights and origin. Simulated or unresolved ancestry is retained as explained research material rather than promoted into positives. Preference data requires an explicit comparison packet. See [snapshot consumption](SNAPSHOT_CONSUMPTION.md) for a decoded native-pixel batch.
+
+The v1 file-oriented `check`, `preflight`, `repair-plan`, `repair-evaluate` and `mcp` commands remain compatibility paths. New durable workflows use `v2-mcp` and the services above.
