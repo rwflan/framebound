@@ -38,4 +38,4 @@ Review writes stay in the browser under `framebound.review-concepts.v4`. Local r
 
 The map's dotted links represent the fixture's recorded baseline comparisons, not invented derivation ancestry. Measured finding pins identify a frame-level finding; they do not claim a machine-localized defect region. User-drawn rectangles carry the spatial scope. Board status reflects actual fixture evidence and local actions. The matrix never edits poses or authored holds.
 
-The production React desk and backend are unchanged. **Reset** clears only this generation's local prototype review.
+The production React desk now adopts the fifth concept through its own API-backed components. These HTML candidates remain independent design studies. **Reset** clears only this generation's local prototype review.
