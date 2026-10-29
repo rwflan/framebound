@@ -49,6 +49,21 @@ class ExportSnapshot(unittest.TestCase):
         assets.import_asset(td, str(src / meta["clean"][0]), "a-id", source_kind="procedural")
         assets.import_asset(td, str(src / meta["clean"][1]), "a-st", source_kind="procedural")
         assets.import_asset(td, str(src / meta["faults"]["pulse"]), "f-wrong", source_kind="procedural")
+        # Labeled test reviewer approval goes through the real authority service.
+        # Declaring an unstored guide is insufficient for trainable positives.
+        from framebound.v2 import storage as S
+        from framebound.v2.services import projects,characters,approvals
+        projects.create_project(td,{'id':'p','name':'Export test fixture'})
+        characters.propose_character(td,{'id':'ch','project_id':'p',
+            'identity_asset_ids':['a-id'],'style_asset_ids':['a-st'],'view_set':['side'],
+            'canvas':{'width':64,'height':64},'scale_ruler':'test-native'})
+        con=S.connect(td)
+        try:entries=[{'phase':f'p{i}','asset_id':f'f{i}',
+                      'byte_sha256':S.get(con,'assets',f'f{i}')[0]['byte_sha256']} for i in range(8)]
+        finally:con.close()
+        approvals.propose_motion_guide(td,Actor(type='orchestrator',id='test-fixture'),
+            {'id':'mg','character_revision_id':'ch','entries':entries})
+        approvals.approve_reference(td,REV,'ch','mg')
         contracts.propose_contract(td, _contract(math.dist(ca, cb), max(1, n // 2)))
         aids = [f"f{i}" for i in range(8)]
         clips.create_revision(td, "c-export-01", "clip-clean", aids, [f"p{i}" for i in range(8)])
