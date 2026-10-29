@@ -52,7 +52,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const OPERATOR_SECRET = process.env.FRAMEBOUND_OPERATOR_SECRET ?? 'e2e-operator-secret';
 async function api(p, { method = 'GET', body = null, token = null, actor = null, operator = false } = {}) {
-  const headers = {};
+  // Synchronous Python checkpoints can outlast the server's idle timeout.
+  // Give each Node probe a fresh socket; browser requests still use normal pooling.
+  const headers = { Connection: 'close' };
   if (body) headers['Content-Type'] = 'application/json';
   if (token) headers['X-Session-Token'] = token;
   else if (actor) headers['X-Actor-Id'] = actor;
@@ -73,8 +75,8 @@ function runPy(args, opts = {}) {
 async function waitHealth(proc) {
   for (let i = 0; i < 60; i++) {
     try {
-      const r = await fetch(BASE + '/api/health');
-      if (r.ok) return;
+      const r = await fetch(BASE + '/api/health',{headers:{Connection:'close'}});
+      if (r.ok) { await r.text();return; }
     } catch { /* not up yet */ }
     if (proc.exitCode !== null) throw new Error(`E2E FAIL [${step}]: API exited early with ${proc.exitCode}`);
     await sleep(500);
@@ -86,8 +88,8 @@ function startApi() {
   const proc = spawn(PY, ['-m', 'framebound', 'serve', '--project', PROJ, '--port', PORT],
     { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...PYENV, FRAMEBOUND_OPERATOR_SECRET: OPERATOR_SECRET } });
-  proc.stdout.on('data', () => {});
-  proc.stderr.on('data', () => {});
+  proc.stdout.on('data',chunk => fs.appendFileSync(path.join(WORK,'server.log'),chunk));
+  proc.stderr.on('data',chunk => fs.appendFileSync(path.join(WORK,'server.log'),chunk));
   return proc;
 }
 
@@ -242,7 +244,7 @@ async function main() {
     await page.screenshot({ path: path.join(SHOTS, 'issue.png') });
 
     step = 'restart-api-and-reload';
-    const before=await fetch(BASE+`/api/asset/${REVIEW_FRAME0}`);
+    const before=await fetch(BASE+`/api/asset/${REVIEW_FRAME0}`,{headers:{Connection:'close'}});
     assert(before.ok,'asset fetch failed before restart');
     const shaBefore=createHash('sha256').update(Buffer.from(await before.arrayBuffer())).digest('hex');
     await stopApi(apiProc);
@@ -253,7 +255,7 @@ async function main() {
     const issues2 = await api(`/api/issues?revision=${REVIEW_REV}`);
     assert(issues2.status === 200 && issues2.json.length === 1, 'issue lost across API restart');
     assert(issues2.json[0].event_id === iss.event_id, 'issue identity changed across restart');
-    const after=await fetch(BASE+`/api/asset/${REVIEW_FRAME0}`);
+    const after=await fetch(BASE+`/api/asset/${REVIEW_FRAME0}`,{headers:{Connection:'close'}});
     const shaAfter=createHash('sha256').update(Buffer.from(await after.arrayBuffer())).digest('hex');
     out.asset_sha256_after_restart=shaAfter;
     assert(shaAfter === shaBefore, 'source bytes changed across restart');
