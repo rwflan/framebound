@@ -341,6 +341,7 @@ async function main() {
     await page.waitForSelector('text="ok": true', { timeout: 120000 });
     const moved = path.join(WORK, 'moved-exp');
     fs.renameSync(path.join(PROJ, 'exports', 'e2e-exp'), moved);
+    await page.screenshot({path:path.join(SHOTS,'final.png')});
     await stopApi(apiProc);apiProc=null;
     fs.renameSync(path.join(PROJ,'framebound.sqlite3'),path.join(PROJ,'framebound.sqlite3.unavailable'));
     const consume=`import json,sys
@@ -364,7 +365,6 @@ report['decoded_batch_shape']=list(batch['chosen'][0][0].shape);print(json.dumps
 
     assert(!out.pageerror,`browser error: ${out.pageerror}`);
     step = 'done';
-    await page.screenshot({ path: path.join(SHOTS, 'final.png') });
   } finally {
     if (browser) await browser.close().catch(() => {});
     if (apiProc) await stopApi(apiProc).catch(() => {});

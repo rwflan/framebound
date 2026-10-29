@@ -677,7 +677,7 @@ function ReferencesView() {
       return <article key={guide.id} style={{borderTop:'1px solid #ccc',padding:'20px 0'}}>
         <h3>{guide.character_revision_id} · {guide.id}</h3>
         <h4>Automatic repair authority</h4>
-        {guide.repair_policy ? <dl>
+        {guide.repair_policy ? <dl style={{display:'grid',gridTemplateColumns:'max-content 1fr',gap:'6px 20px',fontSize:14}}>
           <dt>Allowed operations</dt><dd>{Array.isArray(guide.repair_policy.operators) ? guide.repair_policy.operators.join(', ') : 'None'}</dd>
           <dt>Translation limit</dt><dd>{String(guide.repair_policy.translation_budget_px)} native pixels</dd>
           <dt>Attempts per phase</dt><dd>{String(guide.repair_policy.max_local_attempts)}</dd>
@@ -685,11 +685,11 @@ function ReferencesView() {
           <dt>Provider dispatches</dt><dd>{guide.repair_policy.generation_allowed ? String(guide.repair_policy.max_provider_dispatches) : 'Disabled'}</dd>
         </dl> : <p>Manual work only</p>}
         {guide.source_calibration && <p>Fixed source conversion: {String(guide.source_calibration.source_width)} × {String(guide.source_calibration.source_height)}, crop {JSON.stringify(guide.source_calibration.crop)}, nearest neighbour.</p>}
-        {guide.entries.map(entry => <div key={'scope-'+entry.phase}>
-          <span>{entry.phase}: editable / protected support</span>
-          {entry.editable_mask_asset_id && <img width={128} height={128} src={api.assetUrl(entry.editable_mask_asset_id)} alt={entry.phase+' editable mask'} />}
-          {entry.protected_mask_asset_id && <img width={128} height={128} src={api.assetUrl(entry.protected_mask_asset_id)} alt={entry.phase+' protected mask'} />}
-        </div>)}
+        <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'16px 0'}}>{guide.entries.map(entry => <div key={'scope-'+entry.phase} style={{display:'grid',gridTemplateColumns:'64px 64px',gap:4,border:'1px solid #ddd',padding:8}}>
+          <small style={{gridColumn:'1 / -1'}}>{entry.phase} · editable / protected</small>
+          {entry.editable_mask_asset_id && <img width={64} height={64} style={{imageRendering:'pixelated'}} src={api.assetUrl(entry.editable_mask_asset_id)} alt={entry.phase+' editable mask'} />}
+          {entry.protected_mask_asset_id && <img width={64} height={64} style={{imageRendering:'pixelated'}} src={api.assetUrl(entry.protected_mask_asset_id)} alt={entry.phase+' protected mask'} />}
+        </div>)}</div>
         <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
           {char && [['Identity',char.identity_asset_ids],['Style',char.style_asset_ids]].map(([label,ids]) =>
             <div key={String(label)}><h4>{String(label)}</h4>{(ids as string[]).map(id =>
@@ -702,7 +702,7 @@ function ReferencesView() {
           try { await api.approveReferences(guide.character_revision_id,guide.id,`ref-${crypto.randomUUID()}`);await refresh(); }
           catch(e){setError(e);}finally{setBusy(null);}
         }}>{approved?'References approved':busy===guide.id?'Recording…':'Approve these references'}</button>
-        {approval && <button disabled={busy===guide.id} onClick={async()=>{
+        {approval && <button disabled={!getReviewer() || busy===guide.id} onClick={async()=>{
           setBusy(guide.id);setError(null);
           try {await api.revokeReference(approval.id,`revoke-${crypto.randomUUID()}`);await refresh();}
           catch(e){setError(e);}finally{setBusy(null);}

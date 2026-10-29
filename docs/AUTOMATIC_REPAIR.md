@@ -1,5 +1,7 @@
 # Automatic native repair
 
+See [the native sprite profile](NATIVE_SPRITE_PROFILE.md) for required inputs, measurement scopes, thresholds and unsupported cases.
+
 The external orchestrator creates characters, imports references and proposes a motion guide. The review desk's References screen shows the art, editable/protected masks, fixed source calibration and repair policy together. A reviewer session approves those controls. A guide without a repair policy permits manual work only.
 
 An approved `repair_policy` whitelists operators and caps translation, local attempts and compute steps. A contract may narrow that policy. Masks are native PNG assets: luminance above 127 is selected; protected support overrides editable support. Missing editable support protects the whole frame. Bounds and masks are included in compiled authority and evidence. Changing a guide requires a new immutable guide and approval.
