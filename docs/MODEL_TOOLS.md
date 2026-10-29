@@ -4,7 +4,7 @@ The external orchestrator uses the v2 CLI or MCP stdio server. Humans use the pe
 
 ```sh
 framebound v2-mcp --project PROJECT
-framebound capabilities
+framebound capabilities --project PROJECT
 ```
 
 The MCP server uses the official SDK handshake and actual tool discovery. Enumerate its tools rather than copying a historical catalogue. All transports call the same application services; current capability and pending-evidence states are available at `/api/capabilities`.
