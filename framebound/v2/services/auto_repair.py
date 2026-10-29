@@ -328,6 +328,10 @@ def _step_locked(project,run_id):
         base={(r.constraint_id,r.scope):r for r in ev.results};new={(r.constraint_id,r.scope):r for r in candidate.results}
         regressions=[k for k,r in base.items() if r.outcome=='pass' and new[k].outcome!='pass']
         improved=[k for k,r in base.items() if r.outcome=='fail' and new[k].outcome=='pass']
+        protection_ids={c.id for c in contract.constraints if c.check=='repair_protection'}
+        improved += [key for key,r in base.items() if key[0] in protection_ids and r.outcome=='fail'
+                     and isinstance(r.observed_value,(int,float)) and isinstance(new[key].observed_value,(int,float))
+                     and new[key].observed_value<r.observed_value]
         progressed=bool(improved) and not regressions and all(new[k].outcome not in ('error','unmeasured') for k,r in base.items() if r.outcome in ('pass','fail'))
         con=S.connect(project)
         try:

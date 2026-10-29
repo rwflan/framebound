@@ -364,7 +364,7 @@ def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
                     raw=S.blob_path(project_dir,adata['byte_sha256']).read_bytes()
                     context['baseline'][slot]=canonical_pixels(load_native_image(raw))
                     context['baseline_byte_sha256'][slot]=adata['byte_sha256']
-                    scope=allowed_region(project_dir,task,slot)
+                    scope=allowed_region(project_dir,task,slot,connection=con)
                     context['allowed_mask'][slot]=bytes(a and bool(scope and scope[i]) for i,a in enumerate(context['allowed_mask'][slot]))
                 context['task_id']=task.id;context['mask_id']=task.edit_mask_id
         return context
@@ -422,7 +422,7 @@ def _resolve_repair_context(project_dir: str, con, rev: D.ClipRevision):
         allowed = []
         n = max(child_by_slot) + 1
         for slot in range(n):
-            region = _M.allowed_region(project_dir, task, slot)
+            region = _M.allowed_region(project_dir, task, slot,connection=con)
             allowed.append(bytearray(region) if region is not None else bytearray(len(base_by_slot[slot]) // 4))
         # Stage B: repair identity is part of the evidence key so distinct
         # support yields distinct context and a narrowed mask cannot reuse an

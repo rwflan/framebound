@@ -322,9 +322,10 @@ def _h_temporal(ctx: _Ctx, cid: str, check: str, scope: str) -> D.CheckResult:
                                    (protected[slot] if isinstance(protected, list) else protected)
                                    if protected is not None else None)
             if r.outcome != D.CheckOutcome.PASS:
-                return r.model_copy(update={'scope':scope,'reason':f'slot {slot}: {r.reason}'})
-        return D.CheckResult(constraint_id=cid, scope=scope, outcome=D.CheckOutcome.PASS,
-            reason="exterior + protected pixels identical across repaired slots", units="pixels")
+                bad+=int(r.observed_value or 0)
+        return D.CheckResult(constraint_id=cid,scope=scope,outcome=D.CheckOutcome.FAIL if bad else D.CheckOutcome.PASS,
+            observed_value=bad,expected_interval=[0,0],
+            reason=f'{bad} protected/exterior pixel violations across repaired slots' if bad else 'exterior + protected pixels identical across repaired slots',units='pixels')
     if check == "provenance_coverage":
         gaps = sorted(set(ctx.gaps))
         if gaps or not ctx.context.get("byte_hashes_complete", False):

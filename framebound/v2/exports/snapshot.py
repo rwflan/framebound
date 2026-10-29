@@ -755,6 +755,18 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
         links=[rev.parent_revision_id]
         links += [json.loads(r['data']).get('comparison_revision_id') for r in con.execute('SELECT data FROM review_packets')
                   if json.loads(r['data']).get('clip_revision_id')==rid]
+        for operation_row in con.execute('SELECT data FROM authorized_operations'):
+            operation=json.loads(operation_row['data'])
+            if operation['input_revision_id']==rid and con.execute('SELECT id FROM clip_revisions WHERE id=?',(operation['output_revision_id'],)).fetchone():
+                links.append(operation['output_revision_id'])
+        for attempt_row in con.execute('SELECT data FROM attempts'):
+            attempt=json.loads(attempt_row['data'])
+            if attempt['baseline_revision_id']==rid:
+                links += [candidate for candidate in attempt.get('candidate_asset_ids',[]) if con.execute('SELECT id FROM clip_revisions WHERE id=?',(candidate,)).fetchone()]
+        for trace_row in con.execute('SELECT data FROM transition_traces'):
+            trace=json.loads(trace_row['data'])
+            if trace.get('departure_revision_id')==rid:links.append(trace.get('entry_revision_id'))
+            if trace.get('entry_revision_id')==rid:links.append(trace.get('departure_revision_id'))
         for parent in links:
             if not parent or parent in revs:continue
             if len(revs)>2048:raise ValueError('closure revision traversal exceeds bound')
@@ -818,7 +830,7 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
             e = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
         except Exception:
             continue
-        if e.get("clip_revision_id") in selected or e.get('id') in {a['event_id'] for a in rows['approvals'].values()}:
+        if e.get("clip_revision_id") in selected or e.get('id') in {a['event_id'] for a in rows['approvals'].values()} or e.get('reference_approval_id') in rows['approvals']:
             rows["events"].append(e)
     # packets + tasks + attempts + masks for the selected lineage
     task_ids = set()
@@ -865,6 +877,8 @@ def _collect_closure_rows(con, revs: dict, contracts: dict, evals: dict,
             continue
         if (adata.get('annotator_type')=='human_reviewed' or adata.get('id') in annotation_ids) and (adata.get('frame_instance_id') in frame_ids or adata.get('source_asset_id') in frame_assets):
             rows["annotations"].append(adata)
+            original=r['data'].encode() if isinstance(r['data'],str) else json.dumps(r['data']).encode()
+            rows.setdefault('raw_records',{})[_h(original)]=original
     for r in con.execute("SELECT id, data FROM world_traces").fetchall():
         try:
             wdata = json.loads(r["data"]) if isinstance(r["data"], str) else r["data"]
@@ -935,7 +949,7 @@ def _write_closure(out: Path, manifest_files: dict, exclusions: list,
                        ('assets.jsonl','asset_rows'),('jobs.jsonl','jobs'),
                        ('revisions.jsonl','revisions'),('frames.jsonl','frames'),
                        ('registrations.jsonl','registrations'),('operations.jsonl','operations'),
-                       ('animation_plans.jsonl','plans'),('provider_grants.jsonl','grants')):
+                       ('animation_plans.jsonl','plans'),('provider_grants.jsonl','grants'),('reconciliations.jsonl','reconciliations')):
         items = rows.get(key, [])
         (out / "closure" / fname).write_text(
             "\n".join(json.dumps(r, sort_keys=True) for r in items)
@@ -984,6 +998,7 @@ def _copy_closure_blobs(out: Path, manifest_files: dict, exclusions: list,
         digest = ev.get("evidence_manifest_sha256")
         if digest:
             wanted[digest] = "evidence-manifest"
+    for sha in rows.get('raw_records',{}):wanted[sha]='raw-record'
     for asset in rows.get('assets',{}).values():
         wanted[asset['byte_sha256']]='asset'
     for job in rows.get('jobs',[]):
@@ -993,13 +1008,14 @@ def _copy_closure_blobs(out: Path, manifest_files: dict, exclusions: list,
     # evaluations.jsonl already staged above; blobs carry the bytes.
     for digest, role in sorted(wanted.items()):
         blob = S.blob_path(project_dir, digest)
-        if not blob.is_file():
+        raw=rows.get('raw_records',{}).get(digest)
+        if raw is None and not blob.is_file():
             exclusions.append({"asset": digest[:16],
                                "reason": f"closure {role} blob missing from store",
                                "context": "closure"})
             continue
         dest = out / "closure" / "blobs" / digest
-        raw=blob.read_bytes()
+        if raw is None:raw=blob.read_bytes()
         if _h(raw)!=digest:raise ValueError('closure blob address mismatch: '+digest)
         dest.write_bytes(raw)
         manifest_files[f"closure/blobs/{digest}"] = _h(dest.read_bytes())
@@ -1063,9 +1079,16 @@ def _collect_asset_graph(con,rows,revs):
     for ann in rows['annotations']:
         roots.add(ann['source_asset_id'])
         if ann.get('mask_asset_id'):roots.add(ann['mask_asset_id'])
+    relevant_operations=[json.loads(r['data']) for r in con.execute('SELECT data FROM authorized_operations')
+                         if json.loads(r['data'])['input_revision_id'] in revs or json.loads(r['data'])['output_revision_id'] in revs]
+    requested_jobs={o['job_id'] for o in relevant_operations if o.get('job_id')}
     assets={};pending=list(roots)
     all_jobs={r['id']:json.loads(r['data']) for r in con.execute('SELECT id,data FROM jobs')}
-    jobs={}
+    jobs={jid:all_jobs[jid] for jid in requested_jobs}
+    for job in jobs.values():
+        pending.extend(job.get('output_asset_ids',[]))
+        source=job.get('provider_settings',{}).get('source_asset_id')
+        if source:pending.append(source)
     while pending:
         aid=pending.pop()
         if aid in assets:continue
@@ -1083,6 +1106,15 @@ def _collect_asset_graph(con,rows,revs):
     rows['frames']=frames;rows['registrations']=registrations
     rows['revisions']=[r.model_dump(mode='json') for r in revs.values()]
     op_ids={a.get('operation_id') for a in assets.values() if a.get('operation_id')}
-    rows['operations']=[json.loads(r['data']) for r in con.execute('SELECT id,data FROM authorized_operations') if r['id'] in op_ids]
+    rows['operations']=[json.loads(r['data']) for r in con.execute('SELECT id,data FROM authorized_operations')
+                        if r['id'] in op_ids or json.loads(r['data'])['input_revision_id'] in revs or json.loads(r['data'])['output_revision_id'] in revs]
+    known_evals={e['id'] for e in rows['evals']}
+    for operation in rows['operations']:
+        for key in ('input_evaluation_id','evaluation_id'):
+            eid=operation.get(key)
+            if eid and eid not in known_evals:
+                rows['evals'].append(S.get(con,'evaluations',eid)[0]);known_evals.add(eid)
+    rows['reconciliations']=[json.loads(r['data']) for r in con.execute('SELECT data FROM provider_reconciliations')
+                             if json.loads(r['data'])['job_id'] in jobs]
     plan_ids={o['compiled_plan_id'] for o in rows['operations']}
     rows['plans']=[json.loads(r['data']) for r in con.execute('SELECT id,data FROM compiled_animation_plans') if r['id'] in plan_ids]

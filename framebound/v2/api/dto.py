@@ -44,6 +44,7 @@ class GuideReferenceDto(Strict):
 
 
 class ReferenceApprovalDto(Strict):
+    id: str
     character_revision_id: str
     motion_guide_id: str
 
@@ -53,6 +54,8 @@ class ReferencesDto(Strict):
     motion_guides: list[GuideReferenceDto]
     reference_approvals: list[ReferenceApprovalDto]
     assets: list[dict[str, Any]]
+    revoked_approval_ids: list[str]
+    active_approval_ids: list[str]
 
 
 class ReferenceApproveBodyDto(Strict):
@@ -242,3 +245,95 @@ class MaskApproveResultDto(Strict):
     covered_slots: list[int] = Field(default_factory=list)
     approved_by: str = ""
     approval_event_id: str = ""
+
+
+from pydantic import StrictBool,StrictInt
+from ..services.provider_grants import ProviderGrant as _ProviderGrant
+from ..services.provider_recovery import ProviderReceipt as _ProviderReceipt
+
+
+class AnimationStartBodyDto(Strict):
+    model_config={'extra':'forbid'}
+    revision_id: str = Field(min_length=1)
+    idempotency_key: str | None = None
+    provider_settings: dict[str,Any] | None = None
+    offline: StrictBool = True
+
+
+class AnimationRunDto(Strict):
+    run_id: str
+    status: str
+    revision_id: str | None = None
+    compiled_plan_id: str | None = None
+    local_attempts_used: int | None = None
+    compute_steps_used: int | None = None
+    operation_ids: list[str] | None = None
+    blocker: str | None = None
+    evaluation_id: str | None = None
+    packet_id: str | None = None
+    job_id: str | None = None
+    acceptance: str | None = None
+
+
+class ProviderGrantDto(_ProviderGrant,Strict):
+    model_config={'extra':'forbid'}
+
+
+class ProviderGrantViewDto(Strict):
+    grant: ProviderGrantDto
+    version: int
+
+
+class ExpectedVersionBodyDto(Strict):
+    model_config={'extra':'forbid'}
+    expected_version: StrictInt = Field(ge=1)
+
+
+class ProviderGrantRevokeResultDto(Strict):
+    grant_id: str
+    active: bool
+    version: int
+
+
+class ProviderReceiptBodyDto(_ProviderReceipt,Strict):
+    model_config={'extra':'forbid'}
+
+
+class ProviderReconcileResultDto(Strict):
+    job_id: str
+    status: str
+    version: int
+
+
+class ReferenceRevokeBodyDto(Strict):
+    model_config={'extra':'forbid'}
+    event_id: str | None = Field(default=None,min_length=1,max_length=128)
+    note: str = Field(default='',max_length=2000)
+
+
+class ReferenceRevokeResultDto(Strict):
+    ok: bool
+    event_id: str
+    approval_id: str
+    active: bool
+
+
+class JobSubmitRequestDto(Strict):
+    model_config={'extra':'forbid'}
+    brief: dict[str,Any]
+    references: list[dict[str,Any]] = Field(default_factory=list)
+    idempotency_key: str = Field(min_length=1)
+    provider_settings: dict[str,Any] | None = None
+    offline: StrictBool = False
+    max_attempts: StrictInt = Field(default=3,ge=1,le=10)
+
+
+class CapabilityEvidenceDto(Strict):
+    capability: str
+    designed: bool
+    implemented: bool
+    negative_tested: bool
+    public_integrated: bool
+    live_observed: bool | None
+    human_reviewed: bool | None
+    receipts: list[str]

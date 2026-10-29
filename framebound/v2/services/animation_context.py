@@ -24,6 +24,8 @@ def resolve_in(con, project, contract):
     guide=D.MotionGuide.model_validate(S.get(con,'motion_guides',contract.references['motion_guide_revision'])[0])
     if guide.repair_policy is None:
         raise InvalidInput('contract guide has no human-approved automatic repair policy')
+    if not any(c.check=='repair_protection' and c.required for c in contract.constraints):
+        raise InvalidInput('approved automatic controls require a mandatory repair_protection check')
     approval=approval_for_contract(project,contract,con)
     policy=contract.repair_policy or guide.repair_policy
     ceiling=guide.repair_policy

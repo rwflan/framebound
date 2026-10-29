@@ -336,6 +336,8 @@ def validate_snapshot(snapshot_dir: str) -> dict:
                     issues.append("preference packet " + str(pkt.get("id")) + " addresses a "
                                   "different pair than the preference row")
         selected = set(manifest.get("clip_revisions", []))
+        if (snap/'closure'/'revisions.jsonl').is_file():
+            selected.update(json.loads(line)['id'] for line in (snap/'closure'/'revisions.jsonl').read_text().splitlines() if line.strip())
         for tr in closure_rows["transition_traces.jsonl"]:
             if tr.get("verdict") not in ("pass", "fail"):
                 issues.append("transition trace " + str(tr.get("id")) + " has no verdict")
