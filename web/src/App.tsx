@@ -644,6 +644,12 @@ function StatusView() {
       {!awaiting.data ? null : ((awaiting.data.tasks ?? []) as Record<string, unknown>[]).length === 0 ? null : (
         <ul>{((awaiting.data.tasks ?? []) as Record<string, unknown>[]).map((t) => (
           <li key={String(t.id)}><small><button onClick={() => nav({ name: 'corrections' })}>{String(t.id)}</button> {String(t.status)}</small></li>))}</ul>)}
+      <h3>Evidence</h3>
+      <p><small>Checked-in release evidence. Test reviewers do not represent entrant artistic acceptance.</small></p>
+      {caps.data && <table><thead><tr><th>Capability</th><th>Implemented</th><th>Counterexamples</th><th>Public workflow</th><th>Participant live</th><th>Entrant review</th></tr></thead>
+        <tbody>{caps.data.evidence.map(e => <tr key={e.capability}><td>{e.capability}</td>
+          {[e.implemented,e.negative_tested,e.public_integrated,e.live_observed,e.human_reviewed].map((value,i) => <td key={i}>{value === null ? 'N/A' : value ? 'Demonstrated' : 'Pending'}</td>)}
+        </tr>)}</tbody></table>}
       <h3>Capabilities</h3>
       {!caps.data ? <p>Loading…</p> : (
         <table><thead><tr><th>transport</th><th>operation</th><th>status</th><th>note</th></tr></thead>
@@ -666,17 +672,24 @@ function ReferencesView() {
     {data && data.motion_guides.length === 0 && <p>No guide proposals.</p>}
     {data?.motion_guides.map(guide => {
       const char=data.character_revisions.find(c=>c.id===guide.character_revision_id);
-      const approved=data.reference_approvals.some(a=>a.character_revision_id===guide.character_revision_id && a.motion_guide_id===guide.id);
+      const approval=data.reference_approvals.find(a=>a.character_revision_id===guide.character_revision_id && a.motion_guide_id===guide.id && data.active_approval_ids.includes(a.id));
+      const approved=Boolean(approval);
       return <article key={guide.id} style={{borderTop:'1px solid #ccc',padding:'20px 0'}}>
         <h3>{guide.character_revision_id} · {guide.id}</h3>
         <h4>Automatic repair authority</h4>
-        <pre>{guide.repair_policy ? JSON.stringify(guide.repair_policy,null,2) : 'Manual work only'}</pre>
-        {guide.source_calibration && <pre>{JSON.stringify(guide.source_calibration,null,2)}</pre>}
-        {guide.entries.map(entry => <div key={'scope-'+entry.phase}>
-          <span>{entry.phase}: editable / protected support</span>
-          {entry.editable_mask_asset_id && <img width={128} height={128} src={api.assetUrl(entry.editable_mask_asset_id)} alt={entry.phase+' editable mask'} />}
-          {entry.protected_mask_asset_id && <img width={128} height={128} src={api.assetUrl(entry.protected_mask_asset_id)} alt={entry.phase+' protected mask'} />}
-        </div>)}
+        {guide.repair_policy ? <dl style={{display:'grid',gridTemplateColumns:'max-content 1fr',gap:'6px 20px',fontSize:14}}>
+          <dt>Allowed operations</dt><dd>{Array.isArray(guide.repair_policy.operators) ? guide.repair_policy.operators.join(', ') : 'None'}</dd>
+          <dt>Translation limit</dt><dd>{String(guide.repair_policy.translation_budget_px)} native pixels</dd>
+          <dt>Attempts per phase</dt><dd>{String(guide.repair_policy.max_local_attempts)}</dd>
+          <dt>Compute steps</dt><dd>{String(guide.repair_policy.max_compute_steps)}</dd>
+          <dt>Provider dispatches</dt><dd>{guide.repair_policy.generation_allowed ? String(guide.repair_policy.max_provider_dispatches) : 'Disabled'}</dd>
+        </dl> : <p>Manual work only</p>}
+        {guide.source_calibration && <p>Fixed source conversion: {String(guide.source_calibration.source_width)} × {String(guide.source_calibration.source_height)}, crop {JSON.stringify(guide.source_calibration.crop)}, nearest neighbour.</p>}
+        <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'16px 0'}}>{guide.entries.map(entry => <div key={'scope-'+entry.phase} style={{display:'grid',gridTemplateColumns:'64px 64px',gap:4,border:'1px solid #ddd',padding:8}}>
+          <small style={{gridColumn:'1 / -1'}}>{entry.phase} · editable / protected</small>
+          {entry.editable_mask_asset_id && <img width={64} height={64} style={{imageRendering:'pixelated'}} src={api.assetUrl(entry.editable_mask_asset_id)} alt={entry.phase+' editable mask'} />}
+          {entry.protected_mask_asset_id && <img width={64} height={64} style={{imageRendering:'pixelated'}} src={api.assetUrl(entry.protected_mask_asset_id)} alt={entry.phase+' protected mask'} />}
+        </div>)}</div>
         <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
           {char && [['Identity',char.identity_asset_ids],['Style',char.style_asset_ids]].map(([label,ids]) =>
             <div key={String(label)}><h4>{String(label)}</h4>{(ids as string[]).map(id =>
@@ -689,6 +702,12 @@ function ReferencesView() {
           try { await api.approveReferences(guide.character_revision_id,guide.id,`ref-${crypto.randomUUID()}`);await refresh(); }
           catch(e){setError(e);}finally{setBusy(null);}
         }}>{approved?'References approved':busy===guide.id?'Recording…':'Approve these references'}</button>
+        {approval && <button disabled={!getReviewer() || busy===guide.id} onClick={async()=>{
+          setBusy(guide.id);setError(null);
+          try {await api.revokeReference(approval.id,`revoke-${crypto.randomUUID()}`);await refresh();}
+          catch(e){setError(e);}finally{setBusy(null);}
+        }}>Revoke reference approval</button>}
+
       </article>;
     })}
   </section>;

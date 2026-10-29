@@ -95,9 +95,10 @@ def get_mask(project_dir: str, mask_id: str) -> D.EditMask:
     return D.EditMask.model_validate_json(json.dumps(data))
 
 
-def scope_slots(project_dir: str, task: D.CorrectionTask) -> set[int]:
+def scope_slots(project_dir: str, task: D.CorrectionTask, *, connection=None) -> set[int]:
     """Temporal scope: range/instance slots plus approved mask slots."""
-    con = S.connect(project_dir)
+    owned=connection is None
+    con=connection if connection is not None else S.connect(project_dir)
     try:
         idata, _ = S.get(con, "review_events", task.source_issue_event_id)
         issue = D.ReviewEvent.model_validate_json(json.dumps(idata))
@@ -127,11 +128,11 @@ def scope_slots(project_dir: str, task: D.CorrectionTask) -> set[int]:
                 pass
         return slots
     finally:
-        con.close()
+        if owned:con.close()
 
 
 def allowed_region(project_dir: str, task: D.CorrectionTask,
-                   slot: int) -> bytes | None:
+                   slot: int, *, connection=None) -> bytes | None:
     """Per-slot allowed-edit raster (row-major 0/1) at canvas size, or None.
 
     None means no pixel of this slot may change. The region is the union of
@@ -139,13 +140,14 @@ def allowed_region(project_dir: str, task: D.CorrectionTask,
     (when the slot is mask-covered).
     """
     from ..media.canonical import canonical_pixels
-    con = S.connect(project_dir)
+    owned=connection is None
+    con=connection if connection is not None else S.connect(project_dir)
     try:
         idata, _ = S.get(con, "review_events", task.source_issue_event_id)
         issue = D.ReviewEvent.model_validate_json(json.dumps(idata))
         rev, contract = P._resolve_revision(con, issue.clip_revision_id)
         w, h = contract.canvas.width, contract.canvas.height
-        temporal = scope_slots(project_dir, task)
+        temporal = scope_slots(project_dir, task,connection=con)
         if slot not in temporal:
             return None
         allow = bytearray(w * h)
@@ -165,7 +167,8 @@ def allowed_region(project_dir: str, task: D.CorrectionTask,
                 cur = hashlib.sha256(raw).hexdigest()
                 if cur != m.mask_byte_sha256:
                     raise InvalidInput(f"mask asset {m.mask_asset_id}: bytes changed since approval")
-                img = Image.open(S.blob_path(project_dir, adata["byte_sha256"])).convert("L")
+                from ..media.canonical import load_native_image
+                img=load_native_image(raw).convert('L')
                 if img.size != (w, h):
                     raise InvalidInput("approved mask no longer matches the canvas")
                 px = img.tobytes()
@@ -176,4 +179,4 @@ def allowed_region(project_dir: str, task: D.CorrectionTask,
             return None
         return bytes(allow)
     finally:
-        con.close()
+        if owned:con.close()

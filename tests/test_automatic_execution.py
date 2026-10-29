@@ -151,3 +151,22 @@ def test_approved_family_calibration_uses_same_crop_for_every_pose(tmp_path,monk
         result=cli(p,'source-calibrate','--contract-id','calibrated-contract','--source-asset-id',f'large{index}','--output-asset-id',f'native{index}')
         assert result['parent_asset_ids']==[f'large{index}']
         assert Image.open(S.blob_path(p,result['byte_sha256'])).convert('RGBA').tobytes()==expected.tobytes()
+
+
+def test_multiple_protected_faults_reduce_pixel_count_without_premature_readiness(tmp_path,monkeypatch):
+    p,_,_,contract,_=setup_work(tmp_path,monkeypatch)
+    image=Image.open(tmp_path/'pose1.png').convert('RGBA');image.putpixel((0,0),(251,5,19,255));image.save(tmp_path/'second-damage.png')
+    cli(p,'asset-import','--src',str(tmp_path/'second-damage.png'),'--asset-id','second-damage')
+    cli(p,'clip-create','--contract-id',contract['id'],'--revision-id','two-protected-faults','--frames','fault,second-damage','--phases','p0,p1')
+    run=cli(p,'animation-start','--revision-id','two-protected-faults')
+    first=cli(p,'animation-step','--run-id',run['run_id'])
+    assert first['status']=='running' and first['internal_progress']
+    con=S.connect(p)
+    try:
+        measured=S.get(con,'evaluations',first['evaluation_id'])[0]
+        result=next(r for r in measured['results'] if r['constraint_id']=='fixed-scope')
+        assert result['outcome']=='fail' and result['observed_value']==1
+        assert con.execute('SELECT count(*) FROM review_packets').fetchone()[0]==0
+    finally:con.close()
+    finished=cli(p,'animation-run','--revision-id','two-protected-faults')
+    assert finished['status']=='technically_ready' and finished['local_attempts_used']==2

@@ -21,7 +21,7 @@ from pathlib import Path
 def _build_project(td: str) -> dict:
     from .checks import fixtures as F
     from .services import approvals as A
-    from .services import assets, clips, contracts
+    from .services import assets, clips, contracts, projects, characters
     from .services.authz import Actor
     from . import domain as D
     from . import storage as S
@@ -34,14 +34,11 @@ def _build_project(td: str) -> dict:
                         source_kind="original", rights="original")
     assets.import_asset(td, str(src / meta["clean"][1]), "st-art",
                         source_kind="original", rights="original")
-    con = S.connect(td)
-    try:
-        S.insert(con, D.CharacterRevision(
-            id="char-bench", project_id="p", identity_asset_ids=["id-art"],
-            style_asset_ids=["st-art"], view_set=["side"],
-            canvas={"width": 64, "height": 64}, scale_ruler="x"))
-    finally:
-        con.close()
+    projects.create_project(td, {'id':'p','name':'Benchmark fixture'})
+    characters.propose_character(td,D.CharacterRevision(
+        id="char-bench",project_id="p",identity_asset_ids=["id-art"],
+        style_asset_ids=["st-art"],view_set=["side"],
+        canvas={"width":64,"height":64},scale_ruler="x").model_dump(mode='json'))
     con = S.connect(td)
     try:
         hashes = {f"f{i}": S.get(con, "assets", f"f{i}")[0]["byte_sha256"] for i in range(8)}
@@ -81,7 +78,7 @@ def _p(frac: float, data: list[float]) -> float:
 def _build_large_project(td: str, frames: int = 200) -> dict:
     """Representative workload: many held frames with guides and holds."""
     from .services import approvals as A
-    from .services import assets, clips, contracts
+    from .services import assets, clips, contracts, projects, characters
     from .services.authz import Actor
     from . import domain as D
     from . import storage as S
@@ -95,14 +92,11 @@ def _build_large_project(td: str, frames: int = 200) -> dict:
                         source_kind="original", rights="original")
     assets.import_asset(td, str(src / meta["clean"][1]), "st-big",
                         source_kind="original", rights="original")
-    con = S.connect(td)
-    try:
-        S.insert(con, D.CharacterRevision(
-            id="char-big", project_id="p", identity_asset_ids=["id-big"],
-            style_asset_ids=["st-big"], view_set=["side"],
-            canvas={"width": 64, "height": 64}, scale_ruler="x"))
-    finally:
-        con.close()
+    projects.create_project(td, {'id':'p','name':'Benchmark fixture'})
+    characters.propose_character(td,D.CharacterRevision(
+        id="char-big",project_id="p",identity_asset_ids=["id-big"],
+        style_asset_ids=["st-big"],view_set=["side"],
+        canvas={"width":64,"height":64},scale_ruler="x").model_dump(mode='json'))
     con = S.connect(td)
     try:
         hashes = {f"g{n}": S.get(con, "assets", f"g{n}")[0]["byte_sha256"]
@@ -137,8 +131,63 @@ def _build_large_project(td: str, frames: int = 200) -> dict:
     return {"project": td, "frames": frames}
 
 
+def _bench_local_repair(td: str,n: int) -> dict:
+    """Actual compile/reserve/restore/evaluate/packet path; setup excluded."""
+    from PIL import Image
+    from . import storage as S
+    from .services import approvals as A,assets,clips,contracts,auto_repair
+    from .services.authz import Actor
+    con=S.connect(td)
+    try:
+        guide=S.get(con,'motion_guides','mg-bench')[0]
+        contract=S.get(con,'contract_revisions','c-bench')[0]
+        asset=S.get(con,'assets','f0')[0]
+    finally:con.close()
+    original=Image.open(S.blob_path(td,asset['byte_sha256'])).convert('RGBA')
+    damaged=original.copy();damaged.putpixel((0,0),(255,0,255,255))
+    source=Path(td)/'local-fault.png';damaged.save(source)
+    assets.import_asset(td,str(source),'local-fault',source_kind='procedural',rights='original')
+    mask=Path(td)/'local-editable.png';Image.new('L',(64,64),0).save(mask)
+    assets.import_asset(td,str(mask),'local-editable',source_kind='procedural',rights='original')
+    guide['id']='mg-local-repair'
+    guide['repair_policy']={'operators':['protected_restore'],'max_local_attempts':100,
+                            'max_compute_steps':256,'translation_budget_px':0}
+    for entry in guide['entries']:entry['editable_mask_asset_id']='local-editable'
+    A.propose_motion_guide(td,Actor(type='orchestrator',id='bench'),guide)
+    A.approve_reference(td,Actor(type='reviewer',id='benchmark-test-fixture'),
+                        'char-bench',guide['id'])
+    contract['id']='c-local-repair';contract['references']['motion_guide_revision']=guide['id']
+    contract['constraints'].append({'id':'scope','check':'repair_protection','required':True})
+    contracts.propose_contract(td,contract)
+    measurements=[]
+    for i in range(n):
+        revision=f'rev-local-{i}'
+        clips.create_revision(td,contract['id'],revision,['local-fault']+[f'f{k}' for k in range(1,8)],
+                              [f'p{k}' for k in range(8)])
+        t0=time.perf_counter();result=auto_repair.run_automatic(td,revision,f'benchmark-{i}')
+        measurements.append((time.perf_counter()-t0)*1000)
+        if result['status']!='technically_ready' or result['local_attempts_used']!=1:
+            raise RuntimeError(f'local benchmark did not execute its repair: {result}')
+        con=S.connect(td)
+        try:
+            rev=S.get(con,'clip_revisions',result['revision_id'])[0]
+            frame=S.get(con,'frame_instances',rev['frame_instance_ids'][0])[0]
+            output=S.get(con,'assets',frame['asset_id'])[0]
+            assert Image.open(S.blob_path(td,output['byte_sha256'])).convert('RGBA').tobytes()==original.tobytes()
+            assert not con.execute('SELECT 1 FROM jobs LIMIT 1').fetchone()
+        finally:con.close()
+    return {'service':'services.auto_repair.run_automatic','warm_process_ms':
+            {'n':n,'p50':round(_p(.5,measurements),2),'p95':round(_p(.95,measurements),2)},
+            'frames':8,'resolution':[64,64],'local_attempts_per_run':1,'provider_dispatches':0,
+            'included':'compile, evaluate, reserve, protected_restore, immutable child, full re-evaluation, comparison packet',
+            'excluded':'fixture bootstrap, provider generation and human review; no frame-level cache',
+            'pixel_result':'independently compared to original native RGBA bytes; unchanged slots reused'}
+
+
 def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5,
                          large_frames: int = 200, large_warm_runs: int = 5) -> dict:
+    if min(warm_runs,cold_runs,large_frames,large_warm_runs)<1:
+        raise ValueError('benchmark sample and frame counts must be positive')
     from .services import assets, clips
     td = tempfile.mkdtemp(prefix="fb-bench-")
     _build_project(td)
@@ -186,10 +235,9 @@ def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5,
         t0 = time.perf_counter()
         r = subprocess.run(
             [sys.executable, "-c",
-             "import sys; sys.path.insert(0, '.');"
              "from framebound.v2.services import clips;"
              f"clips.evaluate({td!r}, 'rev-bench')"],
-            capture_output=True, text=True, cwd=str(Path(__file__).resolve().parents[2]))
+            capture_output=True,text=True)
         dt = (time.perf_counter() - t0) * 1000
         if r.returncode != 0:
             raise RuntimeError(f"cold evaluation failed: {r.stderr[-500:]}")
@@ -257,6 +305,7 @@ def run_bench_eval(*, warm_runs: int = 25, cold_runs: int = 5,
                                  "(above) and provider generation (unmeasured "
                                  "offline; recorded-run bundles carry provider "
                                  "response IDs, not latency claims) are separate"},
+        'local_repair':_bench_local_repair(td,min(warm_runs,5)),
         "note": "primitive raster microbenchmarks (run_benchmark) are separate and must "
                 "not be presented as full-framework latency; realtime playback claims "
                 "require the playback numbers above on stated hardware, never the "

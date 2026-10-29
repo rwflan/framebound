@@ -20,6 +20,28 @@ export interface ActivityPageDto {
   cursor?: string | null;
 }
 
+export interface AnimationRunDto {
+  run_id: string;
+  status: string;
+  revision_id?: string | null;
+  compiled_plan_id?: string | null;
+  local_attempts_used?: number | null;
+  compute_steps_used?: number | null;
+  operation_ids?: string[] | null;
+  blocker?: string | null;
+  evaluation_id?: string | null;
+  packet_id?: string | null;
+  job_id?: string | null;
+  acceptance?: string | null;
+}
+
+export interface AnimationStartBodyDto {
+  revision_id: string;
+  idempotency_key?: string | null;
+  provider_settings?: Record<string, unknown> | null;
+  offline?: boolean;
+}
+
 export interface AttemptViewDto {
   id: string;
   result: string;
@@ -30,6 +52,17 @@ export interface CanvasDto {
   width?: number;
   height?: number;
   units?: string;
+}
+
+export interface CapabilityEvidenceDto {
+  capability: string;
+  designed: boolean;
+  implemented: boolean;
+  negative_tested: boolean;
+  public_integrated: boolean;
+  live_observed: boolean | null;
+  human_reviewed: boolean | null;
+  receipts: string[];
 }
 
 export interface CharacterReferenceDto {
@@ -114,6 +147,10 @@ export interface EvaluationDto {
   results: EvalResultDto[];
 }
 
+export interface ExpectedVersionBodyDto {
+  expected_version: number;
+}
+
 export interface ExportResultDto {
   name: string;
   ok: boolean;
@@ -161,6 +198,15 @@ export interface IssueDetailDto {
   resolution_event_id?: string | null;
 }
 
+export interface JobSubmitRequestDto {
+  brief: Record<string, unknown>;
+  references?: Record<string, unknown>[];
+  idempotency_key: string;
+  provider_settings?: Record<string, unknown> | null;
+  offline?: boolean;
+  max_attempts?: number;
+}
+
 export interface MaskApproveResultDto {
   id?: string;
   issue_event_id?: string;
@@ -200,7 +246,52 @@ export interface ProjectSummaryDto {
   summary?: Record<string, unknown>;
 }
 
+export interface ProviderGrantDto {
+  schema_version?: "2.0";
+  id: string;
+  targets: string[];
+  models: string[];
+  endpoints?: string[];
+  limit_kind?: "dispatch_units" | "usd";
+  max_dispatches: number;
+  dispatches_reserved?: number;
+  ceiling_microusd?: unknown | null;
+  quote_microusd?: unknown | null;
+  reserved_microusd?: number;
+  pricing_reference?: string | null;
+  output_rights?: "unknown" | "original";
+  active?: boolean;
+}
+
+export interface ProviderGrantRevokeResultDto {
+  grant_id: string;
+  active: boolean;
+  version: number;
+}
+
+export interface ProviderGrantViewDto {
+  grant: ProviderGrantDto;
+  version: number;
+}
+
+export interface ProviderReceiptBodyDto {
+  id: string;
+  expected_version: number;
+  request_sha256: string;
+  outcome: "not_accepted" | "response" | "abandoned";
+  receipt_reference: string;
+  evidence_note: string;
+  provider_response?: unknown | null;
+}
+
+export interface ProviderReconcileResultDto {
+  job_id: string;
+  status: string;
+  version: number;
+}
+
 export interface ReferenceApprovalDto {
+  id: string;
   character_revision_id: string;
   motion_guide_id: string;
 }
@@ -211,11 +302,25 @@ export interface ReferenceApproveBodyDto {
   event_id?: string | null;
 }
 
+export interface ReferenceRevokeBodyDto {
+  event_id?: string | null;
+  note?: string;
+}
+
+export interface ReferenceRevokeResultDto {
+  ok: boolean;
+  event_id: string;
+  approval_id: string;
+  active: boolean;
+}
+
 export interface ReferencesDto {
   character_revisions: CharacterReferenceDto[];
   motion_guides: GuideReferenceDto[];
   reference_approvals: ReferenceApprovalDto[];
   assets: Record<string, unknown>[];
+  revoked_approval_ids: string[];
+  active_approval_ids: string[];
 }
 
 export interface TaskStatusDto {
@@ -271,11 +376,19 @@ export interface OrchRunBodyDto { job_ids: string[]; max_attempts?: number }
 export interface OrchRunResultDto { run_id: string; status: string; jobs: string[] }
 export interface OrchSendBodyDto { run_id: string; job_id: string; brief: Record<string, unknown>; offline?: boolean }
 export interface OrchSendResultDto { run_id: string; job_id: string; action: string }
-export interface CapabilitiesDto { schema_version: string; rows: { transport: string; operation: string; status: string; note: string }[] }
+export interface CapabilitiesDto { schema_version: string; rows: { transport: string; operation: string; status: string; note: string }[]; evidence: CapabilityEvidenceDto[] }
 export interface ExportBodyDto { name: string; revisions: string[]; policy: Record<string, unknown> }
 
 
 export interface ApiEndpoints {
+  "POST /api/animation/runs": { params: Record<string, never>; body: AnimationStartBodyDto; result: AnimationRunDto };
+  "GET /api/animation/runs/{run_id}": { params: { run_id: string }; body: never; result: AnimationRunDto };
+  "POST /api/animation/runs/{run_id}/step": { params: { run_id: string }; body: never; result: AnimationRunDto };
+  "POST /api/provider-grants": { params: Record<string, never>; body: ProviderGrantDto; result: ProviderGrantDto };
+  "GET /api/provider-grants/{grant_id}": { params: { grant_id: string }; body: never; result: ProviderGrantViewDto };
+  "POST /api/provider-grants/{grant_id}/revoke": { params: { grant_id: string }; body: ExpectedVersionBodyDto; result: ProviderGrantRevokeResultDto };
+  "POST /api/jobs/{job_id}/operator-reconcile": { params: JobParams; body: ProviderReceiptBodyDto; result: ProviderReconcileResultDto };
+  "POST /api/references/{approval_id}/revoke": { params: { approval_id: string }; body: ReferenceRevokeBodyDto; result: ReferenceRevokeResultDto };
   "GET /api/references": { params: Record<string, never>; body: never; result: ReferencesDto };
   "POST /api/references/approve": { params: Record<string, never>; body: ReferenceApproveBodyDto; result: DecisionResultDto };
   "GET /api/health": { params: Record<string, never>; body: never; result: HealthDto };
@@ -297,7 +410,7 @@ export interface ApiEndpoints {
   "POST /api/reviewer/pair": { params: Record<string, never>; body: PairBodyDto; result: PairResultDto };
   "POST /api/reviewer/open": { params: Record<string, never>; body: OpenBodyDto; result: OpenResultDto };
   "GET /api/jobs/{job_id}": { params: JobParams; body: never; result: JobViewDto };
-  "POST /api/jobs": { params: Record<string, never>; body: JobSubmitBodyDto; result: JobSubmitResultDto };
+  "POST /api/jobs": { params: Record<string, never>; body: JobSubmitRequestDto; result: JobSubmitResultDto };
   "POST /api/jobs/{job_id}/claim": { params: JobParams; body: JobClaimBodyDto; result: JobClaimResultDto };
   "POST /api/jobs/{job_id}/cancel": { params: JobParams; body: ExpectedVersionDto; result: JobCancelResultDto };
   "POST /api/jobs/reconcile": { params: Record<string, never>; body: never; result: JobReconcileResultDto };

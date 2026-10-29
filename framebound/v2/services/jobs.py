@@ -90,6 +90,7 @@ def _resolve_references(project_dir: str, brief: dict,
         except KeyError:
             raise InvalidInput(f"brief approval {cb.approval_id} is no longer stored")
         ap = D.ReferenceApproval.model_validate_json(json.dumps(apdata))
+        _A.require_active_approval_in(con,ap.id)
         for aid in [*ap.identity_asset_ids, *ap.style_asset_ids, cb.phase_asset_id]:
             if ap.identity_asset_ids.__contains__(aid) or ap.style_asset_ids.__contains__(aid):
                 expect = ap.asset_hashes.get(aid)
