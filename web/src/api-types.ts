@@ -65,6 +65,10 @@ export interface CapabilityEvidenceDto {
   receipts: string[];
 }
 
+export interface ChangesDto {
+  revision: string;
+}
+
 export interface CharacterReferenceDto {
   id: string;
   project_id?: string | null;
@@ -125,6 +129,10 @@ export interface CorrectionsListDto {
   open?: Record<string, unknown>[] | null;
   tasks?: Record<string, unknown>[] | null;
   count?: number;
+}
+
+export interface DeskSessionDto {
+  ready: boolean;
 }
 
 export interface EligibilityDto {
@@ -373,10 +381,6 @@ export interface DecisionResultDto { ok: boolean; operation_id: string; revision
 export interface ResolveBodyDto { id?: string | null; replacement_revision_id: string; packet_id?: string | null; note: string }
 export interface ResolveResultDto { ok: boolean; resolution_event_id: string }
 export interface MaskBodyDto { issue_event_id: string; mask_asset_id: string; covered_slots: number[] }
-export interface PairBodyDto { reviewer_id: string }
-export interface PairResultDto { pairing_code: string; reviewer_id: string }
-export interface OpenBodyDto { pairing_code: string }
-export interface OpenResultDto { session_token: string; reviewer_id: string }
 export interface JobViewDto { job: Record<string, unknown>; version: number }
 export interface JobSubmitBodyDto { brief: Record<string, unknown>; references: unknown[]; idempotency_key: string; offline?: boolean; max_attempts?: number }
 export interface JobSubmitResultDto { ok: boolean; operation_id: string; revision_id: string | null; artifacts: Record<string, unknown>[]; issues: Record<string, unknown>[]; next_actions: string[] }
@@ -394,6 +398,8 @@ export interface ExportBodyDto { name: string; revisions: string[]; policy: Reco
 
 
 export interface ApiEndpoints {
+  "POST /api/desk/session": { params: Record<string, never>; body: never; result: DeskSessionDto };
+  "GET /api/changes": { params: Record<string, never>; body: never; result: ChangesDto };
   "POST /api/animation/runs": { params: Record<string, never>; body: AnimationStartBodyDto; result: AnimationRunDto };
   "GET /api/animation/runs/{run_id}": { params: { run_id: string }; body: never; result: AnimationRunDto };
   "POST /api/animation/runs/{run_id}/step": { params: { run_id: string }; body: never; result: AnimationRunDto };
@@ -420,8 +426,6 @@ export interface ApiEndpoints {
   "POST /api/decisions": { params: Record<string, never>; body: DecisionBodyDto; result: DecisionResultDto };
   "POST /api/issues/{event_id}/resolve": { params: IssueParams; body: ResolveBodyDto; result: ResolveResultDto };
   "POST /api/masks": { params: Record<string, never>; body: MaskBodyDto; result: MaskApproveResultDto };
-  "POST /api/reviewer/pair": { params: Record<string, never>; body: PairBodyDto; result: PairResultDto };
-  "POST /api/reviewer/open": { params: Record<string, never>; body: OpenBodyDto; result: OpenResultDto };
   "GET /api/jobs/{job_id}": { params: JobParams; body: never; result: JobViewDto };
   "POST /api/jobs": { params: Record<string, never>; body: JobSubmitRequestDto; result: JobSubmitResultDto };
   "POST /api/jobs/{job_id}/claim": { params: JobParams; body: JobClaimBodyDto; result: JobClaimResultDto };

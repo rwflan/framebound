@@ -1,16 +1,6 @@
-"""FastAPI review API. Human writes require a reviewer session token; orchestrator tokens get 403.
-
-Reviewer sessions come from an explicit localhost pairing ceremony
-(`framebound reviewer-pair` / `reviewer-open`, or POST /api/reviewer/*):
-nobody becomes a reviewer by setting a request header. Reads and the model
-queue (GET /api/corrections) stay open to the orchestrator. Mutating the same
-revision concurrently is refused; stale views yield 409 stale_revision.
-Binds 127.0.0.1 by default; a remotely exposed writer needs real authentication
-(P0: local only).
-
-Threat boundary: these checks protect the API transport. A process with
-unrestricted filesystem access to the project database can rewrite it
-directly; no HTTP role check claims to prevent that.
+"""Local review API. Browser review uses an automatic same-origin HttpOnly session.
+Machine actor headers remain orchestrator credentials. Human decisions still bind
+exact immutable revisions/evaluations and enforce all service authority checks.
 """
 from __future__ import annotations
 
@@ -30,6 +20,7 @@ from ..services.authz import Actor
 from .dto import (ActivityPageDto, CompareBundleDto, CorrectionsListDto, EligibilityDto, ExportResultDto, IssueDetailDto, PacketBundleDto, ProjectSummaryDto, TaskStatusDto)
 from ..services.errors import AuthorizationError, InvalidInput, StaleRevision as SvcStale
 from .dto import ReferencesDto, ReferenceApproveBodyDto as ReferenceBody
+from .dto import ChangesDto, DeskSessionDto
 from .dto import (AnimationStartBodyDto,AnimationRunDto,ProviderGrantDto,ProviderGrantViewDto,
                   ProviderGrantRevokeResultDto,ExpectedVersionBodyDto,ProviderReceiptBodyDto,
                   ProviderReconcileResultDto,ReferenceRevokeBodyDto,ReferenceRevokeResultDto,JobSubmitRequestDto)
@@ -86,14 +77,6 @@ class MaskBody(D.Strict):
 
 class ReopenBody(D.Strict):
     note: str = Field(default="", max_length=2000)
-
-
-class PairBody(D.Strict):
-    reviewer_id: str = Field(min_length=1, max_length=200)
-
-
-class OpenBody(D.Strict):
-    pairing_code: str = Field(min_length=1, max_length=256)
 
 
 def create_app(project_dir: str) -> FastAPI:
@@ -169,23 +152,6 @@ def create_app(project_dir: str) -> FastAPI:
     def health():
         return {"ok": True, "schema_version": "2.0"}
 
-    @app.post("/api/reviewer/pair", status_code=201)
-    def reviewer_pair(body: PairBody,
-                      x_operator_secret: str | None = Header(default=None)):
-        """Operator-only pairing: requires FRAMEBOUND_OPERATOR_SECRET.
-
-        Anonymous HTTP clients and model grants cannot mint reviewer codes.
-        The operator console uses `framebound reviewer-pair` (same gate).
-        """
-        from ..services import sessions as SN
-        try:
-            return SN.pair_reviewer(project_dir, body.reviewer_id,
-                                    operator_credential=x_operator_secret or "")
-        except AuthorizationError as e:
-            raise HTTPException(403, str(e))
-        except InvalidInput as e:
-            raise HTTPException(422, str(e))
-
     @app.post("/api/reviewer/revoke", status_code=200)
     def reviewer_revoke(body: dict,
                         x_operator_secret: str | None = Header(default=None)):
@@ -199,16 +165,69 @@ def create_app(project_dir: str) -> FastAPI:
         except InvalidInput as e:
             raise HTTPException(422, str(e))
 
-    @app.post("/api/reviewer/open", status_code=201)
-    def reviewer_open(body: OpenBody):
-        """Exchange a pairing code for a reviewer session token (shown once)."""
-        from ..services import sessions as SN
+    def local_browser(request: Request) -> None:
+        from urllib.parse import urlsplit
+        import ipaddress
+        peer = request.client.host if request.client else ""
         try:
-            return SN.open_session(project_dir, body.pairing_code)
-        except AuthorizationError as e:
-            raise HTTPException(403, str(e))
-        except InvalidInput as e:
-            raise HTTPException(422, str(e))
+            local_peer = ipaddress.ip_address(peer).is_loopback
+        except ValueError:
+            local_peer = False
+        host = request.url.hostname or ""
+        try:
+            local_host = ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            local_host = host == "localhost"
+        origin = urlsplit(request.headers.get("origin", ""))
+        if (not local_peer or not local_host or origin.scheme != request.url.scheme
+                or origin.netloc != request.url.netloc
+                or request.headers.get("x-framebound-desk") != "1"
+                or request.headers.get("sec-fetch-site") != "same-origin"
+                or request.headers.get("x-actor-id")):
+            raise HTTPException(403, "local same-origin browser required")
+
+    @app.middleware("http")
+    async def browser_credentials(request: Request, call_next):
+        token = request.cookies.get("fb_desk_review")
+        if (token and request.method not in {"GET", "HEAD", "OPTIONS"}
+                and not request.headers.get("x-session-token")
+                and not request.headers.get("x-actor-id")
+                and not request.headers.get("x-operator-secret")):
+            try:
+                local_browser(request)
+            except HTTPException as e:
+                return JSONResponse({"code": "forbidden", "detail": e.detail}, status_code=e.status_code)
+            request.scope["headers"] = [*request.scope["headers"],
+                (b"x-session-token", token.encode())]
+        return await call_next(request)
+
+    @app.post("/api/desk/session", response_model=DeskSessionDto)
+    def browser_session(request: Request, response: Response):
+        from ..services import sessions as SN
+        local_browser(request)
+        token = request.cookies.get("fb_desk_review")
+        reviewer = SN.resolve_session(project_dir, token)
+        if not reviewer:
+            session = SN.create_session(project_dir)
+            token, reviewer = session["session_token"], session["reviewer_id"]
+            response.set_cookie("fb_desk_review", token, httponly=True,
+                samesite="strict", secure=request.url.scheme == "https", path="/api",
+                max_age=SN.SESSION_TTL_HOURS * 3600)
+        response.headers["Cache-Control"] = "no-store"
+        return {"ready": True}
+
+    @app.get("/api/changes", response_model=ChangesDto)
+    def changes(response: Response):
+        import hashlib
+        marks = []
+        for name in ("framebound.sqlite3", "framebound.sqlite3-wal"):
+            try:
+                stat = (Path(project_dir) / name).stat()
+                marks.append((name, stat.st_mtime_ns, stat.st_size) if stat.st_size else (name, 0, 0))
+            except FileNotFoundError:
+                marks.append((name, 0, 0))
+        response.headers["Cache-Control"] = "no-store"
+        return {"revision": hashlib.sha256(repr(marks).encode()).hexdigest()}
 
     @app.get("/api/project", response_model=ProjectSummaryDto)
     def project():
