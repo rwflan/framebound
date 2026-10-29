@@ -24,7 +24,7 @@ and current human decision discoverable. Playback, references, correction scope,
 comparison and decisions remain available without forcing a persistent queue or
 inspector into every primary view.
 
-The film workspace candidate prioritizes unresolved interventions by project and exposes chronological framework artifacts, check outcomes and human review activity on a draggable reel. Sequence comparison uses two synchronized lanes; camera dragging changes only the view, while authored timing remains frozen. Keyboard navigation and reduced-motion behavior remain available. History preserves original timestamps and source actors; technical passes, human acceptance and current release eligibility remain separate.
+The film workspace candidate prioritizes unresolved interventions by project and exposes chronological framework artifacts, check outcomes and human review activity on a draggable, zoomable reel. Sequence comparison uses two synchronized lanes with measured drift, limits and overlapping correction status integrated beneath each candidate frame. Fit, percentage zoom and gesture zoom share the same camera; camera movement changes only the view, while authored timing remains frozen. Measurements open full evidence and frame-level correction controls bind the exact authored hold. Keyboard navigation and reduced-motion behavior remain available. History preserves original timestamps and source actors; technical passes, human acceptance and current release eligibility remain separate.
 
 Screen text is functional: action, revision, phase, measured defect, coverage, decision and origin. There are no slogans, fabricated quality percentages or generic success messages. Unknown or unavailable evidence is labelled, not replaced with a passing state.
 
