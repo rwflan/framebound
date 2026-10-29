@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, getReviewer, getToken } from "./api";
+import { api } from "./api";
 import type {
   CompareBundleDto,
   ExportResultDto,
@@ -277,7 +277,7 @@ export function IssuesView({ revision }: { revision?: string }) {
                               {" "}
                               ·{" "}
                               <button
-                                disabled={!getToken()}
+                                disabled={false}
                                 onClick={() =>
                                   act(
                                     () =>
@@ -305,7 +305,7 @@ export function IssuesView({ revision }: { revision?: string }) {
               )}
               {iss.task_status === "resolved" && (
                 <button
-                  disabled={!getToken()}
+                  disabled={false}
                   onClick={() =>
                     act(
                       () =>
@@ -362,7 +362,6 @@ export function CorrectionsView() {
           ))}
         </select>
       </label>{" "}
-      <button onClick={reload}>Refresh</button>
       {err ? (
         <Err e={err} />
       ) : !data ? (
@@ -657,6 +656,11 @@ export function ReferencesView() {
   );
   useEffect(() => {
     void refresh();
+    const changed = () => {
+      void refresh();
+    };
+    window.addEventListener("framebound:changed", changed);
+    return () => window.removeEventListener("framebound:changed", changed);
   }, [refresh]);
   return (
     <section aria-label="Reference proposals">
@@ -823,7 +827,7 @@ export function ReferencesView() {
               </div>
             </div>
             <button
-              disabled={approved || !getReviewer() || busy !== null}
+              disabled={approved || busy !== null}
               onClick={async () => {
                 setBusy(guide.id);
                 setError(null);
@@ -849,7 +853,7 @@ export function ReferencesView() {
             </button>
             {approval && (
               <button
-                disabled={!getReviewer() || busy === guide.id}
+                disabled={busy === guide.id}
                 onClick={async () => {
                   setBusy(guide.id);
                   setError(null);

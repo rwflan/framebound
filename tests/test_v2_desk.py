@@ -18,15 +18,9 @@ MOD = {"X-Actor-Id": "spark-1"}  # orchestrator: no session token, never a revie
 
 
 def _reviewer_headers(client) -> dict:
-    """Localhost pairing ceremony: pair a reviewer id, exchange the code for a session."""
-    pr = client.post("/api/reviewer/pair", json={"reviewer_id": "human-1"}, headers={"X-Operator-Secret": _os.environ.get("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret")})
-    assert pr.status_code == 201, pr.text
-    op = client.post("/api/reviewer/open", json={"pairing_code": pr.json()["pairing_code"]})
-    assert op.status_code == 201, op.text
-    # single-use: the same code cannot mint a second session
-    dup = client.post("/api/reviewer/open", json={"pairing_code": pr.json()["pairing_code"]})
-    assert dup.status_code in (401, 403), dup.text
-    return {"X-Session-Token": op.json()["session_token"]}
+    from framebound.v2.services.sessions import create_session
+    session = create_session(client.app.state.project_dir, "human-1")
+    return {"X-Session-Token": session["session_token"]}
 
 
 def _contract(aid_extra=""):

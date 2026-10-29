@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "./api";
 
 export type View =
@@ -57,9 +57,11 @@ export function useLoad<T>(key: string, fn: () => Promise<T>) {
   const [data, setData] = useState<T | null>(null),
     [err, setErr] = useState<unknown>(null),
     [n, setN] = useState(0);
+  const previousKey = useRef(key);
   useEffect(() => {
     let live = true;
-    setData(null);
+    if (previousKey.current !== key) setData(null);
+    previousKey.current = key;
     setErr(null);
     fn()
       .then((d) => {
@@ -72,6 +74,11 @@ export function useLoad<T>(key: string, fn: () => Promise<T>) {
       live = false;
     };
   }, [key, n]);
+  useEffect(() => {
+    const changed = () => setN((x) => x + 1);
+    window.addEventListener("framebound:changed", changed);
+    return () => window.removeEventListener("framebound:changed", changed);
+  }, []);
   return { data, err, reload: () => setN((x) => x + 1) };
 }
 export function usePreload(urls: string[]) {

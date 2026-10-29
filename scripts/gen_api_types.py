@@ -29,6 +29,8 @@ HEADER = """/**
 """
 
 ENDPOINTS: list[tuple[str, str, str, str | None, str]] = [
+    ('POST', '/api/desk/session', 'Record<string, never>', None, 'DeskSessionDto'),
+    ('GET', '/api/changes', 'Record<string, never>', None, 'ChangesDto'),
     ('POST','/api/animation/runs','Record<string, never>','AnimationStartBodyDto','AnimationRunDto'),
     ('GET','/api/animation/runs/{run_id}','{ run_id: string }',None,'AnimationRunDto'),
     ('POST','/api/animation/runs/{run_id}/step','{ run_id: string }',None,'AnimationRunDto'),
@@ -56,8 +58,6 @@ ENDPOINTS: list[tuple[str, str, str, str | None, str]] = [
     ("POST", "/api/decisions", "Record<string, never>", "DecisionBodyDto", "DecisionResultDto"),
     ("POST", "/api/issues/{event_id}/resolve", "IssueParams", "ResolveBodyDto", "ResolveResultDto"),
     ("POST", "/api/masks", "Record<string, never>", "MaskBodyDto", "MaskApproveResultDto"),
-    ("POST", "/api/reviewer/pair", "Record<string, never>", "PairBodyDto", "PairResultDto"),
-    ("POST", "/api/reviewer/open", "Record<string, never>", "OpenBodyDto", "OpenResultDto"),
     ("GET", "/api/jobs/{job_id}", "JobParams", None, "JobViewDto"),
     ("POST", "/api/jobs", "Record<string, never>", "JobSubmitRequestDto", "JobSubmitResultDto"),
     ("POST", "/api/jobs/{job_id}/claim", "JobParams", "JobClaimBodyDto", "JobClaimResultDto"),
@@ -99,10 +99,6 @@ export interface DecisionResultDto { ok: boolean; operation_id: string; revision
 export interface ResolveBodyDto { id?: string | null; replacement_revision_id: string; packet_id?: string | null; note: string }
 export interface ResolveResultDto { ok: boolean; resolution_event_id: string }
 export interface MaskBodyDto { issue_event_id: string; mask_asset_id: string; covered_slots: number[] }
-export interface PairBodyDto { reviewer_id: string }
-export interface PairResultDto { pairing_code: string; reviewer_id: string }
-export interface OpenBodyDto { pairing_code: string }
-export interface OpenResultDto { session_token: string; reviewer_id: string }
 export interface JobViewDto { job: Record<string, unknown>; version: number }
 export interface JobSubmitBodyDto { brief: Record<string, unknown>; references: unknown[]; idempotency_key: string; offline?: boolean; max_attempts?: number }
 export interface JobSubmitResultDto { ok: boolean; operation_id: string; revision_id: string | null; artifacts: Record<string, unknown>[]; issues: Record<string, unknown>[]; next_actions: string[] }

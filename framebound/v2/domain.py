@@ -751,13 +751,6 @@ class TransitionTrace(Strict):
     created_at: str = Field(default_factory=utcnow)
 
 
-class ReviewerPairing(Strict):
-    code_sha256: str = Field(**HEX64)
-    reviewer_id: str = Field(min_length=1, max_length=200)
-    expires_at: str = Field(min_length=1)
-    used: bool = False
-
-
 class ReviewerSession(Strict):
     token_sha256: str = Field(**HEX64)
     reviewer_id: str = Field(min_length=1, max_length=200)

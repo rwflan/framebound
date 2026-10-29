@@ -60,6 +60,17 @@ def _seed(td: str) -> dict:
 
 
 class DtoConformance(unittest.TestCase):
+    def test_store_marker_changes_for_external_writes_but_not_reads(self):
+        with tempfile.TemporaryDirectory() as td:
+            projects.create_project(td, {'id': 'one', 'name': 'First'})
+            c = TestClient(create_app(td))
+            before = c.get('/api/changes')
+            self.assertEqual(before.status_code, 200)
+            DTO.ChangesDto.model_validate(before.json())
+            c.get('/api/project')
+            self.assertEqual(c.get('/api/changes').json(), before.json())
+            projects.create_project(td, {'id': 'two', 'name': 'Second'})
+            self.assertNotEqual(c.get('/api/changes').json(), before.json())
     def test_source_desk_build_wins_over_stale_packaging_stage(self):
         import framebound.v2.api.app as app_module
         with tempfile.TemporaryDirectory() as td:

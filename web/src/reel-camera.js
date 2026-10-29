@@ -109,6 +109,17 @@ export class ReelCamera {
   }
   paint() {
     this.track.style.transform = `translate3d(${this.x.toFixed(3)}px,${this.y.toFixed(3)}px,0) scale(${this.zoom.toFixed(5)})`;
+    const centers = this.lanes.map(
+      (row) =>
+        this.height / 2 +
+        this.y +
+        (row.top - this.trackHeight / 2 + row.height / 2) * this.zoom,
+    );
+    if (centers.length === 2 && centers[1] - centers[0] < 28) {
+      const middle = (centers[0] + centers[1]) / 2;
+      centers[0] = middle - 14;
+      centers[1] = middle + 14;
+    }
     this.labels.forEach((node, i) => {
       const row = this.lanes[i];
       if (!row) return;
@@ -117,11 +128,13 @@ export class ReelCamera {
           this.y +
           (row.top - this.trackHeight / 2) * this.zoom,
         height = row.height * this.zoom;
+      node.style.visibility =
+        top + height < 12 || top > this.height - 12 ? "hidden" : "visible";
       node.style.top = top + "px";
       node.style.height = height + "px";
       node.style.setProperty(
         "--label-y",
-        Math.max(18, Math.min(this.height - 18, top + height / 2)) - top + "px",
+        Math.max(18, Math.min(this.height - 18, centers[i])) - top + "px",
       );
     });
     this.onPosition(

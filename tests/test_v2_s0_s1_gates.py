@@ -13,6 +13,7 @@ os.environ.setdefault("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret")
 OP = os.environ["FRAMEBOUND_OPERATOR_SECRET"]
 
 from framebound.v2.api.app import create_app  # noqa: E402
+from framebound.v2 import storage as S
 
 
 class TestPortableBaseline(unittest.TestCase):
@@ -54,62 +55,62 @@ class TestPortableBaseline(unittest.TestCase):
 
 
 class TestReviewerAuthority(unittest.TestCase):
-    def test_anonymous_pair_is_refused_and_mints_nothing(self):
-        with tempfile.TemporaryDirectory() as td:
-            c = TestClient(create_app(td))
-            r = c.post("/api/reviewer/pair", json={"reviewer_id": "mallory"})
-            self.assertEqual(r.status_code, 403)
-            # no code was minted: open with a garbage code also fails
-            o = c.post("/api/reviewer/open", json={"pairing_code": "deadbeef"})
-            self.assertIn(o.status_code, (403, 422))
+    browser_headers = {'Origin': 'http://127.0.0.1', 'Sec-Fetch-Site': 'same-origin', 'X-Framebound-Desk': '1'}
 
-    def test_model_grant_header_cannot_pair(self):
-        with tempfile.TemporaryDirectory() as td:
-            c = TestClient(create_app(td))
-            r = c.post("/api/reviewer/pair", json={"reviewer_id": "mallory"},
-                       headers={"X-Actor-Id": "spark-1"})
-            self.assertEqual(r.status_code, 403)
+    def client(self, td, peer='127.0.0.1'):
+        return TestClient(create_app(td), base_url='http://127.0.0.1', client=(peer, 50000))
 
-    def test_operator_pair_open_revoke_lifecycle(self):
+    def test_anonymous_or_model_requests_cannot_start_browser_review(self):
         with tempfile.TemporaryDirectory() as td:
-            c = TestClient(create_app(td))
-            pr = c.post("/api/reviewer/pair", json={"reviewer_id": "human-1"},
-                        headers={"X-Operator-Secret": OP})
-            self.assertEqual(pr.status_code, 201)
-            code = pr.json()["pairing_code"]
-            op = c.post("/api/reviewer/open", json={"pairing_code": code})
-            self.assertEqual(op.status_code, 201)
-            token = op.json()["session_token"]
-            # single-use: redeeming the same code again fails
-            dup = c.post("/api/reviewer/open", json={"pairing_code": code})
-            self.assertIn(dup.status_code, (401, 403, 422))
-            # live token authorizes; revoked token does not
+            c = self.client(td)
+            self.assertEqual(c.post('/api/desk/session').status_code, 403)
+            self.assertEqual(c.post('/api/desk/session', headers={**self.browser_headers, 'X-Actor-Id':'model'}).status_code, 403)
+            con = S.connect(td)
+            try:
+                self.assertEqual(con.execute('SELECT COUNT(*) FROM reviewer_sessions').fetchone()[0], 0)
+            finally:
+                con.close()
+
+    def test_same_origin_browser_is_ready_without_enrollment(self):
+        with tempfile.TemporaryDirectory() as td:
             from framebound.v2.services import sessions as SN
-            self.assertEqual(SN.resolve_session(td, token), "human-1")
-            rv = c.post("/api/reviewer/revoke", json={"session_token": token},
-                        headers={"X-Operator-Secret": OP})
-            self.assertEqual(rv.status_code, 200)
-            self.assertTrue(rv.json()["revoked"])
+            c = self.client(td)
+            r = c.post('/api/desk/session', headers=self.browser_headers)
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(r.json(), {'ready': True})
+            self.assertIn('httponly', r.headers['set-cookie'].lower())
+            self.assertIn('samesite=strict', r.headers['set-cookie'].lower())
+            token = c.cookies['fb_desk_review']
+            self.assertEqual(SN.resolve_session(td, token), 'local-reviewer')
+            self.assertEqual(c.post('/api/desk/session', headers=self.browser_headers).status_code, 200)
+            self.assertEqual(c.cookies['fb_desk_review'], token)
+            revoked = c.post('/api/reviewer/revoke', json={'session_token':token}, headers={'X-Operator-Secret': OP})
+            self.assertEqual(revoked.status_code, 200, revoked.text)
             self.assertIsNone(SN.resolve_session(td, token))
 
-    def test_wrong_operator_secret_is_refused(self):
+    def test_cross_origin_and_remote_browser_requests_are_refused(self):
         with tempfile.TemporaryDirectory() as td:
-            c = TestClient(create_app(td))
-            r = c.post("/api/reviewer/pair", json={"reviewer_id": "human-1"},
-                       headers={"X-Operator-Secret": "wrong-secret"})
+            c = self.client(td)
+            for overrides in ({'Origin':'https://elsewhere.example'}, {'Sec-Fetch-Site':'cross-site'}, {'X-Framebound-Desk':'0'}):
+                self.assertEqual(c.post('/api/desk/session', headers={**self.browser_headers, **overrides}).status_code, 403)
+            remote = self.client(td, peer='192.0.2.1')
+            self.assertEqual(remote.post('/api/desk/session', headers=self.browser_headers).status_code, 403)
+
+    def test_cookie_cannot_authorize_cross_origin_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            c = self.client(td)
+            c.post('/api/desk/session', headers=self.browser_headers)
+            r = c.post('/api/decisions', json={}, headers={**self.browser_headers, 'Origin':'https://elsewhere.example'})
             self.assertEqual(r.status_code, 403)
 
-    def test_cli_pair_needs_operator_secret(self):
+    def test_operator_revocation_still_requires_its_credential(self):
         with tempfile.TemporaryDirectory() as td:
             from framebound.v2.services import sessions as SN
             from framebound.v2.services.errors import AuthorizationError
+            session = SN.create_session(td)
             with self.assertRaises(AuthorizationError):
-                SN.pair_reviewer(td, "human-1")
-            with self.assertRaises(AuthorizationError):
-                SN.pair_reviewer(td, "human-1", operator_credential="wrong")
-            ok = SN.pair_reviewer(td, "human-1", operator_credential=OP)
-            self.assertIn("pairing_code", ok)
+                SN.revoke_session(td, session['session_token'], operator_credential='wrong')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

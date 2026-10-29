@@ -29,17 +29,15 @@ export function PacketWorkspace({
   refs,
   issues,
   bundles,
-  reviewer,
+  choices,
   onRefresh,
-  onPair,
 }: {
   bundle: Bundle;
   refs: ReferencesDto;
   issues: IssueDetailDto[];
   bundles: Bundle[];
-  reviewer: string | null;
+  choices: Bundle[];
   onRefresh: () => void;
-  onPair: () => void;
 }) {
   const id = packetId(b),
     revision = revisionId(b),
@@ -341,23 +339,40 @@ export function PacketWorkspace({
     <>
       <div className="sequence-context">
         <h1
+          className="sr-only"
           id="packet-title"
           data-packet-id={id}
           data-revision-id={revision}
           data-evaluation-id={b.evaluation.id}
         >
-          {actionName(b)} <span>{revision}</span>
+          {actionName(b)} {revision}
         </h1>
+        <select
+          className="sequence-picker"
+          aria-label="Clip revision"
+          title={revision}
+          value={id}
+          onChange={(e) => nav({ name: "packet", id: e.target.value })}
+        >
+          {choices.map((choice) => (
+            <option key={packetId(choice)} value={packetId(choice)}>
+              {actionName(choice)} ·{" "}
+              {revisionId(choice).match(/r\d+$/i)?.[0] || revisionId(choice)}
+            </option>
+          ))}
+        </select>
         <div className="sequence-status">
-          <span className={"status " + b.evaluation.technical_status}>
-            Technical {words(b.evaluation.technical_status)}
+          <span
+            className={"status " + b.evaluation.technical_status}
+            title="Technical evaluation"
+          >
+            {words(b.evaluation.technical_status)}
           </span>
-          <span>{words(b.evaluation.coverage_status)} coverage</span>
-          <span>
-            Review {words(b.current_decision.acceptance || "unreviewed")}
+          <span title="Evidence coverage">
+            {words(b.evaluation.coverage_status)} coverage
           </span>
-          <span className="origin-label">
-            {String((b.contract as { origin?: string }).origin || "")}
+          <span title="Human review">
+            {words(b.current_decision.acceptance || "unreviewed")}
           </span>
         </div>
         <select
@@ -801,10 +816,7 @@ export function PacketWorkspace({
                         rows={4}
                       />
                     </label>
-                    <button
-                      className="primary"
-                      disabled={!reviewer || busy || !note.trim()}
-                    >
+                    <button className="primary" disabled={busy || !note.trim()}>
                       {busy ? "Recording…" : "Send to model"}
                       <Icon name="right" />
                     </button>
@@ -837,7 +849,12 @@ export function PacketWorkspace({
                     .filter(([, asset]) => Boolean(asset))
                     .map(([name, asset]) => (
                       <figure key={name}>
-                        {asset && <img src={api.assetUrl(asset)} alt={name || undefined} />}
+                        {asset && (
+                          <img
+                            src={api.assetUrl(asset)}
+                            alt={name || undefined}
+                          />
+                        )}
                         <figcaption>{name}</figcaption>
                       </figure>
                     ))}
@@ -968,9 +985,7 @@ export function PacketWorkspace({
                               </button>
                               <button
                                 disabled={
-                                  !reviewer ||
-                                  busy ||
-                                  iss.task_status === "resolved"
+                                  busy || iss.task_status === "resolved"
                                 }
                                 onClick={() =>
                                   perform(
@@ -994,7 +1009,7 @@ export function PacketWorkspace({
                     })}
                     {iss.task_status === "resolved" && (
                       <button
-                        disabled={!reviewer || busy}
+                        disabled={busy}
                         onClick={() =>
                           perform(
                             () =>
@@ -1057,21 +1072,18 @@ export function PacketWorkspace({
                   />
                 </label>
                 <div className="decision-actions">
-                  <button
-                    disabled={!reviewer || busy}
-                    onClick={() => decide("reject")}
-                  >
+                  <button disabled={busy} onClick={() => decide("reject")}>
                     Reject
                   </button>
                   <button
-                    disabled={!reviewer || busy}
+                    disabled={busy}
                     onClick={() => decide("needs_changes")}
                   >
                     Needs work
                   </button>
                   <button
                     className="primary"
-                    disabled={!reviewer || busy}
+                    disabled={busy}
                     onClick={() => decide("approve")}
                   >
                     Approve
@@ -1082,18 +1094,6 @@ export function PacketWorkspace({
                   {revision} · {b.evaluation.id}
                 </p>
               </div>
-            )}
-            {!reviewer && ["decision", "correction", "tasks"].includes(tab) && (
-              <button
-                className="pair-prompt"
-                onClick={() => {
-                  setTab(null);
-                  onPair();
-                }}
-              >
-                Pair a reviewer to record changes
-                <Icon name="right" />
-              </button>
             )}
             {message && (
               <p role="status" className="success-message">
