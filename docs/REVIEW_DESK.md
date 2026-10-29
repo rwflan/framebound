@@ -11,13 +11,18 @@ The desk closes the framework's measured-repair/human-review loop. It is not an 
 5. **Request a bounded correction.** Pause to mark a native-pixel ROI and an authored tick range, choose a category and enter the concrete defect. Submission creates a durable issue and correction task for this exact revision. Surface attempt/candidate/status information and let the reviewer compare, resolve or reopen the issue.
 6. **Record a decision and export.** Approve, reject or request changes against the viewed revision and evaluation. Keep human acceptance, technical readiness and release eligibility distinct. Export selected revisions with real exclusions and validation results.
 
-## Information hierarchy
+## Interaction concepts
 
-- Persistent project navigation and reviewer session.
-- A review queue with actionable status and real thumbnails.
-- The animation and frame timeline as the main workspace.
-- Contextual findings, references and correction controls beside that workspace.
-- A compact decision area bound to the current revision; supporting evidence/history on demand.
+The design candidates explore different ways to organize these tasks: a sequential
+review ceremony, a spatial revision-comparison map, a correction lifecycle board,
+a directly annotated canvas, and an aligned sequence/measurement matrix. They
+have different primary surfaces and navigation rather than the same panels in
+different positions. Detailed inspection is a secondary surface when needed.
+
+Every concept must make the selected revision, its technical evidence, coverage,
+and current human decision discoverable. Playback, references, correction scope,
+comparison and decisions remain available without forcing a persistent queue or
+inspector into every primary view.
 
 Screen text is functional: action, revision, phase, measured defect, coverage, decision and origin. There are no slogans, fabricated quality percentages or generic success messages. Unknown or unavailable evidence is labelled, not replaced with a passing state.
 
