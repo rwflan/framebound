@@ -16,7 +16,7 @@ Use the numbered links or keys **1–5** to switch. The header discloses procedu
 
 ## Matrix visual design
 
-Candidate 5 is a self-contained redesign inspired by [T3 Code](https://t3.codes/). It does not load `concepts.css`. DM Sans is the sole family across navigation, frame numbers, measurements, metadata, forms and every inspector tab. It uses larger labels, separate image tiles, outlined frame selection, a selection dock and a concise evidence summary. The inspector has its own matching component styles. Frame alignment, measured evidence, range selection and review semantics are preserved. The other four concepts retain their visual designs.
+Candidate 5 is a self-contained redesign inspired by [T3 Code](https://t3.codes/). It does not load `concepts.css`. DM Sans is the sole family across navigation, frame numbers, measurements, metadata, forms and every inspector tab. It uses larger labels, continuous film strips with sprocket holes for each animation row, outlined frame selection, a selection dock and a concise evidence summary. Redundant prototype, reviewing and footer labels have been removed. The inspector has its own matching component styles. Frame alignment, measured evidence, range selection and review semantics are preserved. The other four concepts retain their visual designs.
 
 The DM Sans Latin subset is locally hosted in `fonts/` with its SIL Open Font License. The font was obtained from T3’s public font assets; no T3 brand assets or marketing copy are used. Monospace fonts are not loaded by the redesigned matrix.
 
