@@ -10,9 +10,15 @@ These five HTML candidates use different primary interactions and different DOM 
 | `04-canvas.html` | Annotated canvas | Mark the frame directly, inspect measured finding pins, open frozen references, and create local correction pins. |
 | `05-matrix.html` | Sequence matrix | Compare reference/baseline/candidate frames and real measurement rows in aligned columns. Shift-select columns to scope authored tick ranges. |
 
-Use the numbered links or keys **1–5** to switch. The header discloses procedural media and local state. Serve the folder over HTTP (or use Vite at `/designs/review-desk/`). All assets are local and no external libraries, fonts, APIs or credentials are needed.
+Use the numbered links or keys **1–5** to switch. The header discloses procedural media and local state. Serve the folder over HTTP (or use Vite at `/designs/review-desk/`). All assets, including the matrix’s font files, are served locally. No external requests, libraries, APIs or credentials are needed.
 
 `concepts.js` defines separate renderers and navigation for the five workspaces. `concepts.css` gives each its own visual system. `review.js` shares only evidence interpretation, the playback clock, correction/decision records, and an on-demand secondary inspector. This inspector provides synchronized frame inspection, real RGBA difference/blink, frozen references, complete evaluation results, native ROI marking, tick-range corrections, and exact revision/evaluation decisions.
+
+## Matrix visual design
+
+`matrix.css` refines candidate 5 using [T3 Code](https://t3.codes/) as a style reference: DM Sans, JetBrains Mono for numeric data, near-black surfaces, restrained grey borders and white primary actions. Warm amber is reserved for failed measurements. Its inspector uses the same visual system. Frame alignment, measured evidence, range selection and review semantics are preserved. The other four concepts retain their visual designs.
+
+The two Latin font subsets are locally hosted in `fonts/`, with their SIL Open Font License files. The files were obtained from T3’s public font assets; no T3 brand assets or marketing copy are used.
 
 ## Evidence and boundaries
 
