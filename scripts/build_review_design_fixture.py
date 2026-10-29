@@ -31,7 +31,7 @@ def build(output: Path) -> dict:
         project = str(Path(work) / 'project')
         source = Path(work) / 'source'
         source.mkdir()
-        projects.create_project(project, {'id': 'design-fixture', 'name': 'Pip review fixture'})
+        projects.create_project(project, {'id': 'design-fixture', 'name': 'Character animation'})
 
         def import_image(aid, image):
             path = source / (aid + '.png')
@@ -125,7 +125,7 @@ def build(output: Path) -> dict:
                 packet=S.get(con,'review_packets',pid)[0]
             finally:
                 con.close()
-            rec={'id':rid,'label':action.title(),'revision':rev,'packet':packet,'contract':contract,
+            rec={'id':rid,'project_id':'design-fixture','label':action.title(),'revision':rev,'packet':packet,'contract':contract,
                  'evaluation':evaluation,'frames':frames,
                  'references':[{'phase':p[0],'asset_id':refs[i]['id'],'url':f"fixture/{refs[i]['id']}.png"} for i,p in enumerate(poses)],
                  'eligibility':release_eligibility(project,rid),
@@ -147,7 +147,7 @@ def build(output: Path) -> dict:
         data={'schema':'review-design-fixture-3','default_revision':'pip-run-r02',
               'identity':'fixture/pip-identity.png','style':'fixture/pip-style.png',
               'editable':'fixture/editable-torso.png','protected':'fixture/protected-rest.png',
-              'origin':'procedural fixture','records':records}
+              'origin':'procedural fixture','projects':[{'id':'design-fixture','name':'Character animation'}],'records':records}
         (output/'fixture.js').write_text('window.FRAMEBOUND_REVIEW_FIXTURE = '+json.dumps(data,separators=(',',':'))+';\n')
         return {r['id']:{'technical':r['evaluation']['technical_status'],
                            'coverage':r['evaluation']['coverage_status'],
