@@ -77,12 +77,8 @@ def _seed_approval_project(td: str) -> dict:
 
 
 def _reviewer_headers(td: str, reviewer_id: str = "human-1") -> dict:
-    c = TestClient(create_app(td))
-    pr = c.post("/api/reviewer/pair", json={"reviewer_id": reviewer_id}, headers={"X-Operator-Secret": _os.environ.get("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret")})
-    assert pr.status_code == 201, pr.text
-    op = c.post("/api/reviewer/open", json={"pairing_code": pr.json()["pairing_code"]})
-    assert op.status_code == 201, op.text
-    return {"X-Session-Token": op.json()["session_token"]}
+    session = SN.create_session(td, reviewer_id)
+    return {"X-Session-Token": session["session_token"]}
 
 
 class TestStoredApprovalAuthority(unittest.TestCase):
@@ -115,7 +111,7 @@ class TestStoredApprovalAuthority(unittest.TestCase):
                         return bool(res.is_error)  # tool-level refusal without stored approval
             self.assertTrue(asyncio.run(mcp_refused()))
 
-            # reviewer pairs, approves through the stored flow; transports now succeed
+            # reviewer approves through the stored flow; transports now succeed
             _reviewer_headers(td)
             from framebound.v2.services import approvals as AP
             out = AP.approve_reference(td, Actor(type="reviewer", id="human-1"), "char-R1", "mg-R1")
@@ -201,13 +197,14 @@ class TestReviewerSessions(unittest.TestCase):
                         headers=REV)
             self.assertEqual(r3.status_code, 201, r3.text)
 
-    def test_pairing_code_is_single_use(self):
+    def test_expired_session_cannot_authorize(self):
         with tempfile.TemporaryDirectory() as td:
-            pr = SN.pair_reviewer(td, "human-1", operator_credential=_os.environ.get("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret"))
-            SN.open_session(td, pr["pairing_code"])
-            from framebound.v2.services.errors import AuthorizationError
-            with self.assertRaises(AuthorizationError):
-                SN.open_session(td, pr["pairing_code"])
+            from unittest.mock import patch
+            from datetime import datetime, timezone
+            session = SN.create_session(td, "human-1")
+            self.assertEqual(SN.resolve_session(td, session["session_token"]), "human-1")
+            with patch.object(SN, '_now', return_value=datetime(2100, 1, 1, tzinfo=timezone.utc)):
+                self.assertIsNone(SN.resolve_session(td, session["session_token"]))
 
 
 class TestRelationshipValidation(unittest.TestCase):
@@ -368,7 +365,7 @@ class TestAtomicTransactions(unittest.TestCase):
                 self.assertEqual(con.execute(
                     "SELECT COUNT(*) AS n FROM clip_revisions").fetchone()["n"], 1)
                 # simulate a v1 database: drop R1 tables, reset the version marker
-                for t in ("reviewer_pairings", "reviewer_sessions", "motion_guides",
+                for t in ("reviewer_sessions", "motion_guides",
                           "reference_approvals"):
                     con.execute(f"DROP TABLE IF EXISTS {t}")
                 con.execute("UPDATE meta SET v='1' WHERE k='migration_version'")
@@ -382,8 +379,8 @@ class TestAtomicTransactions(unittest.TestCase):
                 self.assertEqual(con.execute(
                     "SELECT COUNT(*) AS n FROM clip_revisions").fetchone()["n"], 1)
                 # authority tables exist again and work
-                pr = SN.pair_reviewer(td, "human-1", operator_credential=_os.environ.get("FRAMEBOUND_OPERATOR_SECRET", "test-operator-secret"))
-                self.assertIn("pairing_code", pr)
+                session = SN.create_session(td, "human-1")
+                self.assertIn("session_token", session)
             finally:
                 con.close()
 

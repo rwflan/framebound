@@ -112,21 +112,11 @@ async function main() {
     apiProc = startApi();
     await waitHealth(apiProc);
 
-    step = 'reviewer-ceremony';
-    const pair = await api('/api/reviewer/pair', { method: 'POST', body: { reviewer_id: 'e2e-human' }, operator: true });
-    assert(pair.status === 201, `pair failed: ${pair.status} ${pair.text.slice(0, 200)}`);
-    const open = await api('/api/reviewer/open', { method: 'POST', body: { pairing_code: pair.json.pairing_code } });
-    assert(open.status === 201, `open failed: ${open.status}`);
-    const TOKEN = open.json.session_token;
-    assert(TOKEN && TOKEN.length > 8, 'no session token minted');
+    let TOKEN = '';
 
     step = 'launch-browser';
     browser = await chromium.launch();
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-    await ctx.addInitScript((t) => {
-      window.localStorage.setItem('fb.reviewer_token', t);
-      window.localStorage.setItem('fb.reviewer_id', 'e2e-human');
-    }, TOKEN);
     const page = await ctx.newPage();
     page.on('pageerror', (e) => { out.pageerror = String(e).slice(0, 300); });
 
@@ -137,6 +127,9 @@ async function main() {
       await proposal.getByRole('button',{name:'Approve these references'}).click();
       await proposal.getByRole('button',{name:'References approved'}).waitFor();
     }
+    const reviewCookie = (await ctx.cookies(BASE + '/api')).find(c => c.name === 'fb_desk_review');
+    assert(reviewCookie?.httpOnly && reviewCookie.sameSite === 'Strict', 'browser did not receive its automatic review cookie');
+    TOKEN = reviewCookie.value;
     await page.screenshot({path:path.join(SHOTS,'references.png')});
     step='public-automatic-work-and-worker-restart';
     const automatic=JSON.parse(runPy(['web/e2e/setup.py',PROJ,'automatic']));
@@ -157,6 +150,17 @@ async function main() {
     assert(await page.locator('.frame-evidence').count() === 8, 'per-frame evidence bands missing');
     await page.getByRole('button', {name:'Zoom in',exact:true}).click();
     await page.getByRole('button', {name:'Zoom 125%. Reset to 100%.',exact:true}).waitFor();
+    const viewed = (await api('/api/packet/pkt-diff')).json;
+    await page.getByRole('button', {name:'Request correction',exact:true}).click();
+    await page.getByRole('dialog').getByLabel('Note', {exact:true}).fill('Unsaved review draft');
+    const changed = await api('/api/decisions', {method:'POST', token:TOKEN, body:{action:'needs_changes', clip_revision_id:REVIEW_REV, packet_id:'pkt-diff', expected_revision_id:REVIEW_REV, expected_evaluation_id:viewed.evaluation.id, note:'External test action'}});
+    assert(changed.status===201, 'external review action failed');
+    await page.waitForFunction(() => document.querySelector('.sequence-status')?.textContent.includes('needs changes'), null, {timeout:10000});
+    const draftDialogs = await page.locator('dialog').evaluateAll(nodes => nodes.map(node => ({open:node.open, textarea:node.querySelector('textarea')?.value, title:node.querySelector('h2')?.textContent})));
+    assert(draftDialogs.some(d => d.open && d.textarea === 'Unsaved review draft'), 'automatic update discarded review draft: ' + JSON.stringify(draftDialogs));
+    await page.getByRole('dialog').getByRole('button',{name:'Close review',exact:true}).click();
+    assert(await page.locator('.zoom-value').textContent() === '125%', 'automatic update reset camera zoom');
+
     await page.getByRole('button', {name:'Fit',exact:true}).click();
     await page.waitForFunction(() => {
       const camera = document.querySelector('.reel-camera'), track = document.querySelector('.reel-track');

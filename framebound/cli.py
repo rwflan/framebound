@@ -65,12 +65,6 @@ def main(argv=None):
     be.add_argument("--cold-runs", default="5")
     mc = sub.add_parser("v2-mcp", help="v2: serve application services over MCP (stdio)")
     mc.add_argument("--project", required=True)
-    rp = sub.add_parser("reviewer-pair", help="v2: pair a human reviewer (prints single-use code)")
-    rp.add_argument("--project", required=True); rp.add_argument("--reviewer-id", required=True)
-    rp.add_argument("--operator-secret", required=False, default=None,
-                    help="operator secret (or FRAMEBOUND_OPERATOR_SECRET env)")
-    ro = sub.add_parser("reviewer-open", help="v2: exchange a pairing code for a session token")
-    ro.add_argument("--project", required=True); ro.add_argument("--code", required=True)
     gp = sub.add_parser("guide-propose", help="v2: propose a draft motion guide (orchestrator tool)")
     gp.add_argument("--project", required=True); gp.add_argument("--guide", required=True)
     gp.add_argument("--actor-id", required=False, default="cli")
@@ -248,7 +242,7 @@ def main(argv=None):
                     "orchestrator-send", "capabilities", "correction-claim", "correction-submit",
                     "correction-get", "corrections-list-open", "mask-approve",
                     "issue-reopen", "eligibility", "candidate-register",
-                    "packet-create", "corrections-list", "reviewer-pair", "reviewer-open",
+                    "packet-create", "corrections-list",
                     "guide-propose", "reference-approve"):
         from .v2 import cli_commands as _v2c
         _print(_v2c.dispatch(args))

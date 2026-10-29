@@ -41,9 +41,7 @@ python -m framebound serve --project build/wip6/project --port 8765  # desk at h
 # v1 prototype still works: python -m framebound demo --out build/demo
 ```
 
-Reviewer bootstrap is operator-issued: `FRAMEBOUND_OPERATOR_SECRET=... framebound reviewer-pair --project ... --reviewer-id ...`
-prints a single-use code; the human exchanges it via the desk login (pairing code only — the browser never mints
-reviewer authority). Live provider calls need `MODEL_API_KEY` plus an explicit `FRAMEBOUND_SPEND_CEILING`, otherwise
+Review works directly in the local browser. A same-origin, loopback-only HttpOnly session is managed automatically; model actor headers remain separate from reviewer credentials. Live provider calls need `MODEL_API_KEY` plus an explicit `FRAMEBOUND_SPEND_CEILING`, otherwise
 `scripts/verify-local --live` stays pending with the exact command.
 
 Open http://127.0.0.1:8765 for the review desk.

@@ -43,9 +43,9 @@ def public_project(root, monkeypatch, color=(230,80,30), width=12):
     cli(project,'guide-propose','--guide',str(path))
     monkeypatch.setenv('FRAMEBOUND_OPERATOR_SECRET','test-operator')
     client=TestClient(create_app(str(project)))
-    paired=client.post('/api/reviewer/pair',json={'reviewer_id':'test-reviewer'},headers={'X-Operator-Secret':'test-operator'}).json()
-    opened=client.post('/api/reviewer/open',json={'pairing_code':paired['pairing_code']}).json()
-    headers={'X-Session-Token':opened['session_token']}
+    from framebound.v2.services.sessions import create_session
+    session=create_session(str(project),'test-reviewer')
+    headers={'X-Session-Token':session['session_token']}
     body={'character_revision_id':'char','motion_guide_id':'guide','event_id':'approve-guide'}
     assert client.post('/api/references/approve',json=body).status_code == 403
     approved=client.post('/api/references/approve',json=body,headers=headers)
