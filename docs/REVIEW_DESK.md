@@ -24,7 +24,7 @@ and current human decision discoverable. Playback, references, correction scope,
 comparison and decisions remain available without forcing a persistent queue or
 inspector into every primary view.
 
-The matrix candidate prioritizes unresolved interventions by project and exposes a chronological Timeline of recorded framework artifacts, check outcomes and human review activity. Sequence comparison remains a focused detail surface. History preserves original timestamps and source actors; technical passes, human acceptance and current release eligibility remain separate.
+The film workspace candidate prioritizes unresolved interventions by project and exposes chronological framework artifacts, check outcomes and human review activity on a draggable reel. Sequence comparison uses two synchronized lanes; camera dragging changes only the view, while authored timing remains frozen. Keyboard navigation and reduced-motion behavior remain available. History preserves original timestamps and source actors; technical passes, human acceptance and current release eligibility remain separate.
 
 Screen text is functional: action, revision, phase, measured defect, coverage, decision and origin. There are no slogans, fabricated quality percentages or generic success messages. Unknown or unavailable evidence is labelled, not replaced with a passing state.
 
