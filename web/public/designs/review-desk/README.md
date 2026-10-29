@@ -8,7 +8,7 @@ These five HTML candidates use different primary interactions and different DOM 
 | `02-history.html` | Revision map | Select actual revisions on a spatial comparison graph; zoom, fit, and open the selected comparison. Disconnected actions remain separate contracts. |
 | `03-board.html` | Correction board | Follow measured findings, local correction requests, replacements awaiting visual review, and recorded decisions through distinct columns. No arbitrary drag-to-approve. |
 | `04-canvas.html` | Annotated canvas | Mark the frame directly, inspect measured finding pins, open frozen references, and create local correction pins. |
-| `05-matrix.html` | Draggable film workspace | Browse interventions, chronological project history and sequences on a continuous reel. Pan aligned comparison lanes and Shift-select frames to scope corrections. |
+| `05-matrix.html` | Draggable film workspace | Browse interventions, chronological project history and sequences on a continuous reel. Zoom aligned comparison lanes with frame-level measurements and corrections, and Shift-select correction ranges. |
 
 Use the Concepts menu or keys **1–5** to switch. The matrix desk also accepts `?revision=<revision-id>` to open a specific sequence directly. The header discloses procedural media and local state. Serve the folder over HTTP (or use Vite at `/designs/review-desk/`). All assets, including the matrix’s font files, are served locally. No external requests, libraries, APIs or credentials are needed.
 
@@ -17,6 +17,10 @@ Use the Concepts menu or keys **1–5** to switch. The matrix desk also accepts 
 ## Film workspace
 
 Candidate 5 fills the viewport below the menus with a continuous, draggable film reel. `film-workspace.js` owns pointer capture, bounded momentum, spring settling, wheel/trackpad panning, film-position scrubbing and keyboard focus. Motion uses a single composited transform, cancels on a new gesture and respects reduced-motion preferences. Dragging never records a decision or changes authored holds.
+
+The zoom controls scale the whole film from 5–200%; Fit brings the complete reel into view and the percentage resets to 100%. Ctrl/Command-wheel and two-finger touch pinches anchor zoom at the gesture. Enlarged film can pan vertically as well as horizontally. Reference and candidate lanes, frame ruler, measurements and correction bands share one camera transform; comparison changes and local review updates preserve its position and scale.
+
+Each candidate frame carries its actual area/width drift and limits beneath the image, with failures highlighted. The same band shows overlapping correction requests by category and status, with source revision on inherited requests; notes appear when the displayed frame is wide enough. Click a measurement for complete evidence, a request for its saved scope, or the frame's plus button to request a correction for that authored hold. Missing measurements remain unmeasured. Zoom and pan are presentation state only.
 
 Interventions are the default reel. Project and chronological source/order filters stay in the menus. Timeline frames use recorded timestamps and open complete event evidence. Sequence review uses two synchronized lanes with translucent labels; choose the phase reference or baseline above the candidate. Click to focus, double-click to inspect, or use the action bar. Shift-click frame numbers for a correction range. Playback, difference inspection, ROI marking, human decisions and correction lifecycle remain available through the review inspector.
 
