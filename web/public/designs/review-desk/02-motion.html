@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Motion — Framebound</title><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="desk.css"><script src="desk.js" defer></script></head>
+<body class="motion">
+<header class="shell-header"><div class="identity"><a class="logo" href="index.html" aria-label="Framebound"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M10 3H3v7M18 3h7v7M25 18v7h-7M10 25H3v-7"/></svg></a><h1 class="clip-title">Pip / Run<span>r03</span></h1></div><nav class="design-nav" data-nav aria-label="Design candidates"></nav></header>
+<main class="motion-main">
+  <section class="panorama" data-panorama aria-label="Onion-skin animation frames"></section>
+  <div class="motion-ruler" aria-label="Frame selector"><button data-frame="0" aria-label="Frame 1">01</button><button data-frame="1" aria-label="Frame 2">02</button><button data-frame="2" aria-label="Frame 3">03</button><button data-frame="3" aria-label="Frame 4">04</button><button data-frame="4" aria-label="Frame 5">05</button><button data-frame="5" aria-label="Frame 6">06</button><button data-frame="6" aria-label="Frame 7">07</button><button data-frame="7" aria-label="Frame 8">08</button></div>
+  <div class="motion-dock">
+    <div class="controls"><button class="icon-button " aria-label="Previous frame" title="Previous frame" data-icon="prev" data-step="-1"></button><button class="icon-button play" aria-label="Play" title="Play" data-icon="play" data-play></button><button class="icon-button " aria-label="Next frame" title="Next frame" data-icon="next" data-step="1"></button><button class="speed" data-speed aria-label="Playback speed" title="Playback speed">1×</button></div><span class="counter" data-count>04 / 08</span><span class="divider"></span>
+    <button class="icon-button " aria-label="Toggle onion skins" title="Toggle onion skins" data-icon="layers" data-toggle="onion-off" aria-pressed="false"></button><button class="icon-button " aria-label="Mark frame" title="Mark frame" data-icon="pin" data-pin aria-pressed="false"></button>
+    <span class="divider"></span><div class="decision-buttons"><button class="icon-button " aria-label="Request changes" title="Request changes" data-icon="cross" data-decision="reject" aria-pressed="false"></button><button class="icon-button approve" aria-label="Approve" title="Approve" data-icon="check" data-decision="approve" aria-pressed="false"></button></div>
+  </div>
+  <span class="status" data-status role="status"></span>
+</main>
+</body></html>

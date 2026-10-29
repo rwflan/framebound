@@ -1,16 +1,13 @@
-# Review desk design studies
+# Five review desk prototypes
 
-Five static HTML pages: `index.html` is a visual selector for four interactive directions.
+Open `index.html`, or visit `/designs/review-desk/` through Vite. There are exactly five HTML pages; each is a design candidate. The numbered navigation and keys **1–5** switch directly between them.
 
-- **Afterhours** — dark screening room, large player, compact diagnostics.
-- **Paperwork** — paper contact sheet, eight poses visible together.
-- **Split** — full-width revision wipe in lilac and acid green.
-- **Orbit** — cobalt motion map with a circular frame selector.
+1. `index.html`: full vermilion canvas with a vertical frame reel.
+2. `02-motion.html`: dark, overlapping onion-skin panorama.
+3. `03-compare.html`: synchronized paired revision stages.
+4. `04-clips.html`: asymmetric clip queue with focused review dialogs.
+5. `05-sheet.html`: editable exposure sheet beside a fixed preview.
 
-Open `index.html` directly, or use the existing Vite server at `/designs/review-desk/`. The production web build copies this folder unchanged. No installation, external fonts, network media, or API connection is required.
+All visible copy is operational: clip names, revisions, frame numbers, holds, and decision state. Icon controls have accessible names and hover labels. Space plays or pauses; arrow keys step through frames. Marks and decisions update locally. Exposure-sheet holds change playback timing. Queue cards open distinct Run, Jump, Idle, and Attack pose fixtures.
 
-Click the top navigation or press **1–4** to switch directions; **Escape** returns to the selector. **Space** toggles playback and **←/→** steps through frames. Frames, guides, marks, and decision controls work in every candidate. Split includes a draggable comparison wipe; Orbit includes sample queue selection and scrubbing.
-
-These are UI studies. The original SVG courier poses and metrics are illustrative fixtures, not project frames or check results. Review decisions only affect the current page and reset on navigation. The existing production review desk is unchanged.
-
-Validation: production Vite build, JavaScript syntax check, browser screenshots at desktop and phone widths, overflow checks, and interactive checks for playback, frame selection, guides, marking, decisions, keyboard navigation, wipe, queue, and scrubber.
+These are UI prototypes using original SVG illustrations and authored pose arrays, not evaluated project media. Revision differences are illustrative. Decisions stay in memory and reset on navigation. No API writes, external assets, or dependencies are used. The production React review desk is unchanged.
