@@ -13,7 +13,15 @@ The desk closes the framework's measured-repair/human-review loop. It is not an 
 
 ## Interaction concepts
 
-The design candidates explore different ways to organize these tasks: a sequential
+The production React desk now adopts the fifth concept: a full-viewport film workspace with locally hosted DM Sans, gradient navigation and monochromatic grain. Interventions prioritize open corrections, incomplete evidence and revisions awaiting human review. Project selection scopes the reel; Sequences retains the full packet history. The Timeline combines timestamped revisions, evaluations, packets and recorded reviewer events, with source/order filters, event traversal and paged review history. Artifacts without recorded timestamps are not assigned invented dates.
+
+Sequence review keeps reference/baseline and candidate lanes in one draggable, zoomable camera. Measurements, limits and overlapping correction status travel with each candidate frame. Shift-selection scopes authored holds; per-frame plus buttons scope exactly one hold. Fit, 5–200% zoom, anchored wheel/pinch gestures, keyboard navigation and reduced-motion handling affect presentation only. Baselines share a synchronized strip only when contract and timing match; retimed comparisons disclose their timing separately.
+
+Native dialogs provide full evaluation evidence and provenance, pixel-region correction marking, playback at frozen holds, correction attempts/replacements, exact-evaluation decisions and server-derived release eligibility. Reviewer pairing remains operator-issued. Correction requests and decisions persist through the API; the design-candidate pages continue to store only local prototype state. References, task inspection, pixel comparison, export validation and capability status share the production visual system.
+
+Implementation: `web/src/App.tsx` handles navigation and bounded bundle loading; `review-model.ts` derives project scoping, priority, authored-range overlap and chronology; `Film.tsx` and `reel-camera.js` own presentation; `PacketWorkspace.tsx` binds review actions; `Operations.tsx` retains supporting workflows. `desk.css` and `film.css` define the shared visual system. The API exposes project labels and typed observed values, bounds, evidence digests and timestamps without changing review policy. Source checkouts prefer their current `web/dist` over an older packaging-stage build.
+
+The retained HTML design candidates explore different ways to organize these tasks: a sequential
 review ceremony, a spatial revision-comparison map, a correction lifecycle board,
 a directly annotated canvas, and an aligned sequence/measurement matrix. They
 have different primary surfaces and navigation rather than the same panels in

@@ -9,10 +9,11 @@ export function usePresentationClock(opts: {
   tps: number;
   loop: boolean;
   resetKey: string | number;
+  autoPlay?: boolean;
 }) {
   const { holds, tps, loop, resetKey } = opts;
   const [tickFloat, setTickFloat] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(opts.autoPlay ?? true);
   const [speed, setSpeedState] = useState(1);
   const accRef = useRef(0);
   const lastRef = useRef(0);
@@ -34,6 +35,7 @@ export function usePresentationClock(opts: {
       lastRef.current = now;
       const total = totalTicks(s.holds);
       accRef.current += dt * s.tps * s.speed;
+      if (s.loop && total > 0) accRef.current %= total;
       if (!s.loop && accRef.current >= total) {
         accRef.current = total - 1e-3;
         setTickFloat(accRef.current);
@@ -48,7 +50,7 @@ export function usePresentationClock(opts: {
   }, [playing]);
 
   const total = totalTicks(holds);
-  const tick = Math.max(0, Math.min(total - 1, Math.floor(tickFloat)));
+  const tick = Math.max(0, Math.min(total - 1, Math.floor(loop ? tickFloat % total : tickFloat)));
   const slot = holds.length ? slotAtTick(holds, tick, loop) : 0;
 
   const poke = useCallback(() => { lastRef.current = performance.now(); }, []);

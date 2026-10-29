@@ -27,7 +27,7 @@ from pydantic import Field
 from .. import domain as D
 from .. import storage as S
 from ..services.authz import Actor
-from .dto import (ActivityPageDto, CompareBundleDto, CorrectionsListDto, EligibilityDto, ExportResultDto, IssueDetailDto, PacketBundleDto, TaskStatusDto)
+from .dto import (ActivityPageDto, CompareBundleDto, CorrectionsListDto, EligibilityDto, ExportResultDto, IssueDetailDto, PacketBundleDto, ProjectSummaryDto, TaskStatusDto)
 from ..services.errors import AuthorizationError, InvalidInput, StaleRevision as SvcStale
 from .dto import ReferencesDto, ReferenceApproveBodyDto as ReferenceBody
 from .dto import (AnimationStartBodyDto,AnimationRunDto,ProviderGrantDto,ProviderGrantViewDto,
@@ -210,10 +210,16 @@ def create_app(project_dir: str) -> FastAPI:
         except InvalidInput as e:
             raise HTTPException(422, str(e))
 
-    @app.get("/api/project")
+    @app.get("/api/project", response_model=ProjectSummaryDto)
     def project():
         from ..services import projects
-        return {"summary": projects.get_summary(project_dir)}
+        con = S.connect(project_dir)
+        try:
+            entries = [json.loads(r["data"]) for r in con.execute("SELECT data FROM projects")]
+        finally:
+            con.close()
+        return {"summary": projects.get_summary(project_dir),
+                "projects": [{"id": p["id"], "name": p["name"]} for p in entries]}
 
     @app.post('/api/animation/runs',response_model=AnimationRunDto)
     def animation_start(body: AnimationStartBodyDto):
@@ -909,10 +915,15 @@ def create_app(project_dir: str) -> FastAPI:
 def _desk_dir():
     """Resolve the review-desk build without searching unrelated parents.
 
-    Order: installed package resource `framebound/desk` (wheel), then the
-    source-checkout `web/dist` next to the repository root. Returns None when
+    Prefer a freshly built source checkout over an older wheel staging copy.
+    Installed wheels use `framebound/desk`, with a source-layout fallback.
+    Returns None when
     neither exists so / returns 404 JSON instead of an unrelated directory.
     """
+    root = Path(__file__).resolve().parents[3]
+    candidate = root / "web" / "dist"
+    if (root / ".git").exists() and (root / "web" / "package.json").is_file() and (candidate / "index.html").is_file():
+        return candidate
     try:
         from importlib import resources as _res
         desk = _res.files("framebound") / "desk" / "index.html"
@@ -920,7 +931,6 @@ def _desk_dir():
             return desk.parent
     except Exception:
         pass
-    candidate = Path(__file__).resolve().parents[3] / "web" / "dist"
     if (candidate / "index.html").is_file():
         return candidate
     return None

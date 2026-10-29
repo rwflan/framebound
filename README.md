@@ -48,6 +48,8 @@ reviewer authority). Live provider calls need `MODEL_API_KEY` plus an explicit `
 
 Open http://127.0.0.1:8765 for the review desk.
 
+The desk opens on project interventions. Browse sequences and recorded history on a draggable film reel, zoom aligned reference/candidate frames, and inspect measurements and correction status directly beneath the frames. Review dialogs provide authored-tick playback, native-pixel issue regions, exact-evaluation decisions and release eligibility. See [the review workflow](docs/REVIEW_DESK.md).
+
 ## Model-facing tools
 
 CLI (JSON in/out) and MCP (stdio) expose the same operations: `check`, `brief`, `preflight`, `repair-plan`, `repair-evaluate`, `record-failure`, `export-dataset`. See [docs/MODEL_TOOLS.md](docs/MODEL_TOOLS.md).

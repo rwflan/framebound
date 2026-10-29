@@ -149,9 +149,24 @@ async function main() {
     await page.goto(BASE + '/#/packet/pkt-diff', { waitUntil: 'networkidle' });
     await page.waitForSelector('#packet-title', { timeout: 15000 });
     const title = await page.locator('#packet-title').textContent();
-    assert(title.includes('pkt-diff'), `packet title wrong: ${title}`);
+    assert(title.includes(REVIEW_REV), `revision title wrong: ${title}`);
+    assert(await page.locator('#packet-title').getAttribute('data-packet-id') === 'pkt-diff', 'view bound to wrong packet');
+
+    step = 'film-camera-and-inline-evidence';
+    assert(await page.locator('.reel-lane').count() === 2, 'comparison lanes missing');
+    assert(await page.locator('.frame-evidence').count() === 8, 'per-frame evidence bands missing');
+    await page.getByRole('button', {name:'Zoom in',exact:true}).click();
+    await page.getByRole('button', {name:'Zoom 125%. Reset to 100%.',exact:true}).waitFor();
+    await page.getByRole('button', {name:'Fit',exact:true}).click();
+    await page.waitForFunction(() => {
+      const camera = document.querySelector('.reel-camera'), track = document.querySelector('.reel-track');
+      return track && camera && track.getBoundingClientRect().width <= camera.clientWidth - 47;
+    });
+    await page.locator('.zoom-value').click();
+    await page.getByRole('button', {name:'Zoom 100%. Reset to 100%.',exact:true}).waitFor();
 
     step = 'assert-frame-media';
+    await page.getByRole('button', { name: 'Play', exact: true }).click();
     await page.keyboard.press('Home'); // Home also pauses via the desk shortcut
     const frameImg = page.locator('#frame-img');
     await frameImg.waitFor({ timeout: 15000 });
@@ -167,9 +182,9 @@ async function main() {
     }
 
     step = 'pause-step-resume';
-    const toggle = page.getByRole('button', { name: /^(Play|Pause)$/ });
-    if ((await toggle.textContent()) === 'Play') await toggle.click(); // ensure running
-    await page.getByRole('button', { name: 'Pause' }).click();
+    const toggle = page.getByRole('dialog').getByRole('button', { name: /^(Play|Pause)$/ });
+    if ((await toggle.getAttribute('aria-label')) === 'Play') await toggle.click(); // ensure running
+    await page.getByRole('dialog').getByRole('button', { name: 'Pause', exact:true }).click();
     const [p0] = parseTick(await tickText());
     await sleep(700);
     const [p1] = parseTick(await tickText());
@@ -177,18 +192,18 @@ async function main() {
     await page.getByRole('button', { name: '+1 tick' }).click();
     const [p2] = parseTick(await tickText());
     assert(p2 === p0 + 1 || (p0 === 31 && p2 === 0), `tick step failed ${p0} -> ${p2}`);
-    await page.getByRole('button', { name: 'Play' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Play', exact:true }).click();
     await sleep(900);
     const [p3] = parseTick(await tickText());
     assert(p3 !== p2, `resumed clock stalled at ${p2}`);
 
     step = 'speed-preserves-position';
-    await page.getByRole('button',{name:'Pause',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'Pause',exact:true}).click();
     const [s0]=parseTick(await tickText());
     await page.locator('label:has-text("Speed") input').fill('2');
     const [s1]=parseTick(await tickText());
     assert(s1===s0,`speed change moved a paused timeline ${s0} -> ${s1}`);
-    await page.getByRole('button',{name:'Play',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'Play',exact:true}).click();
 
     step = 'compare-real-media-and-diff';
     await page.goto(BASE + `/#/compare?base=rev-base&other=${REVIEW_REV}`, { waitUntil: 'networkidle' });
@@ -199,7 +214,7 @@ async function main() {
       assert(n.w === 64, `${sel} media missing/wrong: ${JSON.stringify(n)}`);
     }
     await page.locator('#compare-slot').fill('3');
-    await page.locator('select').selectOption('diff');
+    await page.getByLabel('Mode', {exact:true}).selectOption('diff');
     await page.waitForFunction(() => /mean abs diff [\d.]+%/.test(document.querySelector('#diff-readout')?.textContent || ''), null, { timeout: 15000 });
     const diffText = await page.locator('#diff-readout').textContent();
     const dm = /mean abs diff ([\d.]+)%/.exec(diffText || '');
@@ -210,7 +225,8 @@ async function main() {
     step = 'mark-issue';
     await page.goto(BASE + '/#/packet/pkt-diff', { waitUntil: 'networkidle' });
     await page.waitForSelector('#packet-title', { timeout: 15000 });
-    const canvas = page.locator('canvas').first();
+    await page.getByRole('button', { name: 'Request correction', exact: true }).click();
+    const canvas = page.locator('dialog canvas');
     const box = await canvas.boundingBox();
     assert(box, 'stage canvas has no box');
     const x0 = box.x + box.width * 0.2, y0 = box.y + box.height * 0.2;
@@ -219,11 +235,11 @@ async function main() {
     await page.mouse.down();
     await page.mouse.move(x1, y1, { steps: 5 });
     await page.mouse.up();
-    await page.locator('label:has-text("Frame range") input').fill('12-15');
-    await page.locator('label:has-text("Note") input').fill('test input: bounded visual defect at slot 3');
+    await page.getByLabel('Frame range', {exact:true}).fill('12-15');
+    await page.getByLabel('Note', {exact:true}).fill('test input: bounded visual defect at slot 3');
     await page.getByRole('button', { name: 'Send to model' }).click();
-    await page.waitForSelector('text=correction task', { timeout: 10000 });
-    out.issue = await page.locator('text=correction task').textContent();
+    await page.getByRole('status').filter({hasText:'Correction task recorded.'}).waitFor({ timeout:10000 });
+    out.issue = await page.getByRole('status').filter({hasText:'Correction task recorded.'}).textContent();
 
     step = 'assert-server-geometry';
     const issues = await api(`/api/issues?revision=${REVIEW_REV}`);
@@ -255,6 +271,7 @@ async function main() {
     const issues2 = await api(`/api/issues?revision=${REVIEW_REV}`);
     assert(issues2.status === 200 && issues2.json.length === 1, 'issue lost across API restart');
     assert(issues2.json[0].event_id === iss.event_id, 'issue identity changed across restart');
+    assert((await page.locator('.frame-issue').allTextContents()).some(t => t.includes('torso pulse')), 'persisted correction missing from frame strip');
     const after=await fetch(BASE+`/api/asset/${REVIEW_FRAME0}`,{headers:{Connection:'close'}});
     const shaAfter=createHash('sha256').update(Buffer.from(await after.arrayBuffer())).digest('hex');
     out.asset_sha256_after_restart=shaAfter;
@@ -340,7 +357,7 @@ async function main() {
     await page.locator('label:has-text("Revisions") input').fill(`${REVIEW_REV},rev-e2e-fix,${negative.negative_revision}`);
     await page.getByLabel('include procedural positives (labeled research otherwise)').check();
     await page.getByRole('button', { name: 'Build + validate' }).click();
-    await page.waitForSelector('text="ok": true', { timeout: 120000 });
+    await page.getByRole('status').filter({hasText:'Export validated'}).waitFor({timeout:120000});
     const moved = path.join(WORK, 'moved-exp');
     fs.renameSync(path.join(PROJ, 'exports', 'e2e-exp'), moved);
     await page.screenshot({path:path.join(SHOTS,'final.png')});
