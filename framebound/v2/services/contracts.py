@@ -14,6 +14,12 @@ def propose_contract(project_dir: str, contract_dict: dict) -> D.ResultEnvelope:
     _params.validate_contract_constraints(contract, contract.canvas.width, contract.canvas.height)
     con = S.connect(project_dir)
     try:
+        guide_id=contract.references.get('motion_guide_revision')
+        if guide_id:
+            row=con.execute('SELECT data FROM motion_guides WHERE id=?',(guide_id,)).fetchone()
+            if row and D.MotionGuide.model_validate_json(row['data']).repair_policy:
+                if not any(c.check=='repair_protection' and c.required for c in contract.constraints):
+                    raise InvalidInput('approved automatic controls require a mandatory repair_protection check')
         # authority check: referenced assets must exist
         missing = []
         for role in ("identity", "style"):

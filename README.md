@@ -11,11 +11,13 @@ Built for the Meta Global AI Developer Hackathon (Indie track, Build for Your Wo
 1. **Contract.** One approved master, one native canvas, locked frame holds, frozen phase references, declared contacts, anchors, and visible features. Everything hash-bound.
 2. **Check.** Deterministic raster checks per frame: silhouette area/width/height vs the same phase, phase correspondence, visible-feature span and pulse, palette drift, support contacts, anchor drift, centroid steps, cadence. Named issue codes, no prose parsing. Unknowns are reported unmeasured, never passed.
 3. **Brief.** Generation briefs bind master + identity + phase + neighbours by SHA-256. A previous edit is never the sole reference; rejected paths are forbidden inputs.
-4. **Repair.** Bounded only: declared region, protected regions, whole-batch evaluation. A candidate reaches human review only if it strictly improves and leaves zero errors. Nothing auto-promotes.
+4. **Repair.** Compile reviewed bounds and execute native translation or protected restoration. Other measured faults can queue scoped image work. Persist every attempt, preserve protected pixels and re-evaluate the full revision. Only complete passing results become technically ready; artistic approval remains human.
 5. **Review.** A persistent web desk for the human: playback at true holds, frame metrics, issue marking, approve/reject. Open issues become machine-readable correction tasks for the model.
 6. **Export.** COCO annotations, a Hugging Face imagefolder dataset, chosen/rejected preference pairs, and clip timing — the training data that makes this framework obsolete.
 
-Meta models in the loop: Muse Image generates under briefs, SAM 3.1 supplies masks, Muse Spark orchestrates and critiques (advisory only). Deterministic checks remain the gate; model opinion never overrides a failed bound. See [docs/DESIGN.md](docs/DESIGN.md) and [docs/PROVIDER_CONTRACTS.md](docs/PROVIDER_CONTRACTS.md).
+Framebound itself compiles approved controls, measures failures, applies authorized native repairs and verifies the resulting pixels. An external orchestrator uses the CLI or MCP tools. Muse Image generation/edit and SAM segmentation are optional bounded specialists; there is no internal general-purpose adviser or critic. See [docs/DESIGN.md](docs/DESIGN.md) and [docs/PROVIDER_CONTRACTS.md](docs/PROVIDER_CONTRACTS.md).
+
+Start with [automatic repair](docs/AUTOMATIC_REPAIR.md), [portable training consumption](docs/SNAPSHOT_CONSUMPTION.md) and the [current evidence matrix](docs/IMPLEMENTATION_STATUS.md). The public browser journey exercises creation, automatic repair, restart, review and moved export without domain-row inserts.
 
 ## Quick start
 
@@ -64,7 +66,7 @@ python -m framebound v2-mcp --project proj   # MCP stdio (same services as CLI/H
 # v1 prototype tools (check/brief/preflight/repair-plan/repair-evaluate/mcp) unchanged
 ```
 
-With a Meta Model API key (`MODEL_API_KEY`), generation and vision critique go live; without one, adapters return the exact request they would send and fabricate nothing.
+Live specialist work additionally requires genuinely approved references, an operator grant, a frozen live request and an explicit spend ceiling. Offline jobs never send, even when a key is present. Participant live proof is pending; see [provider recovery](docs/PROVIDER_RECOVERY.md).
 
 ## Licence
 

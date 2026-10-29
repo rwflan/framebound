@@ -29,6 +29,14 @@ HEADER = """/**
 """
 
 ENDPOINTS: list[tuple[str, str, str, str | None, str]] = [
+    ('POST','/api/animation/runs','Record<string, never>','AnimationStartBodyDto','AnimationRunDto'),
+    ('GET','/api/animation/runs/{run_id}','{ run_id: string }',None,'AnimationRunDto'),
+    ('POST','/api/animation/runs/{run_id}/step','{ run_id: string }',None,'AnimationRunDto'),
+    ('POST','/api/provider-grants','Record<string, never>','ProviderGrantDto','ProviderGrantDto'),
+    ('GET','/api/provider-grants/{grant_id}','{ grant_id: string }',None,'ProviderGrantViewDto'),
+    ('POST','/api/provider-grants/{grant_id}/revoke','{ grant_id: string }','ExpectedVersionBodyDto','ProviderGrantRevokeResultDto'),
+    ('POST','/api/jobs/{job_id}/operator-reconcile','JobParams','ProviderReceiptBodyDto','ProviderReconcileResultDto'),
+    ('POST','/api/references/{approval_id}/revoke','{ approval_id: string }','ReferenceRevokeBodyDto','ReferenceRevokeResultDto'),
     ('GET', '/api/references', 'Record<string, never>', None, 'ReferencesDto'),
     ('POST', '/api/references/approve', 'Record<string, never>', 'ReferenceApproveBodyDto', 'DecisionResultDto'),
     # (method, path, params_type, body_type, result_type)
@@ -51,7 +59,7 @@ ENDPOINTS: list[tuple[str, str, str, str | None, str]] = [
     ("POST", "/api/reviewer/pair", "Record<string, never>", "PairBodyDto", "PairResultDto"),
     ("POST", "/api/reviewer/open", "Record<string, never>", "OpenBodyDto", "OpenResultDto"),
     ("GET", "/api/jobs/{job_id}", "JobParams", None, "JobViewDto"),
-    ("POST", "/api/jobs", "Record<string, never>", "JobSubmitBodyDto", "JobSubmitResultDto"),
+    ("POST", "/api/jobs", "Record<string, never>", "JobSubmitRequestDto", "JobSubmitResultDto"),
     ("POST", "/api/jobs/{job_id}/claim", "JobParams", "JobClaimBodyDto", "JobClaimResultDto"),
     ("POST", "/api/jobs/{job_id}/cancel", "JobParams", "ExpectedVersionDto", "JobCancelResultDto"),
     ("POST", "/api/jobs/reconcile", "Record<string, never>", None, "JobReconcileResultDto"),
@@ -107,7 +115,7 @@ export interface OrchRunBodyDto { job_ids: string[]; max_attempts?: number }
 export interface OrchRunResultDto { run_id: string; status: string; jobs: string[] }
 export interface OrchSendBodyDto { run_id: string; job_id: string; brief: Record<string, unknown>; offline?: boolean }
 export interface OrchSendResultDto { run_id: string; job_id: string; action: string }
-export interface CapabilitiesDto { schema_version: string; rows: { transport: string; operation: string; status: string; note: string }[] }
+export interface CapabilitiesDto { schema_version: string; rows: { transport: string; operation: string; status: string; note: string }[]; evidence: CapabilityEvidenceDto[] }
 export interface ExportBodyDto { name: string; revisions: string[]; policy: Record<string, unknown> }
 """
 

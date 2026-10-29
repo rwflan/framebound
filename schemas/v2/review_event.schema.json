@@ -75,7 +75,8 @@
         "resolve_issue",
         "reopen_issue",
         "approve_mask",
-        "machine_fault"
+        "machine_fault",
+        "revoke_reference"
       ],
       "title": "Action",
       "type": "string"
@@ -123,6 +124,18 @@
       ],
       "default": null,
       "title": "Frame Range"
+    },
+    "reference_approval_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Approval Id"
     },
     "category": {
       "default": "general",

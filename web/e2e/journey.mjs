@@ -18,6 +18,30 @@ const WORK = process.env.E2E_WORK ?? fs.mkdtempSync(path.join(os.tmpdir(), 'fb-e
 fs.mkdirSync(SHOTS, { recursive: true });
 fs.mkdirSync(WORK, { recursive: true });
 const PROJ = path.join(WORK, 'proj');
+const GUARD = path.join(WORK,'egress-guard');
+const EGRESS_LOG = path.join(WORK,'egress-attempts.jsonl');
+fs.mkdirSync(GUARD,{recursive:true});
+fs.writeFileSync(path.join(GUARD,'sitecustomize.py'),`
+import socket,os,json,sys
+sys._framebound_egress_guard_active=True
+local={'127.0.0.1','localhost','::1','0.0.0.0','::',None}
+def deny(operation,host):
+ with open(os.environ['FRAMEBOUND_EGRESS_LOG'],'a') as log:log.write(json.dumps({'operation':operation,'host':str(host)})+'\\n')
+ raise AssertionError('offline acceptance attempted external network access')
+original_connect=socket.socket.connect
+original_lookup=socket.getaddrinfo
+def connect(self,address):
+ if self.family in (socket.AF_INET,socket.AF_INET6) and address[0] not in local:deny('connect',address[0])
+ return original_connect(self,address)
+def lookup(host,*args,**kwargs):
+ if host not in local:deny('getaddrinfo',host)
+ return original_lookup(host,*args,**kwargs)
+socket.socket.connect=connect
+socket.getaddrinfo=lookup
+`);
+const PYENV={...process.env,PYTHONPATH:[GUARD,ROOT,process.env.PYTHONPATH||''].filter(Boolean).join(path.delimiter),
+  FRAMEBOUND_EGRESS_LOG:EGRESS_LOG,HF_HUB_OFFLINE:'1',HF_DATASETS_OFFLINE:'1'};
+
 const out = {};
 let step = 'init';
 
@@ -28,7 +52,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const OPERATOR_SECRET = process.env.FRAMEBOUND_OPERATOR_SECRET ?? 'e2e-operator-secret';
 async function api(p, { method = 'GET', body = null, token = null, actor = null, operator = false } = {}) {
-  const headers = {};
+  // Synchronous Python checkpoints can outlast the server's idle timeout.
+  // Give each Node probe a fresh socket; browser requests still use normal pooling.
+  const headers = { Connection: 'close' };
   if (body) headers['Content-Type'] = 'application/json';
   if (token) headers['X-Session-Token'] = token;
   else if (actor) headers['X-Actor-Id'] = actor;
@@ -41,7 +67,7 @@ async function api(p, { method = 'GET', body = null, token = null, actor = null,
 }
 
 function runPy(args, opts = {}) {
-  const r = spawnSync(PY, args, { cwd: ROOT, encoding: 'utf8', ...opts });
+  const r = spawnSync(PY, args, { cwd: ROOT, encoding: 'utf8', env: PYENV, ...opts });
   if (r.status !== 0) throw new Error(`E2E FAIL [${step}]: python ${args.join(' ')} exited ${r.status}: ${(r.stderr || '').slice(-800)}`);
   return r.stdout;
 }
@@ -49,8 +75,8 @@ function runPy(args, opts = {}) {
 async function waitHealth(proc) {
   for (let i = 0; i < 60; i++) {
     try {
-      const r = await fetch(BASE + '/api/health');
-      if (r.ok) return;
+      const r = await fetch(BASE + '/api/health',{headers:{Connection:'close'}});
+      if (r.ok) { await r.text();return; }
     } catch { /* not up yet */ }
     if (proc.exitCode !== null) throw new Error(`E2E FAIL [${step}]: API exited early with ${proc.exitCode}`);
     await sleep(500);
@@ -61,9 +87,9 @@ async function waitHealth(proc) {
 function startApi() {
   const proc = spawn(PY, ['-m', 'framebound', 'serve', '--project', PROJ, '--port', PORT],
     { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, FRAMEBOUND_OPERATOR_SECRET: OPERATOR_SECRET } });
-  proc.stdout.on('data', () => {});
-  proc.stderr.on('data', () => {});
+      env: { ...PYENV, FRAMEBOUND_OPERATOR_SECRET: OPERATOR_SECRET } });
+  proc.stdout.on('data',chunk => fs.appendFileSync(path.join(WORK,'server.log'),chunk));
+  proc.stderr.on('data',chunk => fs.appendFileSync(path.join(WORK,'server.log'),chunk));
   return proc;
 }
 
@@ -79,7 +105,8 @@ async function main() {
   try {
     step = 'setup-project';
     const info = JSON.parse(runPy(['web/e2e/setup.py', PROJ]));
-    assert(info.packet_id === 'pkt-base', 'setup did not build pkt-base');
+    assert(info.phase==='references_pending' && info.guard_active,'public MCP bootstrap/egress guard missing');
+    out.public_mcp_tools=info.mcp_tool_count;
 
     step = 'start-api';
     apiProc = startApi();
@@ -103,6 +130,21 @@ async function main() {
     const page = await ctx.newPage();
     page.on('pageerror', (e) => { out.pageerror = String(e).slice(0, 300); });
 
+    step='approve-references-in-browser';
+    await page.goto(BASE+'/#/references',{waitUntil:'networkidle'});
+    for (const character of info.characters) {
+      const proposal=page.locator('article').filter({has:page.getByRole('heading',{name:new RegExp(character)})});
+      await proposal.getByRole('button',{name:'Approve these references'}).click();
+      await proposal.getByRole('button',{name:'References approved'}).waitFor();
+    }
+    await page.screenshot({path:path.join(SHOTS,'references.png')});
+    step='public-automatic-work-and-worker-restart';
+    const automatic=JSON.parse(runPy(['web/e2e/setup.py',PROJ,'automatic']));
+    const REVIEW_REV=automatic.review_revision;
+    const REVIEW_FRAME0=automatic.review_frame0_asset;
+    out.automatic_runs=automatic.automatic_runs;
+    out.worker_crash_exit=automatic.worker_crash_exit;
+
     step = 'open-packet';
     await page.goto(BASE + '/#/packet/pkt-diff', { waitUntil: 'networkidle' });
     await page.waitForSelector('#packet-title', { timeout: 15000 });
@@ -115,7 +157,7 @@ async function main() {
     await frameImg.waitFor({ timeout: 15000 });
     const natural = await frameImg.evaluate((el) => ({ w: el.naturalWidth, h: el.naturalHeight, src: el.currentSrc }));
     assert(natural.w === 64 && natural.h === 64, `frame media is not the 64x64 asset: ${JSON.stringify(natural)}`);
-    assert(natural.src.includes('f-e2e-0'), `frame 0 is the wrong asset: ${natural.src}`);
+    assert(natural.src.includes(REVIEW_FRAME0), `frame 0 is the wrong asset: ${natural.src}`);
     const tickText = async () => page.locator('#tick-readout').textContent();
     const parseTick = (s) => { const m = /tick (\d+) \/ (\d+)/.exec(s || ''); assert(m, `unparseable tick readout: ${s}`); return [parseInt(m[1], 10), parseInt(m[2], 10)]; };
     {
@@ -141,14 +183,15 @@ async function main() {
     assert(p3 !== p2, `resumed clock stalled at ${p2}`);
 
     step = 'speed-preserves-position';
-    const [s0] = parseTick(await tickText());
+    await page.getByRole('button',{name:'Pause',exact:true}).click();
+    const [s0]=parseTick(await tickText());
     await page.locator('label:has-text("Speed") input').fill('2');
-    await sleep(600);
-    const [s1] = parseTick(await tickText());
-    assert(s1 >= s0, `speed change reset the timeline ${s0} -> ${s1}`);
+    const [s1]=parseTick(await tickText());
+    assert(s1===s0,`speed change moved a paused timeline ${s0} -> ${s1}`);
+    await page.getByRole('button',{name:'Play',exact:true}).click();
 
     step = 'compare-real-media-and-diff';
-    await page.goto(BASE + '/#/compare?base=rev-base&other=rev-diff', { waitUntil: 'networkidle' });
+    await page.goto(BASE + `/#/compare?base=rev-base&other=${REVIEW_REV}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('#compare-title', { timeout: 15000 });
     for (const sel of ['#compare-base-img', '#compare-other-img']) {
       await page.locator(sel).waitFor({ timeout: 15000 });
@@ -177,13 +220,13 @@ async function main() {
     await page.mouse.move(x1, y1, { steps: 5 });
     await page.mouse.up();
     await page.locator('label:has-text("Frame range") input').fill('12-15');
-    await page.locator('label:has-text("Note") input').fill('e2e blank at slot 3');
+    await page.locator('label:has-text("Note") input').fill('test input: bounded visual defect at slot 3');
     await page.getByRole('button', { name: 'Send to model' }).click();
     await page.waitForSelector('text=correction task', { timeout: 10000 });
     out.issue = await page.locator('text=correction task').textContent();
 
     step = 'assert-server-geometry';
-    const issues = await api('/api/issues?revision=rev-diff');
+    const issues = await api(`/api/issues?revision=${REVIEW_REV}`);
     assert(issues.status === 200, `issues failed: ${issues.status}`);
     assert(issues.json.length === 1, `expected 1 issue, got ${issues.json.length}`);
     const iss = issues.json[0];
@@ -194,30 +237,31 @@ async function main() {
     }
     assert(JSON.stringify(iss.frame_range) === '[12,15]', `range wrong: ${JSON.stringify(iss.frame_range)}`);
     assert(iss.category === 'torso-pulse', `category wrong: ${iss.category}`);
-    assert(iss.clip_revision_id === 'rev-diff', 'issue on wrong revision');
+    assert(iss.clip_revision_id === REVIEW_REV, 'issue on wrong revision');
     const TASK = iss.task_id;
     const BASE_EV = iss.baseline_evaluation_id;
     assert(TASK && BASE_EV, 'issue has no task/baseline binding');
     await page.screenshot({ path: path.join(SHOTS, 'issue.png') });
 
     step = 'restart-api-and-reload';
-    const before = await api('/api/asset/f-e2e-0');
-    assert(before.status === 200, 'asset fetch failed before restart');
-    const shaBefore = createHash('sha256').update(Buffer.from(before.text, 'binary')).digest('hex');
+    const before=await fetch(BASE+`/api/asset/${REVIEW_FRAME0}`,{headers:{Connection:'close'}});
+    assert(before.ok,'asset fetch failed before restart');
+    const shaBefore=createHash('sha256').update(Buffer.from(await before.arrayBuffer())).digest('hex');
     await stopApi(apiProc);
     apiProc = startApi();
     await waitHealth(apiProc);
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('#packet-title', { timeout: 15000 });
-    const issues2 = await api('/api/issues?revision=rev-diff');
+    const issues2 = await api(`/api/issues?revision=${REVIEW_REV}`);
     assert(issues2.status === 200 && issues2.json.length === 1, 'issue lost across API restart');
     assert(issues2.json[0].event_id === iss.event_id, 'issue identity changed across restart');
-    const after = await api('/api/asset/f-e2e-0');
-    const shaAfter = createHash('sha256').update(Buffer.from(after.text, 'binary')).digest('hex');
+    const after=await fetch(BASE+`/api/asset/${REVIEW_FRAME0}`,{headers:{Connection:'close'}});
+    const shaAfter=createHash('sha256').update(Buffer.from(await after.arrayBuffer())).digest('hex');
+    out.asset_sha256_after_restart=shaAfter;
     assert(shaAfter === shaBefore, 'source bytes changed across restart');
 
     step = 'mask-claim-submit-cli';
-    const mask = await api('/api/masks', { method: 'POST', body: { issue_event_id: iss.event_id, mask_asset_id: 'm-e2e-full', covered_slots: [3] }, token: TOKEN });
+    const mask = await api('/api/masks', { method: 'POST', body: { issue_event_id: iss.event_id, mask_asset_id: 'm-e2e-scope', covered_slots: [3] }, token: TOKEN });
     assert(mask.status === 201, `mask approval failed: ${mask.status} ${mask.text.slice(0, 200)}`);
     const taskGet = await api(`/api/corrections/${TASK}`);
     const claimOut = JSON.parse(runPy(['-m', 'framebound', 'correction-claim', '--project', PROJ, '--task-id', TASK,
@@ -256,13 +300,13 @@ async function main() {
     step = 'compare-and-resolve-in-browser';
     await page.goto(BASE + '/#/compare?base=rev-base&other=rev-e2e-fix', { waitUntil: 'networkidle' });
     await page.waitForSelector('#compare-other-img', { timeout: 15000 });
-    const pre = await api('/api/issues?revision=rev-diff');
+    const pre = await api(`/api/issues?revision=${REVIEW_REV}`);
     assert(pre.json[0].task_status === 'awaiting_comparison', `task not awaiting comparison after CLI submit: ${pre.json[0].task_status}`);
-    await page.goto(BASE + '/#/issues?revision=rev-diff', { waitUntil: 'networkidle' });
+    await page.goto(BASE + `/#/issues?revision=${REVIEW_REV}`, { waitUntil: 'networkidle' });
     await page.waitForSelector('text=rev-e2e-fix', { timeout: 15000 });
     await page.getByRole('button', { name: 'Resolve with this' }).click();
     await page.waitForSelector('text=Resolved', { timeout: 10000 });
-    const resolved = await api('/api/issues?revision=rev-diff');
+    const resolved = await api(`/api/issues?revision=${REVIEW_REV}`);
     assert(resolved.json[0].resolution_event_id, 'no resolution event recorded');
     assert(resolved.json[0].task_status === 'resolved', `task not resolved: ${resolved.json[0].task_status}`);
     const dec = await api('/api/decisions', { method: 'POST', body: {
@@ -279,21 +323,50 @@ async function main() {
     const entry = (queue.json.tasks || []).find((t) => t.id === TASK);
     assert(entry && entry.status === 'reopened', `reopened task not visible: ${JSON.stringify(entry)}`);
 
+    step='reopened-issue-reconfirmed-and-resolved';
+    const reaffirm=await api('/api/decisions',{method:'POST',body:{action:'approve',clip_revision_id:'rev-e2e-fix',packet_id:'pkt-rev-e2e-fix',note:'test fixture: reaffirm after reopen'},token:TOKEN});
+    assert(reaffirm.status===201,'reaffirmation failed');
+    const resolvedAgain=await api(`/api/issues/${iss.event_id}/resolve`,{method:'POST',body:{replacement_revision_id:'rev-e2e-fix',packet_id:'pkt-rev-e2e-fix',note:'test fixture: rechecked comparison'},token:TOKEN});
+    assert(resolvedAgain.status===200,'reopened issue did not resolve');
+    assert((await api('/api/eligibility/rev-e2e-fix')).json.eligible,'reconfirmed result is ineligible');
+    step='simulated-negative-and-unrelated-note';
+    const negative=JSON.parse(runPy(['web/e2e/setup.py',PROJ,'negative']));
+    const negativeDecision=await api('/api/decisions',{method:'POST',body:{action:'approve',clip_revision_id:negative.negative_revision,packet_id:negative.negative_packet,note:'TEST INPUT ONLY: proves approval cannot erase simulated origin'},token:TOKEN});
+    assert(negativeDecision.status===201,'negative fixture review failed');
+
     step = 'export-through-desk-move-consume';
     await page.goto(BASE + '/#/export', { waitUntil: 'networkidle' });
     await page.locator('label:has-text("Name") input').fill('e2e-exp');
-    await page.locator('label:has-text("Revisions") input').fill('rev-diff,rev-e2e-fix');
+    await page.locator('label:has-text("Revisions") input').fill(`${REVIEW_REV},rev-e2e-fix,${negative.negative_revision}`);
+    await page.getByLabel('include procedural positives (labeled research otherwise)').check();
     await page.getByRole('button', { name: 'Build + validate' }).click();
     await page.waitForSelector('text="ok": true', { timeout: 120000 });
     const moved = path.join(WORK, 'moved-exp');
     fs.renameSync(path.join(PROJ, 'exports', 'e2e-exp'), moved);
-    const rep = runPy(['-c', 'import json,sys; from framebound.v2.exports import validate_snapshot; print(json.dumps(validate_snapshot(sys.argv[1])))', moved]);
+    await page.screenshot({path:path.join(SHOTS,'final.png')});
+    await stopApi(apiProc);apiProc=null;
+    fs.renameSync(path.join(PROJ,'framebound.sqlite3'),path.join(PROJ,'framebound.sqlite3.unavailable'));
+    const consume=`import json,sys
+from pathlib import Path
+from framebound.v2.exports import validate_snapshot
+from framebound.v2.exports.dpo_adapter import decoded_batch
+snapshot=Path(sys.argv[1]);report=validate_snapshot(str(snapshot));assert report['ok'],report
+batch=decoded_batch(snapshot);assert batch['chosen'][0][0].shape==(64,64,4)
+metas=[json.loads(line) for line in (snapshot/'hf'/'metadata.jsonl').read_text().splitlines() if line.strip()]
+assert sys.argv[2] not in {m['asset_id'] for m in metas}
+assert not (snapshot/'closure'/'blobs'/sys.argv[3]).exists()
+assert all(sys.argv[4].encode() not in path.read_bytes() for path in snapshot.rglob('*') if path.is_file())
+report['decoded_batch_shape']=list(batch['chosen'][0][0].shape);print(json.dumps(report))`;
+    const rep=runPy(['-c',consume,moved,negative.negative_asset,negative.private_note_digest,negative.private_note]);
     const parsed = JSON.parse(rep.trim().split('\n').pop()); // pycocotools logs to stdout; JSON is last
     assert(parsed.ok === true, `moved export invalid: ${JSON.stringify(parsed.issues).slice(0, 400)}`);
     out.export_counts = parsed.counts;
+    out.decoded_batch_shape=parsed.decoded_batch_shape;
+    assert(!fs.existsSync(EGRESS_LOG) || fs.readFileSync(EGRESS_LOG,'utf8').trim()==='','unexpected network attempt during offline acceptance');
+    out.external_socket_attempts=0;
 
+    assert(!out.pageerror,`browser error: ${out.pageerror}`);
     step = 'done';
-    await page.screenshot({ path: path.join(SHOTS, 'final.png') });
   } finally {
     if (browser) await browser.close().catch(() => {});
     if (apiProc) await stopApi(apiProc).catch(() => {});

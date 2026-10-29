@@ -1,59 +1,29 @@
-> Stage A (corrected handoff): the runtime core makes zero general-purpose model calls. Image/edit/segmentation are explicit optional providers returning proposed artifacts; the internal Spark critique is retired from the workflow, demo and gates. Historical wire shapes below remain for compatibility.
+# Specialist provider contracts
 
-# Provider contracts — spike 2026-10-27 (offline, no key)
+Framebound uses image generation/edit and optional SAM as bounded artifact providers. An external orchestrator can be Spark or another tool-capable model. There is no internal general-purpose critic, and no critic call is required for repair, readiness, export or the live probe.
 
-Environment: no `MODEL_API_KEY`/`META_API_KEY` set. All calls below ran offline and sent nothing.
-`sent: false` fixtures under `fixtures/provider-spike/` capture exact request shapes only.
+This document describes the implemented adapters and their tested boundaries. A strict fake transport can establish what bytes Framebound sends and how it handles a response. It cannot establish that the participant's account or the current upstream service accepts that request. Participant live observation remains pending.
 
-## Researched starting points (verify with participant account before building UX)
+## Implemented request path
 
-- Base URL: `https://api.meta.ai/v1`, bearer auth through `MODEL_API_KEY`. Source: https://dev.meta.ai/docs/overview
-- Spark `muse-spark-1.3`: structured tool loop; local tool execution is the application's responsibility
-  (https://dev.meta.ai/docs/tool-calling); structured output for contracts/critics where supported, still validated server-side
-  (https://dev.meta.ai/docs/structured-output); model page https://dev.meta.ai/models/muse-spark.
-- Muse Image `muse-image-1.0`: reference-conditioned Responses flow + edits endpoint;
-  `size` controls aspect ratio, NOT guaranteed exact pixels; select returned image items by type; archive bytes immediately, not signed URLs;
-  internal search controls should be disabled for reproducible original-character work where supported.
-  Source: https://dev.meta.ai/docs/image-generation
-- SAM 3.1: Responses with real image/video content; special-token box/mask output requiring decoding; store mask bytes, prompt,
-  coordinate mapping, model identity, request ID, confidence. Source: https://dev.meta.ai/docs/media-segmentation
-- MCP SDK catalog: https://modelcontextprotocol.io/docs/sdk (pin a tested release in WP3; no protocol hand-rolling).
+The v2 image and SAM adapters build Responses requests. Image generation carries the approved identity and style pixels plus applicable phase, baseline, repair and support images. An edit chains a durable successful response for the same target and retains reference ancestry. SAM receives the actual source image and returns source-bound proposals only after successful status and decode checks. No match, failed status, malformed output or missing mask is a failed capability rather than successful segmentation.
 
-## v1 prototype gaps (code inspection, `framebound/meta_api.py`)
+The job freezes the complete executable request, model, endpoint, approved scope and offline setting before dispatch. Changing environment variables or run settings cannot silently change that queued request. Only the controller can reserve an attempt and issue a one-use permit consumed at the HTTP boundary. Adapter convenience calls cannot send without it. Atomic job, run, target and operator-grant accounting prevents overlapping workers from sending twice or resetting a ceiling by renaming a contract.
 
-1. `generate_image()`: sends `{model, prompt, size: 1024x1024}` to `/images/generations` — text-only, carries NO bound reference pixels/IDs,
-   no negotiated output encoding/alpha, no response-item type selection, no byte persistence.
-2. `segment()`: sends `{model, image: <local path string>, prompt}` to `/chat/completions` — never transmits image bytes,
-   never decodes special-token masks; offline fallback returns an alpha-derived mask labeled `offline-alpha` (honest label, not SAM output).
-3. `vision_critique()`: chat-completions shape is plausible but unexercised; advisory-only contract is correct and must be kept.
-4. No ledger: request/response artifacts, reference role+hash capture, cost/usage recording, idempotency keys, timeout reconciliation — all absent.
+A scoped redraw has a persisted authorized operation and exact baseline, source slot, phase, editable and protected pixels. Provider output is normalized only through the approved fixed family calibration. The native writer composites within the effective support, preserves exterior and protected pixels, derives provenance from its actual parents, and re-evaluates the whole revision. A provider success is not technical readiness or artistic acceptance.
 
-## Offline fixtures (this spike, redacted, `sent: false`)
+## Origins and evidence
 
-- `fixtures/provider-spike/spark-critique.json` — Spark chat-completions critique request shape (contract summary + fault codes + image parts).
-- `fixtures/provider-spike/image-generation.json` — Muse Image generation request shape as v1 sends it (deficient: no references).
-- `fixtures/provider-spike/image-edit.json` — intended edit/mask shape to confirm in live spike (unimplemented in v1).
-- `fixtures/provider-spike/sam-segmentation.json` — intended SAM Responses shape to confirm in live spike (v1 sends wrong shape).
+Offline jobs persist `not_configured` without contacting a provider, even if a key happens to exist. An injected fake transport stays simulated through materialization, further repair and export. Actual live origin is recorded at the consumed send boundary; an operator receipt cannot upgrade a simulated origin. Derived rights remain conservative across all parents. Redacted requests, responses, hashes and immutable recovery receipts remain addressable artifacts.
 
-## Status 2026-10-28: deterministic gates done (R3); live spike pending credentials
+Unknown outcomes require an operator to reconcile the original request using a matching receipt. Confirming no upstream acceptance can release the quoted money reservation while retaining the consumed call. Abandonment retains uncertain reservation. An equivalent receipt replays the same result; a conflicting receipt fails. See [PROVIDER_RECOVERY.md](PROVIDER_RECOVERY.md).
 
-Transport, parsing, and controller work below is implemented and contract-tested
-(`providers/wire.py`, durable jobs, orchestrator; 17 R3 regressions). What remains
-is the authorized live exercise — it needs a participant credential, which was never
-available in this pass. The harness is ready:
+## Participant live probe
 
 ```sh
-# one recorded run: references + request/response bytes + registered revision +
-# evaluation + comparison packet, or an honest pending bundle without a key
-MODEL_API_KEY=<participant-key> python -m framebound recorded-run --project proj \
-  --contract c-01 --slot 0 --baseline clip-01 --new-id gen-01 --out live-run.json
+sh scripts/verify-local --live --work-dir /outside-repo/participant-spike
 ```
 
-## Rules for the live spike (requires key + participant account)
+The first invocation writes a persistent configuration shape and reports pending. Configure an existing genuinely approved project, operator grant and explicit spend ceiling before supplying a participant credential. The probe records image generation, chained edit and decoded SAM. It resumes existing jobs and bundles rather than repeating completed paid stages. The gate requires actual live origin and complete passing technical evidence. Human art approval remains separate.
 
-- Save ONE redacted request/response per flow: Spark tool call, image request with ≥2 role-labeled references, image edit, SAM decode to aligned mask.
-- Pin SDK/parser versions; record docs URLs + date. No-key result is `unsupported/not_configured`; offline procedural and recorded-replay stay distinct.
-- Retry only bounded transient failures with backoff; record cost/usage when returned, mark estimates as estimates.
-- Never label alpha fallback as SAM output. SAM failure surfaces as unsupported/failed coverage, never silently replaced.
-- Live availability is reported separately from engineering completeness: a live skip
-  leaves live proof pending, never "engineering complete".
+The v1 prototype and historical provider fixtures are compatibility artifacts. They are not the active v2 request contract. The authoritative builders and parser checks are `framebound/v2/providers/image.py`, `sam.py` and `wire.py`; durable execution is in `services/jobs.py`, `orchestrator.py`, `dispatch.py` and `provider_recovery.py`.

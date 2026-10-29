@@ -5,15 +5,6 @@ import json
 
 from mcp.server.mcpserver import MCPServer
 
-TOOLS = ["doctor", "project_get", "asset_import", "contract_propose",
-         "clip_create_revision", "clip_evaluate", "brief_compile",
-         "generation_submit", "generation_submit_offline", "job_get",
-         "job_claim", "job_cancel", "job_reconcile", "orchestrator_run",
-         "capabilities", "correction_claim", "correction_get", "correction_submit",
-         "eligibility_get", "candidate_register",
-         "repair_plan", "repair_evaluate", "review_packet_create", "corrections_list"]
-
-
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
@@ -209,10 +200,10 @@ def build_server(project_dir: str) -> MCPServer:
 
     @server.tool(name="review_packet_create", description="Curate a review packet for a revision+evaluation")
     def review_packet_create(packet_id: str, revision_id: str, evaluation_id: str,
-                             intent: str) -> dict:
+                             intent: str, comparison_revision_id: str | None = None) -> dict:
         from ..services import packets
         return packets.create_packet(project_dir, packet_id, revision_id,
-                                     evaluation_id, intent).model_dump()
+                                     evaluation_id, intent,comparison_revision_id).model_dump()
 
     @server.tool(name="corrections_list", description="List correction tasks (model work queue)")
     def corrections_list(status: str = "open") -> dict:

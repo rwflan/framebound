@@ -513,7 +513,8 @@ class TestCapabilityAndTransportParity(unittest.TestCase):
         self.assertEqual(rows[("desk", "playback/compare/issues/corrections/export")]["status"],
                          "supported")
         self.assertEqual(rows[("cli", "job-cancel")]["status"], "supported")
-        self.assertEqual(rows[("providers", "live-spike")]["status"], "unsupported")
+        self.assertEqual(rows[("providers", "live-spike")]["status"], "provisional")
+        self.assertFalse(any(e['live_observed'] for e in C.table()['evidence']))
         # CLI/MCP/API parity: job submit/get/cancel over HTTP
         from fastapi.testclient import TestClient
         from framebound.v2.api.app import create_app
