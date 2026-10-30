@@ -1,0 +1,77 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+      "title": "Name",
+      "type": "string"
+    },
+    "run_ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 1000,
+      "minItems": 1,
+      "title": "Run Ids",
+      "type": "array"
+    },
+    "policy_id": {
+      "default": "agent-training-v1",
+      "pattern": "^agent-training-v1$",
+      "title": "Policy Id",
+      "type": "string"
+    },
+    "include_automatically_verified": {
+      "default": false,
+      "title": "Include Automatically Verified",
+      "type": "boolean"
+    },
+    "include_procedural_positives": {
+      "default": false,
+      "title": "Include Procedural Positives",
+      "type": "boolean"
+    },
+    "rights_allow": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Rights Allow",
+      "type": "array"
+    },
+    "destination": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Destination"
+    },
+    "split": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Split",
+      "type": "object"
+    },
+    "split_policy": {
+      "default": "exclude",
+      "pattern": "^(strict|exclude)$",
+      "title": "Split Policy",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "run_ids"
+  ],
+  "title": "ExportSelection",
+  "type": "object"
+}

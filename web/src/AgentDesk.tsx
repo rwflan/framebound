@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { req } from './api';
+import { AgentExport } from './AgentExport';
 import { AgentWorkspace } from './AgentWorkspace';
 import { Err, Icon, stamp, words } from './shared';
 import { useAutomaticUpdates } from './useAutomaticUpdates';
@@ -15,7 +16,7 @@ export function useAgentDesk() {
   return {data,error,refresh};
 }
 
-function route(){const [path,query]=location.hash.replace(/^#\/?/,'').split('?'),parts=path.split('/');return {run:parts[0]==='run'?decodeURIComponent(parts[1]||''):'',revision:new URLSearchParams(query).get('revision')};}
+function route(){const [path,query]=location.hash.replace(/^#\/?/,'').split('?'),parts=path.split('/');return {export:parts[0]==='export',run:parts[0]==='run'?decodeURIComponent(parts[1]||''):'',revision:new URLSearchParams(query).get('revision')};}
 export function AgentDesk({data,onChange}:{data:AgentDeskData;onChange:()=>void}) {
   const [selection,setSelection]=useState(route),[navigation,setNavigation]=useState<'interventions'|'timeline'>('interventions');
   const [source,setSource]=useState('all'),[query,setQuery]=useState('');
@@ -45,6 +46,6 @@ export function AgentDesk({data,onChange}:{data:AgentDeskData;onChange:()=>void}
       {navigation==='timeline' && <div className="timeline-tools"><select aria-label="Activity source" value={source} onChange={e=>setSource(e.target.value)}><option value="all">All activity</option><option value="framework">Framework</option><option value="human">Human</option><option value="external_agent">Parent agent</option></select></div>}
       <div className="review-queue" aria-label={navigation==='interventions'?'Intervention queue':'Project timeline'}>{[...groups].map(([pid,entries])=><section className="queue-project" key={pid}><header className="queue-heading"><Icon name="folder"/><span>{data.projects.find(p=>p.id===pid)?.name||pid}</span><small>{entries.length}</small></header>{entries.map(row=><div className="queue-row" key={row.id}><button className="queue-item" aria-label={`${row.title} ${row.revision||''}`} aria-current={row.revision===inspected?'true':undefined} onClick={()=>open(row.run,row.revision)}><span className="queue-thumb"><Icon name="film"/></span><span><strong>{row.title}</strong><small>{row.detail}</small>{row.at && <time dateTime={row.at}>{stamp(row.at)} · {words(row.source)}</time>}</span><span className="queue-revision">{row.revision}</span></button></div>)}</section>)}{!filtered.length&&<p className="queue-empty">{navigation==='interventions'?'No interventions':'No activity'}</p>}</div>
       <div className="sidebar-footer"><a href="#/export">Export training data</a></div>
-    </aside><main className="film-desk" data-film-view="agent-run"><Err e={error}/>{run && bundle && bundle.revision.id===inspected && bundle.revision.run_id===run.id?<AgentWorkspace key={bundle.revision.id} bundle={bundle} run={run} onChange={onChange} onRevision={rid=>open(run,rid)}/>:<p>{run?(run.current_revision_id?'Loading animation…':'Awaiting the first agent submission.'):'Select a run from the timeline.'}</p>}</main></div>
+    </aside><main className={selection.export?"operations-desk":"film-desk"} data-film-view="agent-run"><Err e={error}/>{selection.export?<AgentExport data={data}/>:run && bundle && bundle.revision.id===inspected && bundle.revision.run_id===run.id?<AgentWorkspace key={bundle.revision.id} bundle={bundle} run={run} onChange={onChange} onRevision={rid=>open(run,rid)}/>:<p>{run?(run.current_revision_id?'Loading animation…':'Awaiting the first agent submission.'):'Select a run from the timeline.'}</p>}</main></div>
   </div></div>;
 }

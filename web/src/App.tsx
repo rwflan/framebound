@@ -92,7 +92,7 @@ export default function App() {
   useEffect(()=>{const changed=()=>setHash(location.hash);window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[]);
   if(error)return <Err e={error}/>;
   if(!data)return <p>Loading workspace…</p>;
-  const legacy = /^#\/(packet|compare|issues|references|status|export|corrections|reviewed-guides)/.test(hash);
+  const legacy = /^#\/(packet|compare|issues|references|status|corrections|reviewed-guides)/.test(hash);
   if(data.runs.length && !legacy)return <AgentDesk data={data} onChange={refresh}/>;
   return <LegacyApp/>;
 }
