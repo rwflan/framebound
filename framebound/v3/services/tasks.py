@@ -84,7 +84,7 @@ def _negotiate(spec):
         out.append(NegotiatedRequirement(
             id=rid, check=check, required=required,
             applicability='supported' if supported else 'unsupported',
-            method={'media': 'declared-regions-v1:media', 'timing': 'declared-regions-v1:timing'}.get(check, 'declared-regions-v1' if check in families else 'none'),
+            method={'media': 'declared-regions-v2:media', 'timing': 'declared-regions-v2:timing'}.get(check, 'declared-regions-v2' if check in families else 'none'),
             limitation=('Establishes structural validity only; animation quality is not verified.'
                         if check in {'media', 'timing'} else 'Only task-authored regions, colors and event bounds are measured; arbitrary anatomy and prose action correctness are not established.' if supported else 'No usable task-authored measurement is available for this requirement.'),
             ways_forward=[] if supported else ['Obtain independently reviewed annotations and a validated evaluator.',

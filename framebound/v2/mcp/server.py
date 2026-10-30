@@ -8,6 +8,16 @@ from mcp.server.mcpserver import MCPServer
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
+    @server.tool(name='agent_export_preview', description='Preview manual v3 training export label sources, counts and exclusions; publishes nothing')
+    def agent_export_preview(selection: dict) -> dict:
+        from ...v3.services import exports
+        return exports.plan(project_dir,selection)
+
+    @server.tool(name='agent_export_build', description='Build a manually requested validated portable training snapshot; never infer human preferences')
+    def agent_export_build(selection: dict) -> dict:
+        from ...v3.services import exports
+        return exports.build(project_dir,selection)
+
     @server.tool(name='agent_satisfaction_record', description='Record parent-agent creative satisfaction on an exact revision; never human approval or resolution')
     def agent_satisfaction_record(run_id: str, revision_id: str, evaluation_id: str, note: str = '') -> dict:
         from ...v3.services import interventions

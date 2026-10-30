@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import Field
 
 from ...v3.domain import TaskSpec, TaskRecord
+from ...v3.services.exports import ExportSelection
 from ...v3.services.interventions import MarkRequest, ResolveRequest, DecisionRequest
 from .. import domain as D
 from .. import storage as S
@@ -114,6 +115,22 @@ def create_app(project_dir: str) -> FastAPI:
     app = FastAPI(title="Framebound v2 review API", version="2.0.0a1")
     app.state.project_dir = project_dir
 
+
+    @app.get('/v3/reader-capabilities')
+    def reader_capabilities():
+        return {'schema_versions':['2.0','3.0'],'dataset_versions':['2.3','3.0'],
+                'label_views':['human_accepted','automatically_verified','research','withheld'],
+                'automatic_labels_are_human_acceptance':False}
+
+    @app.post('/v3/exports/preview')
+    def agent_export_preview(body: ExportSelection):
+        from ...v3.services import exports
+        return exports.plan(project_dir,body.model_dump())
+
+    @app.post('/v3/exports')
+    def agent_export_build(body: ExportSelection):
+        from ...v3.services import exports
+        return exports.build(project_dir,body.model_dump())
 
     @app.get('/v3/desk')
     def agent_desk():

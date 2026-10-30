@@ -23,6 +23,9 @@ def load_preferences(snapshot_dir: str | Path) -> list[dict]:
     must fail loudly rather than silently drop pairs.
     """
     snap = Path(snapshot_dir)
+    manifest=json.loads((snap/'manifest.json').read_text())
+    if manifest.get('dataset_version') != '2.3':
+        raise ValueError('This reviewed-guide preference reader does not support the snapshot label semantics.')
     rows = []
     for line in (snap / "preferences.jsonl").read_text().splitlines():
         if not line.strip():
