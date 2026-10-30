@@ -125,7 +125,11 @@ class MigrationDryRun(unittest.TestCase):
     def test_reports_without_mutating(self):
         import subprocess
         before = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
-        rep = dry_run("/tmp/fb-wp0-baseline")
+        from framebound.demo import build_demo
+        with tempfile.TemporaryDirectory(prefix="framebound-migration-fixture-") as directory:
+            baseline = Path(directory) / "baseline"
+            build_demo(baseline)
+            rep = dry_run(baseline)
         self.assertFalse(rep["mutated"])
         self.assertTrue(len(rep["importable_media"]) >= 8)
         self.assertEqual(rep["missing_references"], [])

@@ -117,6 +117,8 @@ def create(project_dir: str, payload: dict) -> dict:
             S.get(con, 'projects', spec.project_id)
             for binding in spec.inputs:
                 asset, _ = S.get(con, 'assets', binding.asset_id)
+                if binding.byte_sha256 and binding.byte_sha256 != asset['byte_sha256']:
+                    raise InvalidInput('input hash differs from immutable binding')
                 blob = S.blob_path(project_dir, asset['byte_sha256'])
                 if not blob.is_file() or S.sha256_bytes(blob.read_bytes()) != asset['byte_sha256']:
                     raise InvalidInput(f'input asset {binding.asset_id} is unavailable or corrupt')
@@ -187,6 +189,8 @@ def compile_inputs(project_dir: str, task_id: str) -> dict:
     try:
         for binding in record['spec']['inputs']:
             asset, _ = S.get(con, 'assets', binding['asset_id'])
+            if binding.get('byte_sha256') and binding['byte_sha256'] != asset['byte_sha256']:
+                raise InvalidInput('input hash differs from immutable binding')
             blob = S.blob_path(project_dir, asset['byte_sha256'])
             if not blob.is_file() or S.sha256_bytes(blob.read_bytes()) != asset['byte_sha256']:
                 raise InvalidInput(f"input asset {binding['asset_id']} is unavailable or corrupt")
