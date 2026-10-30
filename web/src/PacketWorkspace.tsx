@@ -20,7 +20,7 @@ import {
 } from "./review-model";
 import type { Bundle } from "./review-model";
 import { Err, Icon, nav, useLoad, usePreload, words } from "./shared";
-import { tickOfSlot, totalTicks, toNative } from "./playback";
+import { slotAtTick, tickOfSlot, totalTicks, toNative } from "./playback";
 import { usePresentationClock } from "./useClock";
 
 type Tab = "film" | "evidence" | "correction" | "decision" | "tasks";
@@ -50,6 +50,9 @@ export function PacketWorkspace({
     width = canvas.width || 64,
     height = canvas.height || 64;
   const initialSlot = useRef(attentionSlot(b, issues));
+  const [inspectionSlot, setInspectionSlot] = useState(initialSlot.current);
+  const [viewMode, setViewMode] = useState<"frames" | "playback">("frames");
+  const wasPlaying = useRef(false);
   const clock = usePresentationClock({
     holds,
     tps: timing.ticks_per_second || 60,
@@ -115,20 +118,44 @@ export function PacketWorkspace({
     return asset ? api.assetUrl(asset) : "";
   });
   const urls = b.frames.map((f) => f.asset_url);
-  const media = usePreload(urls);
-  const current = b.frames[clock.slot] || b.frames[0];
+  const baselineReady =
+    comparison.data?.same_contract && comparison.data.timing_equal;
+  const rowFrames =
+    compare === "baseline" && baselineReady
+      ? comparison.data!.base.frames.map((f) => f.asset_url)
+      : referenceUrls;
+  const playbackUrls = [...urls, ...rowFrames.filter(Boolean)];
+  const media = usePreload(playbackUrls);
+  const candidateReady = urls.every((url) => media.imgs.has(url));
+  const playbackReady =
+    candidateReady &&
+    playbackUrls.every((url) => media.imgs.has(url) || media.errors.has(url));
+  const current = b.frames[inspectionSlot] || b.frames[0];
+  const playingFrame = b.frames[clock.slot] || b.frames[0];
+  const stageFrame = tab === "film" ? playingFrame : current;
+  const displaySlot = viewMode === "playback" ? clock.slot : inspectionSlot;
   const selectedFirst = Math.min(...selected),
     selectedLast = Math.max(...selected);
   const overlapping = frameIssues(
     issues,
     b,
-    tickOfSlot(holds, clock.slot),
-    tickOfSlot(holds, clock.slot) + holds[clock.slot] - 1,
+    tickOfSlot(holds, inspectionSlot),
+    tickOfSlot(holds, inspectionSlot) + holds[inspectionSlot] - 1,
   );
   const activeIssue = issues.find((i) => i.event_id === issueId);
-  const open = (next: Tab, index = clock.slot, exact = false) => {
+  const open = (next: Tab, index = inspectionSlot, exact = false) => {
+    wasPlaying.current = false;
     clock.setPlaying(false);
     clock.selectSlot(index);
+    setInspectionSlot(index);
+    if (!selected.includes(index)) {
+      setSelected([index]);
+      anchor.current = index;
+    }
+    if (next !== "evidence") {
+      setViewMode("frames");
+      controls.film.current?.reveal(index, true);
+    }
     setTab(next);
     setError(null);
     setMessage("");
@@ -144,8 +171,10 @@ export function PacketWorkspace({
     }
   };
   const focus = (i: number, shift = false) => {
+    wasPlaying.current = false;
     clock.setPlaying(false);
     clock.selectSlot(i);
+    setInspectionSlot(i);
     if (!shift) anchor.current = i;
     setSelected(
       shift
@@ -157,9 +186,53 @@ export function PacketWorkspace({
     );
     controls.film.current?.reveal(i, true);
   };
+  const adoptSlot = (slot: number) => {
+    setInspectionSlot(slot);
+    setSelected([slot]);
+    anchor.current = slot;
+  };
+  const inspectTick = (tick: number) => {
+    const exact = Math.max(0, Math.min(totalTicks(holds) - 1, tick));
+    wasPlaying.current = false;
+    clock.setPlaying(false);
+    clock.selectTick(exact);
+    adoptSlot(slotAtTick(holds, exact, false));
+  };
+  const pausePlayback = () => {
+    wasPlaying.current = false;
+    clock.setPlaying(false);
+    adoptSlot(clock.slot);
+  };
+  const togglePlayback = (surface: "main" | "modal" = "main") => {
+    if (clock.playing) {
+      pausePlayback();
+      return;
+    }
+    if (!(surface === "main" ? playbackReady : candidateReady)) return;
+    if (surface === "main") setViewMode("playback");
+    if (
+      !Boolean((b.contract.action as { loop?: boolean }).loop) &&
+      clock.tick >= totalTicks(holds) - 1
+    )
+      clock.selectTick(0);
+    clock.setPlaying(true);
+  };
+  const returnToFilm = () => {
+    pausePlayback();
+    setViewMode("frames");
+    controls.film.current?.reveal(clock.slot, true);
+  };
   useEffect(() => {
-    if (clock.playing) controls.film.current?.reveal(clock.slot);
-  }, [clock.slot, clock.playing]);
+    // Inspection follows deliberate pauses/one-shot completion, never a running playhead.
+    if (
+      wasPlaying.current &&
+      !clock.playing &&
+      (tab === "film" ||
+        (viewMode === "playback" && (!tab || tab === "evidence")))
+    )
+      adoptSlot(clock.slot);
+    wasPlaying.current = clock.playing;
+  }, [clock.playing]);
   useEffect(() => {
     const keyboard = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -170,7 +243,7 @@ export function PacketWorkspace({
         return;
       if (e.code === "Space") {
         e.preventDefault();
-        clock.setPlaying(!clock.playing);
+        togglePlayback();
       }
       if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
         e.preventDefault();
@@ -183,7 +256,7 @@ export function PacketWorkspace({
                   0,
                   Math.min(
                     holds.length - 1,
-                    clock.slot + (e.key === "ArrowRight" ? 1 : -1),
+                    inspectionSlot + (e.key === "ArrowRight" ? 1 : -1),
                   ),
                 ),
           e.shiftKey,
@@ -211,7 +284,7 @@ export function PacketWorkspace({
     const ctx = stage.current?.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, width, height);
-    const image = media.imgs.get(current?.asset_url);
+    const image = media.imgs.get(stageFrame?.asset_url);
     if (image) {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(image, 0, 0, width, height);
@@ -226,7 +299,7 @@ export function PacketWorkspace({
         roi[3] - roi[1],
       );
     }
-  }, [current, media.imgs, roi, tab, width, height]);
+  }, [stageFrame, media.imgs, roi, tab, width, height]);
   const region = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (tab !== "correction" || (e.button !== 0 && e.type === "pointerdown"))
       return;
@@ -239,6 +312,7 @@ export function PacketWorkspace({
         mirrored: false,
       });
     if (e.type === "pointerdown") {
+      wasPlaying.current = false;
       clock.setPlaying(false);
       e.currentTarget.setPointerCapture(e.pointerId);
       drag.current = { x: p.x, y: p.y, pointer: e.pointerId };
@@ -321,12 +395,6 @@ export function PacketWorkspace({
         }),
       `${words(action)} recorded for ${revision}.`,
     );
-  const baselineReady =
-    comparison.data?.same_contract && comparison.data.timing_equal;
-  const rowFrames =
-    compare === "baseline" && baselineReady
-      ? comparison.data!.base.frames.map((f) => f.asset_url)
-      : referenceUrls;
   const checks = [...b.evaluation.results].sort(
     (a, z) =>
       Number(["pass", "not_applicable"].includes(a.outcome)) -
@@ -340,7 +408,8 @@ export function PacketWorkspace({
           ["Style", contractRefs?.style],
           [
             "Phase",
-            phaseRefs.find((p) => p.slot === clock.slot)?.motion_reference_id,
+            phaseRefs.find((p) => p.slot === inspectionSlot)
+              ?.motion_reference_id,
           ],
           [
             "Editable",
@@ -383,7 +452,7 @@ export function PacketWorkspace({
         <Check
           key={i}
           check={c}
-          selected={scopeSlot(c) === clock.slot}
+          selected={scopeSlot(c) === inspectionSlot}
           onSelect={() => {
             const slot = scopeSlot(c);
             if (slot !== null) focus(slot);
@@ -463,7 +532,10 @@ export function PacketWorkspace({
             <select
               aria-label="Compare candidate with"
               value={compare}
-              onChange={(e) => setCompare(e.target.value as typeof compare)}
+              onChange={(e) => {
+                pausePlayback();
+                setCompare(e.target.value as typeof compare);
+              }}
             >
               <option value="reference">Phase reference</option>
               {base && (
@@ -481,33 +553,47 @@ export function PacketWorkspace({
                 Compare timing
               </button>
             )}
-            <div className="control-zoom" role="group" aria-label="Film zoom">
-              <button
-                aria-label="Zoom out"
-                disabled={controls.zoom <= 5}
-                onClick={() => controls.film.current?.zoom(-1)}
-              >
-                −
+            {viewMode === "playback" ? (
+              <button className="return-to-film" onClick={returnToFilm}>
+                <Icon name="film" />
+                Film strip
               </button>
-              <button
-                className="zoom-value"
-                aria-label={`Zoom ${controls.zoom}%. Reset to 100%.`}
-                onClick={() => controls.film.current?.reset()}
-              >
-                {controls.zoom}%
-              </button>
-              <button
-                aria-label="Zoom in"
-                disabled={controls.zoom >= 200}
-                onClick={() => controls.film.current?.zoom(1)}
-              >
-                +
-              </button>
-              <button onClick={() => controls.film.current?.fit()}>Fit</button>
-            </div>
+            ) : (
+              <div className="control-zoom" role="group" aria-label="Film zoom">
+                <button
+                  aria-label="Zoom out"
+                  disabled={controls.zoom <= 5}
+                  onClick={() => controls.film.current?.zoom(-1)}
+                >
+                  −
+                </button>
+                <button
+                  className="zoom-value"
+                  aria-label={`Zoom ${controls.zoom}%. Reset to 100%.`}
+                  onClick={() => controls.film.current?.reset()}
+                >
+                  {controls.zoom}%
+                </button>
+                <button
+                  aria-label="Zoom in"
+                  disabled={controls.zoom >= 200}
+                  onClick={() => controls.film.current?.zoom(1)}
+                >
+                  +
+                </button>
+                <button onClick={() => controls.film.current?.fit()}>
+                  Fit
+                </button>
+              </div>
+            )}
           </div>
           <Err e={comparison.err} />
-          <div className="film-stage">
+          <div
+            className={
+              "film-stage" + (viewMode === "playback" ? " playback-mode" : "")
+            }
+            data-view-mode={viewMode}
+          >
             <Film
               ref={controls.film}
               filmKey={"packet-" + id}
@@ -520,7 +606,7 @@ export function PacketWorkspace({
                 "Candidate",
                 "Checks",
               ]}
-              selected={clock.slot}
+              selected={inspectionSlot}
               onStep={focus}
               onZoom={controls.setZoom}
               onPosition={controls.setPosition}
@@ -554,7 +640,7 @@ export function PacketWorkspace({
                         <button
                           className={
                             "reel-frame " +
-                            (clock.slot === i ? "is-current" : "")
+                            (inspectionSlot === i ? "is-current" : "")
                           }
                           aria-label={`${lane ? "Candidate" : "Reference"}, frame ${i + 1}`}
                           aria-pressed={selected.includes(i)}
@@ -566,7 +652,7 @@ export function PacketWorkspace({
                               <img
                                 draggable={false}
                                 id={
-                                  lane && clock.slot === i
+                                  lane && inspectionSlot === i
                                     ? "frame-img"
                                     : undefined
                                 }
@@ -618,7 +704,7 @@ export function PacketWorkspace({
                       <div
                         className={
                           "measurement-cell" +
-                          (clock.slot === i ? " is-current" : "") +
+                          (inspectionSlot === i ? " is-current" : "") +
                           (attention ? " needs-attention" : "")
                         }
                         key={i}
@@ -698,48 +784,142 @@ export function PacketWorkspace({
                 </div>
               </div>
             </Film>
+            {viewMode === "playback" && (
+              <div
+                className={
+                  "playback-comparison" + (clock.playing ? " is-running" : "")
+                }
+                aria-label="Animation playback"
+                tabIndex={0}
+              >
+                <div className="playback-images">
+                  {[
+                    {
+                      label:
+                        compare === "baseline" && baselineReady
+                          ? "Previous"
+                          : "Reference",
+                      url: rowFrames[clock.slot],
+                      candidate: false,
+                    },
+                    {
+                      label: "Candidate",
+                      url: playingFrame.asset_url,
+                      candidate: true,
+                    },
+                  ].map((lane) => (
+                    <section
+                      className={
+                        "playback-lane" + (lane.candidate ? " candidate" : "")
+                      }
+                      key={lane.label}
+                    >
+                      <header>{lane.label}</header>
+                      <div className="playback-image">
+                        {lane.url && !media.errors.has(lane.url) ? (
+                          <img
+                            draggable={false}
+                            src={lane.url}
+                            alt={`${lane.label} animation`}
+                          />
+                        ) : (
+                          <span className="missing-reference">
+                            {lane.label} unavailable
+                          </span>
+                        )}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+                <input
+                  className="playback-scrub"
+                  aria-label="Playback tick"
+                  type="range"
+                  min="0"
+                  max={totalTicks(holds) - 1}
+                  value={clock.tick}
+                  onChange={(event) => inspectTick(Number(event.target.value))}
+                />
+              </div>
+            )}
           </div>
           <footer className="review-controls" aria-label="Film controls">
             <div className="control-transport">
               <button
                 aria-label="Previous frame"
-                disabled={clock.slot === 0}
-                onClick={() => focus(clock.slot - 1)}
+                disabled={clock.playing || displaySlot === 0}
+                onClick={() => focus(displaySlot - 1)}
               >
                 <Icon name="left" />
               </button>
               <button
                 className="transport-play"
+                disabled={!clock.playing && !playbackReady}
+                title={
+                  !playbackReady
+                    ? media.errors.size
+                      ? "Frame media unavailable"
+                      : "Loading frame media"
+                    : undefined
+                }
                 aria-label={clock.playing ? "Pause" : "Play"}
-                onClick={() => clock.setPlaying(!clock.playing)}
+                onClick={() => togglePlayback()}
               >
                 <Icon name={clock.playing ? "pause" : "play"} />
               </button>
               <button
                 aria-label="Next frame"
-                disabled={clock.slot === holds.length - 1}
-                onClick={() => focus(clock.slot + 1)}
+                disabled={clock.playing || displaySlot === holds.length - 1}
+                onClick={() => focus(displaySlot + 1)}
               >
                 <Icon name="right" />
               </button>
             </div>
             <output className="control-counter">
-              {String(clock.slot + 1).padStart(2, "0")} /{" "}
-              {String(holds.length).padStart(2, "0")}
+              {viewMode === "playback" && clock.playing
+                ? `${String(holds.length).padStart(2, "0")} frames`
+                : `${String(displaySlot + 1).padStart(2, "0")} / ${String(holds.length).padStart(2, "0")}`}
             </output>
-            <div className="control-caption">
-              <strong>
-                {selected.length > 1
-                  ? `${selected.length} frames`
-                  : words(current.phase)}
-              </strong>
-              <span>
-                {tickOfSlot(holds, selectedFirst)}–
-                {tickOfSlot(holds, selectedLast) + holds[selectedLast] - 1}{" "}
-                ticks
-              </span>
-            </div>
-            <span className="transport-tick">tick {clock.tick}</span>
+            {viewMode === "playback" ? (
+              <div className="control-caption">
+                <span>
+                  {(
+                    totalTicks(holds) / (timing.ticks_per_second || 60)
+                  ).toFixed(2)}
+                  s
+                  {Boolean((b.contract.action as { loop?: boolean }).loop)
+                    ? " · Loop"
+                    : ""}
+                </span>
+              </div>
+            ) : (
+              <div className="control-caption">
+                <strong>
+                  {selected.length > 1
+                    ? `${selected.length} frames`
+                    : words(current.phase)}
+                </strong>
+                <span>
+                  {tickOfSlot(holds, selectedFirst)}–
+                  {tickOfSlot(holds, selectedLast) + holds[selectedLast] - 1}{" "}
+                  ticks
+                </span>
+              </div>
+            )}
+            <span
+              className="transport-tick"
+              style={{
+                visibility:
+                  viewMode === "playback" && clock.playing
+                    ? "hidden"
+                    : undefined,
+              }}
+            >
+              tick{" "}
+              {viewMode === "playback"
+                ? clock.tick
+                : tickOfSlot(holds, inspectionSlot)}
+            </span>
             <select
               aria-label="Playback speed"
               value={clock.speed}
@@ -763,7 +943,7 @@ export function PacketWorkspace({
             <strong>
               {tab === "evidence"
                 ? "Evaluation checks"
-                : `Frame ${String(clock.slot + 1).padStart(2, "0")}`}
+                : `Frame ${String(inspectionSlot + 1).padStart(2, "0")}`}
             </strong>
             <div className="title-grip" aria-hidden="true" />
             {tab === "evidence" ? (
@@ -841,7 +1021,7 @@ export function PacketWorkspace({
                   {b.evaluation.results
                     .filter(
                       (c) =>
-                        scopeSlot(c) === clock.slot &&
+                        scopeSlot(c) === inspectionSlot &&
                         c.constraint_id !== "registration",
                     )
                     .map((check, i) => (
@@ -893,9 +1073,10 @@ export function PacketWorkspace({
                     .map(([label, asset]) => (
                       <button
                         key={label}
-                        onClick={() =>
-                          setReferenceAsset({ label: label!, id: asset! })
-                        }
+                        onClick={() => {
+                          pausePlayback();
+                          setReferenceAsset({ label: label!, id: asset! });
+                        }}
                       >
                         <img
                           src={api.assetUrl(asset!)}
@@ -940,20 +1121,26 @@ export function PacketWorkspace({
           onKeyDown={(e) => {
             const target = e.target as HTMLElement;
             if (target.matches("input,textarea,select")) return;
+            if (tab !== "film") return;
             if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
               e.preventDefault();
+              wasPlaying.current = false;
               clock.setPlaying(false);
-              if (e.key === "Home") clock.selectTick(0);
-              else if (e.key === "End") clock.selectTick(totalTicks(holds) - 1);
-              else clock.stepTick(e.key === "ArrowRight" ? 1 : -1);
+              if (e.key === "Home") inspectTick(0);
+              else if (e.key === "End") inspectTick(totalTicks(holds) - 1);
+              else inspectTick(clock.tick + (e.key === "ArrowRight" ? 1 : -1));
             }
             if (e.code === "Space" && target.tagName !== "BUTTON") {
               e.preventDefault();
-              clock.setPlaying(!clock.playing);
+              if (tab === "film") togglePlayback("modal");
             }
           }}
           title={`${actionName(b)} / ${revision}`}
           onClose={() => {
+            if (tab === "film") {
+              pausePlayback();
+              controls.film.current?.reveal(clock.slot, true);
+            } else clock.setPlaying(false);
             setTab(null);
             drag.current = null;
           }}
@@ -966,9 +1153,7 @@ export function PacketWorkspace({
                 key={t}
                 aria-current={tab === t ? "page" : undefined}
                 onClick={() => {
-                  if (t === "correction" && tab !== "correction")
-                    open("correction");
-                  else setTab(t);
+                  open(t, tab === "film" ? clock.slot : inspectionSlot);
                   setError(null);
                 }}
               >
@@ -1000,60 +1185,62 @@ export function PacketWorkspace({
                       drag.current = null;
                     }}
                   />
-                  <div className="playback-controls">
-                    <button
-                      aria-label={clock.playing ? "Pause" : "Play"}
-                      onClick={() => clock.setPlaying(!clock.playing)}
-                    >
-                      <Icon name={clock.playing ? "pause" : "play"} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        clock.setPlaying(false);
-                        clock.stepTick(-1);
-                      }}
-                    >
-                      −1 tick
-                    </button>
-                    <button
-                      onClick={() => {
-                        clock.setPlaying(false);
-                        clock.stepTick(1);
-                      }}
-                    >
-                      +1 tick
-                    </button>
-                    <label>
-                      Speed
+                  {tab === "film" && (
+                    <>
+                      <div className="playback-controls">
+                        <button
+                          aria-label={clock.playing ? "Pause" : "Play"}
+                          onClick={() => togglePlayback("modal")}
+                          disabled={!clock.playing && !candidateReady}
+                        >
+                          <Icon name={clock.playing ? "pause" : "play"} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            inspectTick(clock.tick - 1);
+                          }}
+                        >
+                          −1 tick
+                        </button>
+                        <button
+                          onClick={() => {
+                            inspectTick(clock.tick + 1);
+                          }}
+                        >
+                          +1 tick
+                        </button>
+                        <label>
+                          Speed
+                          <input
+                            type="number"
+                            min=".1"
+                            max="4"
+                            step=".1"
+                            value={clock.speed}
+                            onChange={(e) =>
+                              clock.setSpeed(Number(e.target.value) || 1)
+                            }
+                          />
+                          ×
+                        </label>
+                      </div>
                       <input
-                        type="number"
-                        min=".1"
-                        max="4"
-                        step=".1"
-                        value={clock.speed}
-                        onChange={(e) =>
-                          clock.setSpeed(Number(e.target.value) || 1)
-                        }
+                        aria-label="Authored tick"
+                        type="range"
+                        min="0"
+                        max={totalTicks(holds) - 1}
+                        value={clock.tick}
+                        onChange={(e) => {
+                          inspectTick(Number(e.target.value));
+                        }}
                       />
-                      ×
-                    </label>
-                  </div>
-                  <input
-                    aria-label="Authored tick"
-                    type="range"
-                    min="0"
-                    max={totalTicks(holds) - 1}
-                    value={clock.tick}
-                    onChange={(e) => {
-                      clock.setPlaying(false);
-                      clock.selectTick(Number(e.target.value));
-                    }}
-                  />
-                  <p id="tick-readout">
-                    tick {clock.tick} / {totalTicks(holds)} · frame{" "}
-                    {clock.slot + 1} · {words(current.phase)} · hold{" "}
-                    {current.hold_ticks}
-                  </p>
+                      <p id="tick-readout">
+                        tick {clock.tick} / {totalTicks(holds)} · frame{" "}
+                        {clock.slot + 1} · {words(stageFrame.phase)} · hold{" "}
+                        {stageFrame.hold_ticks}
+                      </p>
+                    </>
+                  )}
                   {media.errors.has(current.asset_url) && (
                     <p className="error" role="alert">
                       {media.errors.get(current.asset_url)}
