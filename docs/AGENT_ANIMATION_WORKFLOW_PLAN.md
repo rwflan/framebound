@@ -20,7 +20,9 @@ protected source keys, authored-time correspondence, mapped playback and portabl
 source lineage. A provisional tracked-scene milestone now measures declared camera-compensated
 landmarks, visibility and interaction events, with an offline benchmark runner
 reporting errors/localization and actual label provenance. Independently reviewed
-generated-art validation and the final requirement-by-requirement audit remain open.
+generated-art validation and the final quality acceptance remains open. The [implementation audit](AGENT_WORKFLOW_IMPLEMENTATION_AUDIT.md)
+records the full requirement/evidence mapping, broad verification and the remaining
+reviewed-generated-art evidence gap.
 
 ## Goal
 

@@ -40,7 +40,18 @@ class DecisionRequest(D.Strict):
     revision_id: str = Field(min_length=1, max_length=90)
     evaluation_id: str = Field(min_length=1, max_length=128)
     action: str = Field(pattern='^(approve|reject|needs_changes)$')
+    comparison_revision_id: str | None = None
+    comparison_evaluation_id: str | None = None
     note: str = Field(default='', max_length=1000)
+
+
+    @model_validator(mode='after')
+    def valid_preference(self):
+        if bool(self.comparison_revision_id)!=bool(self.comparison_evaluation_id):
+            raise ValueError('explicit comparison requires both revision and evaluation identities')
+        if self.comparison_revision_id and (self.action!='approve' or self.comparison_revision_id==self.revision_id):
+            raise ValueError('preference must explicitly approve one revision over a different compared revision')
+        return self
 
 
 def open_in(con, run_id):
@@ -53,6 +64,8 @@ def _bound(con, run, revision_id, evaluation_id):
     if revision_id != run['current_revision_id']:
         raise S.StaleRevisionError('inspected revision is historical; fetch current state before saving this action')
     revision = loop.get_in(con, 'agent_clip_revisions', revision_id)
+    if revision['task_id']!=run['task_id']:
+        raise S.StaleRevisionError('run task changed; submit a new-task candidate before saving a markup or decision')
     evaluation = loop.get_in(con, 'agent_evaluations', evaluation_id)
     if revision['run_id'] != run['id'] or evaluation['revision_id'] != revision_id:
         raise S.StaleRevisionError('evaluation and revision bindings differ')
@@ -89,6 +102,9 @@ def augment_in(con, bundle, run=None):
             edit_scope_authorized=mark['authorize_edit_scope'],
             permission_baseline_revision_id=run.get('edit_baseline_revision_id', mark['correction']['baseline_revision_id']),
             resolution_owner=mark['owner'], status=mark['correction']['status']))
+    from ..feedback import groups
+    bundle['correction_groups']=groups(bundle)
+    bundle['bundle_version']=2
     return bundle
 
 
@@ -96,11 +112,14 @@ def save_feedback_in(con, run, bundle_id):
     rid = run['current_revision_id']
     revision = loop.get_in(con, 'agent_clip_revisions', rid)
     evaluation = loop.get_in(con, 'agent_evaluations', f'evaluation:{rid}')
-    task = tasks._get(con, run['task_id'])
+    task = tasks._get(con, revision['task_id'])
     bundle = loop._feedback(run, task, revision, evaluation, [])
+    if task.id!=run['task_id']:
+        bundle['next_task_id']=run['task_id'];bundle['next_spec_sha256']=run['spec_sha256']
     bundle['id'] = bundle_id
     bundle['supersedes_feedback_id'] = run.get('feedback_id', f'feedback:{rid}')
-    bundle['continuation']['arguments']['feedback_id'] = bundle_id
+    if bundle['continuation']['operation']=='agent_run_submit':
+        bundle['continuation']['arguments']['feedback_id'] = bundle_id
     augment_in(con, bundle, run)
     loop.insert(con, 'agent_feedback', bundle)
     run['feedback_id'] = bundle_id
@@ -215,29 +234,43 @@ def preservation_in(con, project, run, images, spec):
     return results
 
 
-def render(bundle):
+def render(bundle, *, portable=False):
     """Portable text contains only saved, user-visible instruction and evidence fields."""
     lines = [f"Continue animation run {bundle['run_id']} in project {bundle['project_id']}.",
              f"Task {bundle['task_id']} targets revision {bundle['baseline_revision_id']}, evaluation {bundle['evaluation_id']}.",
              f"Saved feedback: {bundle['id']}; specification digest: {bundle['spec_sha256']}.",
-             'First fetch agent_run_get and task_get. Verify the current revision and saved feedback ID before editing.', '']
+             ('Open manifest.json and resolve asset IDs through its packaged assets map. Verify the saved hashes before editing.' if portable else 'First fetch agent_run_get and task_get. Verify the current revision and saved feedback ID before editing.'), '']
+    if bundle.get('next_task_id'):
+        lines.append(f"Task policy explicitly revised: {'read the packaged task' if portable else 'fetch'} {bundle['next_task_id']} with digest {bundle['next_spec_sha256']} before the next submission. Old evaluation evidence remains bound to the old task.")
     lines.append(f"Disposition: {bundle['disposition']}. {bundle.get('reason') or ''}")
+    if bundle['disposition']=='blocked':
+        lines.append('This run is stopped. Fetch agent_run_get for the recorded blocker and report it; do not submit or reset limits under a new run name.')
+        return '\n'.join(lines)+'\n'
     if bundle['disposition']=='complete' and not bundle['targets']:
         lines.append('The named policy is satisfied; no further edit is requested. Creative status: '+bundle['creative_status']+'.')
         return '\n'.join(lines)+'\n'
     for target in sorted(bundle['targets'], key=lambda t: (t['priority'], min(t['slots']), t['id'])):
         lines.append(f"Target {target['id']}: frames {', '.join(map(str,target['display_numbers']))}, ticks [{target['tick_range'][0]}, {target['tick_range'][1]}).")
         lines.append('Requested correction: '+target['desired_outcome'])
+        lines.append('Observed: '+json.dumps(target.get('observed'))+'; expected: '+json.dumps(target.get('expected'))+'.')
         if target.get('roi'):
             lines.append('Native pixel region: '+json.dumps(target['roi'],sort_keys=True))
         if target.get('edit_scope_authorized'):
             lines.append('Edit support is explicitly authorized only for the saved range/region; preserve pixels outside it.')
         for asset in target['evidence_assets']:
-            lines.append(f"Evidence asset {asset['id']}: sha256 {asset['byte_sha256']}; {asset.get('blob_path', asset.get('http_path', 'resolve with project access'))}")
+            lines.append(f"Evidence asset {asset['id']}: sha256 {asset['byte_sha256']}; {('assets/'+asset['byte_sha256']+'.png') if portable else asset.get('blob_path', asset.get('http_path', 'resolve with project access'))}")
         lines.append('')
     lines.append('Preserve: '+('; '.join(bundle['preserve']) or 'the task requirements and unchanged assets')+'.')
     lines.append('Preserve exact authored timing: '+json.dumps(bundle['timing'],sort_keys=True)+'.')
     lines.append(f"Remaining submission budget: {bundle['remaining_submissions']}. Correction text does not override execution permissions or limits.")
+    if portable:
+        lines.append('Return response.json beside the corrected native PNG files. Keep asset_id entries for unchanged frames; replace changed entries with file paths relative to response.json.')
+        lines.append('Response format: '+json.dumps(dict(revision_id='<new immutable ID>',frames=[dict(asset_id='<unchanged asset ID>'),dict(file='corrected.png',rights='unknown',source_kind='generated')],generation_metadata=None),sort_keys=True))
+        lines.append('The complete ordered frames list must match the task holds. Record actual rights and available generation metadata; do not invent either.')
+        lines.append('The project owner imports the returned directory with: framebound agent-handoff-import --project <project-directory> --manifest <unpacked-manifest.json> --response <response.json>.')
+        lines.append('Import rechecks the current saved bindings and edit limits, then evaluates the full clip. Pasted text and this manifest are not authorization tokens. If scope is insufficient, return the concrete blocker.')
+        return '\n'.join(lines)+'\n'
+    lines.append('Without MCP, fetch state with framebound agent-run-get --project <project-directory> --run-id '+bundle['run_id']+' and framebound task-get --project <project-directory> --task-id '+bundle.get('next_task_id',bundle['task_id'])+'.')
     lines.append('Import changed assets with asset_import, reuse unchanged asset IDs, then call agent_run_submit with:')
     lines.append(json.dumps(bundle['continuation']['arguments'],sort_keys=True))
     lines.append('CLI equivalent: framebound agent-run-submit --project <project-directory> --submission <JSON-file-with-these-arguments>.')
@@ -358,7 +391,7 @@ def decision(project, actor, run_id, payload):
             existing = con.execute('SELECT data FROM agent_run_events WHERE id=?', (event_id,)).fetchone()
             if existing:
                 event = json.loads(existing['data'])
-                if event.get('request') != request.model_dump(mode='json') or event['actor_id'] != actor.id or event['run_id'] != run_id:
+                if DecisionRequest.model_validate(event.get('request')).model_dump(mode='json') != request.model_dump(mode='json') or event['actor_id'] != actor.id or event['run_id'] != run_id:
                     raise S.ConflictError('decision ID is already bound to another reviewer action')
                 return dict(event=event, feedback=loop.get_in(con,'agent_feedback',f'handoff:{event_id}'))
             _bound(con, run, request.revision_id, request.evaluation_id)
@@ -368,6 +401,19 @@ def decision(project, actor, run_id, payload):
                              request.evaluation_id, note=request.note, event_id=event_id)
             event['request'] = request.model_dump(mode='json')
             con.execute('UPDATE agent_run_events SET data=? WHERE id=?', (json.dumps(event), event_id))
+            if request.comparison_revision_id:
+                chosen=loop.get_in(con,'agent_clip_revisions',request.revision_id)
+                rejected=loop.get_in(con,'agent_clip_revisions',request.comparison_revision_id)
+                rejected_eval=loop.get_in(con,'agent_evaluations',request.comparison_evaluation_id)
+                if rejected['task_id']!=chosen['task_id'] or rejected['run_id']!=run_id or rejected_eval['revision_id']!=rejected['id']:
+                    raise InvalidInput('explicit preference needs distinct same-task revisions and their actual evaluations')
+                preference=dict(schema_version='3.0',id=f'preference:{request.id}',run_id=run_id,task_id=chosen['task_id'],
+                    chosen_revision_id=chosen['id'],chosen_evaluation_id=request.evaluation_id,
+                    rejected_revision_id=rejected['id'],rejected_evaluation_id=rejected_eval['id'],
+                    decision_event_id=event_id,source='human_comparison',actor_id=actor.id,note=request.note,created_at=D.utcnow())
+                loop.insert(con,'agent_preferences',preference)
+                _event_in(con,run,actor,'prefer_revision',chosen['id'],request.evaluation_id,
+                          note=f"Explicitly preferred over {rejected['id']}. {request.note}",event_id=f'preference-event:{request.id}')
             run['creative_status'] = {'approve':'human_approved','reject':'human_rejected','needs_changes':'human_needs_changes'}[request.action]
             run['human_decision_id'] = event_id
             if request.action != 'approve':

@@ -43,3 +43,15 @@ def test_history_keeps_exact_revision_and_manual_intervention_source(tmp_path):
     assert historical['revision']['id']=='bad'
     assert historical['frames'][1]['asset_id']=='bad-1'
     assert desk.revision(project,'fixed')['evaluation']['technical_status']=='pass'
+
+
+def test_cancelled_run_leaves_unresolved_work_in_history_without_actionable_queue(tmp_path):
+    project,_,good=setup(tmp_path)
+    bad=import_frames(tmp_path,'bad',{'kind':'flicker'});loop.submit(project,'run','bad',bad)
+    I.mark(project,Actor(type='reviewer',id='human'),'run',dict(id='open',revision_id='bad',evaluation_id='evaluation:bad',tick_range=[0,2],desired_outcome='A subjective concern'))
+    loop.cancel(project,'run','User stopped the run')
+    data=desk.snapshot(project)
+    assert data['runs'][0]['lifecycle']=='cancelled'
+    assert not data['runs'][0]['needs_intervention']
+    assert data['runs'][0]['interventions'][0]['correction']['status']=='open'
+    assert data['events'][-1]['event']=='cancelled'

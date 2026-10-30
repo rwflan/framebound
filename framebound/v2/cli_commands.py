@@ -6,6 +6,11 @@ import json
 
 def dispatch(args) -> dict:
     cmd = args.cmd
+    if cmd in {'agent-handoff-export','agent-handoff-import'}:
+        from pathlib import Path
+        from ..v3.services import portable_handoff as P
+        if cmd=='agent-handoff-import':return P.import_response(args.project,args.manifest,args.response)
+        return P.export_archive(args.project,args.feedback_id,args.out)
     if cmd=='animation-quality-benchmark':
         from ..v3.benchmark import run
         return run(args.manifest)
@@ -49,6 +54,8 @@ def dispatch(args) -> dict:
             return loop.eligibility(args.project, args.run_id)
         if cmd == 'agent-run-cancel':
             return loop.cancel(args.project, args.run_id, args.reason)
+        if cmd == 'agent-run-revise-task':
+            return loop.revise_task(args.project,args.run_id,args.task_id,int(args.expected_version))
         if cmd == 'agent-run-start':
             return loop.start(args.project, args.task_id, args.run_id)
         if cmd == 'agent-run-get':

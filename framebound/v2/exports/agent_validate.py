@@ -14,7 +14,7 @@ def validate(snap,manifest):
     issues=[]
     try:
         required={'agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1'}
-        if not required<=set(manifest.get('reader_capabilities',[])) or set(manifest.get('reader_capabilities',[]))-required-{'source-correspondence-v1','declared-color-camera-tracks-v1'}:issues.append('unsupported reader capabilities')
+        if not required<=set(manifest.get('reader_capabilities',[])) or set(manifest.get('reader_capabilities',[]))-required-{'source-correspondence-v1','declared-color-camera-tracks-v1','explicit-human-preferences-v1','feedback-groups-v2'}:issues.append('unsupported reader capabilities')
         listed=manifest['files']
         for rel,expected in listed.items():
             p=snap/rel
@@ -28,10 +28,10 @@ def validate(snap,manifest):
             any(complete.get(k)!=manifest.get(k) for k in ('snapshot','inputs_digest','dataset_version'))):
             issues.append('COMPLETE marker differs from immutable manifest')
         def load(rel):return [json.loads(line) for line in (snap/rel).read_text().splitlines() if line.strip()]
-        tables=('runs','revisions','tasks','evaluations','feedback','events','interventions','completions','frames','registrations','assets','provider_sources','source_records')
+        tables=('runs','revisions','tasks','evaluations','feedback','events','interventions','completions','frames','registrations','assets','provider_sources','source_records','preferences')
         graph={}
         for table in tables:
-            values=[] if table=='source_records' and not (snap/'closure/source_records.jsonl').is_file() else load(f'closure/{table}.jsonl')
+            values=[] if table in {'source_records','preferences'} and not (snap/f'closure/{table}.jsonl').is_file() else load(f'closure/{table}.jsonl')
             graph[table]={v['id']:v for v in values}
             if len(values)!=len(graph[table]):issues.append('duplicate closure identity '+table)
         asset_files=json.loads((snap/'closure/asset_files.json').read_text())
@@ -72,6 +72,8 @@ def validate(snap,manifest):
                 SC.validate(parsed.spec)
             parent=task['spec'].get('supersedes')
             if parent and parent not in graph['tasks']:issues.append('task predecessor missing '+tid)
+        for run in graph['runs'].values():
+            if run['task_id'] not in graph['tasks']:issues.append('current run task missing from closure')
         for rid,revision in graph['revisions'].items():
             task=graph['tasks'][revision['task_id']];spec=TaskRecord.model_validate(task).spec
             run=graph['runs'][revision['run_id']]
@@ -158,9 +160,13 @@ def validate(snap,manifest):
             if parent and (parent not in graph['revisions'] or revision['targeted_feedback_id'] not in graph['feedback']):issues.append('repair parent/feedback not portable '+rid)
             if parent and graph['feedback'][revision['targeted_feedback_id']]['baseline_revision_id']!=parent:issues.append('repair targets a different feedback baseline '+rid)
         for bundle in graph['feedback'].values():
+            if bundle.get('bundle_version',1)>=2:
+                from ...v3.feedback import groups
+                if json.loads(json.dumps(groups(bundle)))!=bundle.get('correction_groups'):issues.append('correction grouping differs from saved targets')
             evaluation=graph['evaluations'][bundle['evaluation_id']]
             if evaluation['revision_id']!=bundle['baseline_revision_id'] or evaluation['evidence_digest']!=bundle['evidence_digest']:issues.append('feedback evidence binding differs '+bundle['id'])
             if bundle['spec_sha256']!=graph['tasks'][bundle['task_id']]['spec_sha256']:issues.append('feedback task digest differs '+bundle['id'])
+            if bundle.get('next_task_id') and (bundle['next_task_id'] not in graph['tasks'] or bundle.get('next_spec_sha256')!=graph['tasks'][bundle['next_task_id']]['spec_sha256']):issues.append('revised task handoff not portable')
             for target in bundle['targets']:
                 for asset in target['evidence_assets']:
                     if asset['id'] not in graph['assets'] or asset['byte_sha256']!=graph['assets'][asset['id']]['byte_sha256']:issues.append('feedback asset missing or changed '+bundle['id'])
@@ -240,7 +246,29 @@ def validate(snap,manifest):
             evaluation=graph['evaluations'][completion['evaluation_id']]
             if completion['revision_id']!=evaluation['revision_id'] or completion['evidence_digest']!=evaluation['evidence_digest']:issues.append('completion is not bound to its exact evidence')
             if evaluation['technical_status']!='pass' or evaluation['coverage']!='complete':issues.append('completion claims unsupported requirements met')
-        if load('preferences.jsonl') or load('weak_preferences.jsonl'):issues.append('v3 snapshot inferred preferences without explicit comparison records')
+        if load('weak_preferences.jsonl'):issues.append('automatic rankings must not become human preference data')
+        pairs=load('preferences.jsonl')
+        if len(pairs)!=manifest['counts']['preferences']:issues.append('preference count differs from manifest')
+        for pair in pairs:
+            record=graph['preferences'].get(pair['id'])
+            if not record or any(pair.get(k)!=v for k,v in record.items()):issues.append('preference lacks an exact saved human comparison');continue
+            event=graph['events'].get(record['decision_event_id'])
+            chosen=graph['revisions'][record['chosen_revision_id']];rejected=graph['revisions'][record['rejected_revision_id']]
+            if (not event or event['source']!='human' or event['event']!='approve' or event['actor_id']!=record['actor_id']
+                or event['revision_id']!=chosen['id'] or event['evaluation_id']!=record['chosen_evaluation_id']
+                or event.get('request',{}).get('comparison_revision_id')!=rejected['id']
+                or event.get('request',{}).get('comparison_evaluation_id')!=record['rejected_evaluation_id']):issues.append('preference is not the explicit reviewer choice')
+            if chosen['task_id']!=rejected['task_id'] or chosen['id']==rejected['id']:issues.append('preference lacks distinct same-task candidates')
+            if any(m['view']!='human_accepted' for m in members if m['revision_id']==chosen['id']):issues.append('preference chosen output is no longer human-positive')
+            run=graph['runs'][chosen['run_id']]
+            if run.get('human_decision_id')!=record['decision_event_id']:issues.append('stale preference approval')
+            for key,revision in [('chosen',chosen),('rejected',rejected)]:
+                if [f['asset_id'] for f in pair[key]]!=revision['frame_asset_ids']:issues.append('preference pixels differ from exact candidate')
+                for frame in pair[key]:
+                    asset=graph['assets'][frame['asset_id']]
+                    if frame['file']!=asset_files.get(asset['id']) or frame['sha256']!=asset['byte_sha256']:issues.append('preference pixels missing or changed')
+                    if asset['rights'] not in manifest['policy']['rights_allow'] or 'simulated' in asset['origin'] or (asset['source_kind']=='procedural' and not manifest['policy']['include_procedural_positives']):issues.append('preference violates rights/origin policy')
+            if pair['label_source']!='explicit_human_comparison':issues.append('preference label source is not explicit human evidence')
         coco=_check_coco(snap,manifest,issues)
         counts=manifest['counts']
         for key,view in [('positives','human_accepted'),('automatically_verified','automatically_verified'),('research','research'),('withheld','withheld')]:
