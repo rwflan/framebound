@@ -87,7 +87,10 @@ def publish(project,name,rids,out_dir,policy,digest):
             stage.mkdir()
             # The hash-bound backup is immutable; reading must not create WAL sidecars.
             con=sqlite3.connect(f'{pinned.resolve().as_uri()}?immutable=1', uri=True);con.row_factory=sqlite3.Row
-            try:manifest=_build_into(project,name,rids,stage,policy,digest,connection=con)
+            try:
+                from .agent_snapshot import is_agent_selection, build_into
+                manifest=(build_into(project,name,rids,stage,policy,digest,con)
+                          if is_agent_selection(con,rids) else _build_into(project,name,rids,stage,policy,digest,connection=con))
             finally:con.close()
             marker={'snapshot':name,'inputs_digest':digest,'manifest_sha256':_h((stage/'manifest.json').read_bytes()),
                     'dataset_version':manifest['dataset_version']}

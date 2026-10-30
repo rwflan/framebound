@@ -13,7 +13,11 @@ limits and separate automatic output eligibility. Its controlled procedural
 benchmark does not claim arbitrary generated-art quality. Saved reviewer corrections, exact decisions and shared stale-aware handoff rendering
 are implemented in the same loop. The live workspace now displays packet-free runs, candidate-first film, current/best
 revision history, exact event navigation, saved markup and copy/download handoffs.
-Training closure, optional source correspondence and broader profiles remain active implementation work.
+Portable v3 training snapshots now extend the existing atomic publisher, with
+separate human/automatic label views, correction trajectories, optional-input
+closure, moved validation and manual preview/publication. Optional source
+correspondence and broader profiles remain active implementation work; real
+generated-art validation and the final requirement-by-requirement audit remain open.
 
 ## Goal
 

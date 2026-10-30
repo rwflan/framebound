@@ -250,6 +250,12 @@ def _check_temporal(snap: Path, issues: list[str]) -> dict:
 def validate_snapshot(snapshot_dir: str) -> dict:
     snap = Path(snapshot_dir)
     manifest = json.loads((snap / "manifest.json").read_text())
+    if manifest.get('dataset_version') == '3.0':
+        from .agent_validate import validate
+        return validate(snap,manifest)
+    if manifest.get('dataset_version') not in {'2.3'}:
+        return {'ok':False,'snapshot':manifest.get('snapshot'),'issues':['Unsupported dataset label semantics; use a reader advertising this version.'],
+                'skipped':[],'counts':manifest.get('counts',{}),'exclusions':manifest.get('exclusions',[])}
     issues: list[str] = []
     skipped: list[str] = []
     # 0. manifest integrity + no stale/extra files + no invalid paths

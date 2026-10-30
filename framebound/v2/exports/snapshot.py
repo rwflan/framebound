@@ -307,6 +307,14 @@ def _explicit_pairs(con, revs: dict, evals: dict, states: dict,
     return pairs, weak
 
 
+def default_policy(policy=None):
+    pol = {"rights_allow": ["original"], "split": {"train": [], "dev": [], "test": []},
+           "split_policy": "exclude", "include_procedural_positives": False,
+           "seed": 0}
+    pol.update(policy or {})
+    return pol
+
+
 def build_snapshot(project_dir: str, snapshot_name: str, clip_revision_ids: list[str],
                    out_dir: str, policy: dict | None = None) -> dict:
     """Build a portable snapshot under a temp dir, validate, atomically publish.
@@ -316,17 +324,42 @@ def build_snapshot(project_dir: str, snapshot_name: str, clip_revision_ids: list
     identical request returns the recorded identity; incompatible payloads
     conflict instead of overwriting. Returns the manifest.
     """
-    pol = {"rights_allow": ["original"], "split": {"train": [], "dev": [], "test": []},
-           "split_policy": "exclude", "include_procedural_positives": False,
-           "seed": 0}
-    pol.update(policy or {})
-    digest = _inputs_digest(snapshot_name, list(clip_revision_ids), pol)
+    pol = default_policy(policy)
+    from .agent_snapshot import is_agent_selection, VERSION
+    con = S.connect(project_dir)
+    try:
+        agent = is_agent_selection(con, list(clip_revision_ids))
+    finally:
+        con.close()
+    if agent:
+        from ...v3.evaluate import digest as agent_digest
+        digest = agent_digest(dict(dataset_version=VERSION, name=snapshot_name,
+                                   revisions=sorted(clip_revision_ids), policy=pol))
+    else:
+        digest = _inputs_digest(snapshot_name, list(clip_revision_ids), pol)
     from .publication import publish
     return publish(project_dir,snapshot_name,list(clip_revision_ids),out_dir,pol,digest)
 
 
 def _record_snapshot(project_dir: str, name: str, rids: list[str],
                      pol: dict, manifest: dict, *, manifest_sha256: str | None = None) -> None:
+    if manifest.get('dataset_version') == '3.0':
+        from ...v3.services import loop, tasks
+        con = loop.connect(project_dir)
+        try:
+            with S.atomic(con):
+                con.execute('BEGIN IMMEDIATE')
+                if not con.execute("SELECT 1 FROM sqlite_master WHERE name='agent_exports'").fetchone():
+                    tasks.backup_database(project_dir,'before-agent-export-v3.sqlite3')
+                    con.execute('CREATE TABLE agent_exports(id TEXT PRIMARY KEY,data TEXT NOT NULL)')
+                record = dict(id=f'snapshot:{name}',schema_version='3.0',revision_ids=rids,
+                              policy=pol,manifest_sha256=manifest_sha256,inputs_digest=manifest['inputs_digest'])
+                row=con.execute('SELECT data FROM agent_exports WHERE id=?',(record['id'],)).fetchone()
+                if row and json.loads(row['data'])!=record:
+                    raise S.ConflictError('snapshot name is bound to another immutable export')
+                if not row:loop.insert(con,'agent_exports',record)
+        finally:con.close()
+        return
     from ..checks import evaluate as _EV
     digest = _EV.lock_identity().get("digest") or ""
     pol_summary = json.dumps({"rights_allow": pol.get("rights_allow"),

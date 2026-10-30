@@ -96,6 +96,7 @@ fi
 # geometry, persisted bytes, or exact events.
 E2E_PORT="${E2E_PORT:-8766}"
 if [ -f web/package.json ] && command -v npm >/dev/null 2>&1 && [ -d web/node_modules ]; then
+  step agent-browser-journey env E2E_PORT="$E2E_PORT" node web/e2e/agent-workflow.mjs
   step browser-journey env E2E_PORT="$E2E_PORT" E2E_WORK="$WORK/e2e" E2E_SHOTS="$WORK/e2e-shots" node web/e2e/journey.mjs
 else
   echo "SKIP browser/process-restart journey: web toolchain unavailable (recorded, not a pass)"

@@ -8,6 +8,7 @@ pending-reason links.
 from __future__ import annotations
 
 ROWS = [
+    ('cli/mcp/api/desk', 'v3 manual training export', 'supported', 'existing atomic publisher; portable task/run/evidence/feedback/intervention closure; separate exact human and automatic views; trajectories; versioned reader; rights and family-safe splits'),
     ('desk/api', 'v3 run workspace and timeline', 'supported', 'candidate-first film; packet-free runs; exact historical revision navigation; saved markup/copy/download; explicit previous-revision comparison'),
     ('api/cli', 'v3 interventions and decisions', 'supported', 'revision/evaluation-bound reviewer actions; owner-only resolve/reopen; explicit edit support and full-clip preservation checks'),
     ('cli/mcp/api', 'v3 saved handoff', 'supported', 'shared text/JSON renderer; stale binding detection; text download; current-feedback submission binding'),
