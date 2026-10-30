@@ -14,7 +14,7 @@ def validate(snap,manifest):
     issues=[]
     try:
         required={'agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1'}
-        if not required<=set(manifest.get('reader_capabilities',[])) or set(manifest.get('reader_capabilities',[]))-required-{'source-correspondence-v1','declared-color-camera-tracks-v1','explicit-human-preferences-v1','feedback-groups-v2','pre-submission-feedback-v1'}:issues.append('unsupported reader capabilities')
+        if not required<=set(manifest.get('reader_capabilities',[])) or set(manifest.get('reader_capabilities',[]))-required-{'source-correspondence-v1','declared-color-camera-tracks-v1','explicit-human-preferences-v1','feedback-groups-v2','pre-submission-feedback-v1','revision-provenance-v1'}:issues.append('unsupported reader capabilities')
         listed=manifest['files']
         for rel,expected in listed.items():
             p=snap/rel
@@ -28,12 +28,47 @@ def validate(snap,manifest):
             any(complete.get(k)!=manifest.get(k) for k in ('snapshot','inputs_digest','dataset_version'))):
             issues.append('COMPLETE marker differs from immutable manifest')
         def load(rel):return [json.loads(line) for line in (snap/rel).read_text().splitlines() if line.strip()]
-        tables=('runs','revisions','tasks','evaluations','feedback','events','interventions','completions','frames','registrations','assets','provider_sources','source_records','preferences')
+        tables=('runs','revisions','tasks','evaluations','feedback','events','interventions','completions','frames','registrations','assets','provider_sources','source_records','preferences','provenance')
         graph={}
         for table in tables:
-            values=[] if table in {'source_records','preferences'} and not (snap/f'closure/{table}.jsonl').is_file() else load(f'closure/{table}.jsonl')
+            values=[] if table in {'source_records','preferences','provenance'} and not (snap/f'closure/{table}.jsonl').is_file() else load(f'closure/{table}.jsonl')
             graph[table]={v['id']:v for v in values}
             if len(values)!=len(graph[table]):issues.append('duplicate closure identity '+table)
+        from ...v3.provenance import parse, RevisionProvenance, blob_hashes
+        attributed = {rid: parse(rev.get('generation_metadata')) for rid,rev in graph['revisions'].items()}
+        if any(attributed.values()) and 'revision-provenance-v1' not in manifest['reader_capabilities']:
+            issues.append('provenance reader capability missing')
+        if set(graph['provenance']) != {rid for rid,value in attributed.items() if value}:
+            issues.append('provenance closure membership differs')
+        for rid,record in graph['provenance'].items():
+            value = RevisionProvenance.model_validate(record['attribution'])
+            if value != attributed.get(rid): issues.append('revision attribution differs '+rid)
+            task = graph['tasks'][graph['revisions'][rid]['task_id']]
+            if value.style_board != TaskRecord.model_validate(task).spec.style_board:
+                issues.append('provenance style board differs '+rid)
+            for sha in blob_hashes(value):
+                p = snap/'closure/provenance_blobs'/sha
+                if not p.is_file() or _h(p.read_bytes()) != sha: issues.append('provenance blob missing or corrupt '+sha)
+            for event in value.generations:
+                if event.evidence_source == 'provider_response':
+                    provider=graph['provider_sources'].get(event.provider_job_id,{})
+                    job=provider.get('metadata',{})
+                    sha=provider.get('artifact_hashes',{}).get('response_artifact')
+                    if (not provider.get('available') or job.get('origin')!='live' or job.get('status')!='succeeded'
+                            or not set(event.output_asset_ids)<=set(job.get('output_asset_ids',[]))
+                            or sha not in event.receipt_sha256):
+                        issues.append('local provider provenance lacks matching job '+rid)
+                    else:
+                        receipt=json.loads((snap/'closure/provenance_blobs'/sha).read_text()).get('payload',{})
+                        if (receipt.get('model')!=event.requested_model or receipt.get('observed_model')!=event.observed_model
+                                or receipt.get('observed_version')!=event.observed_version
+                                or receipt.get('response_id')!=event.response_id or receipt.get('prompt_sha256')!=event.prompt_sha256
+                                or receipt.get('conditioning_sha256')!=[r.byte_sha256 for r in event.conditioning]
+                                or receipt.get('output_bytes_sha256') not in event.original_output_sha256):
+                            issues.append('local provider provenance differs from receipt '+rid)
+                for ref in event.conditioning:
+                    asset = graph['assets'].get(ref.asset_id)
+                    if not asset or asset['byte_sha256'] != ref.byte_sha256: issues.append('provenance conditioning differs '+rid)
         asset_files=json.loads((snap/'closure/asset_files.json').read_text())
         withheld={r['asset_id']:r['reason'] for r in json.loads((snap/'closure/withheld.json').read_text())}
         for aid,asset in graph['assets'].items():
