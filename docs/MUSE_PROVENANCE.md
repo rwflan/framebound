@@ -10,4 +10,4 @@ Every referenced blob must exist and match its hash. Materialized assets must tr
 
 Use `framebound.v3.provenance.RevisionProvenance.model_json_schema()` for the complete input shape. The `TaskSpec.style_board` binding and optional `InputBinding.byte_sha256` are additive; missing values on older tasks are unknown. Effective Contributor mode and observed model/version stay unknown unless evidence supports them. The current orchestration session is Codex; a separately invoked Muse session is recorded as such rather than relabeling Codex as Muse.
 
-Actual Muse generation remains pending until Muse Image is accessible. No independent human labels or completed pilot are claimed by this implementation.
+Muse artwork generation runs through the separately configured Meta provider. Automated model labels are recorded as model judgments; human oversight is optional and minimal. Neither model attribution nor model labels imply authenticated human acceptance.
