@@ -30,6 +30,8 @@ import type { Bundle, DeskEvent } from "./review-model";
 import { Err, Icon, nav, parseHash, stamp, words } from "./shared";
 import { Modal } from "./Modal";
 import "./desk.css";
+import "./controls.css";
+import "./film-stock.css";
 import { useAutomaticUpdates } from "./useAutomaticUpdates";
 
 type DeskData = {
@@ -81,7 +83,9 @@ export default function App() {
   const [data, setData] = useState<DeskData | null>(null),
     [error, setError] = useState<unknown>(null),
     [version, setVersion] = useState(0),
-    [project, setProject] = useState("all");
+    [activeNavigation, setActiveNavigation] = useState<"inbox" | "activity">(
+      "inbox",
+    );
   useEffect(() => {
     const update = () => {
       setView(parseHash());
@@ -107,13 +111,11 @@ export default function App() {
   }, [version]);
   const refresh = useCallback(() => setVersion((n) => n + 1), []);
   useAutomaticUpdates(refresh);
-  const scoped = useMemo(
-    () =>
-      data?.bundles.filter(
-        (b) => project === "all" || projectId(b, data.refs) === project,
-      ) || [],
-    [data, project],
-  );
+  const scoped = data?.bundles || [];
+  useEffect(() => {
+    if (view.name === "inbox" || view.name === "activity")
+      setActiveNavigation(view.name);
+  }, [view.name]);
   const inFilm = ["inbox", "packet", "activity"].includes(view.name);
   const current =
     view.name === "packet" && data
@@ -139,30 +141,18 @@ export default function App() {
           priority(a, data?.issues || []) - priority(b, data?.issues || []),
       );
   }, [scoped, data]);
-  const [collection, setCollection] = useState<"interventions" | "sequences">(
-    "interventions",
-  );
   const [source, setSource] = useState("all"),
     [order, setOrder] = useState("oldest");
   const timeline = useMemo(
     () =>
       chronology(data?.bundles || [], data?.events || [])
-        .filter(
-          (e) =>
-            (project === "all" ||
-              (e.bundle
-                ? projectId(e.bundle, data?.refs || null)
-                : data?.refs.character_revisions.find(
-                    (c) => c.id === e.review?.clip_revision_id,
-                  )?.project_id) === project) &&
-            (source === "all" || e.source === source),
-        )
+        .filter((e) => source === "all" || e.source === source)
         .sort(
           (a, b) =>
             (order === "oldest" ? 1 : -1) *
             (a.at.localeCompare(b.at) || a.id.localeCompare(b.id)),
         ),
-    [data, project, source, order],
+    [data, source, order],
   );
   const loadMore = async () => {
     if (!data?.more) return;
@@ -198,61 +188,24 @@ export default function App() {
           <Icon name="frame" />
           Framebound
         </button>
-        <label className="project-picker">
-          <Icon name="folder" />
-          <select
-            aria-label="Project"
-            value={project}
-            onChange={(e) => {
-              setProject(e.target.value);
-              if (view.name === "packet") nav({ name: "inbox" });
-            }}
-          >
-            <option value="all">All projects</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-            {data?.bundles.some(
-              (b) => projectId(b, data.refs) === "unassigned",
-            ) && <option value="unassigned">Unassigned project</option>}
-          </select>
-        </label>
         <nav className="review-navigation" aria-label="Review views">
           <button
             aria-current={
-              view.name !== "activity" &&
-              collection === "interventions" &&
-              inFilm
-                ? "page"
-                : undefined
+              activeNavigation === "inbox" && inFilm ? "page" : undefined
             }
             onClick={() => {
-              setCollection("interventions");
               nav({ name: "inbox" });
             }}
           >
             Interventions<span>{interventions.length}</span>
           </button>
           <button
-            aria-current={view.name === "activity" ? "page" : undefined}
+            aria-current={
+              activeNavigation === "activity" && inFilm ? "page" : undefined
+            }
             onClick={() => nav({ name: "activity" })}
           >
             Timeline
-          </button>
-          <button
-            aria-current={
-              collection === "sequences" && view.name !== "activity" && inFilm
-                ? "page"
-                : undefined
-            }
-            onClick={() => {
-              setCollection("sequences");
-              nav({ name: "inbox" });
-            }}
-          >
-            Sequences
           </button>
         </nav>
         <details className="workspace-switcher">
@@ -285,7 +238,7 @@ export default function App() {
             ? "sequence"
             : view.name === "activity"
               ? "timeline"
-              : collection
+              : "interventions"
         }
       >
         {view.name === "activity" && (
@@ -330,22 +283,20 @@ export default function App() {
           <>
             {view.name === "inbox" && (
               <Collection
-                key={collection + project}
-                bundles={
-                  collection === "interventions" ? interventions : scoped
-                }
+                key="interventions"
+                bundles={interventions}
                 issues={data.issues}
                 events={null}
                 projectLabel={(id) =>
                   projects.find((p) => p.id === id)?.name || id
                 }
                 refs={data.refs}
-                filmKey={collection + project}
+                filmKey="interventions"
               />
             )}
             {view.name === "activity" && (
               <Collection
-                key={"timeline" + project + source + order}
+                key={"timeline" + source + order}
                 bundles={[]}
                 issues={data.issues}
                 events={timeline}
@@ -353,7 +304,7 @@ export default function App() {
                   projects.find((p) => p.id === id)?.name || id
                 }
                 refs={data.refs}
-                filmKey={"timeline" + project + source + order}
+                filmKey={"timeline" + source + order}
               />
             )}
             {view.name === "packet" &&
@@ -432,8 +383,8 @@ function Collection({
   };
   const open = (i: number) => {
     const entry = items[i];
-    if (entry?.event) setDetail(entry.event);
-    else if (entry?.bundle) nav({ name: "packet", id: packetId(entry.bundle) });
+    if (entry?.bundle) nav({ name: "packet", id: packetId(entry.bundle) });
+    else if (entry?.event) setDetail(entry.event);
   };
   return (
     <>
@@ -484,7 +435,10 @@ function Collection({
                     className="reel-shot"
                     aria-pressed={i === selected}
                     aria-label={`${event?.title || actionName(b!)} ${b ? revisionId(b) : event?.actor}`}
-                    onClick={() => select(i)}
+                    onClick={() => {
+                      select(i);
+                      if (events) open(i);
+                    }}
                     onDoubleClick={() => open(i)}
                   >
                     <span className="shot-aperture">
@@ -547,6 +501,7 @@ function Collection({
         index={selected}
         count={items.length}
         onSelect={select}
+        itemName={events ? "event" : "sequence"}
         caption={
           <>
             <strong>{item?.bundle ? actionName(item.bundle) : "Review"}</strong>
@@ -556,12 +511,24 @@ function Collection({
           </>
         }
       >
+        {item?.event && item.bundle && (
+          <button
+            className="reel-secondary"
+            onClick={() => setDetail(item.event!)}
+          >
+            Event details
+          </button>
+        )}
         <button
           className="reel-primary"
           disabled={!item}
           onClick={() => open(selected)}
         >
-          {events ? "Details" : "Review"}
+          {events && item?.bundle
+            ? "Open sequence"
+            : events
+              ? "Details"
+              : "Review"}
           <Icon name="right" />
         </button>
       </FilmDock>

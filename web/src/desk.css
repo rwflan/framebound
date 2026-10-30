@@ -419,21 +419,6 @@ small,
 .reel-sequence-camera {
   --lane-height: clamp(54px, calc((100cqh - 228px) / 2), 1200px);
 }
-.reel-dock button:focus-visible {
-  outline-offset: 2px;
-}
-.reel-zoom button:last-child {
-  font-size: 11px;
-  border-left: 1px solid #91a6cc26;
-}
-.reel-position input {
-  appearance: auto;
-  height: auto;
-  background: transparent;
-}
-.reel-focus-caption > span {
-  color: #9bafcd;
-}
 /* Native dialogs trap focus and restore it to the exact strip control. */
 .inspector {
   color: #e2eaf8;
@@ -1126,22 +1111,6 @@ small,
   .reel-sequence-camera {
     --lane-height: clamp(44px, calc((100cqh - 207px) / 2), 1200px);
   }
-  .reel-dock .correction-action span {
-    display: none;
-  }
-  .reel-dock .correction-action {
-    padding: 6px;
-    width: 29px;
-  }
-  .reel-actions > .reel-secondary:first-of-type {
-    display: none;
-  }
-  .reel-focus-caption {
-    min-width: 100px;
-  }
-  .reel-focus-caption > span {
-    font-size: 10px;
-  }
   .inspector {
     max-height: calc(100svh - 20px);
     width: calc(100vw - 20px);
@@ -1229,9 +1198,6 @@ small,
   .decision-actions button {
     padding: 9px 10px;
     font-size: 12px;
-  }
-  .reel-zoom button:last-child {
-    font-size: 10px;
   }
   .inspector > form {
     margin: 20px 17px;
@@ -1326,26 +1292,6 @@ small,
 .streamlined-header .brand svg {
   width: 23px;
   height: 23px;
-}
-.project-picker {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  color: #9eaec6;
-}
-.project-picker svg {
-  width: 16px;
-  height: 16px;
-}
-.project-picker select {
-  border: 0;
-  background: transparent;
-  padding: 7px 18px 7px 0;
-  font-size: 12px;
-  color: #b9c7dd;
-  width: 100%;
-  text-overflow: ellipsis;
 }
 .review-navigation {
   display: flex;
@@ -1567,10 +1513,6 @@ small,
     gap: 0 22px;
     padding: 9px 18px 0;
   }
-  .project-picker {
-    justify-self: end;
-    max-width: 220px;
-  }
   .review-navigation {
     grid-column: 1/-1;
     grid-row: 2;
@@ -1637,16 +1579,6 @@ small,
     width: 19px;
     height: 19px;
   }
-  .project-picker {
-    gap: 6px;
-  }
-  .project-picker select {
-    font-size: 11px;
-    max-width: 145px;
-  }
-  .project-picker svg {
-    display: none;
-  }
   .sequence-context {
     padding-inline: 15px;
     gap: 8px;
@@ -1676,8 +1608,5 @@ small,
   }
   .timeline-tools select {
     max-width: 45vw;
-  }
-  .reel-dock {
-    padding-top: 7px;
   }
 }

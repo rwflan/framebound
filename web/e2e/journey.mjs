@@ -138,6 +138,14 @@ async function main() {
     out.automatic_runs=automatic.automatic_runs;
     out.worker_crash_exit=automatic.worker_crash_exit;
 
+    step = 'timeline-opens-sequence';
+    await page.goto(BASE + '/#/activity', {waitUntil:'networkidle'});
+    assert(await page.getByRole('button',{name:'Sequences',exact:true}).count()===0, 'redundant Sequences navigation remains');
+    assert(await page.getByLabel('Project',{exact:true}).count()===0, 'project selector remains in header');
+    await page.getByRole('button',{name:'Evaluation recorded '+REVIEW_REV,exact:true}).first().click();
+    await page.locator('#packet-title').waitFor();
+    assert(await page.locator('#packet-title').getAttribute('data-revision-id')===REVIEW_REV, 'timeline click loaded the wrong sequence');
+
     step = 'open-packet';
     await page.goto(BASE + '/#/packet/pkt-diff', { waitUntil: 'networkidle' });
     await page.waitForSelector('#packet-title', { timeout: 15000 });
@@ -145,8 +153,28 @@ async function main() {
     assert(title.includes(REVIEW_REV), `revision title wrong: ${title}`);
     assert(await page.locator('#packet-title').getAttribute('data-packet-id') === 'pkt-diff', 'view bound to wrong packet');
 
+    step = 'responsive-control-layout';
+    for (const viewport of [{width:1280,height:900},{width:1218,height:1180},{width:940,height:1218},{width:768,height:1024},{width:390,height:844},{width:360,height:720}]) {
+      await page.setViewportSize(viewport);
+      await page.waitForFunction(() => {
+        const dock=document.querySelector('.review-controls');
+        if (!dock) return false;
+        const box=dock.getBoundingClientRect();
+        const rects=[...dock.querySelectorAll('button,input')].map(el=>el.getBoundingClientRect()).filter(r=>r.width&&r.height);
+        return rects.every(r=>r.left>=box.left && r.right<=box.right+1 && r.top>=box.top && r.bottom<=box.bottom+1) && rects.every((a,i)=>rects.every((b,j)=>i>=j || Math.min(a.right,b.right)-Math.max(a.left,b.left)<=1 || Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)<=1));
+      }, null, {timeout:5000});
+    }
+    await page.setViewportSize({width:1280,height:900});
+
     step = 'film-camera-and-inline-evidence';
     assert(await page.locator('.reel-lane').count() === 2, 'comparison lanes missing');
+    const stock = await page.locator('.reel-lane').first().evaluate(el => {
+      const s=getComputedStyle(el), before=getComputedStyle(el,'::before');
+      return {mask:s.maskImage,composite:s.maskComposite,padding:parseFloat(s.paddingTop),holes:parseFloat(before.height)};
+    });
+    assert(stock.mask.includes('sprocket-hole.svg') && stock.composite.includes('exclude'), 'film perforations are not punched through the stock');
+    assert(stock.padding>=28 && stock.holes>=18, 'film borders/perforations are too small');
+
     assert(await page.locator('.frame-evidence').count() === 8, 'per-frame evidence bands missing');
     await page.getByRole('button', {name:'Zoom in',exact:true}).click();
     await page.getByRole('button', {name:'Zoom 125%. Reset to 100%.',exact:true}).waitFor();
