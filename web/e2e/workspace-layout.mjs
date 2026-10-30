@@ -107,9 +107,16 @@ try {
   const sheetTop = (await page.locator(".measurement-track").boundingBox()).y;
   for (const [i, top] of [...laneTops, sheetTop].entries())
     assert(
-      tabs[i].top < top && tabs[i].bottom > top,
-      "Translucent labels straddle their row edge",
+      tabs[i].top < top + 28 && tabs[i].bottom > top,
+      "Translucent row legends overlap the upper frame edge",
     );
+  const firstMetric = (
+    await page.locator(".measurement-cell .frame-measure").first().boundingBox()
+  ).y;
+  assert(
+    tabs[2].bottom <= firstMetric + 1,
+    "Checks legend clears the measurement text",
+  );
   await page.screenshot({ path: path.join(shots, "desktop.png") });
   // Open every animation through the actual queue/search, including coverage gaps and clean clips.
   for (const bundle of bundles.filter((b) => b.frames.length)) {
