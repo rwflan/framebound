@@ -6,6 +6,11 @@ import json
 
 def dispatch(args) -> dict:
     cmd = args.cmd
+    if cmd in {'agent-export-preview','agent-export-build'}:
+        from pathlib import Path
+        from ..v3.services import exports
+        selection=json.loads(Path(args.selection).read_text())
+        return exports.plan(args.project,selection) if cmd=='agent-export-preview' else exports.build(args.project,selection)
     if cmd == 'agent-satisfaction-record':
         from pathlib import Path
         from ..v3.services import interventions as I

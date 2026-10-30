@@ -210,3 +210,98 @@ Read-only run documentation is available at `GET /v3/desk` and
 saved native markup through clipboard/download, a separate parent-agent CLI
 repair, exact owner resolution/reopen, historical event navigation, comparison,
 stable playback, live-update preservation and clipboard fallback.
+
+## Portable training export
+
+Manual v3 export extends the existing `build_snapshot`/`validate_snapshot` path
+and crash-recoverable publisher. Selecting a v3 revision includes its complete
+run trajectory, ordered revisions, task predecessors, optional inputs, frame
+instances, registrations, generation metadata, evaluations, feedback, events,
+human interventions and completion records. It needs no motion guide or invented
+reference row. Dataset version 3.0 advertises explicit reader capabilities;
+reviewed-guide 2.3 snapshots retain their original publisher and labels. Export
+v2/v3 selections in separate snapshots rather than mixing their label semantics.
+
+The export screen selects runs grouped by project, a snapshot name, the versioned
+`agent-training-v1` policy and an optional destination. Preview counts, exclusions
+and withheld pixels precede publication. Export does not run automatically when
+an animation completes. Publication freezes the project database, validates the
+staging directory and atomically publishes it using the established recovery
+journal. Export records are versioned separately from v2 records.
+
+`POST /v3/exports/preview` and `POST /v3/exports` accept:
+
+```json
+{
+  "name": "training-1",
+  "run_ids": ["run-1"],
+  "policy_id": "agent-training-v1",
+  "include_automatically_verified": true,
+  "include_procedural_positives": false,
+  "rights_allow": ["original"],
+  "destination": null
+}
+```
+
+CLI `agent-export-preview`/`agent-export-build` take `--project` and
+`--selection JSON_FILE`; MCP exposes the corresponding underscore names with a
+`selection` object. The existing CLI `dataset-validate` and shared validator accept
+both snapshot versions. `/v3/reader-capabilities` advertises supported versions
+and label views. A false string is not accepted as a true/false policy value.
+
+- `hf/` contains only current exact human-approved, technically complete, fresh,
+  rights/origin-eligible frames with no unresolved human correction. It is never
+  populated from automatic success or agent satisfaction.
+- `automatically_verified/` is a separate opt-in imagefolder view for complete
+  passing output under the automatic policy. Metadata says `technical_policy`,
+  retains creative status and records the exact evaluation, digest, completion
+  policy and measurement-assumption sources.
+- `research/` retains nonaccepted/failed/partial examples with actual exclusion
+  reasons. `withheld` records retain metadata when rights or missing bytes prevent
+  packaging pixels. Derived and conditioning ancestry retain their exclusions.
+- `trajectories.jsonl` records the failed parent, targeted saved feedback,
+  candidate, changed slots, check outcomes and overall regressions. Improvement
+  at a target is not substituted for overall success.
+- `preferences.jsonl` and `weak_preferences.jsonl` stay empty for v3 until an
+  explicit comparison record exists; revision order and automatic rankings do
+  not create human preference pairs. Existing v2 explicit comparisons continue
+  through their strict reviewed-guide route.
+
+`temporal.jsonl` retains ordered native pixels, authored holds and declared timing;
+missing generation/provider metadata stays missing. `closure/asset_files.json`
+resolves saved asset IDs to packaged content-addressed pixels. Raw feedback keeps
+its original evidence rather than rewriting old hashes to destination paths.
+Provider origin and structured generation briefs are retained when stored;
+hidden provider settings and sensitive credential fields are omitted/redacted,
+with omissions explicitly recorded. Procedural and simulated origins are never
+silently relabeled as real generated art.
+
+COCO annotations use the existing exact alpha-mask RLE encoder and validator.
+All three imagefolder views carry their own label-source metadata. The explicit
+v3 consumer `framebound.v2.exports.agent_reader.load_examples(path, view)` validates
+the snapshot and materializes pixels for the requested view. A reader that does
+not advertise the new label semantics rejects the snapshot. The existing
+reviewed-guide preference consumer rejects v3 rather than loading automatic
+examples as human comparisons.
+
+Split components group run/animation ancestry, shared inputs, exact pixel
+identities and conservative 64-bit dHash near-duplicate components (distance at
+most four). Strict split policy rejects a family crossing train/dev/test;
+exclude policy retains research evidence but removes conflicting trainable rows.
+The hash grouping is a leakage precaution, not a quality metric.
+
+Moved-snapshot validation needs no original database: it checks files and pixel
+hashes, remeasures supported declared-region checks, verifies exact preservation
+outside saved grants, checks task/evaluation/feedback and completion bindings,
+verifies human resolution/acceptance sources, reconstructs split relationships,
+and checks that trajectory outcomes reflect actual whole-clip results. Tests
+include rehashed false-human-label tampering, withheld rights, mixed human and
+technical sources, missing metadata, input closure, source-origin redaction and
+family-safe split rejection. The browser journey exercises preview, publication
+and validation after moving a snapshot.
+
+New evaluations also record their actual evaluator source hash and Python/NumPy/
+Pillow identities. Earlier v3 evaluations missing this identity remain historical
+evidence; exports retain them as research rather than retroactively strengthening
+their training eligibility. New evidence uses `declared-regions-v2`; stored task
+negotiation and earlier evidence are never rewritten.

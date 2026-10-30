@@ -40,3 +40,12 @@
 @media(max-width: 900px) { .agent-workspace { display: flex; flex-direction: column; overflow: auto; } .agent-workspace .film-window { min-height: 480px; } .agent-workspace .agent-inspector { min-height: 420px; max-height: none; } }
 
 .agent-inspector-tabs button { text-transform: capitalize; }
+
+.agent-export { max-width: 900px; margin: 24px auto; padding: 24px; }
+.agent-export form { display: flex; flex-direction: column; gap: 14px; }
+.agent-export label { display: flex; gap: 10px; align-items: center; }
+.agent-export-selection fieldset { margin-bottom: 16px; border: 1px solid var(--border); padding: 14px; }
+.agent-export-selection label { margin: 6px 0; }
+.agent-export-selection small { margin-left: auto; }
+.agent-export .toolbar { display: flex; gap: 10px; margin: 10px 0; }
+.agent-export code { overflow-wrap: anywhere; }
