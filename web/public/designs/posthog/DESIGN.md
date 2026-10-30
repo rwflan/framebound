@@ -1,0 +1,21 @@
+# Why this direction
+
+PostHog's website uses a desktop metaphor with recognisable windows, compact controls and strong material boundaries. Its [website team](https://posthog.com/teams/website) explicitly prioritises a distinctive, consistent experience. Its [product redesign rationale](https://posthog.com/blog/posthog-as-a-dev-tool) explains the practical side: density, fixed panes, contextual tools and keyboard access. The latter describes a 2023 product redesign; the visual reference for this preview is the current [posthog.com](https://posthog.com/) site, inspected 30 October 2026.
+
+The adaptation below is our design interpretation, rather than a claim about measured usability outcomes.
+
+| Choice | Purpose in Framebound |
+| --- | --- |
+| Separate film and frame windows | Keep the sequence spatially stable while inspecting an individual frame. The frame window remains useful at fit zoom. |
+| Warm tan stock, blue frame chrome, black film | Distinguish navigation, the working surface, inspection tools and image content without explanatory copy. |
+| Thin borders, restrained offset shadows, pressed buttons | Make boundaries and click targets visible. Consistent physical feedback supplies character without decorative prose. |
+| Queue thumbnails with concise finding labels | Recognise the animation, revision and reason for intervention before opening it. |
+| Contextual evidence pane | Inspect source results without a modal hiding the film. Changing sequences updates the same pane. |
+| Drift bars with actual tolerance markers | Show the size of a discrepancy and its allowed bound together. The scale is linear, 0–100%, and numeric results remain visible. |
+| Keyboard search, frame arrows, J/K navigation, real open-file tabs | Move among sequences and revisions while retaining context. Tabs appear only after another revision is opened. |
+| Frozen identity and style images | Keep the visual contract available alongside numerical checks. |
+| Human review separate from technical checks | Preserve the framework's distinction between measured compliance, a reviewer's decision and release eligibility. |
+
+Removed: the large repeated sequence heading, breadcrumb, packet identifier in the title bar, repeated project footer, empty-correction prose, zero-correction text on every frame, duplicate selected-frame phase/timing and the procedural-media status label. Provenance and preview limitations remain in About and the README. Full check explanations remain available in the evidence pane.
+
+This is a design preview against the existing procedural fixture. It does not replace the live React desk or write to its project.
