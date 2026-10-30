@@ -7,7 +7,7 @@ export type Target = {
 export type Feedback = { id: string; baseline_revision_id: string; disposition: string; creative_status: string;
   reason: string | null; targets: Target[]; remaining_submissions: number };
 export type Task = { id:string; spec:{ intent:string; animation_id:string; canvas:{width:number;height:number};
-  timing:{holds:number[];ticks_per_second:number}; loop:boolean; profile:string; appearance:string;
+  timing:{holds:number[];ticks_per_second:number}; loop:boolean; profile:string; appearance:string;scene?:{limitation:string}|null;
   inputs:{asset_id:string;role:string;provenance:string}[] }; requirements: {check:string;applicability:string;limitation:string}[] };
 export type Mark = { id:string; run_id:string; owner:string; version:number; handoff_id:string;
   slots:number[]; roi:Roi|null; tick_range:number[]; candidate_revision_id:string|null;

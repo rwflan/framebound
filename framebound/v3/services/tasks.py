@@ -72,9 +72,18 @@ def _negotiate(spec):
         validate_observations(spec)
         from .. import correspondence
         correspondence.validate(spec)
+        from .. import scene
+        scene.validate(spec)
     except ValueError as exc:
         raise InvalidInput(str(exc)) from exc
     families = supported_families(spec)
+    if spec.profile=='tracked-scene-v1':
+        from .. import scene
+        families.update(scene.supported(spec))
+        requested += [(f'profile-{family}',family,True) for family in ('scene_track','scene_temporal','scene_event')]
+    if spec.scene:
+        from .. import scene
+        families.update(scene.supported(spec))
     if spec.source_correspondence:
         requested.append(('source-fidelity','source_fidelity',True))
         families.add('source_fidelity')
@@ -89,8 +98,8 @@ def _negotiate(spec):
         out.append(NegotiatedRequirement(
             id=rid, check=check, required=required,
             applicability='supported' if supported else 'unsupported',
-            method={'media': 'declared-regions-v2:media', 'timing': 'declared-regions-v2:timing','source_fidelity':'source-correspondence-v1'}.get(check, 'declared-regions-v2' if check in families else 'none'),
-            limitation=(spec.source_correspondence.limitation if check=='source_fidelity' and spec.source_correspondence else 'Establishes structural validity only; animation quality is not verified.'
+            method={'media': 'declared-regions-v2:media', 'timing': 'declared-regions-v2:timing','source_fidelity':'source-correspondence-v1','scene_track':'declared-color-camera-tracks-v1','scene_temporal':'declared-color-camera-tracks-v1','scene_event':'declared-color-camera-tracks-v1'}.get(check, 'declared-regions-v2' if check in families else 'none'),
+            limitation=(spec.scene.limitation if check.startswith('scene_') and spec.scene else spec.source_correspondence.limitation if check=='source_fidelity' and spec.source_correspondence else 'Establishes structural validity only; animation quality is not verified.'
                         if check in {'media', 'timing'} else 'Only task-authored regions, colors and event bounds are measured; arbitrary anatomy and prose action correctness are not established.' if supported else 'No usable task-authored measurement is available for this requirement.'),
             ways_forward=[] if supported else ['Obtain independently reviewed annotations and a validated evaluator.',
                         'Create a new specification revision with a recorded scope change.']))

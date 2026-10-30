@@ -6,6 +6,9 @@ import json
 
 def dispatch(args) -> dict:
     cmd = args.cmd
+    if cmd=='animation-quality-benchmark':
+        from ..v3.benchmark import run
+        return run(args.manifest)
     if cmd in {'agent-export-preview','agent-export-build'}:
         from pathlib import Path
         from ..v3.services import exports

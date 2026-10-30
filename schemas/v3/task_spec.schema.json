@@ -1,5 +1,60 @@
 {
   "$defs": {
+    "CameraObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "slot": {
+          "minimum": 0,
+          "title": "Slot",
+          "type": "integer"
+        },
+        "translation": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Translation",
+          "type": "array"
+        },
+        "scale": {
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "title": "Scale",
+          "type": "number"
+        },
+        "provenance": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Provenance",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "user_declared",
+            "agent_proposed",
+            "model_proposed",
+            "procedural"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot",
+        "translation",
+        "scale",
+        "provenance",
+        "source"
+      ],
+      "title": "CameraObservation",
+      "type": "object"
+    },
     "Canvas": {
       "additionalProperties": false,
       "properties": {
@@ -129,6 +184,13 @@
     "Limits": {
       "additionalProperties": false,
       "properties": {
+        "max_measurement_pixels": {
+          "default": 67108864,
+          "maximum": 268435456,
+          "minimum": 1,
+          "title": "Max Measurement Pixels",
+          "type": "integer"
+        },
         "max_evaluation_pixels": {
           "default": 16777216,
           "maximum": 67108864,
@@ -312,6 +374,139 @@
         "bottom"
       ],
       "title": "Roi",
+      "type": "object"
+    },
+    "SceneEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "contact",
+            "separation",
+            "left_of",
+            "above"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "left_feature_id": {
+          "title": "Left Feature Id",
+          "type": "string"
+        },
+        "right_feature_id": {
+          "title": "Right Feature Id",
+          "type": "string"
+        },
+        "distance_world": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Distance World",
+          "type": "number"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "provenance": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Provenance",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "user_declared",
+            "agent_proposed",
+            "model_proposed",
+            "procedural"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "left_feature_id",
+        "right_feature_id",
+        "provenance",
+        "source"
+      ],
+      "title": "SceneEvent",
+      "type": "object"
+    },
+    "SceneSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "subjects": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Subjects",
+          "type": "array"
+        },
+        "camera": {
+          "items": {
+            "$ref": "#/$defs/CameraObservation"
+          },
+          "maxItems": 512,
+          "minItems": 1,
+          "title": "Camera",
+          "type": "array"
+        },
+        "features": {
+          "items": {
+            "$ref": "#/$defs/TrackedFeature"
+          },
+          "maxItems": 8192,
+          "minItems": 1,
+          "title": "Features",
+          "type": "array"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/TrackLink"
+          },
+          "maxItems": 8192,
+          "title": "Links",
+          "type": "array"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/SceneEvent"
+          },
+          "maxItems": 8192,
+          "title": "Events",
+          "type": "array"
+        },
+        "method": {
+          "const": "declared-color-camera-tracks-v1",
+          "default": "declared-color-camera-tracks-v1",
+          "title": "Method",
+          "type": "string"
+        },
+        "limitation": {
+          "default": "Only declared exact-color features, uniform 2D camera transforms and landmark events are measured. Occluded geometry, perspective, anatomy, physical forces and arbitrary prose action correctness are unsupported.",
+          "maxLength": 2000,
+          "title": "Limitation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subjects",
+        "camera",
+        "features"
+      ],
+      "title": "SceneSpec",
       "type": "object"
     },
     "SourceCorrespondence": {
@@ -592,6 +787,147 @@
       ],
       "title": "Timing",
       "type": "object"
+    },
+    "TrackLink": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "left_feature_id": {
+          "title": "Left Feature Id",
+          "type": "string"
+        },
+        "right_feature_id": {
+          "title": "Right Feature Id",
+          "type": "string"
+        },
+        "max_displacement_world": {
+          "minimum": 0,
+          "title": "Max Displacement World",
+          "type": "number"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "left_feature_id",
+        "right_feature_id",
+        "max_displacement_world"
+      ],
+      "title": "TrackLink",
+      "type": "object"
+    },
+    "TrackedFeature": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "subject_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "slot": {
+          "minimum": 0,
+          "title": "Slot",
+          "type": "integer"
+        },
+        "roi": {
+          "$ref": "#/$defs/Roi"
+        },
+        "rgba": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "title": "Rgba",
+          "type": "array"
+        },
+        "expected_world": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Expected World",
+          "type": "array"
+        },
+        "max_error_world": {
+          "minimum": 0,
+          "title": "Max Error World",
+          "type": "number"
+        },
+        "minimum_pixels": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Minimum Pixels",
+          "type": "integer"
+        },
+        "maximum_pixels": {
+          "minimum": 1,
+          "title": "Maximum Pixels",
+          "type": "integer"
+        },
+        "visibility": {
+          "default": "visible",
+          "enum": [
+            "visible",
+            "occluded",
+            "ambiguous"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        },
+        "provenance": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Provenance",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "user_declared",
+            "agent_proposed",
+            "model_proposed",
+            "procedural"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "subject_id",
+        "slot",
+        "roi",
+        "rgba",
+        "expected_world",
+        "max_error_world",
+        "maximum_pixels",
+        "provenance",
+        "source"
+      ],
+      "title": "TrackedFeature",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -704,7 +1040,8 @@
       "default": "structural-v1",
       "enum": [
         "structural-v1",
-        "fixed-subject-v1"
+        "fixed-subject-v1",
+        "tracked-scene-v1"
       ],
       "title": "Profile",
       "type": "string"
@@ -729,6 +1066,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/SourceCorrespondence"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "scene": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SceneSpec"
         },
         {
           "type": "null"
