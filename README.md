@@ -81,6 +81,8 @@ python -m framebound v2-mcp --project proj   # MCP stdio (same services as CLI/H
 
 Live specialist work additionally requires genuinely approved references, an operator grant, a frozen live request and an explicit spend ceiling. Offline jobs never send, even when a key is present. Participant live proof is pending; see [provider recovery](docs/PROVIDER_RECOVERY.md).
 
+## Corpus research
+
+
 ## Licence
 
-MIT. Demo art is procedural and original. Do not add third-party game assets.
