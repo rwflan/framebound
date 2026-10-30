@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import sqlite3
+import uuid
 
 from ...v2 import storage as S
 from ...v2.services.errors import InvalidInput
@@ -36,12 +37,16 @@ def _connect(project_dir):
             backup = Path(project_dir) / 'backups' / 'before-agent-v3.sqlite3'
             if not backup.exists():
                 reader = sqlite3.connect(str(Path(project_dir) / 'framebound.sqlite3'))
-                target = sqlite3.connect(str(backup))
+                temporary = backup.with_name(f'.agent-v3-{uuid.uuid4().hex}.sqlite3')
+                target = sqlite3.connect(str(temporary))
                 try:
                     reader.backup(target)
+                    target.close()
+                    temporary.replace(backup)
                 finally:
                     target.close()
                     reader.close()
+                    temporary.unlink(missing_ok=True)
             con.execute(f'CREATE TABLE {TABLE}(id TEXT PRIMARY KEY, data TEXT NOT NULL)')
         con.commit()
         return con
@@ -64,7 +69,7 @@ def _negotiate(spec):
         out.append(NegotiatedRequirement(
             id=rid, check=check, required=required,
             applicability='supported' if supported else 'unsupported',
-            method='native-media-v1' if supported else 'none',
+            method={'media': 'v2:native_registration', 'timing': 'v2:locked_cadence'}.get(check, 'none'),
             limitation=('Establishes structural validity only; animation quality is not verified.'
                         if supported else 'No validated reference-free evaluator is available for this requirement.'),
             ways_forward=[] if supported else ['Obtain independently reviewed annotations and a validated evaluator.',
