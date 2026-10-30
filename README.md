@@ -46,7 +46,7 @@ Review works directly in the local browser. A same-origin, loopback-only HttpOnl
 
 Open http://127.0.0.1:8765 for the review desk.
 
-The desk opens on interventions grouped by project, with chronological history and keyboard sequence search. Each animation selects and centres its first frame needing attention. Aligned reference/candidate film sits above a separate measurement track, with translucent row labels and a persistent frame inspector for evidence, corrections and decisions. Review dialogs retain exact tick playback, native-pixel regions and server-derived release eligibility. See [the review workflow](docs/REVIEW_DESK.md).
+The desk opens on interventions grouped by project, with chronological history and keyboard sequence search. Each animation selects and centres its first frame needing attention. Aligned reference/candidate film sits above a separate measurement track, with compact opaque row labels and a persistent frame inspector for evidence, corrections and decisions. Playback uses one fixed comparison stage and keeps inspection still until paused. Drag and trackpad overscroll spring back to padded film ends. Review dialogs retain exact tick playback, native-pixel regions and server-derived release eligibility. See [the review workflow](docs/REVIEW_DESK.md).
 
 ## Model-facing tools
 

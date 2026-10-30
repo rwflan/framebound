@@ -202,7 +202,6 @@
   --label-border: #b7ac97;
   position: absolute;
   left: 0;
-  width: 112px;
   pointer-events: none;
 }
 .reel-lane-label.candidate {
@@ -219,9 +218,9 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  width: 112px;
+  width: max-content;
   min-height: 28px;
-  padding: 5px 12px;
+  padding: 5px 9px;
   white-space: nowrap;
   font-size: 11px;
   line-height: 1.2;
@@ -404,11 +403,153 @@
 @media (max-width: 560px) {
   .reel-lane-label,
   .reel-lane-label strong {
-    width: 96px;
+    width: max-content;
   }
   .reel-lane-label strong {
     font-size: 10px;
     min-height: 24px;
-    padding: 4px 10px;
+    padding: 4px 8px;
   }
+}
+/* Playback has a stationary comparison stage. The inspection reel stays mounted underneath. */
+.playback-mode > .reel-camera {
+  visibility: hidden;
+  pointer-events: none;
+}
+.playback-comparison {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  background: #e4dfd2;
+  outline: none;
+}
+.playback-comparison:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -4px;
+}
+.playback-images {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+.playback-lane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid #b7ac97;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #ede7d9;
+  box-shadow: 1px 2px 0 #57493320;
+}
+.playback-lane > header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: max-content;
+  min-height: 28px;
+  padding: 6px 9px;
+  border-right: 1px solid #b7ac97;
+  border-bottom: 1px solid #b7ac97;
+  border-radius: 0 0 4px 0;
+  background: #ede7d9;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.playback-lane.candidate > header {
+  background: #f4e5c8;
+}
+.playback-image {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: conic-gradient(
+    #b5b5a7 25%,
+    #c3c3b5 0 50%,
+    #b5b5a7 0 75%,
+    #c3c3b5 0
+  );
+  background-size: 14px 14px;
+}
+.playback-image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.playback-scrub {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  flex-shrink: 0;
+  background: transparent;
+  accent-color: var(--primary);
+}
+.return-to-film {
+  margin-left: auto;
+  font-size: 10px;
+  min-height: 25px;
+  height: 25px;
+  padding: 3px 8px;
+}
+.return-to-film svg {
+  width: 14px;
+  height: 14px;
+}
+@media (max-width: 980px) {
+  .playback-comparison {
+    padding: 16px;
+    gap: 12px;
+  }
+  .playback-images {
+    gap: 12px;
+  }
+  .playback-image img {
+    padding: 10px;
+  }
+}
+@media (max-width: 760px) {
+  .playback-images {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+  .playback-comparison {
+    padding: 12px;
+  }
+  .playback-lane > header {
+    min-height: 24px;
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+  .playback-image img {
+    padding: 8px;
+  }
+}
+
+/* Inline visibility set by the camera must not bring film labels over the player. */
+.playback-mode > .reel-camera .reel-lane-label {
+  visibility: hidden !important;
+}
+.playback-comparison.is-running .playback-scrub {
+  visibility: hidden;
+}
+.control-counter {
+  min-width: 52px;
 }

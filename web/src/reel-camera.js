@@ -17,6 +17,8 @@ export class ReelCamera {
     this.zoomRaf = 0;
     this.drag = null;
     this.pinch = null;
+    this.wheelPan = null;
+    this.wheelTimer = 0;
     this.pointers = new Map();
     this.suppressUntil = 0;
     this.abort = new AbortController();
@@ -110,11 +112,36 @@ export class ReelCamera {
   clampY(y) {
     return Math.max(this.minY, Math.min(this.maxY, y));
   }
-  rubber(x, min = this.min, max = this.max) {
+  panBounds() {
+    const width = this.trackWidth * this.zoom;
+    const center = (this.width - width) / 2;
+    return {
+      min: width <= this.width - 48 ? center : this.width - width - 24,
+      max: width <= this.width - 48 ? center : 24,
+      minY: this.minY,
+      maxY: this.maxY,
+    };
+  }
+  panOrigin() {
+    const limits = this.panBounds();
+    // A selected end frame may initially be centred. Beginning a gesture must not jump.
+    return {
+      min: Math.min(limits.min, this.x),
+      max: Math.max(limits.max, this.x),
+      minY: Math.min(limits.minY, this.y),
+      maxY: Math.max(limits.maxY, this.y),
+    };
+  }
+  rubber(
+    x,
+    min = this.min,
+    max = this.max,
+    reach = Math.max(240, this.width * 0.85),
+  ) {
     return x > max
-      ? max + 56 * (1 - Math.exp(-(x - max) / 300))
+      ? max + reach * (1 - Math.exp(-(x - max) / reach))
       : x < min
-        ? min - 56 * (1 - Math.exp(-(min - x) / 300))
+        ? min - reach * (1 - Math.exp(-(min - x) / reach))
         : x;
   }
   paint() {
@@ -157,11 +184,17 @@ export class ReelCamera {
       this.zoom,
     );
   }
-  stop() {
+  stopMotion() {
     cancelAnimationFrame(this.raf);
     cancelAnimationFrame(this.zoomRaf);
     this.raf = this.zoomRaf = 0;
     this.velocity = this.velocityY = 0;
+  }
+  stop() {
+    this.stopMotion();
+    clearTimeout(this.wheelTimer);
+    this.wheelTimer = 0;
+    this.wheelPan = null;
   }
   jump(x, y = this.y) {
     this.stop();
@@ -170,13 +203,19 @@ export class ReelCamera {
     this.paint();
   }
   go(x, velocity = this.velocity, y = this.y, velocityY = this.velocityY) {
-    this.target = this.clamp(x);
-    this.targetY = this.clampY(y);
+    this.stop();
+    this.springTo(this.clamp(x), velocity, this.clampY(y), velocityY);
+  }
+  springTo(x, velocity, y, velocityY) {
+    this.stopMotion();
+    this.target = x;
+    this.targetY = y;
     if (reduced.matches) {
-      this.jump(this.target, this.targetY);
+      this.x = x;
+      this.y = y;
+      this.paint();
       return;
     }
-    this.stop();
     this.velocity = velocity;
     this.velocityY = velocityY;
     let previous = performance.now();
@@ -204,6 +243,17 @@ export class ReelCamera {
       this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
+  }
+  settlePan(x = this.x, velocity = 0, y = this.y, velocityY = 0) {
+    const limits = this.panBounds();
+    const outsideX = this.x < limits.min || this.x > limits.max;
+    const outsideY = this.y < limits.minY || this.y > limits.maxY;
+    this.springTo(
+      Math.max(limits.min, Math.min(limits.max, x)),
+      outsideX ? 0 : velocity,
+      Math.max(limits.minY, Math.min(limits.maxY, y)),
+      outsideY ? 0 : velocityY,
+    );
   }
   zoomTo(
     value,
@@ -293,6 +343,7 @@ export class ReelCamera {
       speed: 0,
       speedY: 0,
       moved: false,
+      limits: this.panOrigin(),
     };
   }
   move(e) {
@@ -338,8 +389,15 @@ export class ReelCamera {
     d.lastX = e.clientX;
     d.lastY = e.clientY;
     d.lastTime = now;
-    this.x = this.rubber(d.x + dx);
-    this.y = vertical ? this.rubber(d.y + dy, this.minY, this.maxY) : 0;
+    this.x = this.rubber(d.x + dx, d.limits.min, d.limits.max);
+    this.y = vertical
+      ? this.rubber(
+          d.y + dy,
+          d.limits.minY,
+          d.limits.maxY,
+          Math.max(160, this.height * 0.75),
+        )
+      : 0;
     this.paint();
   }
   up(e, cancelled = false) {
@@ -368,7 +426,7 @@ export class ReelCamera {
         sx = stale ? 0 : Math.max(-3.2, Math.min(3.2, d.speed)),
         sy = stale ? 0 : Math.max(-3.2, Math.min(3.2, d.speedY));
       this.suppressUntil = performance.now() + 320;
-      this.go(
+      this.settlePan(
         this.x + (reduced.matches ? 0 : sx * 170),
         sx * 180,
         this.y + (reduced.matches ? 0 : sy * 170),
@@ -385,17 +443,36 @@ export class ReelCamera {
       this.zoomTo(this.zoom * Math.exp(-e.deltaY * 0.008), p.x, p.y, true);
       return;
     }
-    if (this.minY !== this.maxY && !e.shiftKey) {
-      this.go(
-        (this.raf ? this.target : this.x) - e.deltaX * unit,
-        this.velocity,
-        (this.raf ? this.targetY : this.y) - e.deltaY * unit,
-      );
-      return;
+    if (this.drag || this.pinch) return;
+    if (!this.wheelPan) {
+      this.stop();
+      this.wheelPan = { x: this.x, y: this.y, limits: this.panOrigin() };
     }
-    const delta =
-      (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * unit;
-    this.go((this.raf ? this.target : this.x) - delta);
+    const pan = this.wheelPan;
+    if (this.minY !== this.maxY && !e.shiftKey) {
+      pan.x -= e.deltaX * unit;
+      pan.y -= e.deltaY * unit;
+    } else {
+      pan.x -=
+        (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * unit;
+    }
+    this.springTo(
+      this.rubber(pan.x, pan.limits.min, pan.limits.max),
+      this.velocity,
+      this.rubber(
+        pan.y,
+        pan.limits.minY,
+        pan.limits.maxY,
+        Math.max(160, this.height * 0.75),
+      ),
+      this.velocityY,
+    );
+    clearTimeout(this.wheelTimer);
+    this.wheelTimer = setTimeout(() => {
+      this.wheelTimer = 0;
+      this.wheelPan = null;
+      this.settlePan(this.target, this.velocity, this.targetY, this.velocityY);
+    }, 140);
   }
   reveal(index, width, force = false) {
     const size = width * this.zoom,
