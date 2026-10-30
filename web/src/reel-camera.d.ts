@@ -14,6 +14,7 @@ export class ReelCamera {
   trackHeight: number;
   min: number;
   max: number;
+  centerEdges?: boolean;
   onResize?: () => void;
   bounds(): void;
   measure(): void;

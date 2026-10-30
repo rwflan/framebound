@@ -153,6 +153,16 @@ async function main() {
     assert(title.includes(REVIEW_REV), `revision title wrong: ${title}`);
     assert(await page.locator('#packet-title').getAttribute('data-packet-id') === 'pkt-diff', 'view bound to wrong packet');
 
+    step = 'first-attention-centered';
+    const firstBundle=(await api('/api/packet/pkt-diff')).json;
+    const flagged=firstBundle.evaluation.results.filter(c=>['fail','error','unmeasured'].includes(c.outcome)&&/^slot \d+$/.test(c.scope)).map(c=>Number(c.scope.slice(5)));
+    const firstFlag=flagged.length?Math.min(...flagged):0;
+    assert(await page.locator('.candidate .reel-frame[aria-pressed=true]').getAttribute('aria-label')===`Candidate, frame ${firstFlag+1}`, 'initial selection is not the first errant frame');
+    await page.waitForFunction(()=>{
+      const frame=document.querySelector('.candidate .reel-frame.is-current .frame-aperture')?.getBoundingClientRect(), camera=document.querySelector('.reel-camera')?.getBoundingClientRect();
+      return frame&&camera&&Math.abs((frame.left+frame.right-camera.left-camera.right)/2)<2;
+    });
+
     step = 'responsive-control-layout';
     for (const viewport of [{width:1280,height:900},{width:1218,height:1180},{width:940,height:1218},{width:768,height:1024},{width:390,height:844},{width:360,height:720}]) {
       await page.setViewportSize(viewport);
@@ -173,12 +183,13 @@ async function main() {
       return {mask:s.maskImage,composite:s.maskComposite,padding:parseFloat(s.paddingTop),color:s.backgroundColor,image:s.backgroundImage};
     });
     assert(stock.mask.includes('sprocket-hole.svg') && stock.composite.includes('exclude'), 'film perforations are not punched through the stock');
-    assert(stock.padding>=28, 'film borders are too small');
+    assert(stock.padding>=16, 'film borders are too small');
     assert(stock.color==='rgb(5, 5, 5)' && stock.image==='none', 'film stock must be flat black');
-    assert(await page.locator('html').evaluate(el=>getComputedStyle(el).colorScheme)==='light','Material workspace should use light surfaces');
-    await page.screenshot({path:path.join(SHOTS,'material-workspace.png')});
+    assert(await page.locator('html').evaluate(el=>getComputedStyle(el).colorScheme)==='light','Workspace should use light surfaces');
+    await page.screenshot({path:path.join(SHOTS,'desktop-workspace.png')});
 
-    assert(await page.locator('.frame-evidence').count() === 8, 'per-frame evidence bands missing');
+    assert(await page.locator('.measurement-cell').count() === 8, 'per-frame measurement sheet missing');
+    assert(await page.locator('.reel-stock .frame-measure').count() === 0, 'measurements must be outside the film stock');
     await page.getByRole('button', {name:'Zoom in',exact:true}).click();
     await page.getByRole('button', {name:'Zoom 125%. Reset to 100%.',exact:true}).waitFor();
     const viewed = (await api('/api/packet/pkt-diff')).json;
@@ -201,7 +212,8 @@ async function main() {
     await page.getByRole('button', {name:'Zoom 100%. Reset to 100%.',exact:true}).waitFor();
 
     step = 'assert-frame-media';
-    await page.getByRole('button', { name: 'Play', exact: true }).click();
+    await page.getByRole('button', { name: 'Open frame preview', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Play', exact: true }).click();
     await page.keyboard.press('Home'); // Home also pauses via the desk shortcut
     const frameImg = page.locator('#frame-img');
     await frameImg.waitFor({ timeout: 15000 });
@@ -306,7 +318,7 @@ async function main() {
     const issues2 = await api(`/api/issues?revision=${REVIEW_REV}`);
     assert(issues2.status === 200 && issues2.json.length === 1, 'issue lost across API restart');
     assert(issues2.json[0].event_id === iss.event_id, 'issue identity changed across restart');
-    assert((await page.locator('.frame-issue').allTextContents()).some(t => t.includes('torso pulse')), 'persisted correction missing from frame strip');
+    assert((await page.locator('.frame-issue').allTextContents()).some(t => t.includes('bounded visual defect')), 'persisted correction missing from frame strip');
     const after=await fetch(BASE+`/api/asset/${REVIEW_FRAME0}`,{headers:{Connection:'close'}});
     const shaAfter=createHash('sha256').update(Buffer.from(await after.arrayBuffer())).digest('hex');
     out.asset_sha256_after_restart=shaAfter;

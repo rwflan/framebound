@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { slotAtTick, tickOfSlot, totalTicks } from './playback';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { slotAtTick, tickOfSlot, totalTicks } from "./playback";
 
 /** Persistent monotonic-clock accumulator: pause/resume, speed changes and
  *  frame selection preserve the authored-tick position. One-shot clips stop
@@ -10,20 +10,21 @@ export function usePresentationClock(opts: {
   loop: boolean;
   resetKey: string | number;
   autoPlay?: boolean;
+  initialTick?: number;
 }) {
   const { holds, tps, loop, resetKey } = opts;
-  const [tickFloat, setTickFloat] = useState(0);
+  const [tickFloat, setTickFloat] = useState(opts.initialTick ?? 0);
   const [playing, setPlaying] = useState(opts.autoPlay ?? true);
   const [speed, setSpeedState] = useState(1);
-  const accRef = useRef(0);
+  const accRef = useRef(opts.initialTick ?? 0);
   const lastRef = useRef(0);
   const rafRef = useRef(0);
   const liveRef = useRef({ holds, tps, loop, speed });
   liveRef.current = { holds, tps, loop, speed };
 
   useEffect(() => {
-    accRef.current = 0;
-    setTickFloat(0);
+    accRef.current = opts.initialTick ?? 0;
+    setTickFloat(accRef.current);
   }, [resetKey]);
 
   useEffect(() => {
@@ -50,27 +51,51 @@ export function usePresentationClock(opts: {
   }, [playing]);
 
   const total = totalTicks(holds);
-  const tick = Math.max(0, Math.min(total - 1, Math.floor(loop ? tickFloat % total : tickFloat)));
+  const tick = Math.max(
+    0,
+    Math.min(total - 1, Math.floor(loop ? tickFloat % total : tickFloat)),
+  );
   const slot = holds.length ? slotAtTick(holds, tick, loop) : 0;
 
-  const poke = useCallback(() => { lastRef.current = performance.now(); }, []);
+  const poke = useCallback(() => {
+    lastRef.current = performance.now();
+  }, []);
   const selectTick = useCallback((t: number) => {
     const totalNow = totalTicks(liveRef.current.holds);
     accRef.current = Math.max(0, Math.min(totalNow - 1e-3, t));
     lastRef.current = performance.now();
     setTickFloat(accRef.current);
   }, []);
-  const stepTick = useCallback((d: number) => {
-    selectTick(Math.floor(accRef.current) + d);
-  }, [selectTick]);
-  const selectSlot = useCallback((s: number) => {
-    selectTick(tickOfSlot(liveRef.current.holds, s));
-  }, [selectTick]);
+  const stepTick = useCallback(
+    (d: number) => {
+      selectTick(Math.floor(accRef.current) + d);
+    },
+    [selectTick],
+  );
+  const selectSlot = useCallback(
+    (s: number) => {
+      selectTick(tickOfSlot(liveRef.current.holds, s));
+    },
+    [selectTick],
+  );
   const setSpeed = useCallback((sp: number) => {
     if (!(sp > 0)) return;
     lastRef.current = performance.now(); // continuity: no jump on speed change
     setSpeedState(sp);
   }, []);
 
-  return { tick, tickFloat, slot, total, playing, setPlaying, speed, setSpeed, selectTick, stepTick, selectSlot, poke };
+  return {
+    tick,
+    tickFloat,
+    slot,
+    total,
+    playing,
+    setPlaying,
+    speed,
+    setSpeed,
+    selectTick,
+    stepTick,
+    selectSlot,
+    poke,
+  };
 }

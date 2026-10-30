@@ -105,3 +105,39 @@ test("lane names remain separated at minimum zoom", () => {
   assert.ok(c.labels.every((n) => n.style.visibility === "visible"));
   c.destroy();
 });
+
+test("sequence camera centers both end frames and fit centers the whole strip", () => {
+  const { c } = camera();
+  c.track.querySelector = () => ({ offsetWidth: 250 });
+  c.centerEdges = true;
+  c.bounds();
+  for (const index of [0, 3, 7]) {
+    c.reveal(index, 250, true);
+    assert.equal(c.x + (index + 0.5) * 250 * c.zoom, c.width / 2);
+  }
+  c.fit();
+  assert.ok(c.trackWidth * c.zoom <= c.width - 48 + 0.001);
+  assert.ok(Math.abs(c.x + (c.trackWidth * c.zoom) / 2 - c.width / 2) < 0.001);
+  c.destroy();
+});
+test("reference, candidate and measurement names stay distinct at overview zoom", () => {
+  const { c } = camera();
+  c.lanes = [
+    { top: 34, height: 190 },
+    { top: 280, height: 190 },
+    { top: 530, height: 75 },
+  ];
+  c.labels = c.lanes.map(() => ({
+    style: {
+      setProperty(k, v) {
+        this[k] = v;
+      },
+    },
+  }));
+  c.zoomTo(0.05, 500, 300, true);
+  const centers = c.labels.map(
+    (n) => parseFloat(n.style.top) + parseFloat(n.style["--label-y"]),
+  );
+  assert.ok(centers[1] - centers[0] >= 28 && centers[2] - centers[1] >= 28);
+  c.destroy();
+});
