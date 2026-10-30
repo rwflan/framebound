@@ -1,0 +1,109 @@
+/* Perforations are holes in the stock: the workspace shows through them. */
+.film-desk .reel-stock {
+  --perforation-pitch: calc(var(--cell-width) / 6);
+  padding: 32px 0;
+  border-block: 1px solid #9ba8b548;
+  background:
+    linear-gradient(
+      180deg,
+      #d6e0e41a,
+      transparent 5%,
+      transparent 94%,
+      #03080f80
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(var(--cell-width) - 1px),
+      #02060a80 calc(var(--cell-width) - 1px),
+      #02060a80 var(--cell-width)
+    ),
+    #26303b;
+  box-shadow:
+    inset 0 2px 0 #e5eef50d,
+    inset 0 -2px 0 #0007;
+  mask-image:
+    linear-gradient(#fff, #fff), url("/desk/sprocket-hole.svg"),
+    url("/desk/sprocket-hole.svg");
+  mask-size:
+    100% 100%,
+    var(--perforation-pitch) 18px,
+    var(--perforation-pitch) 18px;
+  mask-position:
+    center,
+    left top 7px,
+    left bottom 7px;
+  mask-repeat: no-repeat, repeat-x, repeat-x;
+  mask-composite: exclude;
+}
+.film-desk .reel-stock:before,
+.film-desk .reel-stock:after {
+  height: 18px;
+  background: url("/desk/film-perforation.svg") repeat-x left center /
+    var(--perforation-pitch) 18px;
+  opacity: 1;
+}
+.film-desk .reel-stock:before {
+  top: 7px;
+}
+.film-desk .reel-stock:after {
+  bottom: 7px;
+}
+.film-desk .reel-frame-unit > .reel-frame,
+.film-desk .reel-shot {
+  padding-inline: 10px;
+}
+.film-desk .frame-aperture,
+.film-desk .shot-aperture {
+  border: 1px solid #05090dcc;
+  border-radius: 3px;
+  box-shadow:
+    0 0 0 2px #10192299,
+    inset 0 0 0 1px #e7f3ff19;
+}
+.film-desk .reel-frame.is-current .frame-aperture {
+  border-color: #dce9fc;
+  box-shadow:
+    0 0 0 2px #acc5e433,
+    inset 0 0 0 1px #f1f7ff25;
+}
+.film-desk .frame-evidence {
+  margin-inline: 10px;
+  background: #172434;
+  border-inline-color: #101922;
+  border-bottom-color: #0a111c;
+  border-radius: 0 0 3px 3px;
+}
+.film-desk .reel-sequence {
+  gap: 20px;
+}
+.film-desk .reel-sequence-camera {
+  --lane-height: clamp(44px, calc((100cqh - 304px) / 2), 1200px);
+}
+@media (max-width: 620px) {
+  .film-desk .reel-stock {
+    padding-block: 28px;
+  }
+  .film-desk .reel-stock:before {
+    top: 5px;
+  }
+  .film-desk .reel-stock:after {
+    bottom: 5px;
+  }
+  .film-desk .reel-stock {
+    mask-position:
+      center,
+      left top 5px,
+      left bottom 5px;
+  }
+  .film-desk .reel-frame-unit > .reel-frame,
+  .film-desk .reel-shot {
+    padding-inline: 8px;
+  }
+  .film-desk .frame-evidence {
+    margin-inline: 8px;
+  }
+  .film-desk .reel-sequence-camera {
+    --lane-height: clamp(36px, calc((100cqh - 288px) / 2), 1200px);
+  }
+}

@@ -1,0 +1,469 @@
+/* Shared surface, spacing and state rules for the review app's controls. */
+.desk-shell {
+  --control-size: 44px;
+  --surface-raised: #19253a;
+  --surface-tonal: #293c58;
+  --control-outline: #9cb4d330;
+  --control-focus: #c7ddff;
+}
+.streamlined-header {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  height: 72px;
+  min-height: 72px;
+  gap: 24px;
+  padding: 0 24px;
+}
+.streamlined-header .brand {
+  grid-column: 1;
+  grid-row: 1;
+}
+.streamlined-header .review-navigation {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  height: auto;
+  gap: 8px;
+}
+.streamlined-header .review-navigation button {
+  min-height: 40px;
+  border-radius: 24px;
+  padding: 10px 16px;
+  gap: 8px;
+  font-size: 13px;
+  color: #a8bad5;
+  transition:
+    background 0.16s,
+    color 0.16s;
+}
+.streamlined-header .review-navigation button:hover {
+  background: #8caed51a;
+  color: #e8f1ff;
+}
+.streamlined-header .review-navigation button[aria-current="page"] {
+  background: #354a686e;
+  color: #edf5ff;
+}
+.streamlined-header .review-navigation button[aria-current="page"]:after {
+  display: none;
+}
+.streamlined-header .review-navigation button > span {
+  border: 0;
+  border-radius: 6px;
+  background: #8facc21a;
+  color: #b9cce7;
+  min-width: 20px;
+  line-height: 20px;
+}
+.streamlined-header > .workspace-switcher {
+  grid-column: 3;
+  grid-row: 1;
+}
+.streamlined-header .workspace-switcher summary {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  padding: 0;
+  transition: background 0.16s;
+}
+.streamlined-header .workspace-switcher summary:hover {
+  background: #8caed51a;
+}
+.workspace-switcher nav {
+  border-radius: 16px;
+  background: #1c2a40f5;
+  box-shadow: 0 12px 36px #0006;
+}
+.sequence-context {
+  gap: 16px;
+  padding: 0 24px 12px;
+  min-height: 56px;
+}
+.sequence-context .sequence-picker,
+.sequence-context > select:not(.sequence-picker) {
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--control-outline);
+  background-color: #26375044;
+  padding: 8px 28px 8px 12px;
+}
+.sequence-context .sequence-picker {
+  font-size: 15px;
+  font-weight: 500;
+}
+.sequence-context > select:not(.sequence-picker) {
+  font-size: 12px;
+  max-width: 170px;
+}
+.sequence-status {
+  gap: 16px;
+}
+.timeline-tools {
+  padding-inline: 24px;
+  min-height: 56px;
+}
+.timeline-tools select {
+  min-height: 40px;
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+/* Each control group occupies a named area; rows never depend on flex wrapping. */
+.review-controls {
+  display: grid;
+  grid-template-columns: auto minmax(80px, 1fr) auto auto;
+  grid-template-areas: "position position position position" "transport caption zoom actions";
+  align-items: center;
+  gap: 8px 16px;
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 12px 24px 20px;
+  padding: 12px 16px 16px;
+  border: 1px solid #a1b5d125;
+  border-radius: 20px;
+  background: linear-gradient(160deg, #24334a88, #172236f2);
+  box-shadow:
+    0 8px 28px #0004,
+    inset 0 1px 0 #d9e6ff08;
+  position: relative;
+  z-index: 8;
+}
+.control-transport {
+  grid-area: transport;
+  display: grid;
+  grid-template-columns: var(--control-size) 48px var(--control-size);
+  gap: 4px;
+  align-items: center;
+}
+.control-counter {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #c7d8ef;
+  text-align: center;
+  white-space: nowrap;
+}
+.control-caption {
+  grid-area: caption;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-inline: 4px;
+}
+.control-caption strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: #d5e3f8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.control-caption > span {
+  font-size: 11px;
+  color: #9cb1d0;
+  white-space: nowrap;
+}
+.review-controls button {
+  height: var(--control-size);
+  min-height: var(--control-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  margin: 0;
+  border: 1px solid var(--control-outline);
+  border-radius: 24px;
+  color: #c0d1eb;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    background 0.16s,
+    border-color 0.16s,
+    color 0.16s;
+}
+.review-controls button:hover {
+  background: #9cb9e019;
+  border-color: #9cb9e05c;
+  color: #f2f7ff;
+}
+.review-controls button:active {
+  background: #9cb9e02b;
+}
+.review-controls button:focus-visible {
+  outline: 2px solid var(--control-focus);
+  outline-offset: 3px;
+}
+.review-controls button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.review-controls button svg {
+  width: 18px;
+  height: 18px;
+}
+.review-controls .control-icon,
+.review-controls .control-actions > .reel-icon {
+  width: var(--control-size);
+  min-width: var(--control-size);
+  padding: 0;
+}
+.control-zoom {
+  grid-area: zoom;
+  display: grid;
+  grid-template-columns: var(--control-size) 52px var(--control-size) var(
+      --control-size
+    );
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--control-outline);
+  border-radius: 24px;
+  background: #0b152640;
+  overflow: hidden;
+}
+.review-controls .control-zoom button {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-size: 16px;
+}
+.review-controls .control-zoom .zoom-value {
+  font-size: 12px;
+  font-weight: 400;
+}
+.review-controls .control-zoom button:last-child {
+  border-left: 1px solid var(--control-outline);
+  font-size: 12px;
+}
+.review-controls .control-zoom button:focus-visible {
+  outline-offset: -4px;
+  border-radius: 20px;
+}
+.control-position {
+  grid-area: position;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 24px;
+  margin: 0 6px;
+}
+.control-position input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: ew-resize;
+}
+.control-position input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 4px;
+  background: #60799d70;
+}
+.control-position input::-moz-range-track {
+  height: 4px;
+  border-radius: 4px;
+  background: #60799d70;
+}
+.control-position input::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 50%;
+  background: #c1d7f6;
+  box-shadow: 0 0 0 4px #a8c5f017;
+}
+.control-position input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: #c1d7f6;
+  box-shadow: 0 0 0 4px #a8c5f017;
+}
+.control-position input:disabled {
+  opacity: 0.3;
+}
+.control-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+.review-controls .control-actions > .reel-icon {
+  background: #8baee821;
+  border-color: #9cb9e039;
+  color: #d4e5ff;
+}
+.review-controls .control-actions > .reel-primary {
+  background: #e0ebfc;
+  border-color: #e0ebfc;
+  color: #19273d;
+  padding-inline: 20px;
+}
+.review-controls .control-actions > .reel-primary:hover {
+  background: #f4f8ff;
+  border-color: #f4f8ff;
+  color: #101b2b;
+}
+.review-controls .correction-action span {
+  display: inline;
+}
+.inspector {
+  border-radius: 20px;
+}
+.inspector button:not(.check-row):not(.frame-measure) {
+  min-height: 36px;
+  border-radius: 18px;
+}
+.inspector input:not([type="range"]),
+.inspector select,
+.inspector textarea {
+  border-radius: 10px;
+}
+@media (max-width: 1100px) {
+  .review-controls {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "position position position" "transport caption zoom" "actions actions actions";
+    margin: 12px 20px 16px;
+  }
+  .control-actions {
+    padding-top: 4px;
+  }
+}
+@media (max-width: 620px) {
+  .streamlined-header {
+    height: auto;
+    min-height: 108px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 10px 16px 4px;
+    gap: 4px 16px;
+  }
+  .streamlined-header .brand {
+    grid-column: 1;
+  }
+  .streamlined-header > .workspace-switcher {
+    grid-column: 2;
+  }
+  .streamlined-header .review-navigation {
+    grid-column: 1/-1;
+    grid-row: 2;
+    justify-self: start;
+    gap: 4px;
+  }
+  .streamlined-header .review-navigation button {
+    padding-inline: 14px;
+  }
+  .sequence-context {
+    padding: 0 16px 8px;
+    min-height: 52px;
+    gap: 8px;
+  }
+  .sequence-context .sequence-picker {
+    max-width: 135px;
+    font-size: 14px;
+  }
+  .sequence-context > select:not(.sequence-picker) {
+    max-width: 142px;
+    font-size: 11px;
+    padding-inline: 10px 22px;
+  }
+  .timeline-tools {
+    padding-inline: 16px;
+  }
+  .review-controls {
+    grid-template-columns: 144px minmax(0, 1fr);
+    grid-template-areas: "caption position" "transport zoom" "actions actions";
+    gap: 8px 12px;
+    margin: 8px 12px 12px;
+    padding: 12px;
+    border-radius: 18px;
+  }
+  .control-caption {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    max-width: 174px;
+    padding: 0;
+  }
+  .control-caption strong {
+    font-size: 11px;
+    max-width: 90px;
+  }
+  .control-caption > span {
+    font-size: 10px;
+  }
+  .control-position {
+    margin: 0 4px;
+  }
+  .control-zoom {
+    grid-template-columns: var(--control-size) 48px var(--control-size) var(
+        --control-size
+      );
+    justify-self: end;
+  }
+  .control-actions {
+    padding-top: 4px;
+    justify-content: flex-end;
+  }
+  .review-controls .control-actions > .correction-action {
+    width: var(--control-size);
+    min-width: var(--control-size);
+    padding: 0;
+  }
+  .review-controls .correction-action span {
+    display: none;
+  }
+  .review-controls .control-actions > .reel-primary {
+    padding-inline: 16px;
+  }
+}
+@media (max-width: 380px) {
+  .review-controls {
+    --control-size: 40px;
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 8px;
+  }
+  .control-transport {
+    grid-template-columns: var(--control-size) 40px var(--control-size);
+  }
+  .control-zoom {
+    grid-template-columns: var(--control-size) 44px var(--control-size) var(
+        --control-size
+      );
+  }
+  .control-caption {
+    gap: 5px;
+    max-width: 154px;
+  }
+  .review-controls .control-actions {
+    gap: 6px;
+  }
+  .review-controls .control-actions > button {
+    padding-inline: 12px;
+  }
+  .review-controls .control-actions > .reel-primary {
+    padding-inline: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .review-controls button,
+  .streamlined-header .review-navigation button {
+    transition: none;
+  }
+}
