@@ -31,6 +31,7 @@ import { Err, Icon, nav, parseHash, stamp, words } from "./shared";
 import { Modal } from "./Modal";
 import { useAutomaticUpdates } from "./useAutomaticUpdates";
 import "./desk.css";
+import { AgentDesk, useAgentDesk } from "./AgentDesk";
 type DeskData = {
   bundles: Bundle[];
   issues: IssueDetailDto[];
@@ -86,6 +87,17 @@ const workspaces = [
 ] as const;
 
 export default function App() {
+  const {data,error,refresh}=useAgentDesk();
+  const [hash,setHash]=useState(location.hash);
+  useEffect(()=>{const changed=()=>setHash(location.hash);window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[]);
+  if(error)return <Err e={error}/>;
+  if(!data)return <p>Loading workspace…</p>;
+  const legacy = /^#\/(packet|compare|issues|references|status|export|corrections|reviewed-guides)/.test(hash);
+  if(data.runs.length && !legacy)return <AgentDesk data={data} onChange={refresh}/>;
+  return <LegacyApp/>;
+}
+
+function LegacyApp() {
   const [view, setView] = useState(parseHash);
   const [data, setData] = useState<DeskData | null>(null);
   const [error, setError] = useState<unknown>(null);
