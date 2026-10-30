@@ -46,6 +46,7 @@ def revision(project, revision_id):
             source_comparison=dict(designation=task['spec']['source_correspondence'],
                                    frames=C.frames_at_output_starts(spec))
             for f in source_comparison['frames']:f['asset_url']=f"/api/asset/{f['asset_id']}"
-        return dict(source_comparison=source_comparison,revision=revision,evaluation=evaluation,task=task,feedback=feedback,frames=frames,
+        from ..provenance import summary
+        return dict(provenance=summary(revision.get('generation_metadata')),source_comparison=source_comparison,revision=revision,evaluation=evaluation,task=task,feedback=feedback,frames=frames,
                     current_revision_id=run['current_revision_id'],best_revision_id=run['best_revision_id'])
     finally:con.close()
