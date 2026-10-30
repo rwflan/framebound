@@ -168,8 +168,30 @@ response=dict(revision_id='fixed',frames=[dict(asset_id=baseline[0]),dict(file='
   const moved=path.join(WORK,'moved-snapshot');fs.renameSync(snapshot,moved);
   const validated=JSON.parse(python(`import json,sys;from framebound.v2.exports import validate_snapshot;result=validate_snapshot(sys.argv[1]);assert result['ok'],result['issues'];print(json.dumps(result))`,[moved]).split('\n').filter(l=>l.startsWith('{')).at(-1));
   assert(validated.ok);
+  // Before pixels exist, a durable parent-reported failure still has a usable handoff.
+  python(`import sys
+from framebound.v3.services import tasks,loop,failures
+project=sys.argv[1];spec=tasks.get(project,'task')['spec'];spec.update(id='pending-task',animation_id='pending')
+tasks.create(project,spec);loop.start(project,'pending-task','pending-run')
+failures.record(project,'pending-run',dict(id='attempt-1',kind='tool_error',reason='External tool unavailable before generating frames.',outcome_known=True))
+`,[PROJECT]);
+  await page.goto(BASE+'/#/run/pending-run');
+  await page.getByRole('main').getByText('External tool unavailable before generating frames.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'View instructions',exact:true}).click();
+  assert.match(await page.getByLabel('Saved instructions').inputValue(),/No candidate has been registered/);
+  assert.equal(await page.getByRole('link',{name:'Download portable handoff',exact:true}).count(),0);
+  const initialText=await fetch(BASE+'/v3/runs/pending-run').then(r=>r.json());
+  const initialDownload=await fetch(BASE+'/v3/feedback/'+encodeURIComponent(initialText.feedback_id)+'/text').then(r=>r.text());
+  assert.equal(await page.getByLabel('Saved instructions').inputValue(),initialDownload);
+  python(`import sys
+from framebound.v3.services import failures
+failures.record(sys.argv[1],'pending-run',dict(id='attempt-2',kind='provider_failure',reason='External provider outcome is unknown.',outcome_known=False))
+`,[PROJECT]);
+  await page.getByText(/Unknown parent-reported provider outcome/).first().waitFor();
+  await page.getByRole('button',{name:'View instructions',exact:true}).click();
+  assert.match(await page.getByLabel('Saved instructions').inputValue(),/This run is stopped/);
   fs.mkdirSync(path.join(ROOT,'output/playwright'),{recursive:true});
   await page.screenshot({path:path.join(ROOT,'output/playwright/agent-workflow.png')});
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({ok:true,work:WORK,checks:['native-markup','portable-offline-handoff','explicit-human-preference','saved-copy-download','live-stability','fresh-process-repair','owner-resolve-reopen','timeline-exact-revision','conditional-comparison','stable-playback','clipboard-fallback','manual-export-preview','moved-snapshot-validation','known-good-authored-time-comparison']}));
+  console.log(JSON.stringify({ok:true,work:WORK,checks:['native-markup','portable-offline-handoff','explicit-human-preference','saved-copy-download','live-stability','fresh-process-repair','owner-resolve-reopen','timeline-exact-revision','conditional-comparison','stable-playback','clipboard-fallback','manual-export-preview','moved-snapshot-validation','known-good-authored-time-comparison','pre-submission-failure-handoff','unknown-provider-stop']}));
 }finally{if(browser)await browser.close();server.kill('SIGTERM');}

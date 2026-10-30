@@ -76,7 +76,7 @@ def get(project, run_id):
         run = get_in(con, 'agent_runs', run_id)
         run['remaining_submissions'] = max(0, run['limits']['max_submissions'] - len(run['submission_ids']))
         run['feedback'] = (get_in(con, 'agent_feedback', run.get('feedback_id', f"feedback:{run['current_revision_id']}"))
-                           if run['current_revision_id'] else None)
+                           if run.get('feedback_id') or run['current_revision_id'] else None)
         return run
     finally:
         con.close()
@@ -124,7 +124,7 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 raise InvalidInput('persistent submission budget exhausted')
             if parent_revision_id != run['current_revision_id']:
                 raise S.StaleRevisionError('submission parent differs from current revision; fetch current feedback and explicitly rebase')
-            if parent_revision_id and feedback_id != run.get('feedback_id', f'feedback:{parent_revision_id}'):
+            if (parent_revision_id or run.get('feedback_id')) and feedback_id != run.get('feedback_id', f'feedback:{parent_revision_id}'):
                 raise S.StaleRevisionError('child submission must bind current saved feedback')
             if len(frame_asset_ids) != len(spec.timing.holds):
                 raise InvalidInput('frame count must equal the frozen authored hold count')
@@ -240,6 +240,7 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
             if passed and I.open_in(con, run_id):
                 run['lifecycle'], run['stop_reason'] = 'awaiting_decision', 'Technical checks passed; saved human corrections require explicit owner resolution.'
             elif passed and spec.intervention != 'explicit_review' and spec.completion.id == 'technical-unreviewed-v1':
+                run['best_revision_id']=revision_id
                 run['lifecycle'], run['stop_reason'] = 'completed', 'Declared requirements met under technical-unreviewed-v1.'
             elif passed:
                 run['lifecycle'], run['stop_reason'] = 'awaiting_decision', 'Exact-revision human decision required by the task policy.'
@@ -309,7 +310,7 @@ def _feedback(run, task, revision, evaluation, regressions):
         allowed_changes=spec.allowed_changes, repair_scope=spec.repair_scope,
         timing=spec.timing.model_dump(), remaining_submissions=max(0,run['limits']['max_submissions']-len(run['submission_ids'])),
         verification='Re-evaluate the complete declared matrix, including neighbours and loop boundaries; frozen bounds cannot be weakened.',
-        continuation=(dict(operation='agent_run_get',arguments=dict(run_id=run['id']),submission_allowed=False) if run['lifecycle'] in {'cancelled','blocked'} else dict(operation='agent_run_submit', arguments=dict(run_id=run['id'], parent_revision_id=revision['id'],
+        continuation=(dict(operation='agent_run_get',arguments=dict(run_id=run['id']),submission_allowed=False) if run['lifecycle'] in {'cancelled','blocked'} else dict(operation='agent_run_eligibility',arguments=dict(run_id=run['id']),submission_allowed=False) if run['lifecycle']=='completed' else dict(operation='agent_run_submit', arguments=dict(run_id=run['id'], parent_revision_id=revision['id'],
             feedback_id=f"feedback:{revision['id']}", revision_id='<new immutable ID>', frame_asset_ids='<complete ordered imported asset IDs>'))))
 
 
@@ -323,13 +324,27 @@ def eligibility(project, run_id):
         if not rid:
             return dict(eligible=False, reasons=['No evaluated revision.'], creative_status=run['creative_status'])
         evaluation = get_in(con, 'agent_evaluations', f'evaluation:{rid}')
-        for asset in evaluation['evidence']['assets']:
+        spec = tasks._get(con, run['task_id']).spec
+        media=list(evaluation['evidence']['assets'])+list(evaluation['evidence'].get('source_correspondence',{}).get('assets',[]))
+        for binding in spec.inputs:
+            try:
+                asset,_=S.get(con,'assets',binding.asset_id)
+                media.append(dict(id=binding.asset_id,byte_sha256=asset['byte_sha256']))
+            except KeyError:reasons.append(f'missing_input_asset_record:{binding.asset_id}')
+        checked=set()
+        for asset in media:
+            identity=(asset['id'],asset['byte_sha256'])
+            if identity in checked:continue
+            checked.add(identity)
+            try:
+                record,_=S.get(con,'assets',asset['id'])
+                if record['byte_sha256']!=asset['byte_sha256']:reasons.append(f"changed_asset_binding:{asset['id']}")
+            except KeyError:reasons.append(f"missing_asset_record:{asset['id']}")
             path = S.blob_path(project, asset['byte_sha256'])
             if not path.is_file() or S.sha256_bytes(path.read_bytes()) != asset['byte_sha256']:
                 reasons.append(f"missing_or_changed_asset:{asset['id']}")
         if evaluation['technical_status'] != 'pass' or evaluation['coverage'] != 'complete':
             reasons.append('Required technical matrix is not complete and passing.')
-        spec = tasks._get(con, run['task_id']).spec
         from . import interventions as I
         if spec.completion.id == 'human-reviewed-v1' and not I.approved_in(con, run_id, rid, evaluation['id']):
             reasons.append('Human-reviewed policy requires an exact saved reviewer decision.')
@@ -365,6 +380,11 @@ def cancel(project, run_id, reason):
             if run['current_revision_id']:
                 from . import interventions as I
                 I.save_feedback_in(con,run,f"handoff:{run_id}:cancelled")
+            elif run.get('feedback_id'):
+                import copy
+                bundle=copy.deepcopy(get_in(con,'agent_feedback',run['feedback_id']))
+                bundle.update(id=f"handoff:{run_id}:cancelled",supersedes_feedback_id=bundle['id'],disposition='blocked',reason=reason,continuation=dict(operation='agent_run_get',arguments=dict(run_id=run_id),submission_allowed=False))
+                insert(con,'agent_feedback',bundle);run['feedback_id']=bundle['id']
             _update(con, run)
         return run
     finally:
@@ -391,6 +411,8 @@ def revise_task(project, run_id, task_id, expected_version):
             if run['task_id']==task_id:return run
             if run['version']!=expected_version:raise S.StaleRevisionError('run changed; fetch its current version before applying a task revision')
             if run['lifecycle']=='cancelled':raise InvalidInput('cancelled runs cannot be resumed with a task revision')
+            if run.get('blocker_kind')=='provider_outcome_unknown':raise InvalidInput('an unknown provider outcome cannot be cleared by revising the task')
+            if run.get('external_failures',0)>=run['limits'].get('max_external_failures',8) or run.get('provider_failures',0)>=run['limits'].get('max_provider_failures',3):raise InvalidInput('persistent external-failure limit reached; a task revision cannot replenish it')
             new=tasks._get(con,task_id);old=tasks._get(con,run['task_id'])
             if new.spec.supersedes!=old.id or (new.spec.project_id,new.spec.animation_id)!=(run['project_id'],run['animation_id']):
                 raise InvalidInput('new task must explicitly supersede this run task with the same project/animation identity')
@@ -406,14 +428,16 @@ def revise_task(project, run_id, task_id, expected_version):
                 if type(value) is int:run['limits'][key]=min(run['limits'].get(key,value),value)
             run['creative_status']='unreviewed'
             run['lifecycle']='awaiting_agent';run['stop_reason']='Task specification explicitly revised: '+new.spec.change_reason
-            if len(run['submission_ids'])>=run['limits']['max_submissions'] or run['no_progress_count']>=run['limits']['max_unchanged']:
+            if (len(run['submission_ids'])>=run['limits']['max_submissions'] or run['no_progress_count']>=run['limits']['max_unchanged']
+                or run.get('external_failures',0)>=run['limits'].get('max_external_failures',8)
+                or run.get('provider_failures',0)>=run['limits'].get('max_provider_failures',3)):
                 run['lifecycle']='blocked';run['stop_reason']='New task limits leave no remaining attempts; prior spending is retained.'
             if not I.open_in(con,run_id):run.pop('edit_baseline_revision_id',None)
             event=dict(id=f'{run_id}:task:{task_id}',run_id=run_id,project_id=run['project_id'],animation_id=run['animation_id'],
                        task_id=task_id,previous_task_id=prior,event='task_revised',revision_id=run['current_revision_id'],
                        source='external_agent',note=new.spec.change_reason,created_at=D.utcnow(),ordinal=run['version']+1)
             insert(con,'agent_run_events',event)
-            if run['current_revision_id']:
+            if run['current_revision_id'] or run.get('feedback_id'):
                 previous=get_in(con,'agent_feedback',run.get('feedback_id',f"feedback:{run['current_revision_id']}"))
                 import copy
                 bundle=copy.deepcopy(previous);bundle['id']=f'handoff:{run_id}:task:{task_id}'
@@ -421,7 +445,8 @@ def revise_task(project, run_id, task_id, expected_version):
                 bundle['next_task_id']=task_id;bundle['next_spec_sha256']=new.spec_sha256
                 bundle['creative_status']='unreviewed';bundle['remaining_submissions']=max(0,run['limits']['max_submissions']-len(run['submission_ids']))
                 if run['lifecycle']=='blocked':bundle['continuation']=dict(operation='agent_run_get',arguments=dict(run_id=run_id),submission_allowed=False)
-                else:bundle['continuation']['arguments']['feedback_id']=bundle['id']
+                elif not run['current_revision_id']:bundle['continuation']=dict(operation='task_compile_inputs',arguments=dict(task_id=task_id),submission=dict(operation='agent_run_submit',arguments=dict(run_id=run_id,feedback_id=bundle['id'],revision_id='<new immutable ID>',frame_asset_ids='<complete ordered imported asset IDs>')))
+                else:bundle['continuation']=dict(operation='agent_run_submit',arguments=dict(run_id=run_id,parent_revision_id=run['current_revision_id'],feedback_id=bundle['id'],revision_id='<new immutable ID>',frame_asset_ids='<complete ordered imported asset IDs>'))
                 insert(con,'agent_feedback',bundle);run['feedback_id']=bundle['id']
             _update(con,run)
         return run

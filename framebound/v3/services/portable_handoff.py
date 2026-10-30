@@ -39,6 +39,7 @@ def archive(project,feedback_id):
         bundle=loop.get_in(con,'agent_feedback',feedback_id);run=loop.get_in(con,'agent_runs',bundle['run_id'])
         if run.get('feedback_id',f"feedback:{run['current_revision_id']}")!=feedback_id or run['current_revision_id']!=bundle['baseline_revision_id']:
             raise S.StaleRevisionError('saved instructions are stale; fetch/rebase current feedback before packaging')
+        if bundle['baseline_revision_id'] is None:raise InvalidInput('no candidate exists to package; compile task inputs and recover the reported failure first')
         task_ids={bundle['task_id'],run['task_id']};specs={tid:tasks._get(con,tid).model_dump(mode='json',exclude_unset=True) for tid in task_ids}
         revision_ids={bundle['baseline_revision_id']}
         if run.get('edit_baseline_revision_id'):revision_ids.add(run['edit_baseline_revision_id'])

@@ -20,6 +20,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
   const [note,setNote]=useState(''),[roi,setRoi]=useState<Roi|null>(null),[grant,setGrant]=useState(false);
   const [rangeStart,setRangeStart]=useState(tickOfSlot(holds,initial.current));
   const [rangeEnd,setRangeEnd]=useState(tickOfSlot(holds,initial.current)+holds[initial.current]);
+  const [eligibility,setEligibility]=useState<{eligible:boolean;policy?:string;revision_id?:string;reasons:string[]}|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[message,setMessage]=useState('');
   const [saved,setSaved]=useState<string|null>(null),[compare,setCompare]=useState<AgentBundle|null>(null);
   const [compareSource,setCompareSource]=useState(false),[preferPrevious,setPreferPrevious]=useState(false);
@@ -33,6 +34,13 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
     if(wasPlaying.current && !clock.playing) { setSlot(clock.slot);setSelected([clock.slot]);anchor.current=clock.slot; }
     wasPlaying.current=clock.playing;
   },[clock.playing,clock.slot]);
+  useEffect(()=>{
+    let active=true;
+    const load=()=>req<{eligible:boolean;policy?:string;revision_id?:string;reasons:string[]}>(`/v3/runs/${encodeURIComponent(run.id)}/eligibility`)
+      .then(value=>{if(active)setEligibility(value);}).catch(()=>{if(active)setEligibility(null);});
+    void load();window.addEventListener('focus',load);
+    return()=>{active=false;window.removeEventListener('focus',load);};
+  },[run.id,run.version,b.revision.id]);
   useEffect(()=>{ setCompare(null); },[b.revision.id]);
   useEffect(()=>setPreferPrevious(false),[compare?.revision.id]);
   const focus=(index:number,shift=false)=>{
@@ -119,6 +127,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
         {b.task.requirements.filter(r=>r.applicability!=='supported').map(r=><p key={r.check}>{words(r.check)}: {r.limitation}</p>)}
         <details><summary>Contextual inputs</summary>{spec.inputs.map(i=><figure key={i.asset_id}><img className="agent-context-image" src={'/api/asset/'+encodeURIComponent(i.asset_id)} alt={i.role}/><figcaption>{words(i.role)} · {i.provenance}</figcaption></figure>)}</details>
         <small>{spec.scene?.limitation || (spec.profile==='structural-v1'?'Structural only; animation quality not verified.':'Declared regions and events only; broader anatomy and action quality remain judgment.')}</small>
+        <section className="agent-finding" aria-label="Output policy"><strong>Output policy</strong>{eligibility?<><small>{eligibility.policy||'Not evaluated'} · {eligibility.eligible?'Eligible':'Withheld'}</small>{eligibility.revision_id && eligibility.revision_id!==b.revision.id && <small>Applies to current best {eligibility.revision_id}</small>}{eligibility.reasons.map((reason,index)=><small key={index}>{reason}</small>)}</>:<small>Current eligibility unavailable</small>}</section>
         <Handoff feedbackId={b.feedback.id}/></>}
         {tab==='correction' && <form onSubmit={e=>{e.preventDefault();void save();}}><label>Desired correction<textarea aria-label="Desired correction" value={note} onChange={e=>setNote(e.target.value)} required maxLength={1000}/></label>
           <div className="agent-tick-range"><label>Start tick<input aria-label="Start tick" type="number" min={0} value={rangeStart} onChange={e=>setRangeStart(Number(e.target.value))}/></label><label>End tick (exclusive)<input aria-label="End tick" type="number" min={rangeStart+1} value={rangeEnd} onChange={e=>setRangeEnd(Number(e.target.value))}/></label></div>

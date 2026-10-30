@@ -18,6 +18,7 @@ missing real-art evidence below is supplied and measured.
 | Complete evaluation with localized useful defects, tool errors and missing measurements kept distinct | `evaluate`, `scene`, `correspondence`; defect localization/measurement tests | Implemented for the measured profiles, without artistic-completeness claims |
 | Full-matrix re-evaluation, no-regression best retention, failed history, broader declared repair scope | `loop.submit`, exact grant-preservation checks; regression/oscillation/scope tests | Implemented; best selection and historical evidence are separate from latest submission |
 | Persistent attempt/compute budgets, repeated outputs, oscillation, stale/concurrent submissions, process death | `loop`, `test_agent_loop.py`, `test_agent_task_revision.py`, provider recovery suites | Implemented; actual subprocess death and overlapping submissions tested |
+| Durable pre-submission failure reports, provider-unknown stop and persistent retry budgets | `services/failures.py`, shared CLI/MCP/HTTP, `test_agent_failures.py`, browser recovery/stop journey | Implemented; parent reports stay separate from provider receipts, artistic decisions and pixel evidence |
 | Durable shared feedback with exact task/revision/evaluation/assets/hashes, scope, preservation and available continuation operations | `_feedback`, interventions renderer; shared CLI/MCP/HTTP reads | Implemented; related scopes group without losing results/authority, and stopped runs return stop/state-fetch instructions |
 | Saved markup and decisions, owner resolve/reopen, no automatic closure of subjective work | `interventions`, API and browser journey | Implemented; real reviewer boundary and exact bindings enforced |
 | Copy/download/JSON handoff and stale rebase | `Handoff.tsx`, shared renderer, explicit rebase; browser clipboard/fallback tests | Implemented after save, with stale binding checks |
@@ -55,12 +56,20 @@ It runs unittest, the full pytest suite, offline demos, stored verification,
 portable export round-trip, frontend type/type-freshness/unit/build checks and
 both the agent and reviewed-guide browser journeys. Live provider work remains
 explicitly opt-in; skipping it is not counted as a successful participant live
-observation. The full verification run passed: 423 pytest cases passed and 4 were skipped;
+observation. All verification stages passed: 437 pytest cases passed and 4 were skipped;
 the unittest stage, both offline demos, stored verification, export round-trip,
 frontend type/type-freshness/unit/build checks and both real browser journeys
-passed. The legacy browser guard recorded zero external socket attempts. Live
+passed. The final reviewed-guide browser stage was resumed separately after an
+interruption. The legacy browser guard recorded zero external socket attempts. Live
 specialist observation was skipped in offline mode and remains unproven. The
-focused old-task HTTP serialization regression test also passes.
+focused old-task HTTP serialization regression test also passes. Final focused
+regressions additionally verify current source/context evidence freshness after
+completion; historical passing evaluation is not confused with current output
+eligibility. Parent-reported failure tests also cover pre-submission recovery,
+idempotent replay, stale initial-feedback rejection, persistent limits, unknown
+provider outcomes, retained spending under reduced task limits and human approval
+that cannot clear an execution stop. Both recovery and stopped handoffs are
+exercised in the browser.
 
 The standard `datasets` imagefolder loader has separately decoded all three views
 of a moved reference-free mixed-label snapshot: 3 human-approved procedural fixture

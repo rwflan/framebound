@@ -14,7 +14,7 @@ def validate(snap,manifest):
     issues=[]
     try:
         required={'agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1'}
-        if not required<=set(manifest.get('reader_capabilities',[])) or set(manifest.get('reader_capabilities',[]))-required-{'source-correspondence-v1','declared-color-camera-tracks-v1','explicit-human-preferences-v1','feedback-groups-v2'}:issues.append('unsupported reader capabilities')
+        if not required<=set(manifest.get('reader_capabilities',[])) or set(manifest.get('reader_capabilities',[]))-required-{'source-correspondence-v1','declared-color-camera-tracks-v1','explicit-human-preferences-v1','feedback-groups-v2','pre-submission-feedback-v1'}:issues.append('unsupported reader capabilities')
         listed=manifest['files']
         for rel,expected in listed.items():
             p=snap/rel
@@ -158,13 +158,22 @@ def validate(snap,manifest):
                 if r['required'] and not any(result['required'] and result['family']==r['check'] for result in evaluation['results']):issues.append('required matrix omitted '+rid+'/'+r['id'])
             parent=revision.get('parent_revision_id')
             if parent and (parent not in graph['revisions'] or revision['targeted_feedback_id'] not in graph['feedback']):issues.append('repair parent/feedback not portable '+rid)
+            if revision.get('targeted_feedback_id') and (revision['targeted_feedback_id'] not in graph['feedback'] or graph['feedback'][revision['targeted_feedback_id']]['baseline_revision_id']!=parent):issues.append('submission feedback binding differs '+rid)
             if parent and graph['feedback'][revision['targeted_feedback_id']]['baseline_revision_id']!=parent:issues.append('repair targets a different feedback baseline '+rid)
         for bundle in graph['feedback'].values():
             if bundle.get('bundle_version',1)>=2:
                 from ...v3.feedback import groups
                 if json.loads(json.dumps(groups(bundle)))!=bundle.get('correction_groups'):issues.append('correction grouping differs from saved targets')
-            evaluation=graph['evaluations'][bundle['evaluation_id']]
-            if evaluation['revision_id']!=bundle['baseline_revision_id'] or evaluation['evidence_digest']!=bundle['evidence_digest']:issues.append('feedback evidence binding differs '+bundle['id'])
+            if bundle['baseline_revision_id'] is None:
+                if 'pre-submission-feedback-v1' not in manifest['reader_capabilities'] or bundle['evaluation_id'] is not None or bundle['evidence_digest'] is not None or bundle['targets'] or bundle['technical_status']!='unevaluated':issues.append('pre-submission feedback invents evaluation evidence '+bundle['id'])
+                if not bundle.get('external_failure_event_id'):issues.append('pre-submission feedback lacks its actual failure report '+bundle['id'])
+            else:
+                evaluation=graph['evaluations'][bundle['evaluation_id']]
+                if evaluation['revision_id']!=bundle['baseline_revision_id'] or evaluation['evidence_digest']!=bundle['evidence_digest']:issues.append('feedback evidence binding differs '+bundle['id'])
+            if bundle.get('external_failure_event_id'):
+                event=graph['events'].get(bundle['external_failure_event_id'],{})
+                report=bundle.get('external_failure',{})
+                if event.get('source')!='external_agent' or event.get('run_id')!=bundle['run_id'] or event.get('revision_id')!=bundle['baseline_revision_id'] or event.get('evidence_task_id',event.get('task_id'))!=bundle['task_id'] or event.get('report')!={k:v for k,v in report.items() if k!='observation_source'}:issues.append('external failure provenance differs '+bundle['id'])
             if bundle['spec_sha256']!=graph['tasks'][bundle['task_id']]['spec_sha256']:issues.append('feedback task digest differs '+bundle['id'])
             if bundle.get('next_task_id') and (bundle['next_task_id'] not in graph['tasks'] or bundle.get('next_spec_sha256')!=graph['tasks'][bundle['next_task_id']]['spec_sha256']):issues.append('revised task handoff not portable')
             for target in bundle['targets']:

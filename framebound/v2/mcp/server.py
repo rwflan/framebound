@@ -60,6 +60,11 @@ def build_server(project_dir: str) -> MCPServer:
         from ...v3.services import loop
         return loop.eligibility(project_dir, run_id)
 
+    @server.tool(name='agent_run_report_failure', description='Record a parent-reported execution failure and persistent stopping limits; never dispatches a provider')
+    def agent_run_report_failure(run_id: str, report: dict) -> dict:
+        from ...v3.services import failures
+        return failures.record(project_dir,run_id,report)
+
     @server.tool(name='agent_run_cancel', description='Cancel a run with a durable reason')
     def agent_run_cancel(run_id: str, reason: str) -> dict:
         from ...v3.services import loop
