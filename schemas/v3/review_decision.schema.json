@@ -24,6 +24,30 @@
       "title": "Action",
       "type": "string"
     },
+    "comparison_revision_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Comparison Revision Id"
+    },
+    "comparison_evaluation_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Comparison Evaluation Id"
+    },
     "note": {
       "default": "",
       "maxLength": 1000,

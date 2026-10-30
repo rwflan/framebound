@@ -40,6 +40,11 @@ class HandoffRebaseBody(D.Strict):
     expected_feedback_id: str = Field(min_length=1, max_length=256)
 
 
+class AgentTaskRevisionBody(D.Strict):
+    task_id: str = Field(min_length=1,max_length=128)
+    expected_version: D.StrictInt = Field(ge=1)
+
+
 class AgentRunStartBody(D.Strict):
     task_id: str = Field(min_length=1, max_length=128)
     run_id: str = Field(min_length=1, max_length=128)
@@ -116,11 +121,16 @@ def create_app(project_dir: str) -> FastAPI:
     app.state.project_dir = project_dir
 
 
+    @app.post('/v3/runs/{run_id}/task-revision')
+    def agent_run_revise_task(run_id: str, body: AgentTaskRevisionBody):
+        from ...v3.services import loop
+        return loop.revise_task(project_dir,run_id,body.task_id,body.expected_version)
+
     @app.get('/v3/reader-capabilities')
     def reader_capabilities():
         return {'schema_versions':['2.0','3.0'],'dataset_versions':['2.3','3.0'],
                 'label_views':['human_accepted','automatically_verified','research','withheld'],
-                'automatic_labels_are_human_acceptance':False,'source_correspondence':'source-correspondence-v1','tracked_scene':'declared-color-camera-tracks-v1'}
+                'automatic_labels_are_human_acceptance':False,'source_correspondence':'source-correspondence-v1','tracked_scene':'declared-color-camera-tracks-v1','preferences':'explicit-human-preferences-v1','feedback_bundle_versions':[1,2],'portable_handoff_formats':['framebound-handoff-1.0']}
 
     @app.post('/v3/exports/preview')
     def agent_export_preview(body: ExportSelection):
@@ -191,6 +201,12 @@ def create_app(project_dir: str) -> FastAPI:
         from ...v3.services import interventions as I
         return I.handoff(project_dir, feedback_id)
 
+    @app.get('/v3/feedback/{feedback_id}/portable')
+    def agent_handoff_portable(feedback_id: str):
+        from ...v3.services.portable_handoff import archive
+        return Response(archive(project_dir,feedback_id),media_type='application/zip',
+                        headers={'Content-Disposition':'attachment; filename="framebound-handoff.zip"'})
+
     @app.get('/v3/feedback/{feedback_id}/text')
     def agent_handoff_download(feedback_id: str):
         from ...v3.services import interventions as I
@@ -238,12 +254,12 @@ def create_app(project_dir: str) -> FastAPI:
         from ...v3.services import loop
         return loop.submit(project_dir, run_id, **body.model_dump())
 
-    @app.post('/v3/tasks', response_model=TaskRecord)
+    @app.post('/v3/tasks', response_model=TaskRecord,response_model_exclude_unset=True)
     def task_create(spec: TaskSpec):
         from ...v3.services import tasks
         return tasks.create(project_dir, spec.model_dump(mode='json'))
 
-    @app.get('/v3/tasks/{task_id}', response_model=TaskRecord)
+    @app.get('/v3/tasks/{task_id}', response_model=TaskRecord,response_model_exclude_unset=True)
     def task_get(task_id: str):
         from ...v3.services import tasks
         return tasks.get(project_dir, task_id)

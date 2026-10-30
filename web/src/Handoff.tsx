@@ -54,6 +54,7 @@ export function Handoff({ feedbackId }: { feedbackId: string }) {
     <div className="toolbar">
       <button type="button" onClick={() => void copy()} disabled={data.stale}>Copy instructions</button>
       <a href={`/v3/feedback/${encodeURIComponent(feedbackId)}/text`} download>Download text</a>
+      <a href={`/v3/feedback/${encodeURIComponent(feedbackId)}/portable`} download>Download portable handoff</a>
       <button type="button" onClick={() => setExpanded(value => !value)} aria-expanded={expanded}>View instructions</button>
       <span role="status" aria-live="polite">{status}</span>
     </div>

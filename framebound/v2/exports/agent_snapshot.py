@@ -32,15 +32,16 @@ def closure(con,rids):
     pending=list(run_ids)
     while pending:
         run_id=pending.pop()
-        for rid in all_runs[run_id]['submission_ids']:
-            source=specs[all_revisions[rid]['task_id']]['spec'].get('source_correspondence')
+        tids={all_runs[run_id]['task_id']}|{all_revisions[rid]['task_id'] for rid in all_runs[run_id]['submission_ids']}
+        for tid in tids:
+            source=specs[tid]['spec'].get('source_correspondence')
             source_id=source.get('source_revision_id') if source else None
             if source_id in all_revisions and all_revisions[source_id]['run_id'] not in run_ids:
                 extra=all_revisions[source_id]['run_id'];run_ids.add(extra);pending.append(extra)
     runs={k:v for k,v in all_runs.items() if k in run_ids}
     revisions={rid:all_revisions[rid] for run in runs.values() for rid in run['submission_ids']}
     # Always include the complete selected run trajectory, not just its best output.
-    specs=rows(con,'agent_task_specs');task_ids={r['task_id'] for r in revisions.values()}
+    specs=rows(con,'agent_task_specs');task_ids={r['task_id'] for r in revisions.values()}|{run['task_id'] for run in runs.values()}
     pending=list(task_ids)
     while pending:
         tid=pending.pop();parent=specs[tid]['spec'].get('supersedes')
@@ -51,6 +52,7 @@ def closure(con,rids):
     events={k:v for k,v in rows(con,'agent_run_events').items() if v['run_id'] in run_ids}
     marks={k:v for k,v in rows(con,'agent_interventions').items() if v['run_id'] in run_ids}
     completions={k:v for k,v in rows(con,'agent_completions').items() if v['run_id'] in run_ids}
+    preferences={k:v for k,v in rows(con,'agent_preferences').items() if v['run_id'] in run_ids}
     all_frames=rows(con,'frame_instances');frame_ids={f for r in revisions.values() for f in r['frame_instance_ids']}
     frames={fid:all_frames[fid] for fid in frame_ids}
     registrations=rows(con,'registrations');registrations={f['registration_id']:registrations[f['registration_id']] for f in frames.values()}
@@ -96,7 +98,7 @@ def closure(con,rids):
             raw_artifacts='not packaged; structured generation brief and evidence pixels retained')
     return dict(runs=runs,revisions=revisions,tasks=tasks,evaluations=evaluations,feedback=feedback,
                 events=events,interventions=marks,completions=completions,frames=frames,
-                registrations=registrations,assets=assets,provider_sources=provider_sources,source_records=source_records)
+                registrations=registrations,assets=assets,provider_sources=provider_sources,source_records=source_records,preferences=preferences)
 
 
 def _asset_reasons(asset,policy,assets=None,seen=None,provider_sources=None):
@@ -308,18 +310,29 @@ def build_into(project,name,rids,out,policy,digest,con):
             target_ids={t['check_id'] for t in targeted['targets']}
             trajectories.append(dict(parent_revision_id=parent,candidate_revision_id=rid,task_id=revision['task_id'],run_id=revision['run_id'],
                 feedback_id=revision['targeted_feedback_id'],changed_slots=revision['changed_slots'],
+                task_changed=graph['revisions'][parent]['task_id']!=revision['task_id'],removed_slots=revision.get('removed_slots',[]),
                 before_evaluation_id=before['id'],after_evaluation_id=evaluation['id'],
                 targeted_changes=[dict(check_id=k,before=old.get(k,{}).get('outcome','subjective'),after=after.get(k,{}).get('outcome','unresolved')) for k in sorted(target_ids)],
                 regressions=[k for k,r in old.items() if r['outcome']=='pass' and after.get(k,{}).get('outcome') not in {'pass','not_applicable'}],
                 overall_outcome=evaluation['technical_status'],human_resolution='see exact intervention/events records'))
-    for rel,data in [('temporal.jsonl',temporal),('trajectories.jsonl',trajectories),('preferences.jsonl',[]),('weak_preferences.jsonl',[])]:
+    pref_rows=[]
+    for preference in graph['preferences'].values():
+        chosen=graph['revisions'][preference['chosen_revision_id']];rejected=graph['revisions'][preference['rejected_revision_id']]
+        chosen_rows=[m for m in membership if m['revision_id']==chosen['id']]
+        run=graph['runs'][chosen['run_id']]
+        if not chosen_rows or not all(m['view']=='human_accepted' for m in chosen_rows) or run.get('human_decision_id')!=preference['decision_event_id']:continue
+        if any(aid not in asset_files or _asset_reasons(graph['assets'][aid],policy,graph['assets'],provider_sources=graph['provider_sources']) for aid in rejected['frame_asset_ids']):continue
+        pref_rows.append(dict(preference,chosen=[dict(asset_id=aid,file=asset_files[aid],sha256=graph['assets'][aid]['byte_sha256']) for aid in chosen['frame_asset_ids']],
+                              rejected=[dict(asset_id=aid,file=asset_files[aid],sha256=graph['assets'][aid]['byte_sha256']) for aid in rejected['frame_asset_ids']],
+                              conditioning_task=chosen['task_id'],label_source='explicit_human_comparison'))
+    for rel,data in [('temporal.jsonl',temporal),('trajectories.jsonl',trajectories),('preferences.jsonl',pref_rows),('weak_preferences.jsonl',[])]:
         write(rel,''.join(json.dumps(row,sort_keys=True)+'\n' for row in data))
     write('README.md','# Framebound agent trajectories\n\nVersion 3 requires explicit reader support. `hf/` contains exact human-accepted positives only; `automatically_verified/` is a separate technical-policy view. Research/withheld data retain rights, source and missing-evidence labels. No preference pairs are inferred. Snapshot transport does not grant training rights. Missing generation metadata remains null. Controlled declared-region measurements do not certify arbitrary creative quality.\n')
     files={str(p.relative_to(out)):_h(p.read_bytes()) for p in out.rglob('*') if p.is_file()}
-    manifest=dict(snapshot=name,dataset_version=VERSION,schemas={'domain':'3.0'},reader_capabilities=['agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1']+(['source-correspondence-v1'] if graph['source_records'] else [])+(['declared-color-camera-tracks-v1'] if any(t['spec'].get('scene') for t in graph['tasks'].values()) else []),
+    manifest=dict(snapshot=name,dataset_version=VERSION,schemas={'domain':'3.0'},reader_capabilities=['agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1']+(['source-correspondence-v1'] if graph['source_records'] else [])+(['explicit-human-preferences-v1'] if graph['preferences'] else [])+(['feedback-groups-v2'] if any(f.get('bundle_version',1)>=2 for f in graph['feedback'].values()) else [])+(['declared-color-camera-tracks-v1'] if any(t['spec'].get('scene') for t in graph['tasks'].values()) else []),
         inputs_digest=digest,clip_revisions=rids,policy=dict(policy,agent_export_policy=POLICY),files=files,exclusions=exclusions,
         families={m['revision_id']:m['family'] for m in membership},split_semantics='animation/derivation/shared-input/exact-pixel and 64-bit dHash distance <=4 components; conservative grouping only, not quality judgment',
         counts=dict(images=len(coco_images),annotations=len(coco_annotations),positives=len(views['human_accepted']),automatically_verified=len(views['automatically_verified']),
-                    research=len(views['research']),withheld=sum(m['view']=='withheld' for m in membership),preferences=0,weak_preferences=0,temporal=len(temporal),trajectories=len(trajectories)))
+                    research=len(views['research']),withheld=sum(m['view']=='withheld' for m in membership),preferences=len(pref_rows),weak_preferences=0,temporal=len(temporal),trajectories=len(trajectories)))
     write('manifest.json',manifest)
     return manifest

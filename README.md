@@ -2,13 +2,24 @@
 
 Consistency bounds for AI-generated 2D animation.
 
-Image models produce a good style frame. They do not reliably hold a character's shape, size, movement, or appearance across dozens of frames of a specific action. Framebound gives the orchestrating model a frozen contract and deterministic tools to check its own work, repair only what failed, and send the rest to a human — with every result exported as training data so the model needs this less over time.
+Framebound is the checking, feedback and evidence layer for an external animation agent. The agent starts from intent and optional appearance/source inputs, supplies native image-generated frames, receives localized measurements and correction instructions, then submits immutable child revisions within persistent limits. Creative judgment and human acceptance remain separate from technical checks.
 
 Built for the Meta Global AI Developer Hackathon (Indie track, Build for Your World). See [docs/HACKATHON.md](docs/HACKATHON.md).
 
-Product direction: [agent-led animation workflow plan](docs/AGENT_ANIMATION_WORKFLOW_PLAN.md) — reference-optional generation and correction, actionable agent feedback, exceptional human intervention and training-data export. This is the proposed implementation plan; the sections below describe the current reference-first implementation.
+Product direction: [agent-led animation workflow plan](docs/AGENT_ANIMATION_WORKFLOW_PLAN.md) — reference-optional generation and correction, actionable agent feedback, exceptional human intervention and training-data export. The reference-free agent loop, live workspace and portable trajectory exporter are implemented. Known-good enhancement/interpolation is optional. The tracked-scene milestone is provisional; independently reviewed generated-art validation remains pending. See [the implementation audit](docs/AGENT_WORKFLOW_IMPLEMENTATION_AUDIT.md).
 
-## How it works
+## Agent-led workflow
+
+1. Register an immutable v3 task: intent, native canvas/timing, optional inputs, measurable requirements, completion policy and limits. Unsupported requirements stay explicit gaps.
+2. Generate art with the parent agent's own tools, import the PNGs, and submit a revision through CLI, MCP or HTTP. Framebound does not require a motion guide or reviewer event.
+3. Consume one durable feedback bundle: exact evidence, affected frames/times/regions, observed/expected values, preservation rules, remaining budget and actual continuation operations.
+4. Submit corrections against current saved bindings. The full matrix is rechecked, earlier best results are retained, and restarts, repeated outputs or a new run name cannot reset limits.
+5. Inspect the run timeline and candidate-first film. Save exceptional markup/decisions, copy instructions, or download a self-contained handoff for an agent without project access. Human corrections require explicit owner resolution.
+6. Manually export portable trajectories and separate human-accepted, automatically verified, research and withheld views. Revision order never creates human preferences.
+
+Start with [agent task creation](docs/AGENT_TASKS.md) and [the complete agent loop](docs/AGENT_LOOP.md). Structural checks do not verify animation quality; declared-region/track checks cover their explicit inputs and limits. Arbitrary anatomy, perspective, hidden physics and prose action correctness are not solved by those measurements.
+
+## Existing reviewed-guide profile
 
 1. **Contract.** One approved master, one native canvas, locked frame holds, frozen phase references, declared contacts, anchors, and visible features. Everything hash-bound.
 2. **Check.** Deterministic raster checks per frame: silhouette area/width/height vs the same phase, phase correspondence, visible-feature span and pulse, palette drift, support contacts, anchor drift, centroid steps, cadence. Named issue codes, no prose parsing. Unknowns are reported unmeasured, never passed.
@@ -39,7 +50,7 @@ python -m framebound doctor                          # project + dependency self
 sh scripts/verify-local                        # offline P0 checks (live providers opt-in, skipped honestly)
 python -m framebound demo --profile wp6 --offline --out build/wip6   # Pip: 4 clips pass
 python -m framebound serve --project build/wip6/project --port 8765  # desk at http://127.0.0.1:8765
-# desk dev: cd web && npm install && npm run dev   (proxies /api to :8765)
+# desk dev: cd web && npm install && npm run dev   (proxies /api and /v3 to :8765)
 # v1 prototype still works: python -m framebound demo --out build/demo
 ```
 
@@ -48,7 +59,7 @@ Review works directly in the local browser. A same-origin, loopback-only HttpOnl
 
 Open http://127.0.0.1:8765 for the review desk.
 
-The desk opens on interventions grouped by project, with chronological history and keyboard sequence search. Each animation selects and centres its first frame needing attention. Aligned reference/candidate film sits above a separate measurement track, with compact opaque row labels and a persistent frame inspector for evidence, corrections and decisions. Playback uses one fixed comparison stage and keeps inspection still until paused. Drag and trackpad overscroll spring back to padded film ends. Review dialogs retain exact tick playback, native-pixel regions and server-derived release eligibility. See [the review workflow](docs/REVIEW_DESK.md).
+The desk opens on interventions grouped by project, with chronological history and keyboard sequence search. Each animation selects and centres its first frame needing attention. The candidate film sits above a separate check/correction track, with compact opaque tabs and a contextual inspector. Previous revisions or designated known-good sources appear only in explicit comparisons using valid authored-time correspondence. Playback uses one main stage and keeps inspection still until paused. Drag and trackpad overscroll spring back to padded film ends. Review dialogs retain exact tick playback, native-pixel regions and server-derived release eligibility. See [the review workflow](docs/REVIEW_DESK.md).
 
 ## Model-facing tools
 

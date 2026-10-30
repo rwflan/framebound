@@ -95,8 +95,9 @@ Every attempt remains queryable, including rejected improvements. Fingerprints,
 submission limits and no-progress counts survive restarts; repeated/alternating
 outputs eventually stop. A second run name for the same animation is rejected,
 including when a new task specification exists, so it cannot reset the budget.
-Task rebinding and negotiated broader permissions require an explicit future
-operation; starting another run is not a workaround.
+Task rebinding uses the explicit version-checked specification-revision operation
+below; it retains spent budgets and exact old evidence. Starting another run is
+not a workaround.
 
 Media/tool errors and missing measurements are distinct from measured defects.
 Feedback includes stable issue IDs, exact bindings, localized frame/tick/region
@@ -262,8 +263,9 @@ and label views. A false string is not accepted as a true/false policy value.
 - `trajectories.jsonl` records the failed parent, targeted saved feedback,
   candidate, changed slots, check outcomes and overall regressions. Improvement
   at a target is not substituted for overall success.
-- `preferences.jsonl` and `weak_preferences.jsonl` stay empty for v3 until an
-  explicit comparison record exists; revision order and automatic rankings do
+- `preferences.jsonl` contains only the explicit same-task reviewer comparisons
+  described below; `weak_preferences.jsonl` remains empty. Without that comparison
+  record both views stay empty; revision order and automatic rankings do
   not create human preference pairs. Existing v2 explicit comparisons continue
   through their strict reviewed-guide route.
 
@@ -431,3 +433,90 @@ acceptance. The report explicitly lists when independently human-reviewed held-o
 image-generated cases are absent. No general accuracy claim follows merely from
 procedural benchmark success. Broader real-art validation remains required before
 promoting this provisional profile to a reliable general animation-quality claim.
+
+## Explicit task changes and durable stops
+
+`agent-run-revise-task --project PROJECT --run-id RUN --task-id NEW_TASK
+--expected-version VERSION`, MCP `agent_run_revise_task` or
+`POST /v3/runs/RUN/task-revision` applies a stored direct superseding task with its
+recorded reason. Prior task/evaluation/feedback/completion records stay immutable.
+The run's explicit task-change event and new feedback identify the new task and
+its digest separately from the previous baseline evidence; an old failure is not
+reclassified as a pass. Best selection is retained by task and restarted for the
+new requirement matrix, rather than comparing scores across different policies.
+
+The same spent attempts, fingerprints and no-progress counts persist. New limits
+can reduce remaining capacity but cannot raise it. Exhausted/cancelled runs cannot
+be revived through a specification change or another run name. Timing/canvas
+changes cannot silently retarget unresolved human corrections. The workspace
+labels an inspected previous-task result while awaiting a new-task submission.
+Identical old submissions can still retrieve their immutable replay result after
+a later task revision; replay spends no new budget.
+
+Cancellation supersedes saved continuation instructions with an explicit stopped
+bundle and a state-fetch operation. It does not leave an apparently live repair
+instruction attached to a cancelled run. Timeline evaluations record their best
+selection outcome and distinguish retained earlier results from selected current
+ones.
+
+## Disconnected handoff and returned correction
+
+Download portable handoff in the saved-action control packages `manifest.json`,
+`instructions.txt` and hashed native PNGs. The instructions use the same renderer
+as connected feedback, but name packaged asset locations and the actual return/
+import procedure rather than requiring inaccessible MCP IDs. Task versions,
+baseline/preservation pixels, evidence, rights/origins and limits are included;
+provider settings and unrelated generation metadata are excluded. The packet is
+not an authorization token and does not grant training or execution rights.
+
+CLI `agent-handoff-export --project PROJECT --feedback-id FEEDBACK --out FILE.zip`
+and MCP `agent_handoff_export` produce the same archive. The HTTP route is
+`GET /v3/feedback/FEEDBACK/portable`. Oversized or unavailable pixel closure is
+reported as a blocker rather than packaged with invented evidence.
+
+The external agent works from the unpacked packet and returns a `response.json`
+with a new `revision_id`, complete ordered `frames` list and actual optional
+`generation_metadata`. Each frame is either `{ "asset_id": "unchanged-id" }` or
+`{ "file": "corrected.png", "rights": "unknown", "source_kind": "generated" }`.
+Paths are relative to the response directory. Rights default to unknown, not an
+invented original-art grant. See `schemas/v3/portable_response.schema.json`.
+
+`agent-handoff-import --project PROJECT --manifest manifest.json --response
+response.json`, or MCP `agent_handoff_import`, checks the saved packet against the
+current durable project bindings, imports changed pixels, enforces edit support
+and evaluates the whole clip. Path escapes and changed task/evidence bindings are
+rejected. Identical replay returns the same result; a stale packet cannot target
+a different current revision.
+
+## Explicit human preference records
+
+Ordinary approval, comparison playback and newer revision order never imply a
+preference pair. While explicitly comparing a previous same-task revision, a
+reviewer can select “Explicitly prefer this revision over …” and approve. The
+saved decision includes exact `comparison_revision_id` and
+`comparison_evaluation_id` in addition to the chosen revision/evaluation. Both
+must be distinct actual candidates for the same frozen task.
+
+The record is separate from artistic acceptance, technical ranking and correction
+status. Export includes a pair only while its exact chosen approval remains
+current and human-positive, with permitted rights/origin and no unresolved human
+correction. The rejected pixels and both evaluations remain bound to the explicit
+human choice. Later rejection/needs-changes removes the pair from a fresh
+trainable export while preserving its historical record.
+
+Snapshots advertise `explicit-human-preferences-v1`; the v3
+`agent_reader.load_preferences(path)` validates and materializes common-task,
+chosen/rejected pixels with the original label source. Earlier v3 snapshots with
+no optional comparison closure still validate, and legacy v2 preference readers
+continue to reject unsupported v3 semantics rather than guessing.
+
+Feedback bundle version 2 adds deterministic correction groups. Related symptoms
+sharing authored frames/regions can share a suggested repair scope while their
+individual check results remain intact. Tool/evidence recovery, candidate defects
+and human-owned corrections are kept distinct; grouping never grants extra edit
+support or closes an owner's correction. An unmeasured continuity result caused
+by an already-failed visible feature links to that actual prerequisite, rather
+than instructing the parent to re-import otherwise readable media. Older saved
+bundles retain version 1 semantics and their original evidence. Portable snapshots
+advertise `feedback-groups-v2` when needed and verify group membership against the
+saved targets.
