@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import Field, StrictInt, model_validator
 
 from ..v2.domain import Canvas, Timing, Strict, utcnow
+from .provenance import StyleBoard
 
 
 class InputBinding(Strict):
@@ -12,6 +13,7 @@ class InputBinding(Strict):
     provenance: str = Field(min_length=1, max_length=2000)
     designated_by: str = Field(min_length=1, max_length=200)
     basis: str = Field(min_length=1, max_length=2000)
+    byte_sha256: str | None = Field(default=None, pattern=r'^[0-9a-f]{64}$')
     tick_range: tuple[StrictInt, StrictInt] | None = None
 
     @model_validator(mode='after')
@@ -57,6 +59,7 @@ class TaskSpec(Strict):
     timing: Timing
     loop: bool = True
     delivery: str = Field(default='ordered native PNG frames with authored holds', max_length=2000)
+    style_board: StyleBoard | None = None
     inputs: list[InputBinding] = Field(default_factory=list, max_length=512)
     preserve: list[str] = Field(default_factory=list, max_length=128)
     allowed_changes: list[str] = Field(default_factory=list, max_length=128)
