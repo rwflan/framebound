@@ -6,6 +6,17 @@ import json
 
 def dispatch(args) -> dict:
     cmd = args.cmd
+    if cmd.startswith('task-'):
+        from ..v3.services import tasks
+        if cmd == 'task-create':
+            from pathlib import Path
+            return tasks.create(args.project, json.loads(Path(args.spec).read_text()))
+        if cmd == 'task-get':
+            return tasks.get(args.project, args.task_id)
+        if cmd == 'task-compile-inputs':
+            return tasks.compile_inputs(args.project, args.task_id)
+        if cmd == 'task-migration-report':
+            return tasks.migration_report(args.project)
     if cmd == 'provider-grant':
         import os
         from .services import provider_grants
