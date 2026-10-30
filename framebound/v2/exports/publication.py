@@ -85,7 +85,8 @@ def publish(project,name,rids,out_dir,policy,digest):
                 # Only the journal-owned partial directory is moved; user data is retained.
                 stage.rename(stage.with_name(stage.name+'.interrupted-'+uuid.uuid4().hex))
             stage.mkdir()
-            con=sqlite3.connect(pinned);con.row_factory=sqlite3.Row
+            # The hash-bound backup is immutable; reading must not create WAL sidecars.
+            con=sqlite3.connect(f'{pinned.resolve().as_uri()}?immutable=1', uri=True);con.row_factory=sqlite3.Row
             try:manifest=_build_into(project,name,rids,stage,policy,digest,connection=con)
             finally:con.close()
             marker={'snapshot':name,'inputs_digest':digest,'manifest_sha256':_h((stage/'manifest.json').read_bytes()),
