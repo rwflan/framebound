@@ -121,8 +121,11 @@ export class ReelCamera {
     this.viewport.style?.setProperty("--film-scale", this.zoom);
     this.track.style.transform = `translate3d(${this.x.toFixed(3)}px,${this.y.toFixed(3)}px,0) scale(${this.zoom.toFixed(5)})`;
     const centers = this.lanes.map(
-      (row) =>
-        this.height / 2 + this.y + (row.top - this.trackHeight / 2) * this.zoom,
+      (row, index) =>
+        this.height / 2 +
+        this.y +
+        (row.top - this.trackHeight / 2) * this.zoom +
+        (index === 2 ? -10 : row.height * this.zoom >= 80 ? 14 : 0),
     );
     if (centers.some((center, i) => i > 0 && center - centers[i - 1] < 28)) {
       const middle = (centers[0] + centers[centers.length - 1]) / 2;
@@ -140,8 +143,19 @@ export class ReelCamera {
         height = row.height * this.zoom;
       node.style.visibility =
         top + height < 12 || top > this.height - 12 ? "hidden" : "visible";
+      const cell =
+        (this.track.querySelector?.(".reel-frame-unit")?.offsetWidth ||
+          this.trackWidth) * this.zoom;
+      const firstComplete =
+        this.x + Math.max(0, Math.ceil(-this.x / cell)) * cell;
+      const legendWidth = Math.max(76, Math.min(166, cell - 12));
+      const left =
+        cell >= 80 && cell <= this.width
+          ? firstComplete + 10
+          : Math.max(4, Math.min(10, this.x + 5));
       node.style.left =
-        Math.max(4, Math.min(this.width - 90, this.x + 8 * this.zoom)) + "px";
+        Math.max(4, Math.min(this.width - legendWidth - 4, left)) + "px";
+      node.style.setProperty("--legend-width", legendWidth + "px");
       node.style.top = top + "px";
       node.style.height = height + "px";
       node.style.setProperty(
