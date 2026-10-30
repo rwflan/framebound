@@ -272,3 +272,32 @@ loop.submit(sys.argv[1],'run','killed',json.loads(sys.argv[2]))
     feedback=loop.submit(project,'run','killed',good)
     assert feedback['disposition']=='complete'
     assert loop.revision_get(project,'killed')['evaluation']['evidence_digest']==feedback['evidence_digest']
+
+
+def test_related_symptoms_group_without_discarding_checks_or_turning_defect_into_tool_error(tmp_path):
+    project,_,_=setup(tmp_path)
+    bad=import_frames(tmp_path,'bad',{'kind':'disappearance'})
+    feedback=loop.submit(project,'run','absent',bad)
+    assert feedback['bundle_version']==2
+    target_ids={t['id'] for t in feedback['targets']}
+    assert {tid for group in feedback['correction_groups'] for tid in group['target_ids']}==target_ids
+    dependent=next(t for t in feedback['targets'] if t['check_id']=='continuity-0')
+    assert dependent['outcome']=='unmeasured'
+    assert dependent['depends_on_check_ids']==['feature-1']
+    assert dependent['suggested_operation']=='restore_failed_visible_feature_then_remeasure'
+    assert any(group['category']=='candidate_defect' and {'feature-1','continuity-0','continuity-1'}<=set(group['verification_checks']) for group in feedback['correction_groups'])
+
+
+def test_output_policy_rechecks_bound_context_inputs(tmp_path):
+    project,spec,good=setup(tmp_path)
+    # Use a distinct existing asset as an appearance input so its later loss cannot
+    # be confused with missing candidate pixels.
+    from PIL import Image
+    path=tmp_path/'anchor.png';Image.new('RGBA',(8,8),(50,50,50,255)).save(path)
+    import_asset(project,str(path),'anchor',source_kind='procedural')
+    spec['id']='context-task';spec['animation_id']='context'
+    spec['inputs']=[dict(asset_id='anchor',role='identity',provenance='fixture conditioning',designated_by='fixture',basis='appearance anchor, not motion authority')]
+    tasks.create(project,spec);loop.start(project,'context-task','context-run');loop.submit(project,'context-run','with-context',good)
+    assert loop.eligibility(project,'context-run')['eligible']
+    con=S.connect(project);asset,_=S.get(con,'assets','anchor');con.close();S.blob_path(project,asset['byte_sha256']).unlink()
+    assert not loop.eligibility(project,'context-run')['eligible']

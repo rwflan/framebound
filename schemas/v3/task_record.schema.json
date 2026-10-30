@@ -184,6 +184,20 @@
     "Limits": {
       "additionalProperties": false,
       "properties": {
+        "max_external_failures": {
+          "default": 8,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max External Failures",
+          "type": "integer"
+        },
+        "max_provider_failures": {
+          "default": 3,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Provider Failures",
+          "type": "integer"
+        },
         "max_measurement_pixels": {
           "default": 67108864,
           "maximum": 268435456,

@@ -20,19 +20,29 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
   const [note,setNote]=useState(''),[roi,setRoi]=useState<Roi|null>(null),[grant,setGrant]=useState(false);
   const [rangeStart,setRangeStart]=useState(tickOfSlot(holds,initial.current));
   const [rangeEnd,setRangeEnd]=useState(tickOfSlot(holds,initial.current)+holds[initial.current]);
+  const [eligibility,setEligibility]=useState<{eligible:boolean;policy?:string;revision_id?:string;reasons:string[]}|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[message,setMessage]=useState('');
   const [saved,setSaved]=useState<string|null>(null),[compare,setCompare]=useState<AgentBundle|null>(null);
-  const [compareSource,setCompareSource]=useState(false);
+  const [compareSource,setCompareSource]=useState(false),[preferPrevious,setPreferPrevious]=useState(false);
   const operation=useRef(crypto.randomUUID());
   const drag=useRef<{x:number;y:number}|null>(null),canvas=useRef<HTMLCanvasElement>(null);
-  const live=b.revision.id===run.current_revision_id;
+  const live=b.revision.id===run.current_revision_id && b.task.id===run.task_id;
+  const writable=live && run.lifecycle!=='cancelled';
   const targets=b.feedback.targets.filter(t=>t.slots.includes(slot));
   const frame=b.frames[slot],marks=run.interventions.filter(m=>m.slots.includes(slot));
   useEffect(()=>{
     if(wasPlaying.current && !clock.playing) { setSlot(clock.slot);setSelected([clock.slot]);anchor.current=clock.slot; }
     wasPlaying.current=clock.playing;
   },[clock.playing,clock.slot]);
+  useEffect(()=>{
+    let active=true;
+    const load=()=>req<{eligible:boolean;policy?:string;revision_id?:string;reasons:string[]}>(`/v3/runs/${encodeURIComponent(run.id)}/eligibility`)
+      .then(value=>{if(active)setEligibility(value);}).catch(()=>{if(active)setEligibility(null);});
+    void load();window.addEventListener('focus',load);
+    return()=>{active=false;window.removeEventListener('focus',load);};
+  },[run.id,run.version,b.revision.id]);
   useEffect(()=>{ setCompare(null); },[b.revision.id]);
+  useEffect(()=>setPreferPrevious(false),[compare?.revision.id]);
   const focus=(index:number,shift=false)=>{
     clock.setPlaying(false);wasPlaying.current=false;clock.selectSlot(index);setSlot(index);
     if(!shift)anchor.current=index;
@@ -52,12 +62,12 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
     }catch(e){setError(e);}
   }
   async function save(action?:string){
-    if(busy || !live)return;
+    if(busy || !writable)return;
     setBusy(true);setError(null);setMessage('');
     try{
       const result=await req<{feedback:{id:string}}>(`/v3/runs/${encodeURIComponent(run.id)}/${action?'decisions':'interventions'}`,{
         method:'POST',body:JSON.stringify(action?{id:operation.current,revision_id:b.revision.id,
-          evaluation_id:b.evaluation.id,action,note}:{id:operation.current,revision_id:b.revision.id,
+          evaluation_id:b.evaluation.id,action,note,...(action==='approve' && preferPrevious && compare && compare.task.id===b.task.id?{comparison_revision_id:compare.revision.id,comparison_evaluation_id:compare.evaluation.id}:{})}:{id:operation.current,revision_id:b.revision.id,
           evaluation_id:b.evaluation.id,desired_outcome:note,tick_range:[rangeStart,rangeEnd],roi,authorize_edit_scope:grant})});
       setSaved(result.feedback.id);setNote('');setRoi(null);setGrant(false);operation.current=crypto.randomUUID();
       setMessage(action?'Decision saved':'Correction saved');onChange();
@@ -87,8 +97,8 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
       <header className="pane-title viewer-title"><span className="file-icon"><Icon name="film"/></span><strong>{run.animation_id}</strong><span className="title-grip"/>
         <span className={"badge "+b.evaluation.technical_status}>{words(b.evaluation.technical_status)}</span><span className="badge">{words(b.evaluation.coverage)} coverage</span></header>
       <div className="viewer-toolbar"><span title={spec.intent}>{b.revision.id}</span>
-        <span>{live?'Current revision':'Historical revision'}</span>
-        {!live && run.current_revision_id && <button onClick={()=>onRevision(run.current_revision_id!)}>Open current</button>}
+        <span>{live?'Current revision':b.revision.id===run.current_revision_id?'Task revised · awaiting new submission':'Historical revision'}</span>
+        {b.revision.id!==run.current_revision_id && run.current_revision_id && <button onClick={()=>onRevision(run.current_revision_id!)}>Open current</button>}
         {b.source_comparison && <button aria-pressed={compareSource} onClick={()=>{setCompare(null);setCompareSource(v=>!v);}}>Compare known-good source</button>}
         {b.revision.parent_revision_id && <button aria-pressed={Boolean(compare)} onClick={()=>void comparePrevious()}>Compare previous</button>}
         <div className="control-zoom"><button aria-label="Zoom out" onClick={()=>controls.film.current?.zoom(-1)}>−</button><output>{controls.zoom}%</output><button aria-label="Zoom in" onClick={()=>controls.film.current?.zoom(1)}>+</button><button onClick={()=>controls.film.current?.fit()}>Fit</button></div>
@@ -117,15 +127,16 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
         {b.task.requirements.filter(r=>r.applicability!=='supported').map(r=><p key={r.check}>{words(r.check)}: {r.limitation}</p>)}
         <details><summary>Contextual inputs</summary>{spec.inputs.map(i=><figure key={i.asset_id}><img className="agent-context-image" src={'/api/asset/'+encodeURIComponent(i.asset_id)} alt={i.role}/><figcaption>{words(i.role)} · {i.provenance}</figcaption></figure>)}</details>
         <small>{spec.scene?.limitation || (spec.profile==='structural-v1'?'Structural only; animation quality not verified.':'Declared regions and events only; broader anatomy and action quality remain judgment.')}</small>
+        <section className="agent-finding" aria-label="Output policy"><strong>Output policy</strong>{eligibility?<><small>{eligibility.policy||'Not evaluated'} · {eligibility.eligible?'Eligible':'Withheld'}</small>{eligibility.revision_id && eligibility.revision_id!==b.revision.id && <small>Applies to current best {eligibility.revision_id}</small>}{eligibility.reasons.map((reason,index)=><small key={index}>{reason}</small>)}</>:<small>Current eligibility unavailable</small>}</section>
         <Handoff feedbackId={b.feedback.id}/></>}
         {tab==='correction' && <form onSubmit={e=>{e.preventDefault();void save();}}><label>Desired correction<textarea aria-label="Desired correction" value={note} onChange={e=>setNote(e.target.value)} required maxLength={1000}/></label>
           <div className="agent-tick-range"><label>Start tick<input aria-label="Start tick" type="number" min={0} value={rangeStart} onChange={e=>setRangeStart(Number(e.target.value))}/></label><label>End tick (exclusive)<input aria-label="End tick" type="number" min={rangeStart+1} value={rangeEnd} onChange={e=>setRangeEnd(Number(e.target.value))}/></label></div>
           <div className="agent-mark-stage"><canvas ref={canvas} width={spec.canvas.width} height={spec.canvas.height} aria-label="Mark correction region" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);const [x,y]=point(e);drag.current={x,y};}} onPointerMove={e=>{if(!drag.current)return;const [x,y]=point(e),start=drag.current;setRoi({left:Math.min(start.x,x),top:Math.min(start.y,y),right:Math.max(start.x,x)+1,bottom:Math.max(start.y,y)+1});}} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}/>{roi && <div className="region-box" style={{left:100*roi.left/spec.canvas.width+'%',top:100*roi.top/spec.canvas.height+'%',width:100*(roi.right-roi.left)/spec.canvas.width+'%',height:100*(roi.bottom-roi.top)/spec.canvas.height+'%'}}/>}</div>
           {roi && <button type="button" onClick={()=>setRoi(null)}>Clear region</button>}
           <label><input type="checkbox" checked={grant} onChange={e=>setGrant(e.target.checked)}/>Authorize edits only within this range/region</label>
-          <button disabled={busy||!live||!note.trim()}>Save correction</button></form>}
-        {tab==='decision' && <><label>Decision note<textarea aria-label="Decision note" value={note} onChange={e=>setNote(e.target.value)} maxLength={1000}/></label><div className="review-actions">{['approve','needs_changes','reject'].map(action=><button key={action} disabled={busy||!live} onClick={()=>void save(action)}>{words(action)}</button>)}</div></>}
-        {marks.map(mark=><section className="agent-finding" key={mark.id}><strong>{mark.correction.desired_outcome}</strong><small>{words(mark.correction.status)} · {mark.owner}</small>{live && <button disabled={busy||(mark.correction.status!=='resolved' && mark.candidate_revision_id!==b.revision.id)} onClick={()=>void resolve(mark,mark.correction.status==='resolved')}>{mark.correction.status==='resolved'?'Reopen':'Resolve'}</button>}<Handoff feedbackId={mark.handoff_id}/></section>)}
+          <button disabled={busy||!writable||!note.trim()}>Save correction</button></form>}
+        {tab==='decision' && <>{compare && compare.task.id===b.task.id && <label><input type="checkbox" checked={preferPrevious} onChange={e=>setPreferPrevious(e.target.checked)}/>Explicitly prefer this revision over {compare.revision.id}</label>}<label>Decision note<textarea aria-label="Decision note" value={note} onChange={e=>setNote(e.target.value)} maxLength={1000}/></label><div className="review-actions">{['approve','needs_changes','reject'].map(action=><button key={action} disabled={busy||!writable} onClick={()=>void save(action)}>{words(action)}</button>)}</div></>}
+        {marks.map(mark=><section className="agent-finding" key={mark.id}><strong>{mark.correction.desired_outcome}</strong><small>{words(mark.correction.status)} · {mark.owner}</small>{live && <button disabled={busy||!writable||(mark.correction.status!=='resolved' && mark.candidate_revision_id!==b.revision.id)} onClick={()=>void resolve(mark,mark.correction.status==='resolved')}>{mark.correction.status==='resolved'?'Reopen':'Resolve'}</button>}<Handoff feedbackId={mark.handoff_id}/></section>)}
         {saved && <section aria-label="Saved action instructions"><Handoff feedbackId={saved}/></section>}
       </div>
     </aside>

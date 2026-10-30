@@ -42,8 +42,10 @@ external generator. It does not authorize Framebound provider execution.
 Task IDs are immutable and replayable. A changed specification needs a new ID,
 `supersedes` and `change_reason`; the predecessor must belong to the same project
 and animation. Policies, limits and negotiated requirements are frozen in each
-record. A future run must bind one exact task version and retain its budget
-across task revisions; task registration itself does not start a run.
+record. A run binds exact task versions and retains its budget across explicitly recorded
+specification revisions. `agent-run-revise-task` applies a direct superseding
+specification with version checks; it cannot replenish attempts or erase earlier
+evidence. Task registration itself does not start a run.
 
 The first registration adds a separate `agent_task_specs` table and backs up the
 pre-v3 database to `backups/before-agent-v3.sqlite3`. The dry-run report opens an

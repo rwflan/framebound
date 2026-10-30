@@ -87,6 +87,8 @@ def main(argv=None):
         ('agent-export-preview', 'Preview a manual versioned training export', [('--project', True), ('--selection', True)]),
         ('agent-export-build', 'Publish a manually requested portable training snapshot', [('--project', True), ('--selection', True)]),
         ('agent-satisfaction-record', 'Record exact parent-agent creative judgment', [('--project', True), ('--run-id', True), ('--action', True)]),
+        ('agent-handoff-export', 'Package a saved continuation for an agent without project access', [('--project',True),('--feedback-id',True),('--out',True)]),
+        ('agent-handoff-import', 'Import a returned revision against saved handoff bindings', [('--project',True),('--manifest',True),('--response',True)]),
         ('agent-handoff-get', 'Read saved handoff text, JSON and stale binding', [('--project', True), ('--feedback-id', True)]),
         ('agent-intervention-get', 'Read an exact saved correction', [('--project', True), ('--intervention-id', True)]),
         ('agent-intervention-mark', 'Save reviewer correction', [('--project', True), ('--run-id', True), ('--action', True), ('--session-token', False)]),
@@ -95,7 +97,9 @@ def main(argv=None):
         ('agent-decision', 'Save exact reviewer decision', [('--project', True), ('--run-id', True), ('--action', True), ('--session-token', False)]),
         ('agent-revision-get', 'Read exact revision and evidence', [('--project', True), ('--revision-id', True)]),
         ('agent-run-eligibility', 'Check automatic output policy', [('--project', True), ('--run-id', True)]),
+        ('agent-run-report-failure', 'Record a bounded parent-reported execution failure', [('--project',True),('--run-id',True),('--report',True)]),
         ('agent-run-cancel', 'Cancel external-agent work', [('--project', True), ('--run-id', True), ('--reason', True)]),
+        ('agent-run-revise-task', 'Apply a superseding task without resetting run budgets', [('--project',True),('--run-id',True),('--task-id',True),('--expected-version',True)]),
         ('agent-run-start', 'Start/resume an external-agent run', [('--project', True), ('--task-id', True), ('--run-id', True)]),
         ('agent-run-get', 'Get durable agent progress and feedback', [('--project', True), ('--run-id', True)]),
         ('agent-run-submit', 'Submit/evaluate an immutable external revision', [('--project', True), ('--submission', True)]),
@@ -256,7 +260,7 @@ def main(argv=None):
         _s = _bs(args.project)
         _aio.run(_s.run_stdio_async())
         return 0
-    if args.cmd in ("animation-quality-benchmark", "agent-export-preview", "agent-export-build", "agent-satisfaction-record", "agent-handoff-get", "agent-intervention-get", "agent-intervention-mark", "agent-intervention-resolve", "agent-intervention-reopen", "agent-decision", "agent-revision-get", "agent-run-eligibility", "agent-run-cancel", "agent-run-start", "agent-run-get", "agent-run-submit", "task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
+    if args.cmd in ("agent-run-report-failure", "agent-handoff-export", "agent-handoff-import", "agent-run-revise-task", "animation-quality-benchmark", "agent-export-preview", "agent-export-build", "agent-satisfaction-record", "agent-handoff-get", "agent-intervention-get", "agent-intervention-mark", "agent-intervention-resolve", "agent-intervention-reopen", "agent-decision", "agent-revision-get", "agent-run-eligibility", "agent-run-cancel", "agent-run-start", "agent-run-get", "agent-run-submit", "task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
                     "orchestrator-send", "capabilities", "correction-claim", "correction-submit",

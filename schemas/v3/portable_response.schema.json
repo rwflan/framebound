@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "ResponseFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "rights": {
+          "default": "unknown",
+          "title": "Rights",
+          "type": "string"
+        },
+        "source_kind": {
+          "default": "generated",
+          "pattern": "^(original|procedural|generated|derived|imported)$",
+          "title": "Source Kind",
+          "type": "string"
+        }
+      },
+      "title": "ResponseFrame",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "revision_id": {
+      "maxLength": 90,
+      "minLength": 1,
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "frames": {
+      "items": {
+        "$ref": "#/$defs/ResponseFrame"
+      },
+      "maxItems": 512,
+      "minItems": 1,
+      "title": "Frames",
+      "type": "array"
+    },
+    "generation_metadata": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Generation Metadata"
+    }
+  },
+  "required": [
+    "revision_id",
+    "frames"
+  ],
+  "title": "Response",
+  "type": "object"
+}

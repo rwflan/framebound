@@ -12,7 +12,7 @@ export type Task = { id:string; spec:{ intent:string; animation_id:string; canva
 export type Mark = { id:string; run_id:string; owner:string; version:number; handoff_id:string;
   slots:number[]; roi:Roi|null; tick_range:number[]; candidate_revision_id:string|null;
   correction:{status:string;desired_outcome:string;baseline_revision_id:string} };
-export type Run = { id:string; project_id:string; animation_id:string; task_id:string; task:Task;
+export type Run = { feedback_id?:string; id:string; project_id:string; animation_id:string; task_id:string; task:Task;
   lifecycle:string; stop_reason:string|null; creative_status:string; current_revision_id:string|null;
   best_revision_id:string|null; submission_ids:string[]; interventions:Mark[]; needs_intervention:boolean; version:number };
 export type Event = { id:string; run_id:string; project_id:string; animation_id:string; event:string;

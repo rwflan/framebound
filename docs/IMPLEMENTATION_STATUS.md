@@ -2,7 +2,17 @@
 
 The active framework has no internal general-purpose adviser or critic. An external orchestrator supplies typed work through CLI, MCP or HTTP. Framebound compiles reviewed controls, measures actual pixels, executes authorized native repairs, queues bounded image work when needed, and independently checks the result before presenting a comparison.
 
-## Evidence by capability
+## Agent-led v3 path
+
+The reference-free task/agent loop, saved interventions and handoff, packet-free
+workspace, portable training views and optional source-time correspondence are
+implemented. The tracked-scene profile and offline quality benchmark are a
+provisional broader milestone, with camera/visibility/event counterexamples.
+See [the requirement audit](AGENT_WORKFLOW_IMPLEMENTATION_AUDIT.md) and
+[the public operations](AGENT_LOOP.md). Tests and procedural benchmark cases do
+not supply independently reviewed generated-art reliability evidence.
+
+## Reviewed-guide evidence by capability
 
 | Capability | Implemented | Counterexample tested | Public integration | Participant live observation | Entrant artistic acceptance |
 |---|---|---|---|---|---|

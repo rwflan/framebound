@@ -34,6 +34,8 @@ class CompletionPolicy(Strict):
 
 
 class Limits(Strict):
+    max_external_failures: StrictInt = Field(default=8,ge=1,le=1000)
+    max_provider_failures: StrictInt = Field(default=3,ge=1,le=100)
     max_measurement_pixels: StrictInt = Field(default=67108864,ge=1,le=268435456)
     max_evaluation_pixels: StrictInt = Field(default=16777216, ge=1, le=67108864)
     max_submissions: StrictInt = Field(default=8, ge=1, le=1000)

@@ -188,3 +188,17 @@ def test_parent_judgment_does_not_close_human_correction_or_impersonate_approval
     assert not I.approved_in(con,'run','fixed','evaluation:fixed')
     con.close()
     with pytest.raises(AuthorizationError):I.agent_satisfied(project,HUMAN,'run',revision_id='fixed',evaluation_id='evaluation:fixed')
+
+
+def test_technical_completion_selects_repaired_output_after_subjective_resolution(tmp_path):
+    project,_,good=setup(tmp_path)
+    loop.submit(project,'run','original',good)
+    decision=I.decision(project,HUMAN,'run',dict(id='changes',revision_id='original',evaluation_id='evaluation:original',action='needs_changes',note='Clarify the gesture.'))
+    bad=import_frames(tmp_path,'bad-costume',{'kind':'flicker'})
+    failed=loop.submit(project,'run','gesture-fixed-costume-failed',bad,parent_revision_id='original',feedback_id=decision['feedback']['id'])
+    mark=I.get(project,'decision-task:changes')
+    resolved=I.resolve(project,HUMAN,mark['id'],dict(expected_version=mark['version'],revision_id='gesture-fixed-costume-failed',evaluation_id='evaluation:gesture-fixed-costume-failed',note='Gesture resolved; technical costume issue remains.'))
+    final=loop.submit(project,'run','repaired',good,parent_revision_id='gesture-fixed-costume-failed',feedback_id=resolved['handoff_id'])
+    assert final['disposition']=='complete' and final['best_revision_id']=='repaired'
+    assert loop.eligibility(project,'run')['revision_id']=='repaired'
+    assert final['creative_status']=='unreviewed'
