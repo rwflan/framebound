@@ -285,7 +285,7 @@ def reconcile_in(con, run, event_id):
             run_id=run['id'], task_id=run['task_id'], revision_id=rid, evaluation_id=evaluation['id'],
             policy=spec.completion.model_dump(), evidence_digest=evaluation['evidence_digest'],
             creative_status=run['creative_status'], output_eligibility='human-reviewed' if approved_in(con,run['id'],rid,evaluation['id'],run) else 'automatic-technical',
-            quality_scope='declared-region constraints' if spec.profile=='fixed-subject-v1' else 'structural only; animation quality not verified'))
+            quality_scope='declared camera/landmark constraints; semantics unverified' if spec.profile=='tracked-scene-v1' else 'declared-region constraints' if spec.profile=='fixed-subject-v1' else 'structural only; animation quality not verified'))
     elif passed:
         run['lifecycle'], run['stop_reason'] = 'awaiting_decision', 'Exact-revision human decision required by task policy.'
     elif len(run['submission_ids']) >= run['limits']['max_submissions'] or run['no_progress_count'] >= run['limits']['max_unchanged']:

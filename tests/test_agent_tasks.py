@@ -120,6 +120,7 @@ def test_older_v3_record_keeps_its_original_fields_and_digest(tmp_path):
     # Represent the v1 negotiator's pre-extension serialized task shape.
     original['spec'].pop('region_observations'); original['spec'].pop('temporal_observations')
     original['spec']['limits'].pop('max_evaluation_pixels')
+    original['spec']['limits'].pop('max_measurement_pixels')
     original['spec_sha256']=digest(original['spec'])
     original['evaluator_version']='task-negotiator-v1'
     con=tasks._connect(str(tmp_path))
