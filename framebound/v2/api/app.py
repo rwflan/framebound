@@ -14,6 +14,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import Field
 
+from ...v3.domain import TaskSpec, TaskRecord
 from .. import domain as D
 from .. import storage as S
 from ..services.authz import Actor
@@ -82,6 +83,23 @@ class ReopenBody(D.Strict):
 def create_app(project_dir: str) -> FastAPI:
     app = FastAPI(title="Framebound v2 review API", version="2.0.0a1")
     app.state.project_dir = project_dir
+
+
+    @app.post('/v3/tasks', response_model=TaskRecord)
+    def task_create(spec: TaskSpec):
+        from ...v3.services import tasks
+        return tasks.create(project_dir, spec.model_dump(mode='json'))
+
+    @app.get('/v3/tasks/{task_id}', response_model=TaskRecord)
+    def task_get(task_id: str):
+        from ...v3.services import tasks
+        return tasks.get(project_dir, task_id)
+
+    @app.get('/v3/tasks/{task_id}/inputs')
+    def task_inputs(task_id: str):
+        from ...v3.services import tasks
+        return tasks.compile_inputs(project_dir, task_id)
+
 
     app.state.subscribers: list[asyncio.Queue] = []
 

@@ -2,6 +2,14 @@
 
 Status: proposed implementation plan, 2026-10-30. This document records the target product and the work needed to reach it; it does not claim these changes are implemented. It supersedes reference-first and mandatory-review assumptions as the product direction. Existing capability documentation still describes the running software.
 
+## Implementation progress
+
+The task-registration foundation is implemented in the additive v3 service; see
+[Agent task registration](AGENT_TASKS.md) for the public CLI/MCP/HTTP operations,
+backup behaviour and exact capability boundary. This establishes immutable
+reference-free intent and generation-input compilation. It does not implement or
+claim completion of the reference-free quality loop or phases 2–7 below.
+
 ## Goal
 
 Framebound helps an external agent produce accurate, complex image-generated animations through repeated, evidence-based correction. The agent generates the art, calls the framework, receives actionable feedback, corrects the animation and submits a new revision. Framebound checks the result, records the process and returns the next action until the declared requirements are met or the run reaches an explicit stopping condition.
