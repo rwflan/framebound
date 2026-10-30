@@ -34,6 +34,7 @@ class CompletionPolicy(Strict):
 
 
 class Limits(Strict):
+    max_measurement_pixels: StrictInt = Field(default=67108864,ge=1,le=268435456)
     max_evaluation_pixels: StrictInt = Field(default=16777216, ge=1, le=67108864)
     max_submissions: StrictInt = Field(default=8, ge=1, le=1000)
     max_unchanged: StrictInt = Field(default=2, ge=1, le=100)
@@ -58,10 +59,11 @@ class TaskSpec(Strict):
     preserve: list[str] = Field(default_factory=list, max_length=128)
     allowed_changes: list[str] = Field(default_factory=list, max_length=128)
     repair_scope: Literal['full_clip', 'declared_regions'] = 'full_clip'
-    profile: Literal['structural-v1', 'fixed-subject-v1'] = 'structural-v1'
+    profile: Literal['structural-v1', 'fixed-subject-v1', 'tracked-scene-v1'] = 'structural-v1'
     region_observations: list['RegionObservation'] = Field(default_factory=list, max_length=4096)
     temporal_observations: list['TemporalObservation'] = Field(default_factory=list, max_length=4096)
     source_correspondence: 'SourceCorrespondence | None' = None
+    scene: 'SceneSpec | None' = None
     requirements: list[Requirement] = Field(default_factory=list, max_length=128)
     limits: Limits = Field(default_factory=Limits)
     completion: CompletionPolicy = Field(default_factory=CompletionPolicy)
@@ -174,8 +176,62 @@ class SourceCorrespondence(Strict):
         return self
 
 
+class CameraObservation(Strict):
+    slot: StrictInt = Field(ge=0)
+    translation: tuple[float, float]
+    scale: float = Field(gt=0, le=100, allow_inf_nan=False)
+    provenance: str = Field(min_length=1, max_length=2000)
+    source: Literal['user_declared', 'agent_proposed', 'model_proposed', 'procedural']
+
+
+class TrackedFeature(Strict):
+    id: str = Field(min_length=1, max_length=128)
+    subject_id: str = Field(min_length=1, max_length=128)
+    slot: StrictInt = Field(ge=0)
+    roi: 'Roi'
+    rgba: list[StrictInt] = Field(min_length=4,max_length=4)
+    expected_world: tuple[float, float]
+    max_error_world: float = Field(ge=0, allow_inf_nan=False)
+    minimum_pixels: StrictInt = Field(default=1,ge=1)
+    maximum_pixels: StrictInt = Field(ge=1)
+    visibility: Literal['visible','occluded','ambiguous'] = 'visible'
+    provenance: str = Field(min_length=1, max_length=2000)
+    source: Literal['user_declared', 'agent_proposed', 'model_proposed', 'procedural']
+
+
+class TrackLink(Strict):
+    id: str = Field(min_length=1,max_length=128)
+    left_feature_id: str
+    right_feature_id: str
+    max_displacement_world: float = Field(ge=0,allow_inf_nan=False)
+    required: bool = True
+
+
+class SceneEvent(Strict):
+    id: str = Field(min_length=1,max_length=128)
+    kind: Literal['contact','separation','left_of','above']
+    left_feature_id: str
+    right_feature_id: str
+    distance_world: float = Field(default=0,ge=0,allow_inf_nan=False)
+    required: bool = True
+    provenance: str = Field(min_length=1,max_length=2000)
+    source: Literal['user_declared', 'agent_proposed', 'model_proposed', 'procedural']
+
+
+class SceneSpec(Strict):
+    subjects: list[str] = Field(min_length=1,max_length=16)
+    camera: list[CameraObservation] = Field(min_length=1,max_length=512)
+    features: list[TrackedFeature] = Field(min_length=1,max_length=8192)
+    links: list[TrackLink] = Field(default_factory=list,max_length=8192)
+    events: list[SceneEvent] = Field(default_factory=list,max_length=8192)
+    method: Literal['declared-color-camera-tracks-v1'] = 'declared-color-camera-tracks-v1'
+    limitation: str = Field(default='Only declared exact-color features, uniform 2D camera transforms and landmark events are measured. Occluded geometry, perspective, anatomy, physical forces and arbitrary prose action correctness are unsupported.',max_length=2000)
+
+
 from ..v2.domain import Roi
 RegionObservation.model_rebuild()
+TrackedFeature.model_rebuild()
+SceneSpec.model_rebuild()
 SourceKey.model_rebuild()
 SourceCorrespondence.model_rebuild()
 

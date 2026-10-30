@@ -372,3 +372,62 @@ This establishes the declared preservation and timing checks. More inserted
 frames are not a fluidity score, and alpha/pixel anchors do not prove motion,
 contact or camera behavior outside the explicitly evaluated requirements. Required
 region/contact/event checks remain part of the full task matrix.
+
+## Camera, occlusion and interacting-subject milestone
+
+The provisional `tracked-scene-v1` profile adds frozen `scene` declarations with
+up to 16 subject IDs, one explicit 2D camera transform per authored frame, and
+frame-local feature ROIs with exact RGBA/count bounds and expected world anchors.
+Every subject needs a visible/occluded/ambiguous declaration for every frame. The
+camera's translation and uniform scale compensate measured feature centroids
+before world-anchor and temporal-link checks. No perspective or 3D camera solver
+is implied.
+
+`scene.features` retain their source/provenance; an occluded feature makes no
+visible-location claim. Ambiguous required evidence is unmeasured and blocks
+completion. A required temporal link through an unobservable endpoint is also
+unmeasured; an explicitly advisory link remains advisory rather than silently
+becoming a required pass. The profile requires actual track, temporal and event
+measurement families, so missing declarations do not yield a quality pass.
+
+`scene.events` bind simultaneous feature IDs to contact/separation or left-of/
+above constraints with authored world-distance bounds. A stable, correctly tracked
+scene can still fail the specified interaction event. Landmark contact/order is
+an image-space measurement: physical forces, hidden contact, anatomy and arbitrary
+narrative semantics remain unsupported. Source/model-proposed camera or landmark
+assumptions retain their provenance and do not validate their own semantic meaning.
+The engine makes no internal generative/model calls.
+
+`max_measurement_pixels` is a frozen run limit in addition to raster allocation
+and submission limits. It bounds the summed declared-region measurement work;
+an oversized declaration is rejected before registering a submission or spending
+its budget. No internal retry loop can bypass the parent agent's run limits.
+
+The procedural scene suite includes legitimate translation/scale changes,
+intentional occlusion, two-subject contact/order, discontinuous motion, feature
+loss/duplication and an incorrect event despite individually tolerated feature
+positions. Fail→repair→pass and moved-snapshot reproduction use the same stored
+matrix. The source/dependency identity and limitations are retained in scene
+evidence and the `declared-color-camera-tracks-v1` portable-reader capability.
+These fixtures are engineering evidence, not real generated-art reliability.
+
+### Offline quality benchmark
+
+`framebound animation-quality-benchmark --manifest CORPUS_JSON` executes a
+versioned local corpus without provider calls. `schemas/v3/quality_benchmark.schema.json`
+describes cases containing task specifications, relative asset paths, ordered
+candidate asset IDs, independent expected defect/check IDs and frame/ROI labels,
+complete/partial-label coverage, art origin, label source/provenance and held-out/
+development split. Optional `repair_of` links assess actual after-outcomes and
+new regressions separately from target improvement. Asset files must resolve
+inside the corpus directory.
+
+The report retains exact task/evaluation/asset identities and reports true/false
+positives, misses, exact frame localization, frame IoU and available region IoU.
+Unmeasured/tool errors are distinct from detected candidate defects. Precision
+is not invented for partially labeled cases. Imported human-label declarations
+are evidence with provenance, not authenticated reviewer decisions or training
+acceptance. The report explicitly lists when independently human-reviewed held-out
+image-generated cases are absent. No general accuracy claim follows merely from
+procedural benchmark success. Broader real-art validation remains required before
+promoting this provisional profile to a reliable general animation-quality claim.

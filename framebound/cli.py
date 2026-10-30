@@ -83,6 +83,7 @@ def main(argv=None):
         ('provider-grant-revoke','Revoke provider authority',[('--project',True),('--grant-id',True),('--expected-version',True),('--operator-secret',False)]),
         ('provider-reconcile','Attach an operator receipt to an unknown send',[('--project',True),('--job-id',True),('--receipt',True),('--operator-secret',False)]),
         ('provider-grant', 'Authorize a bounded provider grant (operator only)', [('--project',True),('--grant',True),('--operator-secret',False)]),
+        ('animation-quality-benchmark', 'Run a versioned offline labeled animation corpus', [('--manifest', True)]),
         ('agent-export-preview', 'Preview a manual versioned training export', [('--project', True), ('--selection', True)]),
         ('agent-export-build', 'Publish a manually requested portable training snapshot', [('--project', True), ('--selection', True)]),
         ('agent-satisfaction-record', 'Record exact parent-agent creative judgment', [('--project', True), ('--run-id', True), ('--action', True)]),
@@ -255,7 +256,7 @@ def main(argv=None):
         _s = _bs(args.project)
         _aio.run(_s.run_stdio_async())
         return 0
-    if args.cmd in ("agent-export-preview", "agent-export-build", "agent-satisfaction-record", "agent-handoff-get", "agent-intervention-get", "agent-intervention-mark", "agent-intervention-resolve", "agent-intervention-reopen", "agent-decision", "agent-revision-get", "agent-run-eligibility", "agent-run-cancel", "agent-run-start", "agent-run-get", "agent-run-submit", "task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
+    if args.cmd in ("animation-quality-benchmark", "agent-export-preview", "agent-export-build", "agent-satisfaction-record", "agent-handoff-get", "agent-intervention-get", "agent-intervention-mark", "agent-intervention-resolve", "agent-intervention-reopen", "agent-decision", "agent-revision-get", "agent-run-eligibility", "agent-run-cancel", "agent-run-start", "agent-run-get", "agent-run-submit", "task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
                     "orchestrator-send", "capabilities", "correction-claim", "correction-submit",

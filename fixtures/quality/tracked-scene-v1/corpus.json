@@ -1,0 +1,1711 @@
+{
+  "schema_version": "1.0",
+  "id": "tracked-scene-procedural-v1",
+  "methodology": "Controlled 2D landmark cases with explicit camera shifts/scales, intended occlusion, contact and order. Thresholds are task-authored fixture bounds, not universal quality thresholds. Defect labels are separately authored, not derived from evaluator output. All cases are procedural and are not a generated-art generalization benchmark.",
+  "cases": [
+    {
+      "id": "correct",
+      "spec": {
+        "id": "scene",
+        "project_id": "p",
+        "animation_id": "interaction",
+        "intent": "The hand reaches the prop, then is occluded; the camera translates and zooms.",
+        "subjects": "hand and prop",
+        "profile": "tracked-scene-v1",
+        "canvas": {
+          "width": 24,
+          "height": 24
+        },
+        "timing": {
+          "holds": [
+            3,
+            4,
+            3
+          ]
+        },
+        "loop": false,
+        "scene": {
+          "subjects": [
+            "hand",
+            "prop"
+          ],
+          "camera": [
+            {
+              "slot": 0,
+              "translation": [
+                0,
+                0
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 1,
+              "translation": [
+                2,
+                1
+              ],
+              "scale": 2,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 2,
+              "translation": [
+                1,
+                2
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            }
+          ],
+          "features": [
+            {
+              "id": "hand-0",
+              "subject_id": "hand",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                2,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-0",
+              "subject_id": "prop",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-1",
+              "subject_id": "hand",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                3,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-1",
+              "subject_id": "prop",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-2",
+              "subject_id": "hand",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "occluded",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-2",
+              "subject_id": "prop",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            }
+          ],
+          "links": [
+            {
+              "id": "hand-motion",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "hand-1",
+              "max_displacement_world": 1.1
+            },
+            {
+              "id": "occluded-link",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "hand-2",
+              "max_displacement_world": 2,
+              "required": false
+            }
+          ],
+          "events": [
+            {
+              "id": "touch",
+              "kind": "contact",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "prop-1",
+              "distance_world": 1,
+              "source": "procedural",
+              "provenance": "authored contact at tick 3"
+            },
+            {
+              "id": "order",
+              "kind": "left_of",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "prop-0",
+              "distance_world": 0.5,
+              "source": "procedural",
+              "provenance": "hand begins left of prop"
+            }
+          ]
+        }
+      },
+      "assets": {
+        "frame-0": "correct/frame-0.png",
+        "frame-1": "correct/frame-1.png",
+        "frame-2": "correct/frame-2.png"
+      },
+      "frame_asset_ids": [
+        "frame-0",
+        "frame-1",
+        "frame-2"
+      ],
+      "expected_defects": [],
+      "complete_labels": true,
+      "origin": "procedural",
+      "label_source": "procedural",
+      "label_provenance": "Authored geometric counterexample labels; no human reviewer decision is claimed.",
+      "generation_provenance": "Deterministic native landmarks and declared 2D camera fixture.",
+      "split": "held_out"
+    },
+    {
+      "id": "jump",
+      "spec": {
+        "id": "scene",
+        "project_id": "p",
+        "animation_id": "interaction",
+        "intent": "The hand reaches the prop, then is occluded; the camera translates and zooms.",
+        "subjects": "hand and prop",
+        "profile": "tracked-scene-v1",
+        "canvas": {
+          "width": 24,
+          "height": 24
+        },
+        "timing": {
+          "holds": [
+            3,
+            4,
+            3
+          ]
+        },
+        "loop": false,
+        "scene": {
+          "subjects": [
+            "hand",
+            "prop"
+          ],
+          "camera": [
+            {
+              "slot": 0,
+              "translation": [
+                0,
+                0
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 1,
+              "translation": [
+                2,
+                1
+              ],
+              "scale": 2,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 2,
+              "translation": [
+                1,
+                2
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            }
+          ],
+          "features": [
+            {
+              "id": "hand-0",
+              "subject_id": "hand",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                2,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-0",
+              "subject_id": "prop",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-1",
+              "subject_id": "hand",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                3,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-1",
+              "subject_id": "prop",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-2",
+              "subject_id": "hand",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "occluded",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-2",
+              "subject_id": "prop",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            }
+          ],
+          "links": [
+            {
+              "id": "hand-motion",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "hand-1",
+              "max_displacement_world": 1.1
+            },
+            {
+              "id": "occluded-link",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "hand-2",
+              "max_displacement_world": 2,
+              "required": false
+            }
+          ],
+          "events": [
+            {
+              "id": "touch",
+              "kind": "contact",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "prop-1",
+              "distance_world": 1,
+              "source": "procedural",
+              "provenance": "authored contact at tick 3"
+            },
+            {
+              "id": "order",
+              "kind": "left_of",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "prop-0",
+              "distance_world": 0.5,
+              "source": "procedural",
+              "provenance": "hand begins left of prop"
+            }
+          ]
+        }
+      },
+      "assets": {
+        "frame-0": "jump/frame-0.png",
+        "frame-1": "jump/frame-1.png",
+        "frame-2": "jump/frame-2.png"
+      },
+      "frame_asset_ids": [
+        "frame-0",
+        "frame-1",
+        "frame-2"
+      ],
+      "expected_defects": [
+        {
+          "check_id": "scene:hand-1",
+          "slots": [
+            1
+          ]
+        },
+        {
+          "check_id": "scene:hand-motion",
+          "slots": [
+            0,
+            1
+          ]
+        },
+        {
+          "check_id": "scene:touch",
+          "slots": [
+            1
+          ]
+        }
+      ],
+      "complete_labels": true,
+      "origin": "procedural",
+      "label_source": "procedural",
+      "label_provenance": "Authored geometric counterexample labels; no human reviewer decision is claimed.",
+      "generation_provenance": "Deterministic native landmarks and declared 2D camera fixture.",
+      "split": "held_out"
+    },
+    {
+      "id": "wrong-event",
+      "spec": {
+        "id": "scene",
+        "project_id": "p",
+        "animation_id": "interaction",
+        "intent": "The hand reaches the prop, then is occluded; the camera translates and zooms.",
+        "subjects": "hand and prop",
+        "profile": "tracked-scene-v1",
+        "canvas": {
+          "width": 24,
+          "height": 24
+        },
+        "timing": {
+          "holds": [
+            3,
+            4,
+            3
+          ]
+        },
+        "loop": false,
+        "scene": {
+          "subjects": [
+            "hand",
+            "prop"
+          ],
+          "camera": [
+            {
+              "slot": 0,
+              "translation": [
+                0,
+                0
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 1,
+              "translation": [
+                2,
+                1
+              ],
+              "scale": 2,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 2,
+              "translation": [
+                1,
+                2
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            }
+          ],
+          "features": [
+            {
+              "id": "hand-0",
+              "subject_id": "hand",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                2,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-0",
+              "subject_id": "prop",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-1",
+              "subject_id": "hand",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                3,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-1",
+              "subject_id": "prop",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-2",
+              "subject_id": "hand",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "occluded",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-2",
+              "subject_id": "prop",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            }
+          ],
+          "links": [
+            {
+              "id": "hand-motion",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "hand-1",
+              "max_displacement_world": 1.1
+            },
+            {
+              "id": "occluded-link",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "hand-2",
+              "max_displacement_world": 2,
+              "required": false
+            }
+          ],
+          "events": [
+            {
+              "id": "touch",
+              "kind": "contact",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "prop-1",
+              "distance_world": 1,
+              "source": "procedural",
+              "provenance": "authored contact at tick 3"
+            },
+            {
+              "id": "order",
+              "kind": "left_of",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "prop-0",
+              "distance_world": 0.5,
+              "source": "procedural",
+              "provenance": "hand begins left of prop"
+            }
+          ]
+        }
+      },
+      "assets": {
+        "frame-0": "wrong-event/frame-0.png",
+        "frame-1": "wrong-event/frame-1.png",
+        "frame-2": "wrong-event/frame-2.png"
+      },
+      "frame_asset_ids": [
+        "frame-0",
+        "frame-1",
+        "frame-2"
+      ],
+      "expected_defects": [
+        {
+          "check_id": "scene:touch",
+          "slots": [
+            1
+          ]
+        }
+      ],
+      "complete_labels": true,
+      "origin": "procedural",
+      "label_source": "procedural",
+      "label_provenance": "Authored geometric counterexample labels; no human reviewer decision is claimed.",
+      "generation_provenance": "Deterministic native landmarks and declared 2D camera fixture.",
+      "split": "held_out"
+    },
+    {
+      "id": "missing",
+      "spec": {
+        "id": "scene",
+        "project_id": "p",
+        "animation_id": "interaction",
+        "intent": "The hand reaches the prop, then is occluded; the camera translates and zooms.",
+        "subjects": "hand and prop",
+        "profile": "tracked-scene-v1",
+        "canvas": {
+          "width": 24,
+          "height": 24
+        },
+        "timing": {
+          "holds": [
+            3,
+            4,
+            3
+          ]
+        },
+        "loop": false,
+        "scene": {
+          "subjects": [
+            "hand",
+            "prop"
+          ],
+          "camera": [
+            {
+              "slot": 0,
+              "translation": [
+                0,
+                0
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 1,
+              "translation": [
+                2,
+                1
+              ],
+              "scale": 2,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 2,
+              "translation": [
+                1,
+                2
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            }
+          ],
+          "features": [
+            {
+              "id": "hand-0",
+              "subject_id": "hand",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                2,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-0",
+              "subject_id": "prop",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-1",
+              "subject_id": "hand",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                3,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-1",
+              "subject_id": "prop",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-2",
+              "subject_id": "hand",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "occluded",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-2",
+              "subject_id": "prop",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            }
+          ],
+          "links": [
+            {
+              "id": "hand-motion",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "hand-1",
+              "max_displacement_world": 1.1
+            },
+            {
+              "id": "occluded-link",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "hand-2",
+              "max_displacement_world": 2,
+              "required": false
+            }
+          ],
+          "events": [
+            {
+              "id": "touch",
+              "kind": "contact",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "prop-1",
+              "distance_world": 1,
+              "source": "procedural",
+              "provenance": "authored contact at tick 3"
+            },
+            {
+              "id": "order",
+              "kind": "left_of",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "prop-0",
+              "distance_world": 0.5,
+              "source": "procedural",
+              "provenance": "hand begins left of prop"
+            }
+          ]
+        }
+      },
+      "assets": {
+        "frame-0": "missing/frame-0.png",
+        "frame-1": "missing/frame-1.png",
+        "frame-2": "missing/frame-2.png"
+      },
+      "frame_asset_ids": [
+        "frame-0",
+        "frame-1",
+        "frame-2"
+      ],
+      "expected_defects": [
+        {
+          "check_id": "scene:prop-0",
+          "slots": [
+            0
+          ]
+        }
+      ],
+      "complete_labels": true,
+      "origin": "procedural",
+      "label_source": "procedural",
+      "label_provenance": "Authored geometric counterexample labels; no human reviewer decision is claimed.",
+      "generation_provenance": "Deterministic native landmarks and declared 2D camera fixture.",
+      "split": "held_out"
+    },
+    {
+      "id": "duplicated",
+      "spec": {
+        "id": "scene",
+        "project_id": "p",
+        "animation_id": "interaction",
+        "intent": "The hand reaches the prop, then is occluded; the camera translates and zooms.",
+        "subjects": "hand and prop",
+        "profile": "tracked-scene-v1",
+        "canvas": {
+          "width": 24,
+          "height": 24
+        },
+        "timing": {
+          "holds": [
+            3,
+            4,
+            3
+          ]
+        },
+        "loop": false,
+        "scene": {
+          "subjects": [
+            "hand",
+            "prop"
+          ],
+          "camera": [
+            {
+              "slot": 0,
+              "translation": [
+                0,
+                0
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 1,
+              "translation": [
+                2,
+                1
+              ],
+              "scale": 2,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 2,
+              "translation": [
+                1,
+                2
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            }
+          ],
+          "features": [
+            {
+              "id": "hand-0",
+              "subject_id": "hand",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                2,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-0",
+              "subject_id": "prop",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-1",
+              "subject_id": "hand",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                3,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-1",
+              "subject_id": "prop",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-2",
+              "subject_id": "hand",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "occluded",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-2",
+              "subject_id": "prop",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            }
+          ],
+          "links": [
+            {
+              "id": "hand-motion",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "hand-1",
+              "max_displacement_world": 1.1
+            },
+            {
+              "id": "occluded-link",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "hand-2",
+              "max_displacement_world": 2,
+              "required": false
+            }
+          ],
+          "events": [
+            {
+              "id": "touch",
+              "kind": "contact",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "prop-1",
+              "distance_world": 1,
+              "source": "procedural",
+              "provenance": "authored contact at tick 3"
+            },
+            {
+              "id": "order",
+              "kind": "left_of",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "prop-0",
+              "distance_world": 0.5,
+              "source": "procedural",
+              "provenance": "hand begins left of prop"
+            }
+          ]
+        }
+      },
+      "assets": {
+        "frame-0": "duplicated/frame-0.png",
+        "frame-1": "duplicated/frame-1.png",
+        "frame-2": "duplicated/frame-2.png"
+      },
+      "frame_asset_ids": [
+        "frame-0",
+        "frame-1",
+        "frame-2"
+      ],
+      "expected_defects": [
+        {
+          "check_id": "scene:hand-0",
+          "slots": [
+            0
+          ]
+        }
+      ],
+      "complete_labels": true,
+      "origin": "procedural",
+      "label_source": "procedural",
+      "label_provenance": "Authored geometric counterexample labels; no human reviewer decision is claimed.",
+      "generation_provenance": "Deterministic native landmarks and declared 2D camera fixture.",
+      "split": "held_out"
+    },
+    {
+      "id": "repair",
+      "spec": {
+        "id": "scene",
+        "project_id": "p",
+        "animation_id": "interaction",
+        "intent": "The hand reaches the prop, then is occluded; the camera translates and zooms.",
+        "subjects": "hand and prop",
+        "profile": "tracked-scene-v1",
+        "canvas": {
+          "width": 24,
+          "height": 24
+        },
+        "timing": {
+          "holds": [
+            3,
+            4,
+            3
+          ]
+        },
+        "loop": false,
+        "scene": {
+          "subjects": [
+            "hand",
+            "prop"
+          ],
+          "camera": [
+            {
+              "slot": 0,
+              "translation": [
+                0,
+                0
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 1,
+              "translation": [
+                2,
+                1
+              ],
+              "scale": 2,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            },
+            {
+              "slot": 2,
+              "translation": [
+                1,
+                2
+              ],
+              "scale": 1,
+              "source": "procedural",
+              "provenance": "authored camera path"
+            }
+          ],
+          "features": [
+            {
+              "id": "hand-0",
+              "subject_id": "hand",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                2,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-0",
+              "subject_id": "prop",
+              "slot": 0,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-1",
+              "subject_id": "hand",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                3,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-1",
+              "subject_id": "prop",
+              "slot": 1,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "hand-2",
+              "subject_id": "hand",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                255,
+                0,
+                0,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "occluded",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            },
+            {
+              "id": "prop-2",
+              "subject_id": "prop",
+              "slot": 2,
+              "roi": {
+                "left": 0,
+                "top": 0,
+                "right": 24,
+                "bottom": 24
+              },
+              "rgba": [
+                0,
+                0,
+                255,
+                255
+              ],
+              "expected_world": [
+                4,
+                3
+              ],
+              "max_error_world": 1.1,
+              "minimum_pixels": 1,
+              "maximum_pixels": 1,
+              "visibility": "visible",
+              "source": "procedural",
+              "provenance": "independently authored subject trajectory"
+            }
+          ],
+          "links": [
+            {
+              "id": "hand-motion",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "hand-1",
+              "max_displacement_world": 1.1
+            },
+            {
+              "id": "occluded-link",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "hand-2",
+              "max_displacement_world": 2,
+              "required": false
+            }
+          ],
+          "events": [
+            {
+              "id": "touch",
+              "kind": "contact",
+              "left_feature_id": "hand-1",
+              "right_feature_id": "prop-1",
+              "distance_world": 1,
+              "source": "procedural",
+              "provenance": "authored contact at tick 3"
+            },
+            {
+              "id": "order",
+              "kind": "left_of",
+              "left_feature_id": "hand-0",
+              "right_feature_id": "prop-0",
+              "distance_world": 0.5,
+              "source": "procedural",
+              "provenance": "hand begins left of prop"
+            }
+          ]
+        }
+      },
+      "assets": {
+        "frame-0": "repair/frame-0.png",
+        "frame-1": "repair/frame-1.png",
+        "frame-2": "repair/frame-2.png"
+      },
+      "frame_asset_ids": [
+        "frame-0",
+        "frame-1",
+        "frame-2"
+      ],
+      "expected_defects": [],
+      "complete_labels": true,
+      "origin": "procedural",
+      "label_source": "procedural",
+      "label_provenance": "Authored geometric counterexample labels; no human reviewer decision is claimed.",
+      "generation_provenance": "Deterministic native landmarks and declared 2D camera fixture.",
+      "split": "held_out",
+      "repair_of": "wrong-event"
+    }
+  ]
+}

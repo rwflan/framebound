@@ -14,7 +14,7 @@ def validate(snap,manifest):
     issues=[]
     try:
         required={'agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1'}
-        if not required<=set(manifest.get('reader_capabilities',[])) or set(manifest.get('reader_capabilities',[]))-required-{'source-correspondence-v1'}:issues.append('unsupported reader capabilities')
+        if not required<=set(manifest.get('reader_capabilities',[])) or set(manifest.get('reader_capabilities',[]))-required-{'source-correspondence-v1','declared-color-camera-tracks-v1'}:issues.append('unsupported reader capabilities')
         listed=manifest['files']
         for rel,expected in listed.items():
             p=snap/rel
@@ -67,6 +67,9 @@ def validate(snap,manifest):
                         if record[key]!=source[key]:issues.append('source designation reinterprets original binding '+tid)
                 for aid in source['frame_asset_ids']:
                     if aid not in graph['assets']:issues.append('known-good source pixels absent from closure '+tid)
+            if parsed.spec.scene:
+                from ...v3 import scene as SC
+                SC.validate(parsed.spec)
             parent=task['spec'].get('supersedes')
             if parent and parent not in graph['tasks']:issues.append('task predecessor missing '+tid)
         for rid,revision in graph['revisions'].items():
@@ -96,6 +99,16 @@ def validate(snap,manifest):
                 for measured_result in measured:
                     actual_result=saved.get(measured_result['id'])
                     if not actual_result or any(actual_result.get(k)!=v for k,v in measured_result.items() if k!='evidence_method'):issues.append('packaged measurement does not reproduce '+rid+'/'+measured_result['id'])
+            if spec.scene and available:
+                from ...v3 import scene as SC
+                measured,scene_evidence=SC.evaluate(spec,images)
+                stored={r['id']:r for r in evaluation['results']}
+                for result in measured:
+                    if stored.get(result['id'])!=result:issues.append('tracked scene measurement does not reproduce '+rid)
+                saved_scene=evaluation['evidence'].get('scene',{})
+                if any(saved_scene.get(k)!=value for k,value in scene_evidence.items() if k!='source_sha256'):
+                    issues.append('scene evaluator method/assumptions differ '+rid)
+                if len(saved_scene.get('source_sha256',''))!=64:issues.append('scene evaluator implementation identity missing '+rid)
             if spec.source_correspondence:
                 from ...v3 import correspondence as C
                 source_evidence=evaluation['evidence'].get('source_correspondence')
