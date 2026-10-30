@@ -8,6 +8,8 @@ pending-reason links.
 from __future__ import annotations
 
 ROWS = [
+    ('cli/mcp/api/desk', 'tracked-scene-v1', 'provisional', 'declared color landmarks with 2D camera compensation, visibility and authored interaction events; procedural counterexamples; independent reviewed generated-art validation pending'),
+    ('cli', 'animation-quality-benchmark', 'supported', 'versioned offline corpus runner; false alarms/misses/frame and ROI localization; repair regressions; actual label and art provenance retained'),
     ('cli/mcp/api/desk', 'known-good enhancement/interpolation', 'supported', 'explicit source designation and authored-time map; protected pixel/alpha keys; interval-labeled comparison; portable lineage; no generic fluidity claim'),
     ('cli/mcp/api/desk', 'v3 manual training export', 'supported', 'existing atomic publisher; portable task/run/evidence/feedback/intervention closure; separate exact human and automatic views; trajectories; versioned reader; rights and family-safe splits'),
     ('desk/api', 'v3 run workspace and timeline', 'supported', 'candidate-first film; packet-free runs; exact historical revision navigation; saved markup/copy/download; explicit previous-revision comparison'),

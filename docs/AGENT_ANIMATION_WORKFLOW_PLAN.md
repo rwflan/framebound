@@ -17,8 +17,10 @@ Portable v3 training snapshots now extend the existing atomic publisher, with
 separate human/automatic label views, correction trajectories, optional-input
 closure, moved validation and manual preview/publication. Optional known-good enhancement/interpolation now binds explicit designation,
 protected source keys, authored-time correspondence, mapped playback and portable
-source lineage. Broader profiles, real generated-art validation and the final
-requirement-by-requirement audit remain open.
+source lineage. A provisional tracked-scene milestone now measures declared camera-compensated
+landmarks, visibility and interaction events, with an offline benchmark runner
+reporting errors/localization and actual label provenance. Independently reviewed
+generated-art validation and the final requirement-by-requirement audit remain open.
 
 ## Goal
 

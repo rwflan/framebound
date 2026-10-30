@@ -239,7 +239,7 @@ def plan(project,con,rids,policy):
                 reasons=reasons,evaluation_id=f'evaluation:{rid}',
                 evidence_digest=graph['evaluations'][f'evaluation:{rid}']['evidence_digest'],
                 completion_policy=task['spec']['completion']['id'],
-                assumption_sources=sorted({r['source'] for r in task['spec'].get('region_observations',[])+task['spec'].get('temporal_observations',[])}),
+                assumption_sources=sorted({r['source'] for r in task['spec'].get('region_observations',[])+task['spec'].get('temporal_observations',[])+((task['spec'].get('scene') or {}).get('features',[]))+((task['spec'].get('scene') or {}).get('camera',[]))+((task['spec'].get('scene') or {}).get('events',[]))}),
                 byte_sha256=asset['byte_sha256'],pixel_sha256=asset.get('pixel_sha256'),
                 rights=asset['rights'],origin=asset.get('origin','unknown'),source_kind=asset['source_kind']))
     return graph,membership,asset_files,withheld,exclusions
@@ -316,7 +316,7 @@ def build_into(project,name,rids,out,policy,digest,con):
         write(rel,''.join(json.dumps(row,sort_keys=True)+'\n' for row in data))
     write('README.md','# Framebound agent trajectories\n\nVersion 3 requires explicit reader support. `hf/` contains exact human-accepted positives only; `automatically_verified/` is a separate technical-policy view. Research/withheld data retain rights, source and missing-evidence labels. No preference pairs are inferred. Snapshot transport does not grant training rights. Missing generation metadata remains null. Controlled declared-region measurements do not certify arbitrary creative quality.\n')
     files={str(p.relative_to(out)):_h(p.read_bytes()) for p in out.rglob('*') if p.is_file()}
-    manifest=dict(snapshot=name,dataset_version=VERSION,schemas={'domain':'3.0'},reader_capabilities=['agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1']+(['source-correspondence-v1'] if graph['source_records'] else []),
+    manifest=dict(snapshot=name,dataset_version=VERSION,schemas={'domain':'3.0'},reader_capabilities=['agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1']+(['source-correspondence-v1'] if graph['source_records'] else [])+(['declared-color-camera-tracks-v1'] if any(t['spec'].get('scene') for t in graph['tasks'].values()) else []),
         inputs_digest=digest,clip_revisions=rids,policy=dict(policy,agent_export_policy=POLICY),files=files,exclusions=exclusions,
         families={m['revision_id']:m['family'] for m in membership},split_semantics='animation/derivation/shared-input/exact-pixel and 64-bit dHash distance <=4 components; conservative grouping only, not quality judgment',
         counts=dict(images=len(coco_images),annotations=len(coco_annotations),positives=len(views['human_accepted']),automatically_verified=len(views['automatically_verified']),

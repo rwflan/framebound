@@ -1,0 +1,216 @@
+{
+  "$defs": {
+    "Case": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "spec": {
+          "additionalProperties": true,
+          "title": "Spec",
+          "type": "object"
+        },
+        "assets": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Assets",
+          "type": "object"
+        },
+        "frame_asset_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 512,
+          "minItems": 1,
+          "title": "Frame Asset Ids",
+          "type": "array"
+        },
+        "expected_defects": {
+          "items": {
+            "$ref": "#/$defs/DefectLabel"
+          },
+          "title": "Expected Defects",
+          "type": "array"
+        },
+        "complete_labels": {
+          "title": "Complete Labels",
+          "type": "boolean"
+        },
+        "origin": {
+          "enum": [
+            "procedural",
+            "image_generated",
+            "human_authored"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "label_source": {
+          "enum": [
+            "procedural",
+            "independent_human_review",
+            "model_review",
+            "unreviewed"
+          ],
+          "title": "Label Source",
+          "type": "string"
+        },
+        "label_provenance": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Label Provenance",
+          "type": "string"
+        },
+        "generation_provenance": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Generation Provenance",
+          "type": "string"
+        },
+        "split": {
+          "enum": [
+            "development",
+            "held_out"
+          ],
+          "title": "Split",
+          "type": "string"
+        },
+        "repair_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repair Of"
+        }
+      },
+      "required": [
+        "id",
+        "spec",
+        "assets",
+        "frame_asset_ids",
+        "complete_labels",
+        "origin",
+        "label_source",
+        "label_provenance",
+        "generation_provenance",
+        "split"
+      ],
+      "title": "Case",
+      "type": "object"
+    },
+    "DefectLabel": {
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "slots": {
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Slots",
+          "type": "array"
+        },
+        "roi": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Roi"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "check_id",
+        "slots"
+      ],
+      "title": "DefectLabel",
+      "type": "object"
+    },
+    "Roi": {
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "minimum": 0,
+          "title": "Left",
+          "type": "integer"
+        },
+        "top": {
+          "minimum": 0,
+          "title": "Top",
+          "type": "integer"
+        },
+        "right": {
+          "minimum": 0,
+          "title": "Right",
+          "type": "integer"
+        },
+        "bottom": {
+          "minimum": 0,
+          "title": "Bottom",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "left",
+        "top",
+        "right",
+        "bottom"
+      ],
+      "title": "Roi",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/Case"
+      },
+      "maxItems": 1000,
+      "minItems": 1,
+      "title": "Cases",
+      "type": "array"
+    },
+    "methodology": {
+      "maxLength": 8000,
+      "minLength": 1,
+      "title": "Methodology",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "cases",
+    "methodology"
+  ],
+  "title": "Corpus",
+  "type": "object"
+}

@@ -131,6 +131,10 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 raise InvalidInput('declared-region edit permissions need a saved intervention grant; full-clip permission cannot be inferred')
             if spec.canvas.width * spec.canvas.height * (len(frame_asset_ids)+(len(spec.source_correspondence.frame_asset_ids) if spec.source_correspondence else 0)) > run['limits'].get('max_evaluation_pixels', 16777216):
                 raise InvalidInput('frozen evaluation pixel budget exceeded; negotiate a new task before allocating frames')
+            measurement_pixels=sum((r.roi.right-r.roi.left)*(r.roi.bottom-r.roi.top) for r in spec.region_observations)
+            if spec.scene:measurement_pixels+=sum((f.roi.right-f.roi.left)*(f.roi.bottom-f.roi.top) for f in spec.scene.features)
+            if measurement_pixels>run['limits'].get('max_measurement_pixels',67108864):
+                raise InvalidInput('frozen measurement pixel budget exceeded; reduce/partition declared measurements in a new task')
             images, manifest, fids = [], [], []
             for slot, aid in enumerate(frame_asset_ids):
                 try:
@@ -172,15 +176,19 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 results.extend(source_results)
                 source_evidence['implementation_sha256']=S.sha256_bytes(Path(C.__file__).read_bytes())
                 evidence['source_correspondence']=source_evidence
+            if spec.scene:
+                from .. import scene
+                scene_results,scene_evidence=scene.evaluate(spec,images)
+                results.extend(scene_results);evidence['scene']=scene_evidence
             preservation = I.preservation_in(con, project, run, images, spec)
             results.extend(preservation)
             for result in results:
-                result['required'] = True
+                result.setdefault('required',True)
             required_by_check = {check: any(r.required for r in task.requirements if r.check == check)
                                  for check in {r.check for r in task.requirements}}
             for result in results:
                 result['required'] = (True if result['family'] in {'media', 'timing', 'edit_preservation','source_fidelity'}
-                                      else required_by_check.get(result['family'], True))
+                                      else result.get('required',True) and required_by_check.get(result['family'], True))
             for requirement in task.requirements:
                 if requirement.applicability != 'supported':
                     results.append(dict(id=f'gap:{requirement.id}', family=requirement.check,
@@ -249,7 +257,7 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                     run_id=run_id, task_id=task.id, policy=spec.completion.model_dump(),
                     revision_id=revision_id, evaluation_id=evaluation['id'], evidence_digest=evidence_digest,
                     creative_status='unreviewed', output_eligibility='automatic-technical',
-                    quality_scope='declared-region constraints' if spec.profile == 'fixed-subject-v1' else 'structural only; animation quality not verified'))
+                    quality_scope='declared camera/landmark constraints; semantics unverified' if spec.profile=='tracked-scene-v1' else 'declared-region constraints' if spec.profile == 'fixed-subject-v1' else 'structural only; animation quality not verified'))
             insert(con, 'agent_run_events', dict(id=f'{run_id}:submission:{revision_id}', run_id=run_id,
                 project_id=run['project_id'], animation_id=run['animation_id'], task_id=task.id,
                 event='completed' if run['lifecycle']=='completed' else 'evaluated', revision_id=revision_id,
@@ -320,7 +328,7 @@ def eligibility(project, run_id):
         return dict(schema_version='3.0', eligible=not reasons, policy=spec.completion.id,
                     revision_id=rid, evaluation_id=evaluation['id'], evidence_digest=evaluation['evidence_digest'],
                     creative_status=run['creative_status'], reasons=reasons,
-                    quality_scope='declared regions and events only' if spec.profile=='fixed-subject-v1' else 'structural only; animation quality not verified')
+                    quality_scope='declared camera/landmark constraints; semantics unverified' if spec.profile=='tracked-scene-v1' else 'declared regions and events only' if spec.profile=='fixed-subject-v1' else 'structural only; animation quality not verified')
     finally:
         con.close()
 
