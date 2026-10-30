@@ -6,6 +6,8 @@ Image models produce a good style frame. They do not reliably hold a character's
 
 Built for the Meta Global AI Developer Hackathon (Indie track, Build for Your World). See [docs/HACKATHON.md](docs/HACKATHON.md).
 
+Product direction: [agent-led animation workflow plan](docs/AGENT_ANIMATION_WORKFLOW_PLAN.md) — reference-optional generation and correction, actionable agent feedback, exceptional human intervention and training-data export. This is the proposed implementation plan; the sections below describe the current reference-first implementation.
+
 ## How it works
 
 1. **Contract.** One approved master, one native canvas, locked frame holds, frozen phase references, declared contacts, anchors, and visible features. Everything hash-bound.
