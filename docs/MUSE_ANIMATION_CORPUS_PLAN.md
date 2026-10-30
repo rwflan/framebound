@@ -6,7 +6,7 @@ Restarted 2026-10-30. This replaces the asset-pack/museum-led reference approach
 
 Open the [game-led gallery](research/game-art/index.html) and [source manifest](research/game-art/games.json). Publisher storefront screenshots and trailers are the initial research sources. The gallery links original full-resolution screenshots rather than presenting sprite-pack promotional sheets. It groups work by named games so comparisons remain recognizable and useful.
 
-The expanded library lists 67 games and 531 publisher screenshot links. Titles without acquired images are marked as acquisition gaps. These are research references, not a completed model-conditioning library.
+The expanded library lists 107 games and 878 publisher screenshot links. Titles without acquired images are marked as acquisition gaps. These are research references, not a completed model-conditioning library.
 
 ## Initial game shortlist
 
@@ -79,6 +79,46 @@ The expanded library lists 67 games and 531 publisher screenshot links. Titles w
 | River City Girls | Drawn/pixel brawler | Expressive poses, characters and impacts |
 | Scott Pilgrim vs. The World | Pixel brawler | Cartoon proportions and readable combat |
 | Odin Sphere Leifthrasir | Painted fantasy | Layered painted characters and secondary motion |
+| Garou: Mark of the Wolves | Arcade fighter pixel | Weight shifts, cloth and recovery |
+| The King of Fighters XIII | High-detail fighter pixel | Anatomy, lighting and complex action poses |
+| The Last Blade 2 | Arcade weapon fighter | Cloth, stance and weapon arcs |
+| Samurai Shodown V Special | Arcade fighter | Large silhouettes and restrained anticipation |
+| Rivals of Aether | Pixel platform fighter | Distinct creature shapes and elemental effects |
+| Record of Lodoss War: Deedlit in Wonder Labyrinth | Detailed fantasy pixel | Flowing hair, cloth and magic |
+| Touhou Luna Nights | Detailed action pixel | Fast poses, projectiles and time effects |
+| Castlevania Advance Collection | Handheld action pixel | Verify individual game; anatomy, cloth and effects |
+| Castlevania Dominus Collection | Detailed action pixel | Verify individual game; large sprites and layered scenes |
+| Mega Man X Legacy Collection | 16-bit action pixel | Verify individual game; mechanical poses and effects |
+| Mega Man Zero/ZX Legacy Collection | Handheld action pixel | Verify individual game; silhouettes and attack arcs |
+| Sonic CD | Classic pixel | Momentum, character posing and colourful environments |
+| Wonder Boy: Asha in Monster World | Toon rendered hybrid | Compare 3D cartoon forms with drawn-style presentation |
+| Neva | Illustrated atmospheric | Animal motion, silhouettes and changing scale |
+| Planet of Lana | Painted cinematic | Composition, companion acting and restrained motion |
+| Little Misfortune | Drawn storybook | Character acting and expressive posing |
+| Fran Bow | Drawn surreal | Shape language, expressions and illustrated environments |
+| Machinarium | Drawn mechanical | Mechanical acting, texture and environmental detail |
+| Samorost 3 | Mixed-media illustrated | Organic texture, creature motion and layered scenes |
+| Botanicula | Organic collage | Tiny creatures and expressive minimal motion |
+| Creaks | Illustrated puzzle | Graphic environments and character transformations |
+| Lost in Play | Drawn cartoon | Acting, shape exaggeration and expressive interaction |
+| Toem | Monochrome illustrated hybrid | Linework and readable silhouettes; mixed production |
+| Wytchwood | Storybook cutout | Texture, costume and graphic shape language |
+| Snufkin: Melody of Moominvalley | Storybook illustration | Soft colour, line and environmental movement |
+| Chicory: A Colorful Tale | Graphic line art | Contour clarity, colour application and expressive poses |
+| Night in the Woods | Graphic character cutout | Acting through simple shapes and posing |
+| Oxenfree | Painted cinematic | Small characters against atmospheric scenes |
+| Oxenfree II | Painted cinematic | Lighting, scale and layered environments |
+| Afterimage | Drawn fantasy | Costume detail, effects and environmental layers |
+| TEVI | Anime pixel action | Character readability and dense projectiles |
+| Rabi-Ribi | Anime pixel action | Compact poses and bullet effects |
+| Iconoclasts | Detailed pixel | Expressive acting and mechanical motion |
+| Axiom Verge | Retro surreal pixel | Creature silhouettes, biomechanical texture and effects |
+| Axiom Verge 2 | Retro pixel | Organic motion and environmental atmosphere |
+| Timespinner | 16-bit inspired | Character pose economy and effects |
+| Chasm | Detailed pixel | Action readability and environmental texture |
+| Infernax | 8-bit inspired | Compact silhouettes and impact language |
+| Cyber Shadow | 8-bit inspired | Mechanical detail and rapid action posing |
+| Blazing Chrome | Arcade action pixel | Mechanical enemies, explosions and animation clarity |
 
 ## Curate the actual art, not a list of style labels
 
