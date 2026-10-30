@@ -8,7 +8,7 @@ from ...v2.services.errors import InvalidInput
 from .. import evaluate as E
 from . import tasks
 
-TABLES = ('agent_runs', 'agent_clip_revisions', 'agent_evaluations', 'agent_feedback', 'agent_completions', 'agent_run_events')
+TABLES = ('agent_runs', 'agent_clip_revisions', 'agent_evaluations', 'agent_feedback', 'agent_completions', 'agent_run_events', 'agent_interventions')
 
 
 def connect(project):
@@ -18,7 +18,8 @@ def connect(project):
             con.execute('BEGIN IMMEDIATE')
             existing = {r['name'] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if any(table not in existing for table in TABLES):
-                tasks.backup_database(project, 'before-agent-loop-v3.sqlite3')
+                tasks.backup_database(project, 'before-agent-interventions-v3.sqlite3'
+                                      if 'agent_runs' in existing else 'before-agent-loop-v3.sqlite3')
             for table in TABLES:
                 con.execute(f'CREATE TABLE IF NOT EXISTS {table}(id TEXT PRIMARY KEY, data TEXT NOT NULL)')
     except Exception:
@@ -74,7 +75,7 @@ def get(project, run_id):
     try:
         run = get_in(con, 'agent_runs', run_id)
         run['remaining_submissions'] = max(0, run['limits']['max_submissions'] - len(run['submission_ids']))
-        run['feedback'] = (get_in(con, 'agent_feedback', f"feedback:{run['current_revision_id']}")
+        run['feedback'] = (get_in(con, 'agent_feedback', run.get('feedback_id', f"feedback:{run['current_revision_id']}"))
                            if run['current_revision_id'] else None)
         return run
     finally:
@@ -121,11 +122,12 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 raise InvalidInput('persistent submission budget exhausted')
             if parent_revision_id != run['current_revision_id']:
                 raise S.StaleRevisionError('submission parent differs from current revision; fetch current feedback and explicitly rebase')
-            if parent_revision_id and feedback_id != f'feedback:{parent_revision_id}':
+            if parent_revision_id and feedback_id != run.get('feedback_id', f'feedback:{parent_revision_id}'):
                 raise S.StaleRevisionError('child submission must bind current saved feedback')
             if len(frame_asset_ids) != len(spec.timing.holds):
                 raise InvalidInput('frame count must equal the frozen authored hold count')
-            if spec.repair_scope == 'declared_regions':
+            from . import interventions as I
+            if parent_revision_id and spec.repair_scope == 'declared_regions' and not any(m['authorize_edit_scope'] for m in I.open_in(con, run_id)):
                 raise InvalidInput('declared-region edit permissions need a saved intervention grant; full-clip permission cannot be inferred')
             if spec.canvas.width * spec.canvas.height * len(frame_asset_ids) > run['limits'].get('max_evaluation_pixels', 16777216):
                 raise InvalidInput('frozen evaluation pixel budget exceeded; negotiate a new task before allocating frames')
@@ -155,12 +157,15 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                                             pixels_baked=True, verified_by='external-import'))
                 fids.append(fid)
             results, evidence, evidence_digest = E.evaluate(spec, images, manifest, holds)
+            preservation = I.preservation_in(con, project, run, images, spec)
+            results.extend(preservation)
             for result in results:
                 result['required'] = True
             required_by_check = {check: any(r.required for r in task.requirements if r.check == check)
                                  for check in {r.check for r in task.requirements}}
             for result in results:
-                result['required'] = required_by_check.get(result['family'], True)
+                result['required'] = (True if result['family'] in {'media', 'timing', 'edit_preservation'}
+                                      else required_by_check.get(result['family'], True))
             for requirement in task.requirements:
                 if requirement.applicability != 'supported':
                     results.append(dict(id=f'gap:{requirement.id}', family=requirement.check,
@@ -194,6 +199,7 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
             run['fingerprints'].append(fingerprint)
             run['submission_ids'].append(revision_id)
             run['current_revision_id'] = revision_id
+            run['creative_status'] = 'unreviewed'
             regression_ids = []
             if run['best_revision_id']:
                 best = get_in(con, 'agent_evaluations', f"evaluation:{run['best_revision_id']}")
@@ -204,7 +210,10 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
             if best is None or (_score(evaluation) < _score(best) and not regression_ids):
                 run['best_revision_id'] = revision_id
             passed = evaluation['technical_status'] == 'pass' and evaluation['coverage'] == 'complete'
-            if passed and spec.completion.id == 'technical-unreviewed-v1':
+            I.after_submission_in(con, run, revision_id, all(r['outcome']=='pass' for r in preservation))
+            if passed and I.open_in(con, run_id):
+                run['lifecycle'], run['stop_reason'] = 'awaiting_decision', 'Technical checks passed; saved human corrections require explicit owner resolution.'
+            elif passed and spec.intervention != 'explicit_review' and spec.completion.id == 'technical-unreviewed-v1':
                 run['lifecycle'], run['stop_reason'] = 'completed', 'Declared requirements met under technical-unreviewed-v1.'
             elif passed:
                 run['lifecycle'], run['stop_reason'] = 'awaiting_decision', 'Exact-revision human decision required by the task policy.'
@@ -217,7 +226,9 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
             else:
                 run['lifecycle'], run['stop_reason'] = 'awaiting_agent', None
             feedback = _feedback(run, task, revision, evaluation, regression_ids)
+            I.augment_in(con, feedback, run)
             insert(con, 'agent_feedback', feedback)
+            run['feedback_id'] = feedback['id']
             if run['lifecycle'] == 'completed':
                 insert(con, 'agent_completions', dict(id=f'completion:{revision_id}', schema_version='3.0',
                     run_id=run_id, task_id=task.id, policy=spec.completion.model_dump(),
@@ -281,8 +292,11 @@ def eligibility(project, run_id):
         if evaluation['technical_status'] != 'pass' or evaluation['coverage'] != 'complete':
             reasons.append('Required technical matrix is not complete and passing.')
         spec = tasks._get(con, run['task_id']).spec
-        if spec.completion.id != 'technical-unreviewed-v1':
+        from . import interventions as I
+        if spec.completion.id == 'human-reviewed-v1' and not I.approved_in(con, run_id, rid, evaluation['id']):
             reasons.append('Human-reviewed policy requires an exact saved reviewer decision.')
+        if I.open_in(con, run_id):
+            reasons.append('Saved human corrections remain unresolved.')
         if run['lifecycle'] != 'completed':
             reasons.append(f"Run lifecycle is {run['lifecycle']}.")
         return dict(schema_version='3.0', eligible=not reasons, policy=spec.completion.id,
