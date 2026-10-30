@@ -6,7 +6,7 @@ Restarted 2026-10-30. This replaces the asset-pack/museum-led reference approach
 
 Open the [game-led gallery](research/game-art/index.html) and [source manifest](research/game-art/games.json). Publisher storefront screenshots and trailers are the initial research sources. The gallery links original full-resolution screenshots rather than presenting sprite-pack promotional sheets. It groups work by named games so comparisons remain recognizable and useful.
 
-The first pass lists 27 games and 170 publisher screenshot links. Titles without acquired images are marked as acquisition gaps. These are research references, not a completed model-conditioning library.
+The expanded library lists 67 games and 531 publisher screenshot links. Titles without acquired images are marked as acquisition gaps. These are research references, not a completed model-conditioning library.
 
 ## Initial game shortlist
 
@@ -39,6 +39,46 @@ The first pass lists 27 games and 170 publisher screenshot links. Titles without
 | The Legend of Zelda: The Minish Cap | Handheld pixel | Expressive compact poses, colour hierarchy and environmental charm |
 | Dragon’s Crown | Painted fantasy | Large illustrated characters, materials and exaggerated proportions |
 | Octopath Traveler II | Dimensional pixel | Pixel actors against dimensional lighting and scenes |
+| Nine Sols | Drawn action | Linework, parries and readable anticipation |
+| ANIMAL WELL | Atmospheric pixel | Tiny creatures, lighting and environmental motion |
+| The Banner Saga | Illustrated tactical | Character acting, costume and landscape composition |
+| Hyper Light Drifter | Graphic pixel | Colour blocking, silhouettes and action effects |
+| Katana ZERO | Cinematic pixel | Impact timing, lighting and character poses |
+| The Messenger | Retro pixel | Compare compact and richer pixel treatments |
+| Eastward | Detailed pixel | Character acting, dense environments and material detail |
+| CrossCode | Action RPG pixel | Directional poses and effect readability |
+| Chained Echoes | RPG pixel | Character scale, environments and combat effects |
+| The Last Faith | Gothic pixel | Large anatomy, costume and dramatic lighting |
+| Momodora: Reverie Under the Moonlight | Expressive pixel | Compact action poses and secondary motion |
+| ENDER LILIES | Painted fantasy | Delicate characters, layered scenery and effects |
+| ENDER MAGNOLIA | Painted fantasy | Mechanical and organic shapes in motion |
+| Dust: An Elysian Tail | Drawn fantasy | Exaggeration, cloth and action arcs |
+| Wonder Boy: The Dragon’s Trap | Drawn cartoon | Shape language, expressive animals and backgrounds |
+| Monster Boy and the Cursed Kingdom | Drawn cartoon | Transformations, silhouettes and animation clarity |
+| Child of Light | Watercolour fantasy | Painterly environments, character integration and light |
+| Pentiment | Manuscript illustration | Flat composition, line and restrained acting |
+| Battle Chef Brigade | Drawn fantasy | Character acting and graphic combat |
+| Indivisible | Drawn combat | Distinct body types, posing and effects |
+| Guacamelee! 2 | Graphic cutout | Geometry, contrast and exaggerated action |
+| Salt and Sanctuary | Dark drawn cutout | Layered limbs, silhouettes and atmosphere |
+| Mark of the Ninja: Remastered | Graphic stealth | Silhouette readability, gesture and shadows |
+| Apotheon | Pottery-inspired graphic | Profile posing and restricted palette |
+| Transistor | Painted isometric | Material detail, composition and graphic effects |
+| Bastion | Painted isometric | Readable characters and modular painted environments |
+| Pyre | Illustrated fantasy | Character design, motion and bright effects |
+| Sundered | Drawn eldritch | Organic deformation and large creature motion |
+| Jotun | Drawn mythic | Scale contrasts and boss silhouettes |
+| Braid, Anniversary Edition | Painterly platformer | Brush texture, motion and scene readability |
+| The Artful Escape | Illustrated psychedelic | Colour, layered scenes and expressive motion |
+| Pizza Tower | Exaggerated cartoon pixel | Extreme poses, smears and squash |
+| Broforce | Destructive pixel | Tiny readable action and explosion stages |
+| Carrion | Organic pixel | Tentacles, deformation and changing topology |
+| Rain World | Creature pixel | Procedural-looking articulation and contact |
+| Wargroove | Tactical pixel | Unit silhouettes and directional motion |
+| TMNT: Shredder’s Revenge | Arcade pixel | Combat anticipation, teamwork and effects |
+| River City Girls | Drawn/pixel brawler | Expressive poses, characters and impacts |
+| Scott Pilgrim vs. The World | Pixel brawler | Cartoon proportions and readable combat |
+| Odin Sphere Leifthrasir | Painted fantasy | Layered painted characters and secondary motion |
 
 ## Curate the actual art, not a list of style labels
 
