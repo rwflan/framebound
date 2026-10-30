@@ -34,6 +34,7 @@ class CompletionPolicy(Strict):
 
 
 class Limits(Strict):
+    max_evaluation_pixels: StrictInt = Field(default=16777216, ge=1, le=67108864)
     max_submissions: StrictInt = Field(default=8, ge=1, le=1000)
     max_unchanged: StrictInt = Field(default=2, ge=1, le=100)
     provider_execution: Literal['external_only'] = 'external_only'
@@ -58,6 +59,8 @@ class TaskSpec(Strict):
     allowed_changes: list[str] = Field(default_factory=list, max_length=128)
     repair_scope: Literal['full_clip', 'declared_regions'] = 'full_clip'
     profile: Literal['structural-v1', 'fixed-subject-v1'] = 'structural-v1'
+    region_observations: list['RegionObservation'] = Field(default_factory=list, max_length=4096)
+    temporal_observations: list['TemporalObservation'] = Field(default_factory=list, max_length=4096)
     requirements: list[Requirement] = Field(default_factory=list, max_length=128)
     limits: Limits = Field(default_factory=Limits)
     completion: CompletionPolicy = Field(default_factory=CompletionPolicy)
@@ -94,5 +97,44 @@ class TaskRecord(Strict):
     spec: TaskSpec
     requirements: list[NegotiatedRequirement]
     spec_sha256: str
-    evaluator_version: Literal['task-negotiator-v1'] = 'task-negotiator-v1'
+    evaluator_version: Literal['task-negotiator-v1', 'task-negotiator-v2'] = 'task-negotiator-v2'
     animation_quality_verified: Literal[False] = False
+
+
+class RegionObservation(Strict):
+    """A task-authored measurement, not a generated annotation or reviewer decision."""
+    id: str = Field(min_length=1, max_length=128)
+    family: Literal['feature', 'appearance', 'contact']
+    slot: StrictInt = Field(ge=0)
+    roi: 'Roi'
+    rgba: list[StrictInt] = Field(min_length=4, max_length=4)
+    minimum: StrictInt = Field(default=1, ge=0)
+    maximum: StrictInt = Field(ge=0)
+    visibility: Literal['visible', 'occluded'] = 'visible'
+    provenance: str = Field(min_length=1, max_length=2000)
+    source: Literal['user_declared', 'agent_proposed', 'model_proposed', 'procedural']
+
+    @model_validator(mode='after')
+    def valid_observation(self):
+        if any(c < 0 or c > 255 for c in self.rgba) or self.minimum > self.maximum:
+            raise ValueError('invalid color or count interval')
+        return self
+
+
+class TemporalObservation(Strict):
+    id: str = Field(min_length=1, max_length=128)
+    family: Literal['continuity', 'moving', 'loop']
+    left_slot: StrictInt = Field(ge=0)
+    right_slot: StrictInt = Field(ge=0)
+    left_region_id: str | None = None
+    right_region_id: str | None = None
+    max_distance_px: float = Field(default=0, ge=0, allow_inf_nan=False)
+    provenance: str = Field(min_length=1, max_length=2000)
+    source: Literal['user_declared', 'agent_proposed', 'model_proposed', 'procedural']
+
+
+from ..v2.domain import Roi
+RegionObservation.model_rebuild()
+
+TaskSpec.model_rebuild()
+TaskRecord.model_rebuild()

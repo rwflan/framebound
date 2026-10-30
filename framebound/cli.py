@@ -83,6 +83,12 @@ def main(argv=None):
         ('provider-grant-revoke','Revoke provider authority',[('--project',True),('--grant-id',True),('--expected-version',True),('--operator-secret',False)]),
         ('provider-reconcile','Attach an operator receipt to an unknown send',[('--project',True),('--job-id',True),('--receipt',True),('--operator-secret',False)]),
         ('provider-grant', 'Authorize a bounded provider grant (operator only)', [('--project',True),('--grant',True),('--operator-secret',False)]),
+        ('agent-revision-get', 'Read exact revision and evidence', [('--project', True), ('--revision-id', True)]),
+        ('agent-run-eligibility', 'Check automatic output policy', [('--project', True), ('--run-id', True)]),
+        ('agent-run-cancel', 'Cancel external-agent work', [('--project', True), ('--run-id', True), ('--reason', True)]),
+        ('agent-run-start', 'Start/resume an external-agent run', [('--project', True), ('--task-id', True), ('--run-id', True)]),
+        ('agent-run-get', 'Get durable agent progress and feedback', [('--project', True), ('--run-id', True)]),
+        ('agent-run-submit', 'Submit/evaluate an immutable external revision', [('--project', True), ('--submission', True)]),
         ('task-create', 'Register an immutable v3 agent task', [('--project', True), ('--spec', True)]),
         ('task-get', 'Read a frozen v3 agent task', [('--project', True), ('--task-id', True)]),
         ('task-compile-inputs', 'Compile external generation inputs', [('--project', True), ('--task-id', True)]),
@@ -240,7 +246,7 @@ def main(argv=None):
         _s = _bs(args.project)
         _aio.run(_s.run_stdio_async())
         return 0
-    if args.cmd in ("task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
+    if args.cmd in ("agent-revision-get", "agent-run-eligibility", "agent-run-cancel", "agent-run-start", "agent-run-get", "agent-run-submit", "task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
                     "orchestrator-send", "capabilities", "correction-claim", "correction-submit",

@@ -6,6 +6,22 @@ import json
 
 def dispatch(args) -> dict:
     cmd = args.cmd
+    if cmd == 'agent-revision-get':
+        from ..v3.services import loop
+        return loop.revision_get(args.project, args.revision_id)
+    if cmd.startswith('agent-run-'):
+        from ..v3.services import loop
+        from pathlib import Path
+        if cmd == 'agent-run-eligibility':
+            return loop.eligibility(args.project, args.run_id)
+        if cmd == 'agent-run-cancel':
+            return loop.cancel(args.project, args.run_id, args.reason)
+        if cmd == 'agent-run-start':
+            return loop.start(args.project, args.task_id, args.run_id)
+        if cmd == 'agent-run-get':
+            return loop.get(args.project, args.run_id)
+        if cmd == 'agent-run-submit':
+            return loop.submit(args.project, **json.loads(Path(args.submission).read_text()))
     if cmd.startswith('task-'):
         from ..v3.services import tasks
         if cmd == 'task-create':
