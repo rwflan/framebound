@@ -120,7 +120,7 @@ def create_app(project_dir: str) -> FastAPI:
     def reader_capabilities():
         return {'schema_versions':['2.0','3.0'],'dataset_versions':['2.3','3.0'],
                 'label_views':['human_accepted','automatically_verified','research','withheld'],
-                'automatic_labels_are_human_acceptance':False}
+                'automatic_labels_are_human_acceptance':False,'source_correspondence':'source-correspondence-v1'}
 
     @app.post('/v3/exports/preview')
     def agent_export_preview(body: ExportSelection):

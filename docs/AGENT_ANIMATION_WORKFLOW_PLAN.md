@@ -15,9 +15,10 @@ are implemented in the same loop. The live workspace now displays packet-free ru
 revision history, exact event navigation, saved markup and copy/download handoffs.
 Portable v3 training snapshots now extend the existing atomic publisher, with
 separate human/automatic label views, correction trajectories, optional-input
-closure, moved validation and manual preview/publication. Optional source
-correspondence and broader profiles remain active implementation work; real
-generated-art validation and the final requirement-by-requirement audit remain open.
+closure, moved validation and manual preview/publication. Optional known-good enhancement/interpolation now binds explicit designation,
+protected source keys, authored-time correspondence, mapped playback and portable
+source lineage. Broader profiles, real generated-art validation and the final
+requirement-by-requirement audit remain open.
 
 ## Goal
 

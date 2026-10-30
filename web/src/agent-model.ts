@@ -18,7 +18,9 @@ export type Run = { id:string; project_id:string; animation_id:string; task_id:s
 export type Event = { id:string; run_id:string; project_id:string; animation_id:string; event:string;
   revision_id:string|null; source:string; created_at:string; note?:string; ordinal:number };
 export type AgentDeskData = {runs:Run[]; events:Event[]; projects:{id:string;name:string}[]};
-export type AgentBundle = { revision:{ id:string; run_id:string; parent_revision_id:string|null; frame_asset_ids:string[] };
+export type SourceComparison = {designation:{designated_by:string;designation_basis:string;provenance:string};
+  frames:{output_slot:number;output_tick:number;source_tick:number[];source_slot:number;asset_id:string;asset_url:string;correspondence:string}[]};
+export type AgentBundle = { source_comparison?:SourceComparison|null; revision:{ id:string; run_id:string; parent_revision_id:string|null; frame_asset_ids:string[] };
   evaluation:{id:string;technical_status:string;coverage:string;results:{id:string;family:string;outcome:string;slots:number[];
   observed:unknown;expected:unknown;reason:string;source:string;roi:Roi|null}[]};
   task:Task; feedback:Feedback; frames:{id:string;slot:number;asset_id:string;asset_url:string;hold_ticks:number}[];

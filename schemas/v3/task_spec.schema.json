@@ -314,6 +314,152 @@
       "title": "Roi",
       "type": "object"
     },
+    "SourceCorrespondence": {
+      "additionalProperties": false,
+      "properties": {
+        "frame_asset_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 512,
+          "minItems": 1,
+          "title": "Frame Asset Ids",
+          "type": "array"
+        },
+        "timing": {
+          "$ref": "#/$defs/Timing"
+        },
+        "loop": {
+          "title": "Loop",
+          "type": "boolean"
+        },
+        "designated_by": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Designated By",
+          "type": "string"
+        },
+        "designation_basis": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Designation Basis",
+          "type": "string"
+        },
+        "provenance": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Provenance",
+          "type": "string"
+        },
+        "source_revision_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Revision Id"
+        },
+        "goal": {
+          "enum": [
+            "detail_enhancement",
+            "interpolation",
+            "enhancement_and_interpolation"
+          ],
+          "title": "Goal",
+          "type": "string"
+        },
+        "time_map": {
+          "items": {
+            "$ref": "#/$defs/TimeAnchor"
+          },
+          "maxItems": 1024,
+          "minItems": 2,
+          "title": "Time Map",
+          "type": "array"
+        },
+        "protected_keys": {
+          "items": {
+            "$ref": "#/$defs/SourceKey"
+          },
+          "maxItems": 512,
+          "minItems": 1,
+          "title": "Protected Keys",
+          "type": "array"
+        },
+        "preserve_duration": {
+          "const": true,
+          "default": true,
+          "title": "Preserve Duration",
+          "type": "boolean"
+        },
+        "limitation": {
+          "default": "Source fidelity checks establish only the declared pixel/alpha anchors and authored time map; fluidity and unmeasured motion remain judgment.",
+          "maxLength": 2000,
+          "title": "Limitation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "frame_asset_ids",
+        "timing",
+        "loop",
+        "designated_by",
+        "designation_basis",
+        "provenance",
+        "goal",
+        "time_map",
+        "protected_keys"
+      ],
+      "title": "SourceCorrespondence",
+      "type": "object"
+    },
+    "SourceKey": {
+      "additionalProperties": false,
+      "properties": {
+        "source_tick": {
+          "minimum": 0,
+          "title": "Source Tick",
+          "type": "integer"
+        },
+        "output_tick": {
+          "minimum": 0,
+          "title": "Output Tick",
+          "type": "integer"
+        },
+        "preservation": {
+          "enum": [
+            "exact_pixels",
+            "alpha_geometry"
+          ],
+          "title": "Preservation",
+          "type": "string"
+        },
+        "roi": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Roi"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "source_tick",
+        "output_tick",
+        "preservation"
+      ],
+      "title": "SourceKey",
+      "type": "object"
+    },
     "TemporalObservation": {
       "additionalProperties": false,
       "properties": {
@@ -398,6 +544,27 @@
         "source"
       ],
       "title": "TemporalObservation",
+      "type": "object"
+    },
+    "TimeAnchor": {
+      "additionalProperties": false,
+      "properties": {
+        "source_tick": {
+          "minimum": 0,
+          "title": "Source Tick",
+          "type": "integer"
+        },
+        "output_tick": {
+          "minimum": 0,
+          "title": "Output Tick",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_tick",
+        "output_tick"
+      ],
+      "title": "TimeAnchor",
       "type": "object"
     },
     "Timing": {
@@ -557,6 +724,17 @@
       "maxItems": 4096,
       "title": "Temporal Observations",
       "type": "array"
+    },
+    "source_correspondence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourceCorrespondence"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "requirements": {
       "items": {

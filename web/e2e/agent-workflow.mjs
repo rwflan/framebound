@@ -21,6 +21,9 @@ bad=import_frames(Path(project),'bad',{'kind':'flicker'})
 loop.submit(project,'run','base',bad)
 spec['id']='clean-task';spec['animation_id']='clean'
 tasks.create(project,spec);loop.start(project,'clean-task','clean-run');loop.submit(project,'clean-run','clean-result',good)
+from test_source_correspondence import source_task
+_,source_spec,source_candidate=source_task(Path(project))
+tasks.create(project,source_spec);loop.start(project,'enhance','enhancement-run');loop.submit(project,'enhancement-run','enhanced',source_candidate)
 `,[PROJECT]);
 const server=spawn(PY,['-c',`import sys,uvicorn;from framebound.v2.api.app import create_app;uvicorn.run(create_app(sys.argv[1]),host='127.0.0.1',port=int(sys.argv[2]))`,PROJECT,PORT],{cwd:ROOT,env:ENV,stdio:['ignore','pipe','pipe']});
 let serverLog='';server.stderr.on('data',d=>serverLog+=d);
@@ -101,6 +104,27 @@ try{
   await page.getByRole('button',{name:'Zoom out',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'Play',exact:true}).count(),1);
   await page.setViewportSize({width:1440,height:1000});
+  await page.goto(BASE+'/#/run/enhancement-run?revision=enhanced');
+  await page.locator('[data-revision="enhanced"]').waitFor();
+  assert.equal(await page.getByRole('button',{name:/Candidate, frame /}).count(),6);
+  assert.equal(await page.getByRole('button',{name:/Known-good source, frame /}).count(),0);
+  await page.getByRole('button',{name:'Compare known-good source',exact:true}).click();
+  const mapped=page.getByRole('button',{name:'Known-good source, frame 4',exact:true});
+  assert((await mapped.locator('img').getAttribute('src')).endsWith('/source-1'));
+  assert.match(await mapped.getAttribute('title'),/source motion interval/);
+  await page.getByRole('button',{name:'Candidate, frame 4',exact:true}).click();
+  assert.equal(await page.getByText('source motion interval · source frame 2',{exact:false}).count(),1);
+  await page.getByRole('button',{name:'Play',exact:true}).click();
+  for(let sample=0;sample<5;sample++){
+    const shown=await page.getByLabel('Main playback').locator('img').evaluateAll(images=>images.map(im=>im.getAttribute('src')));
+    assert.equal(shown.length,2);
+    const index=Number(shown[1].split('candidate-')[1]);
+    assert(shown[0].endsWith('/source-'+Math.floor(index/2)),'source playback used output array index instead of authored time');
+    await wait(40);
+  }
+  await page.getByRole('button',{name:'Pause',exact:true}).click();
+  await page.getByRole('button',{name:'Compare known-good source',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:/Known-good source, frame /}).count(),0);
   await page.getByRole('link',{name:'Export training data',exact:true}).click();
   await page.getByRole('heading',{name:'Export training data',exact:true}).waitFor();
   const selections=page.locator('.agent-export-selection input[type=checkbox]');
@@ -116,7 +140,7 @@ try{
   await page.getByText('Snapshot validated',{exact:true}).waitFor();
   const manifest=JSON.parse(fs.readFileSync(path.join(snapshot,'manifest.json'),'utf8'));
   assert.equal(manifest.counts.positives,0);
-  assert.equal(manifest.counts.automatically_verified,3);
+  assert.equal(manifest.counts.automatically_verified,9);
   assert.equal(manifest.counts.preferences,0);
   const moved=path.join(WORK,'moved-snapshot');fs.renameSync(snapshot,moved);
   const validated=JSON.parse(python(`import json,sys;from framebound.v2.exports import validate_snapshot;result=validate_snapshot(sys.argv[1]);assert result['ok'],result['issues'];print(json.dumps(result))`,[moved]).split('\n').filter(l=>l.startsWith('{')).at(-1));
@@ -124,5 +148,5 @@ try{
   fs.mkdirSync(path.join(ROOT,'output/playwright'),{recursive:true});
   await page.screenshot({path:path.join(ROOT,'output/playwright/agent-workflow.png')});
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({ok:true,work:WORK,checks:['native-markup','saved-copy-download','live-stability','fresh-process-repair','owner-resolve-reopen','timeline-exact-revision','conditional-comparison','stable-playback','clipboard-fallback','manual-export-preview','moved-snapshot-validation']}));
+  console.log(JSON.stringify({ok:true,work:WORK,checks:['native-markup','saved-copy-download','live-stability','fresh-process-repair','owner-resolve-reopen','timeline-exact-revision','conditional-comparison','stable-playback','clipboard-fallback','manual-export-preview','moved-snapshot-validation','known-good-authored-time-comparison']}));
 }finally{if(browser)await browser.close();server.kill('SIGTERM');}

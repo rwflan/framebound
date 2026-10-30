@@ -14,7 +14,7 @@ def validate(snap,manifest):
     issues=[]
     try:
         required={'agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1'}
-        if set(manifest.get('reader_capabilities',[]))!=required:issues.append('unsupported reader capabilities')
+        if not required<=set(manifest.get('reader_capabilities',[])) or set(manifest.get('reader_capabilities',[]))-required-{'source-correspondence-v1'}:issues.append('unsupported reader capabilities')
         listed=manifest['files']
         for rel,expected in listed.items():
             p=snap/rel
@@ -28,10 +28,11 @@ def validate(snap,manifest):
             any(complete.get(k)!=manifest.get(k) for k in ('snapshot','inputs_digest','dataset_version'))):
             issues.append('COMPLETE marker differs from immutable manifest')
         def load(rel):return [json.loads(line) for line in (snap/rel).read_text().splitlines() if line.strip()]
-        tables=('runs','revisions','tasks','evaluations','feedback','events','interventions','completions','frames','registrations','assets','provider_sources')
+        tables=('runs','revisions','tasks','evaluations','feedback','events','interventions','completions','frames','registrations','assets','provider_sources','source_records')
         graph={}
         for table in tables:
-            values=load(f'closure/{table}.jsonl');graph[table]={v['id']:v for v in values}
+            values=[] if table=='source_records' and not (snap/'closure/source_records.jsonl').is_file() else load(f'closure/{table}.jsonl')
+            graph[table]={v['id']:v for v in values}
             if len(values)!=len(graph[table]):issues.append('duplicate closure identity '+table)
         asset_files=json.loads((snap/'closure/asset_files.json').read_text())
         withheld={r['asset_id']:r['reason'] for r in json.loads((snap/'closure/withheld.json').read_text())}
@@ -55,6 +56,17 @@ def validate(snap,manifest):
             if E.digest(task['spec'])!=task['spec_sha256']:issues.append('frozen task digest differs '+tid)
             for binding in task['spec']['inputs']:
                 if binding['asset_id'] not in graph['assets']:issues.append('optional input missing '+tid)
+            source=task['spec'].get('source_correspondence')
+            if source:
+                from ...v3 import correspondence as C
+                C.validate(parsed.spec)
+                if tid not in graph['source_records']:issues.append('source designation record missing '+tid)
+                else:
+                    record=graph['source_records'][tid]
+                    for key in ('frame_asset_ids','timing','loop','designated_by','designation_basis','provenance'):
+                        if record[key]!=source[key]:issues.append('source designation reinterprets original binding '+tid)
+                for aid in source['frame_asset_ids']:
+                    if aid not in graph['assets']:issues.append('known-good source pixels absent from closure '+tid)
             parent=task['spec'].get('supersedes')
             if parent and parent not in graph['tasks']:issues.append('task predecessor missing '+tid)
         for rid,revision in graph['revisions'].items():
@@ -84,6 +96,26 @@ def validate(snap,manifest):
                 for measured_result in measured:
                     actual_result=saved.get(measured_result['id'])
                     if not actual_result or any(actual_result.get(k)!=v for k,v in measured_result.items() if k!='evidence_method'):issues.append('packaged measurement does not reproduce '+rid+'/'+measured_result['id'])
+            if spec.source_correspondence:
+                from ...v3 import correspondence as C
+                source_evidence=evaluation['evidence'].get('source_correspondence')
+                if not source_evidence:issues.append('source fidelity evidence missing '+rid)
+                else:
+                    for aid,record in zip(spec.source_correspondence.frame_asset_ids,source_evidence['assets']):
+                        if record['id']!=aid or record['byte_sha256']!=graph['assets'][aid]['byte_sha256']:
+                            issues.append('source asset evidence binding differs '+rid)
+                    if len(source_evidence['assets'])!=len(spec.source_correspondence.frame_asset_ids):issues.append('source asset evidence incomplete '+rid)
+                    sources=[];source_available=True
+                    for aid in spec.source_correspondence.frame_asset_ids:
+                        if aid not in asset_files:sources.append(None);source_available=False
+                        else:sources.append(load_native_image(snap/asset_files[aid]))
+                    if available and source_available:
+                        measured,source_manifest=C.evaluate(spec,images,sources,source_evidence['assets'])
+                        stored={r['id']:r for r in evaluation['results']}
+                        for result in measured:
+                            if stored.get(result['id'])!=result:issues.append('source anchor fidelity does not reproduce '+rid)
+                        for key,value in source_manifest.items():
+                            if source_evidence.get(key)!=value:issues.append('source correspondence evidence differs '+rid)
             for result in evaluation['results']:
                 if result['family']!='edit_preservation':continue
                 baseline=graph['revisions'][result['baseline_revision_id']]
@@ -141,7 +173,7 @@ def validate(snap,manifest):
                 if not ev['evidence'].get('evaluator_identity'):issues.append('trainable example has incomplete historical evaluator identity')
                 if ev['technical_status']!='pass' or ev['coverage']!='complete' or run['lifecycle']!='completed' or run['current_revision_id']!=rev['id']:issues.append('trainable example lacks complete passing exact output '+rev['id'])
                 if any(m['run_id']==run['id'] and m['correction']['status'] not in {'resolved','cancelled'} for m in graph['interventions'].values()):issues.append('trainable output has unresolved human work')
-                controls=[i['asset_id'] for i in graph['tasks'][rev['task_id']]['spec']['inputs']]
+                controls=[i['asset_id'] for i in graph['tasks'][rev['task_id']]['spec']['inputs']]+(graph['tasks'][rev['task_id']]['spec'].get('source_correspondence') or {}).get('frame_asset_ids',[])
                 def ancestry_allowed(aid,active=None):
                     active=active or set()
                     if aid in active or aid not in graph['assets'] or aid not in asset_files:return False
