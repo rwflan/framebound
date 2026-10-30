@@ -98,6 +98,20 @@ try {
       nodes.map((node) => node.getBoundingClientRect().toJSON()),
     );
   assert.equal(tabs.length, 3);
+  assert(
+    await page.locator(".reel-lane-label strong").evaluateAll((nodes) =>
+      nodes.every((node) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return (
+          node.getBoundingClientRect().right -
+            range.getBoundingClientRect().right <=
+          12
+        );
+      }),
+    ),
+    "Row tabs should end close to their text",
+  );
   const viewportLeft = (await page.locator(".reel-camera").boundingBox()).x;
   assert(
     tabs.every((tab) => Math.abs(tab.left - viewportLeft) < 1),
@@ -181,6 +195,7 @@ try {
     1,
   );
   await page.keyboard.press("Space");
+  await page.getByRole("button", { name: "Film strip", exact: true }).click();
   // Playback may stop on a visible frame away from the camera centre.
   // Explicit frame navigation restores the centering precondition for the checks below.
   await page.locator(".reel-camera").focus();

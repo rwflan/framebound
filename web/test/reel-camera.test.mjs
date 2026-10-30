@@ -141,3 +141,87 @@ test("reference, candidate and measurement names stay distinct at overview zoom"
   assert.ok(centers[1] - centers[0] >= 28 && centers[2] - centers[1] >= 28);
   c.destroy();
 });
+
+function pointer(x) {
+  return {
+    pointerId: 1,
+    pointerType: "mouse",
+    button: 0,
+    clientX: x,
+    clientY: 100,
+    target: {
+      closest() {
+        return null;
+      },
+    },
+    preventDefault() {},
+  };
+}
+function wheel(deltaY) {
+  return { deltaX: 0, deltaY, deltaMode: 0, preventDefault() {} };
+}
+test("drag can travel far beyond each end and releases to padded film edges", () => {
+  const { c, captures } = camera();
+  c.track.querySelector = () => ({ offsetWidth: 250 });
+  c.centerEdges = true;
+  c.bounds();
+  c.jump(c.max);
+  const first = c.x;
+  c.down(pointer(100));
+  c.move(pointer(900));
+  assert(
+    c.x > first + 160,
+    "The drag should stretch far past a centred end frame",
+  );
+  c.up(pointer(900));
+  assert.equal(c.x, 24);
+  assert.equal(captures.size, 0);
+  c.jump(c.min);
+  const last = c.x;
+  c.down(pointer(900));
+  c.move(pointer(100));
+  assert(c.x < last - 160);
+  c.up(pointer(100));
+  assert.equal(c.x, c.width - c.trackWidth * c.zoom - 24);
+  assert.equal(captures.size, 0);
+  c.reveal(0, 250, true);
+  assert.equal(
+    c.x + 125,
+    c.width / 2,
+    "Frame selection still centres the first frame",
+  );
+  c.destroy();
+});
+test("wheel scrolling stretches beyond both ends and settles after input stops", async () => {
+  const { c } = camera();
+  c.jump(24);
+  c.wheel(wheel(-1000));
+  assert(c.x > 24 + 160);
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  assert.equal(c.x, 24);
+  assert.equal(c.wheelPan, null);
+  const end = c.width - c.trackWidth * c.zoom - 24;
+  c.jump(end);
+  c.wheel(wheel(1000));
+  assert(c.x < end - 160);
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  assert.equal(c.x, end);
+  c.destroy();
+});
+test("navigation cancels a pending wheel rebound and short film returns to the centre", async () => {
+  const { c } = camera();
+  c.wheel(wheel(-1000));
+  c.reveal(3, 250, true);
+  const selected = c.x;
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  assert.equal(c.x, selected);
+  c.zoomTo(0.25, 500, 300, true);
+  c.jump((c.width - c.trackWidth * c.zoom) / 2);
+  const center = c.x;
+  c.down(pointer(100));
+  c.move(pointer(900));
+  assert(c.x > center + 160);
+  c.up(pointer(900));
+  assert.equal(c.x, center);
+  c.destroy();
+});
