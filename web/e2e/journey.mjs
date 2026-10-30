@@ -169,11 +169,14 @@ async function main() {
     step = 'film-camera-and-inline-evidence';
     assert(await page.locator('.reel-lane').count() === 2, 'comparison lanes missing');
     const stock = await page.locator('.reel-lane').first().evaluate(el => {
-      const s=getComputedStyle(el), before=getComputedStyle(el,'::before');
-      return {mask:s.maskImage,composite:s.maskComposite,padding:parseFloat(s.paddingTop),holes:parseFloat(before.height)};
+      const s=getComputedStyle(el);
+      return {mask:s.maskImage,composite:s.maskComposite,padding:parseFloat(s.paddingTop),color:s.backgroundColor,image:s.backgroundImage};
     });
     assert(stock.mask.includes('sprocket-hole.svg') && stock.composite.includes('exclude'), 'film perforations are not punched through the stock');
-    assert(stock.padding>=28 && stock.holes>=18, 'film borders/perforations are too small');
+    assert(stock.padding>=28, 'film borders are too small');
+    assert(stock.color==='rgb(5, 5, 5)' && stock.image==='none', 'film stock must be flat black');
+    assert(await page.locator('html').evaluate(el=>getComputedStyle(el).colorScheme)==='light','Material workspace should use light surfaces');
+    await page.screenshot({path:path.join(SHOTS,'material-workspace.png')});
 
     assert(await page.locator('.frame-evidence').count() === 8, 'per-frame evidence bands missing');
     await page.getByRole('button', {name:'Zoom in',exact:true}).click();
