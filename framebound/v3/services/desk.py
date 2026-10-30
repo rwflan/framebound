@@ -18,7 +18,7 @@ def snapshot(project):
             run['task']=specs[run['task_id']]
             run['interventions']=[m for m in marks if m['run_id']==run['id']]
             open_marks=[m for m in run['interventions'] if m['correction']['status'] not in {'resolved','cancelled'}]
-            run['needs_intervention']=bool(open_marks) or run['lifecycle'] in {'blocked','awaiting_input','awaiting_decision'}
+            run['needs_intervention']=run['lifecycle']!='cancelled' and (bool(open_marks) or run['lifecycle'] in {'blocked','awaiting_input','awaiting_decision'})
         return dict(schema_version='3.0',runs=runs,events=sorted(events,key=lambda e:(e['created_at'],e['ordinal'],e['id'])),projects=projects)
     finally:con.close()
 

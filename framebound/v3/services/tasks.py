@@ -216,5 +216,6 @@ def compile_inputs(project_dir: str, task_id: str) -> dict:
             'spec_sha256': record['spec_sha256'], 'assets': assets, 'intent': record['spec']['intent'],
             'spec': record['spec'], 'requirements': record['requirements'],
             'execution': 'external_agent', 'provider_execution_authorized': False,
+            'failure_reporting': {'operation':'agent_run_report_failure','arguments':{'run_id':'<current run ID>','report':{'id':'<stable attempt ID>','kind':'provider_failure|tool_error|missing_input','reason':'<actual observed failure>','outcome_known':'<boolean: whether the external outcome is known>'}},'authority':'Parent report only; no provider dispatch. Unknown provider outcomes stop the run without blind retry.'},
             'creative_status': 'unreviewed', 'animation_quality_verified': False,
             'capability_gaps': [r for r in record['requirements'] if r['applicability'] != 'supported']}

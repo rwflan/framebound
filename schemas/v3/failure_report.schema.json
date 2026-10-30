@@ -1,0 +1,60 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "pattern": "^(provider_failure|tool_error|missing_input)$",
+      "title": "Kind",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "outcome_known": {
+      "title": "Outcome Known",
+      "type": "boolean"
+    },
+    "provider": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider"
+    },
+    "external_request_id": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "External Request Id"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "reason",
+    "outcome_known"
+  ],
+  "title": "FailureReport",
+  "type": "object"
+}

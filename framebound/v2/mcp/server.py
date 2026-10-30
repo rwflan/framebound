@@ -8,6 +8,21 @@ from mcp.server.mcpserver import MCPServer
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
+    @server.tool(name='agent_handoff_export', description='Package a saved handoff and hashed native assets for an external agent without project access')
+    def agent_handoff_export(feedback_id: str, out_path: str) -> dict:
+        from ...v3.services import portable_handoff as P
+        return P.export_archive(project_dir,feedback_id,out_path)
+
+    @server.tool(name='agent_handoff_import', description='Import a returned portable correction; rechecks saved task/feedback/current revision and edit limits')
+    def agent_handoff_import(manifest_path: str, response_path: str) -> dict:
+        from ...v3.services import portable_handoff as P
+        return P.import_response(project_dir,manifest_path,response_path)
+
+    @server.tool(name='agent_run_revise_task', description='Explicitly apply a superseding task with recorded reason; retain spent and remaining run limits')
+    def agent_run_revise_task(run_id: str,task_id: str,expected_version: int) -> dict:
+        from ...v3.services import loop
+        return loop.revise_task(project_dir,run_id,task_id,expected_version)
+
     @server.tool(name='agent_export_preview', description='Preview manual v3 training export label sources, counts and exclusions; publishes nothing')
     def agent_export_preview(selection: dict) -> dict:
         from ...v3.services import exports
@@ -44,6 +59,11 @@ def build_server(project_dir: str) -> MCPServer:
     def agent_run_eligibility(run_id: str) -> dict:
         from ...v3.services import loop
         return loop.eligibility(project_dir, run_id)
+
+    @server.tool(name='agent_run_report_failure', description='Record a parent-reported execution failure and persistent stopping limits; never dispatches a provider')
+    def agent_run_report_failure(run_id: str, report: dict) -> dict:
+        from ...v3.services import failures
+        return failures.record(project_dir,run_id,report)
 
     @server.tool(name='agent_run_cancel', description='Cancel a run with a durable reason')
     def agent_run_cancel(run_id: str, reason: str) -> dict:

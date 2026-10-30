@@ -67,8 +67,21 @@ try{
   assert.equal(mark.authorize_edit_scope,true);
   const download=await Promise.all([page.waitForEvent('download'),handoff.getByRole('link',{name:'Download text'}).click()]);
   const file=await download[0].path();assert.equal(fs.readFileSync(file,'utf8'),clipboard);
-  const submission=path.join(WORK,'submit.json');fs.writeFileSync(submission,JSON.stringify({run_id:'run',revision_id:'fixed',parent_revision_id:'base',feedback_id:feedback.id,frame_asset_ids:['good-0','good-1','good-2']}));
-  python(`import subprocess,sys;subprocess.run([sys.executable,'-m','framebound','agent-run-submit','--project',sys.argv[1],'--submission',sys.argv[2]],check=True)`,[PROJECT,submission]);
+  const portableDownload=await Promise.all([page.waitForEvent('download'),handoff.getByRole('link',{name:'Download portable handoff',exact:true}).click()]);
+  const packagePath=await portableDownload[0].path(),external=path.join(WORK,'external-agent');
+  python(`import json,sys,zipfile
+from pathlib import Path
+from PIL import Image
+root=Path(sys.argv[2]);root.mkdir()
+with zipfile.ZipFile(sys.argv[1]) as archive:archive.extractall(root)
+manifest=json.loads((root/'manifest.json').read_text())
+baseline=manifest['revisions']['base']['frame_asset_ids']
+image=Image.open(root/manifest['assets'][baseline[1]]['file']).convert('RGBA')
+image.putpixel((3,3),(0,255,0,255));image.save(root/'repair.png')
+response=dict(revision_id='fixed',frames=[dict(asset_id=baseline[0]),dict(file='repair.png',rights='original',source_kind='procedural'),dict(asset_id=baseline[2])],generation_metadata=None)
+(root/'response.json').write_text(json.dumps(response))
+`,[packagePath,external]);
+  python(`import subprocess,sys;subprocess.run([sys.executable,'-m','framebound','agent-handoff-import','--project',sys.argv[1],'--manifest',sys.argv[2],'--response',sys.argv[3]],check=True)`,[PROJECT,path.join(external,'manifest.json'),path.join(external,'response.json')]);
   await wait(2300);
   assert.equal(await page.locator('[data-revision="base"]').count(),1,'live update stole selected revision');
   await page.getByRole('button',{name:'Open current'}).click();
@@ -86,6 +99,16 @@ try{
   await page.getByRole('button',{name:'Open current'}).click();await page.locator('[data-revision="fixed"]').waitFor();
   await page.getByRole('button',{name:'Compare previous',exact:true}).click();
   await page.getByRole('button',{name:'Previous revision, frame 1',exact:true}).waitFor();
+  // An explicit comparison choice is different from ordinary approval or newer-revision order.
+  await page.getByRole('button',{name:'Resolve',exact:true}).click();
+  await page.getByRole('button',{name:'Reopen',exact:true}).waitFor();
+  await page.getByRole('button',{name:'decision',exact:true}).click();
+  await page.getByRole('checkbox',{name:'Explicitly prefer this revision over base'}).check();
+  await page.getByLabel('Decision note').fill('Explicitly prefer the restored costume over the previous flicker.');
+  await page.getByRole('button',{name:'approve',exact:true}).click();
+  await wait(1800);
+  assert.equal((await (await fetch(BASE+'/v3/runs/run')).json()).creative_status,'human_approved');
+  await page.getByRole('button',{name:'evidence',exact:true}).click();
   await page.getByRole('button',{name:'Compare previous',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'Previous revision, frame 1',exact:true}).count(),0);
   const inspected=await page.getByRole('status',{name:'Inspected frame'}).innerText();
@@ -139,14 +162,36 @@ try{
   await page.getByRole('button',{name:'Export snapshot',exact:true}).click();
   await page.getByText('Snapshot validated',{exact:true}).waitFor();
   const manifest=JSON.parse(fs.readFileSync(path.join(snapshot,'manifest.json'),'utf8'));
-  assert.equal(manifest.counts.positives,0);
+  assert.equal(manifest.counts.positives,3);
   assert.equal(manifest.counts.automatically_verified,9);
-  assert.equal(manifest.counts.preferences,0);
+  assert.equal(manifest.counts.preferences,1);
   const moved=path.join(WORK,'moved-snapshot');fs.renameSync(snapshot,moved);
   const validated=JSON.parse(python(`import json,sys;from framebound.v2.exports import validate_snapshot;result=validate_snapshot(sys.argv[1]);assert result['ok'],result['issues'];print(json.dumps(result))`,[moved]).split('\n').filter(l=>l.startsWith('{')).at(-1));
   assert(validated.ok);
+  // Before pixels exist, a durable parent-reported failure still has a usable handoff.
+  python(`import sys
+from framebound.v3.services import tasks,loop,failures
+project=sys.argv[1];spec=tasks.get(project,'task')['spec'];spec.update(id='pending-task',animation_id='pending')
+tasks.create(project,spec);loop.start(project,'pending-task','pending-run')
+failures.record(project,'pending-run',dict(id='attempt-1',kind='tool_error',reason='External tool unavailable before generating frames.',outcome_known=True))
+`,[PROJECT]);
+  await page.goto(BASE+'/#/run/pending-run');
+  await page.getByRole('main').getByText('External tool unavailable before generating frames.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'View instructions',exact:true}).click();
+  assert.match(await page.getByLabel('Saved instructions').inputValue(),/No candidate has been registered/);
+  assert.equal(await page.getByRole('link',{name:'Download portable handoff',exact:true}).count(),0);
+  const initialText=await fetch(BASE+'/v3/runs/pending-run').then(r=>r.json());
+  const initialDownload=await fetch(BASE+'/v3/feedback/'+encodeURIComponent(initialText.feedback_id)+'/text').then(r=>r.text());
+  assert.equal(await page.getByLabel('Saved instructions').inputValue(),initialDownload);
+  python(`import sys
+from framebound.v3.services import failures
+failures.record(sys.argv[1],'pending-run',dict(id='attempt-2',kind='provider_failure',reason='External provider outcome is unknown.',outcome_known=False))
+`,[PROJECT]);
+  await page.getByText(/Unknown parent-reported provider outcome/).first().waitFor();
+  await page.getByRole('button',{name:'View instructions',exact:true}).click();
+  assert.match(await page.getByLabel('Saved instructions').inputValue(),/This run is stopped/);
   fs.mkdirSync(path.join(ROOT,'output/playwright'),{recursive:true});
   await page.screenshot({path:path.join(ROOT,'output/playwright/agent-workflow.png')});
   assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({ok:true,work:WORK,checks:['native-markup','saved-copy-download','live-stability','fresh-process-repair','owner-resolve-reopen','timeline-exact-revision','conditional-comparison','stable-playback','clipboard-fallback','manual-export-preview','moved-snapshot-validation','known-good-authored-time-comparison']}));
+  console.log(JSON.stringify({ok:true,work:WORK,checks:['native-markup','portable-offline-handoff','explicit-human-preference','saved-copy-download','live-stability','fresh-process-repair','owner-resolve-reopen','timeline-exact-revision','conditional-comparison','stable-playback','clipboard-fallback','manual-export-preview','moved-snapshot-validation','known-good-authored-time-comparison','pre-submission-failure-handoff','unknown-provider-stop']}));
 }finally{if(browser)await browser.close();server.kill('SIGTERM');}
