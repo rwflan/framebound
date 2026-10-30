@@ -125,16 +125,25 @@ def get(project_dir: str, task_id: str) -> dict:
 def compile_inputs(project_dir: str, task_id: str) -> dict:
     record = get(project_dir, task_id)
     con = S.connect(project_dir)
+    assets = []
     try:
         for binding in record['spec']['inputs']:
             asset, _ = S.get(con, 'assets', binding['asset_id'])
             blob = S.blob_path(project_dir, asset['byte_sha256'])
             if not blob.is_file() or S.sha256_bytes(blob.read_bytes()) != asset['byte_sha256']:
                 raise InvalidInput(f"input asset {binding['asset_id']} is unavailable or corrupt")
+            assets.append({'id': binding['asset_id'], 'role': binding['role'],
+                           'byte_sha256': asset['byte_sha256'],
+                           'pixel_sha256': asset.get('pixel_sha256'),
+                           'width': asset.get('width'), 'height': asset.get('height'),
+                           'blob_path': str(blob.relative_to(Path(project_dir))),
+                           'http_path': f"/api/asset/{binding['asset_id']}"})
+    except KeyError as exc:
+        raise InvalidInput(f'missing task input: {exc}') from exc
     finally:
         con.close()
     return {'schema_version': '3.0', 'task_id': task_id,
-            'spec_sha256': record['spec_sha256'], 'intent': record['spec']['intent'],
+            'spec_sha256': record['spec_sha256'], 'assets': assets, 'intent': record['spec']['intent'],
             'spec': record['spec'], 'requirements': record['requirements'],
             'execution': 'external_agent', 'provider_execution_authorized': False,
             'creative_status': 'unreviewed', 'animation_quality_verified': False,

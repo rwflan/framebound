@@ -84,8 +84,13 @@ def test_identity_only_and_missing_input_fail_closed(tmp_path):
                'designated_by': 'parent-agent', 'basis': 'user supplied appearance input'}
     record = tasks.create(str(tmp_path), spec(inputs=[binding]))
     assert record['spec']['inputs'][0]['role'] == 'identity'
+    compiled = tasks.compile_inputs(str(tmp_path), 'task')
+    assert compiled['assets'][0]['byte_sha256'] == S.sha256_bytes(image.read_bytes())
+    assert (tmp_path / compiled['assets'][0]['blob_path']).is_file()
     image_blob = S.blob_path(str(tmp_path), tasks.S.sha256_bytes(image.read_bytes()))
     image_blob.unlink()
+    with pytest.raises(InvalidInput, match='unavailable or corrupt'):
+        tasks.compile_inputs(str(tmp_path), 'task')
     payload = spec(inputs=[binding]); payload['id'] = 'missing'
     with pytest.raises(InvalidInput, match='unavailable or corrupt'):
         tasks.create(str(tmp_path), payload)
