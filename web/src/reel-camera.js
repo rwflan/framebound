@@ -143,19 +143,8 @@ export class ReelCamera {
         height = row.height * this.zoom;
       node.style.visibility =
         top + height < 12 || top > this.height - 12 ? "hidden" : "visible";
-      const cell =
-        (this.track.querySelector?.(".reel-frame-unit")?.offsetWidth ||
-          this.trackWidth) * this.zoom;
-      const firstComplete =
-        this.x + Math.max(0, Math.ceil(-this.x / cell)) * cell;
-      const legendWidth = Math.max(76, Math.min(166, cell - 12));
-      const left =
-        cell >= 80 && cell <= this.width
-          ? firstComplete + 10
-          : Math.max(4, Math.min(10, this.x + 5));
-      node.style.left =
-        Math.max(4, Math.min(this.width - legendWidth - 4, left)) + "px";
-      node.style.setProperty("--legend-width", legendWidth + "px");
+      // Row names belong to the viewport, independently of the film's pan and zoom.
+      node.style.left = "0px";
       node.style.top = top + "px";
       node.style.height = height + "px";
       node.style.setProperty(
