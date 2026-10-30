@@ -1,6 +1,6 @@
 # Agent-led animation workflow plan
 
-Status: proposed implementation plan, 2026-10-30. This document records the target product and the work needed to reach it; it does not claim these changes are implemented. It supersedes reference-first and mandatory-review assumptions as the product direction. Existing capability documentation still describes the running software.
+Status: implementation progressed through the v3 workflow and provisional broader-profile milestone, 2026-10-30. This document preserves the original target, delivery sequence and acceptance gates. Implemented behavior and the remaining independently reviewed generated-art evidence are tracked below and in the implementation audit. It supersedes reference-first and mandatory-review assumptions as the product direction; the reviewed-guide profile retains its original semantics.
 
 ## Implementation progress
 
