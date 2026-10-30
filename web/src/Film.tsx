@@ -174,6 +174,7 @@ export function FilmDock({
   caption,
   children,
   onSelect,
+  itemName = "frame",
 }: {
   controls: ReturnType<typeof useFilm>;
   index: number;
@@ -181,33 +182,38 @@ export function FilmDock({
   caption: ReactNode;
   children: ReactNode;
   onSelect: (i: number) => void;
+  itemName?: string;
 }) {
   return (
-    <footer className="reel-dock">
-      <div className="reel-navigation">
+    <footer className="review-controls" aria-label="Film controls">
+      <div
+        className="control-transport"
+        role="group"
+        aria-label="Frame navigation"
+      >
         <button
-          className="reel-icon"
-          aria-label="Previous frame"
+          className="control-icon"
+          aria-label={`Previous ${itemName}`}
           disabled={index <= 0}
           onClick={() => onSelect(index - 1)}
         >
           <Icon name="left" />
         </button>
-        <output className="reel-counter">
+        <output className="control-counter" aria-live="off">
           {count ? String(index + 1).padStart(2, "0") : "00"} /{" "}
           {String(count).padStart(2, "0")}
         </output>
         <button
-          className="reel-icon"
-          aria-label="Next frame"
+          className="control-icon"
+          aria-label={`Next ${itemName}`}
           disabled={index >= count - 1 || !count}
           onClick={() => onSelect(index + 1)}
         >
           <Icon name="right" />
         </button>
       </div>
-      <div className="reel-focus-caption">{caption}</div>
-      <div className="reel-zoom" role="group" aria-label="Film zoom">
+      <div className="control-caption">{caption}</div>
+      <div className="control-zoom" role="group" aria-label="Film zoom">
         <button
           aria-label="Zoom out"
           disabled={!count || controls.zoom <= 5}
@@ -233,7 +239,7 @@ export function FilmDock({
           Fit
         </button>
       </div>
-      <label className="reel-position">
+      <label className="control-position">
         <span className="sr-only">Film position</span>
         <input
           type="range"
@@ -247,7 +253,7 @@ export function FilmDock({
           }
         />
       </label>
-      <div className="reel-actions">{children}</div>
+      <div className="control-actions">{children}</div>
     </footer>
   );
 }
