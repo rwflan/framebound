@@ -81,6 +81,10 @@ python -m framebound v2-mcp --project proj   # MCP stdio (same services as CLI/H
 
 Live specialist work additionally requires genuinely approved references, an operator grant, a frozen live request and an explicit spend ceiling. Offline jobs never send, even when a key is present. Participant live proof is pending; see [provider recovery](docs/PROVIDER_RECOVERY.md).
 
+## Corpus research
+
+The [Muse animation corpus plan](docs/MUSE_ANIMATION_CORPUS_PLAN.md) covers Muse-generated tests across 48 proposed styles, parent/image-model provenance in the framework and web app, and a [local visual reference catalogue](docs/research/muse-animation/index.html). This is researched future work; downloaded references are not Muse-generated benchmark results.
+
 ## Licence
 
-MIT. Demo art is procedural and original. Do not add third-party game assets.
+Code: MIT. Procedural demo art is original. Downloaded research references retain their recorded source licences and credits; they are not demo art or Muse-generated benchmark outputs. See the [reference catalogue notes](docs/research/muse-animation/README.md).

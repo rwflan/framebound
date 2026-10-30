@@ -1,0 +1,966 @@
+{
+  "schema_version": "research-1.0",
+  "status": "planned curation queue; source entry points are discovery leads, not claims of completed packs",
+  "styles": [
+    {
+      "style_id": "P01",
+      "style": "1-bit / monochrome pixel",
+      "seed_files": 7,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "1-bit / monochrome pixel animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P02",
+      "style": "Game Boy inspired four-shade pixel",
+      "seed_files": 9,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Game Boy inspired four-shade pixel animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P03",
+      "style": "NES inspired 8-bit sprites",
+      "seed_files": 13,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "NES inspired 8-bit sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P04",
+      "style": "CGA / ZX Spectrum inspired",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "CGA / ZX Spectrum inspired animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P05",
+      "style": "PICO-8 / fantasy-console pixel",
+      "seed_files": 4,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "PICO-8 / fantasy-console pixel animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P06",
+      "style": "16-bit top-down RPG sprites",
+      "seed_files": 18,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "16-bit top-down RPG sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P07",
+      "style": "16-bit platform/action sprites",
+      "seed_files": 25,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "16-bit platform/action sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P08",
+      "style": "Arcade / 32-bit-era drawn fighters",
+      "seed_files": 8,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Arcade / 32-bit-era drawn fighters animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P09",
+      "style": "Isometric pixel / tactics sprites",
+      "seed_files": 9,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Isometric pixel / tactics sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P10",
+      "style": "Pre-rendered 32-bit-era sprites",
+      "seed_files": 5,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Pre-rendered 32-bit-era sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P11",
+      "style": "Modern high-resolution pixel art",
+      "seed_files": 27,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Modern high-resolution pixel art animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "P12",
+      "style": "Pixel characters in dimensional scenes",
+      "seed_files": 2,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Pixel characters in dimensional scenes animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D01",
+      "style": "Flat vector / geometric characters",
+      "seed_files": 6,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Flat vector / geometric characters animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D02",
+      "style": "Cutout / skeletal puppet animation",
+      "seed_files": 5,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Cutout / skeletal puppet animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D03",
+      "style": "Hand-drawn cel animation",
+      "seed_files": 13,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Hand-drawn cel animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D04",
+      "style": "Anime-inspired limited animation",
+      "seed_files": 4,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Anime-inspired limited animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D05",
+      "style": "Rubber-hose / early cartoon movement",
+      "seed_files": 1,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Rubber-hose / early cartoon movement animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D06",
+      "style": "Chibi / super-deformed illustration",
+      "seed_files": 7,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Chibi / super-deformed illustration animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D07",
+      "style": "Pencil / ink sketch animation",
+      "seed_files": 26,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Pencil / ink sketch animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D08",
+      "style": "Comic / graphic-novel animation",
+      "seed_files": 2,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Comic / graphic-novel animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D09",
+      "style": "Watercolour animation",
+      "seed_files": 10,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Watercolour animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D10",
+      "style": "Gouache / oil-painted animation",
+      "seed_files": 20,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Gouache / oil-painted animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D11",
+      "style": "Ink wash / woodcut / print",
+      "seed_files": 21,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Ink wash / woodcut / print animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "D12",
+      "style": "Silhouette / shadow-puppet",
+      "seed_files": 11,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Silhouette / shadow-puppet animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "M01",
+      "style": "Paper cut / layered collage",
+      "seed_files": 1,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Paper cut / layered collage animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "M02",
+      "style": "Clay / plasticine stop-motion look",
+      "seed_files": 2,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Clay / plasticine stop-motion look animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "M03",
+      "style": "Felt / knitted / textile animation",
+      "seed_files": 8,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Felt / knitted / textile animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "M04",
+      "style": "Voxel / block-built sprites",
+      "seed_files": 3,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Voxel / block-built sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "R01",
+      "style": "Low-poly rendered sprites",
+      "seed_files": 8,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Low-poly rendered sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "R02",
+      "style": "Cel-shaded / toon 3D sprites",
+      "seed_files": 4,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Cel-shaded / toon 3D sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "R03",
+      "style": "Toy / clay-like glossy 3D",
+      "seed_files": 4,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Toy / clay-like glossy 3D animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "R04",
+      "style": "Realistic painted / rendered sprites",
+      "seed_files": 3,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Realistic painted / rendered sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "F01",
+      "style": "Pixel-art VFX flipbooks",
+      "seed_files": 11,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Pixel-art VFX flipbooks animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "F02",
+      "style": "Hand-painted / stylized VFX",
+      "seed_files": 26,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Hand-painted / stylized VFX animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "F03",
+      "style": "Smoke / fog / weather flipbooks",
+      "seed_files": 18,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Smoke / fog / weather flipbooks animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "F04",
+      "style": "Water / liquid / organic motion",
+      "seed_files": 8,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Water / liquid / organic motion animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E01",
+      "style": "Charcoal / chalk animation",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Charcoal / chalk animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E02",
+      "style": "Pastel / crayon illustration",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Pastel / crayon illustration animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E03",
+      "style": "Stipple / crosshatch engraving",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Stipple / crosshatch engraving animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E04",
+      "style": "Risograph / screen-print look",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Risograph / screen-print look animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E05",
+      "style": "Neon / emissive outline sprites",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Neon / emissive outline sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E06",
+      "style": "Dithered retro-computer pixel",
+      "seed_files": 1,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Dithered retro-computer pixel animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E07",
+      "style": "ASCII / character-cell animation",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "ASCII / character-cell animation animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E08",
+      "style": "Embroidery / cross-stitch grid",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Embroidery / cross-stitch grid animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E09",
+      "style": "Clay-to-paper mixed media",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Clay-to-paper mixed media animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E10",
+      "style": "Machinery / mechanical sprites",
+      "seed_files": 3,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Machinery / mechanical sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E11",
+      "style": "Glass / translucent sprites",
+      "seed_files": 0,
+      "status": "needs_reference_acquisition",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "Glass / translucent sprites animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    },
+    {
+      "style_id": "E12",
+      "style": "UI / icon / mascot motion",
+      "seed_files": 11,
+      "status": "needs_role_family_review_and_top_up",
+      "required_images": 12,
+      "required_independent_families": 3,
+      "required_roles": [
+        "appearance",
+        "motion_with_verified_order_and_timing",
+        "palette_material_lighting"
+      ],
+      "primary_discovery_sources": [
+        "https://opengameart.org/",
+        "https://kenney-assets.itch.io/",
+        "https://www.clevelandart.org/open-access-api"
+      ],
+      "search_brief": "UI / icon / mascot motion animated sprites reference CC0",
+      "review_instruction": "Find genuine examples of the named treatment and ordered motion; material stills alone cannot complete the pack. Do not fill an absent exact style with an unrelated near match."
+    }
+  ]
+}

@@ -1,0 +1,4486 @@
+{
+  "schema_version": "research-1.0",
+  "checked_at": "2026-10-30",
+  "sources": [
+    {
+      "id": "kenney-1-bit-pack",
+      "page_url": "https://kenney-assets.itch.io/1-bit-pack",
+      "style_leads": [
+        "P01"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "0a8c41f2b46bf7c3a70d38eb816bbfbdd555248bcedcc08a0609721d61e80c85",
+      "title": "1-Bit Pack by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDQ4Mi83NDA2NTE2LnBuZw==/original/%2FmVJKr.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDQ4Mi82Nzc1MTI4LnBuZw==/original/hD7qKC.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDQ4Mi82Nzc1MTI3LnBuZw==/original/Yn9qqj.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDQ4Mi82Nzc1MTMwLnBuZw==/original/Ia9BTu.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDQ4Mi82Nzc1MTI5LnBuZw==/original/OMBKHn.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-1-bit-platformer-pack",
+      "page_url": "https://kenney-assets.itch.io/1-bit-platformer-pack",
+      "style_leads": [
+        "P01"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "7416f7a17ada25beb7c5af376d7557a92bb150845027b7659e6bf8d66c399717",
+      "title": "1-Bit Platformer Pack by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDQ4NC83MzkyNzUyLnBuZw==/original/WgwwNy.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDQ4NC82Nzc1MTM3LnBuZw==/original/%2F7v3cD.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-monochrome-rpg",
+      "page_url": "https://kenney-assets.itch.io/monochrome-rpg",
+      "style_leads": [
+        "P02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "5ece339f77cf92c0aae2665242c34880ee3d31c0391e67f80d6a396523b26df9",
+      "title": "Monochrome RPG by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzY4NS83MzkyNzE3LnBuZw==/original/rdApqp.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzY4NS83MzkyNzE4LnBuZw==/original/iQEoma.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-monochrome-pirates",
+      "page_url": "https://kenney-assets.itch.io/monochrome-pirates",
+      "style_leads": [
+        "P02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "e6ddf1574e74922f1ca2955e2561bd70d7d95820e7b7a66e95f52bdd2655a4aa",
+      "title": "Monochrome Pirates by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQwNzEyNi8xNDI0ODg0Mi5wbmc=/original/ZJAO1W.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQwNzEyNi8xNDI0ODg0My5wbmc=/original/yELqhA.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQwNzEyNi8xNDI0ODg0MS5wbmc=/original/kSVJ1Z.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-pico-8-city",
+      "page_url": "https://kenney-assets.itch.io/pico-8-city",
+      "style_leads": [
+        "P05"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "20a71af7b441d7067ba877940cb301824cbe4f0e4c58345e61549a9fd1c3b535",
+      "title": "Pico-8 City by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjMwMTM5NC8xMzYzODI3Mi5wbmc=/original/vcje78.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjMwMTM5NC8xMzYzODI3My5wbmc=/original/Ot0zEk.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-micro-roguelike",
+      "page_url": "https://kenney-assets.itch.io/micro-roguelike",
+      "style_leads": [
+        "P03",
+        "P05"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "35be494fb9d22425daffec11e5ef2b7e91d0b43de9867f35e684007c6b382df1",
+      "title": "Micro Roguelike by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2ODI1NS83MzkyNzM5LnBuZw==/original/iu8ItE.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2ODI1NS82Nzk4MTYzLnBuZw==/original/lXf0PN.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-pixel-platformer",
+      "page_url": "https://kenney-assets.itch.io/pixel-platformer",
+      "style_leads": [
+        "P03",
+        "P07"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "136ca97a26aea47814e9ae7cbfd435b78375e87e069910dc5446590eb49b2b9b",
+      "title": "Pixel Platformer by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzY1Ni8xMzY0MTM2Ny5wbmc=/original/JSovvL.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzY1Ni8xMzY0MTM2OC5wbmc=/original/%2FaV8Pe.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzY1Ni8xMzY0MTM2OS5wbmc=/original/uU%2By2f.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-tiny-dungeon",
+      "page_url": "https://kenney-assets.itch.io/tiny-dungeon",
+      "style_leads": [
+        "P06"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "5c34b0421e5010cafaed2c48751b6775c178e5c9e01a779d1a83e839773987b8",
+      "title": "Tiny Dungeon by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTYwMzc5My85MzgzMTY1LnBuZw==/original/%2FtZmZ0.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTYwMzc5My85MzgzMTY3LnBuZw==/original/J%2BiwC%2B.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-tiny-battle",
+      "page_url": "https://kenney-assets.itch.io/tiny-battle",
+      "style_leads": [
+        "P06"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "8ec5776fd915d98b63e3125ad8fb9c65e34b7da8f867d5970a0bc99222c5cbe3",
+      "title": "Tiny Battle by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjMwMTQxMy8xMzYzODQwNC5wbmc=/original/Hj8IkB.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjMwMTQxMy8xMzYzODQwNS5wbmc=/original/33zasM.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-pixel-shmup",
+      "page_url": "https://kenney-assets.itch.io/pixel-shmup",
+      "style_leads": [
+        "P07",
+        "F01"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "7f5bd67aa5713bc4adda3f0ad462677c7e87f19238832e671ed062122032b115",
+      "title": "Pixel Shmup by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDQ3MS83MzkyNzA4LnBuZw==/original/IDzpZq.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDQ3MS82Nzc1MDcwLnBuZw==/original/L%2FEhea.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-rpg-urban-kit",
+      "page_url": "https://kenney-assets.itch.io/rpg-urban-kit",
+      "style_leads": [
+        "P06"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "ba10af7b71f0d2d44fe88af4d7a46f0831388375c8b824674af1f0c95f6564c8",
+      "title": "RPG Urban Kit by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzY5Mi82NzY5NTY0LnBuZw==/original/xEwj8x.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzY5Mi82NzY5NTY1LnBuZw==/original/fQirtN.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-isometric-dungeon-tiles",
+      "page_url": "https://kenney-assets.itch.io/isometric-dungeon-tiles",
+      "style_leads": [
+        "P09"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "d456253aa4fbad1df9bec2247f4b2a40a3400720258d1b3a5211ec575b2d6db6",
+      "title": "Isometric Dungeon Tiles by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE3MDg3NC82ODE2MDczLnBuZw==/original/Fm3TrJ.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE3MDg3NC82ODE2MDc0LnBuZw==/original/15%2B1EO.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-isometric-library-tiles",
+      "page_url": "https://kenney-assets.itch.io/isometric-library-tiles",
+      "style_leads": [
+        "P09"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "d303b7cdc9578815859a4679a8ed9e7f43734b4a453b4714f9e3bdec16f5682f",
+      "title": "Isometric Library Tiles by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE3MDg3Ni82ODE2MDkyLnBuZw==/original/uyxkuR.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE3MDg3Ni82ODE2MDkzLnBuZw==/original/pNaS%2B6.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-isometric-miniature-farm",
+      "page_url": "https://kenney-assets.itch.io/isometric-miniature-farm",
+      "style_leads": [
+        "P09"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "caa7f5e691dcefcc0afbf1619c055f7aa98669bd3ef67a999e31decc58fd1ae2",
+      "title": "Isometric Miniature Farm by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTY4MTY2OC85OTAyOTkyLnBuZw==/original/vgcMS0.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTY4MTY2OC85OTAyOTkzLnBuZw==/original/nJ3R5o.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-animated-characters-3",
+      "page_url": "https://kenney-assets.itch.io/animated-characters-3",
+      "style_leads": [
+        "R01",
+        "R02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "7309a2cea89401b225c5a3ca3aaa5306376ffcee94b449ea4038a282984e0296",
+      "title": "Animated Characters 3 by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTgwODg5OC8xMDYyMTM0NS5wbmc=/original/wJ9ioK.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-retro-medieval-kit",
+      "page_url": "https://kenney-assets.itch.io/retro-medieval-kit",
+      "style_leads": [
+        "P10",
+        "R01"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "975ce99b92e856a5a74cc818203a4e2840eb373d6a8b7a72b8160cb45d60a425",
+      "title": "Retro Medieval Kit by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzU3MS8yMDE0NDcxNy5wbmc=/original/glhrqL.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzU3MS8yMDE0NDcxOC5wbmc=/original/kEElmo.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-retro-urban-kit",
+      "page_url": "https://kenney-assets.itch.io/retro-urban-kit",
+      "style_leads": [
+        "P10",
+        "R01"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "955438638d42ea1b7aa4f53b7cc743db964f1d58c194e62452ed861e07373e81",
+      "title": "Retro Urban Kit by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MjQwOS8yMDE0NDc0Ny5wbmc=/original/Lqq62H.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MjQwOS8yMDE0NDc0OC5wbmc=/original/vp%2BPP7.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-shape-characters",
+      "page_url": "https://kenney-assets.itch.io/shape-characters",
+      "style_leads": [
+        "D01",
+        "D02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "41fba9fde37889ab0cd08641fbc372e54b5cefe054b5ea3ff33dfed4469fc844",
+      "title": "Shape Characters by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQwNzEyOC8xNDI0ODg0NS5wbmc=/original/gvMoMJ.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQwNzEyOC8xNDI0ODg0NC5wbmc=/original/csnpXG.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-monster-builder-pack",
+      "page_url": "https://kenney-assets.itch.io/monster-builder-pack",
+      "style_leads": [
+        "D01",
+        "D02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "b5439252bb767c4bac1274bb2a1148dfff185f782572ca56bf14a49cc6888581",
+      "title": "Monster Builder Pack by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTM2NDI1MS83OTQyMTIxLnBuZw==/original/3zNXOX.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTM2NDI1MS83OTQyMTIyLnBuZw==/original/TO2Bdf.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-scribble-platformer",
+      "page_url": "https://kenney-assets.itch.io/scribble-platformer",
+      "style_leads": [
+        "D07",
+        "D08"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "69152c316c665b17b3dc1e937c160adf4854540e4cc06e5c8ced12449e6f9eae",
+      "title": "Scribble Platformer by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDA2OC82NzcyMjI5LnBuZw==/original/E2uREa.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NDA2OC82NzcyMjMwLnBuZw==/original/HXH8AE.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-scribble-dungeons",
+      "page_url": "https://kenney-assets.itch.io/scribble-dungeons",
+      "style_leads": [
+        "D07"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "7102ec5370cf1dda6050c3f43dca96b9da56516a3337555671857860bccea080",
+      "title": "Scribble Dungeons by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTQ3NzAyMi84NjE0MjI2LnBuZw==/original/V5aS1J.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTQ3NzAyMi84NjE0MjI3LnBuZw==/original/DUy5th.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-sketch-town",
+      "page_url": "https://kenney-assets.itch.io/sketch-town",
+      "style_leads": [
+        "D07"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "36ee6adcf476594411d43ea37b5bd4359752de0eccf55b7bf4f98888313e6122",
+      "title": "Sketch Town by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzY2My82NzY5Mzc5LnBuZw==/original/SF0L2p.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2MzY2My82NzY5Mzc4LnBuZw==/original/ZJhCbR.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-sketch-desert",
+      "page_url": "https://kenney-assets.itch.io/sketch-desert",
+      "style_leads": [
+        "D07"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "554b91ef3850e30033c4c98bc3da93a8eec00897d7800fbd6c6e99caf294a4a2",
+      "title": "Sketch Desert by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTY4MTU0MS85OTAyMDQ3LnBuZw==/original/8hxmpU.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTY4MTU0MS85OTAyMDQ5LnBuZw==/original/tsTmQH.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-foliage-sprites",
+      "page_url": "https://kenney-assets.itch.io/foliage-sprites",
+      "style_leads": [
+        "P12",
+        "D10"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "acd0dad892f4bd8f87d446cd199eda6f79e9366cb8d91af6a20d712f01298846",
+      "title": "Foliage Sprites by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE4MjQ4OS82ODkwNzU2LnBuZw==/original/2iBE3K.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE4MjQ4OS82ODkwNzU3LnBuZw==/original/pJMGs1.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-splat-pack",
+      "page_url": "https://kenney-assets.itch.io/splat-pack",
+      "style_leads": [
+        "D10",
+        "F02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "9b777612d8a6eead58b4632361be871bdfc38f7f8168823100e126a9dc63c74f",
+      "title": "Splat Pack by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTQ3NzAxNy84NjE0MTkwLnBuZw==/original/w73Yqd.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-food-kit",
+      "page_url": "https://kenney-assets.itch.io/food-kit",
+      "style_leads": [
+        "R03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "6094bc410f6f78f129ccec80c938419e91ae9dce3edc41f75dad92f1540ee19c",
+      "title": "Food Kit by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjgxNzMxMC8xNjgyODIyMS5wbmc=/original/LA0e%2BX.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-platformer-kit",
+      "page_url": "https://kenney-assets.itch.io/platformer-kit",
+      "style_leads": [
+        "R01",
+        "R02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "67ade73cf81a60043ef372d0761db9f2d79cfdaa99ac1e0f8c2fbf48c9d06ace",
+      "title": "Platformer Kit by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjc3NzY1OC8xNjU3NDc3MS5wbmc=/original/xyRCgZ.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjc3NzY1OC8xNjU3NDc3Mi5wbmc=/original/P8OQrj.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjc3NzY1OC8xNjU3NDc3NC5wbmc=/original/tgvXg8.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-mini-characters",
+      "page_url": "https://kenney-assets.itch.io/mini-characters",
+      "style_leads": [
+        "R01"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 404,
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-watercraft-kit",
+      "page_url": "https://kenney-assets.itch.io/watercraft-kit",
+      "style_leads": [
+        "R03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "56156a28b21f934eb77618eb83102a8a0050d3557d5b5580df87c5e8b71e4a28",
+      "title": "Watercraft Kit by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjc3NzY2OC8xNjU3NDg1NC5wbmc=/original/2kwhFA.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-space-kit",
+      "page_url": "https://kenney-assets.itch.io/space-kit",
+      "style_leads": [
+        "R03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "e973c85af0a4f08330354d91e9a9adec6be3c6974d14ff1ed5b523d4fb4b1ee8",
+      "title": "Space Kit by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NTM0OC82NzgwMzMxLnBuZw==/original/GW0lf%2F.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NTM0OC82NzgwMzMyLnBuZw==/original/I%2Fbtjw.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-simple-animated-character-16x16",
+      "page_url": "https://opengameart.org/content/simple-animated-character-16x16",
+      "style_leads": [
+        "P03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "67f62b479352b75f4af997e638edb27c1ff6a9c2264853b9ad9d284bef1e123c",
+      "title": "Simple animated character 16x16 | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/spr_stickman_jump.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/spr_stickman_idle.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/spr_stickman_jump_0.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/spr_stickman_roll.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/spr_stickman_run.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-gameboy-platformer-art",
+      "page_url": "https://opengameart.org/content/gameboy-platformer-art",
+      "style_leads": [
+        "P02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "25e418e1e9d79f955f4f37a24fff3c2ee0c8facede50f6d0aa0fe57a4dd5010a",
+      "title": "Gameboy Platformer Art | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/Screenshot_4_0.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Screenshot_1_2.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/tilesetv2big.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/previewstuff.png",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-a-blocky-dungeon",
+      "page_url": "https://opengameart.org/content/a-blocky-dungeon",
+      "style_leads": [
+        "P03",
+        "P06"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "8127800f3819ff31833a996aa3762bc423d845b18f1672b897610a028d120c15",
+      "title": "A blocky dungeon | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/dungeon_pre_small.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/dungeon_preview.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/dungeon_sheet.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/dungeon_sheet_0.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-fantasy-rpg-sprite-kit-32x32",
+      "page_url": "https://opengameart.org/content/fantasy-rpg-sprite-kit-32x32",
+      "style_leads": [
+        "P06"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "b1c5477ea6447e9d1f0be69d859a25aefdba77ba39b7a55aa088964b10f64cda",
+      "title": "Fantasy RPG Sprite Kit (32x32) | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/demo_1.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/chars_1.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/m_torso.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/m_head.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/m_legs.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/f_torso.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/f_head.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/f_legs.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/misc_0.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/items_9.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-base-character-spritesheet-16x16",
+      "page_url": "https://opengameart.org/content/base-character-spritesheet-16x16",
+      "style_leads": [
+        "P03",
+        "P06"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "a79292a29eff64145abbad9608994f050b7962d1ac0e32611261c642a4c7f6e8",
+      "title": "Base character spritesheet 16x16 | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/Hero_0.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Hero.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-mv-platformer-female-32x64",
+      "page_url": "https://opengameart.org/content/mv-platformer-female-32x64",
+      "style_leads": [
+        "P07"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "7edcf0d85407424017c25c72643a83912a59a53d5e0e5adac7de4e0c52a40496",
+      "title": "MV Platformer Female (32x64) | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/humanWomanPreview.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/humanWomanPreview2.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/frameTestAnim.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/warrior_1.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/knight_22.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/mage_3.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/cleric_0.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/ninja_4.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/thief_4.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-mv-platformer-male-32x64",
+      "page_url": "https://opengameart.org/content/mv-platformer-male-32x64",
+      "style_leads": [
+        "P07"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "95988adf21da8e2ee3cf30f484be118caea2cdadcb61a91dd3b9458ed73e2d01",
+      "title": "MV Platformer Male (32x64) | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/maleBasePreview.png",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-space-soldier-resize-64x64",
+      "page_url": "https://opengameart.org/content/space-soldier-resize-64x64",
+      "style_leads": [
+        "P07",
+        "P11"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "a113ca574982030e7fdf24ccec23f0bf4fddb2cfbba4d8de3cf577287252436a",
+      "title": "Space soldier (resize 64x64) | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_walk.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_walk_rifle.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_run.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_run_rifle.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_jump.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_jump_rifle.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_crouch.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_crouch_rifle.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_attack.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_attack_rifle.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_idle.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_idle_rifle.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/shq_trooper_killed.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/HQ_Trooper_all.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/HQ_Trooper_all.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-fighting-character-template-mustermann-2-a001aaaa001-karate",
+      "page_url": "https://opengameart.org/content/fighting-character-template-mustermann-2-a001aaaa001-karate",
+      "style_leads": [
+        "P08"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "4fd87315c1a7b997b0e6abf2c0a8fb670446a6a3793cb4552c71a3825bb2037b",
+      "title": "Fighting character template Mustermann 2 ( A001AAAA001 ) (karate) | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/preview0.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/preview2_1.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/1_8.gif",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/2_3.gif",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Orangeblack.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Blueehite.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-generic-woman-for-fighting-games-stardrinkers-style",
+      "page_url": "https://opengameart.org/content/generic-woman-for-fighting-games-stardrinkers-style",
+      "style_leads": [
+        "P08",
+        "P11"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "154c2fbce843cec1f606753aabc6eac92ff23e9f0b247e9bacbfa2b556c144e7",
+      "title": "Generic woman for fighting games. (stardrinkers style) | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/preview_56.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/human%20fighter.gif",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-cartoon-female-turn-around-and-walk-cycle-sheet",
+      "page_url": "https://opengameart.org/content/cartoon-female-turn-around-and-walk-cycle-sheet",
+      "style_leads": [
+        "D03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "0c45013fe5a4079bd0431541231b8e474677b932e519b2ffe3d8945485a74909",
+      "title": "Cartoon Female - Turn Around And Walk Cycle Sheet | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/turn-around_16.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/turn-around_17.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-cartoon-male-turn-around-and-walk-cycle-sheet",
+      "page_url": "https://opengameart.org/content/cartoon-male-turn-around-and-walk-cycle-sheet",
+      "style_leads": [
+        "D03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "e4a5bcdb775fa3ece3c7a1d25d0e9f1a8ad047e75b6d832e124b0f5721fc89e9",
+      "title": "Cartoon Male - Turn Around And Walk Cycle Sheet | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/turn-around_14.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/turn-around_15.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-symel-turn-around-and-walk-cycle-sheet",
+      "page_url": "https://opengameart.org/content/symel-turn-around-and-walk-cycle-sheet",
+      "style_leads": [
+        "D03",
+        "D05"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "cb6eac9e3db7166ee38225ca7801b83a2c147bdf1092bed3a96970e636fd44e1",
+      "title": "Symel - Turn Around And Walk Cycle Sheet | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/Turn-Around_0.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Turn-Around.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-cute-girlanimation",
+      "page_url": "https://opengameart.org/content/cute-girlanimation",
+      "style_leads": [
+        "D04",
+        "D06"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "1fee095861d899c06902511bd88f4fb4461bc55a56315e8da8d84cf2acb00dac",
+      "title": "cute girl(animation) | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/girly_anim_walk_prev.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-girl-walking-side",
+      "page_url": "https://opengameart.org/content/girl-walking-side",
+      "style_leads": [
+        "D03",
+        "D04"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "b6751247312011ef6b9c4e0ed76f40b7cd1fe685ac2b0911eb4892ce116cab77",
+      "title": "Girl walking side | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/preview_419.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/walk.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/walk9_0.gif",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-cartoon-vector-characters",
+      "page_url": "https://opengameart.org/content/cartoon-vector-characters",
+      "style_leads": [
+        "D01",
+        "D02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "6957c73bd83781aaaa9d4e5fd3c19e6e89266820367fb67feee6f848136f18ed",
+      "title": "Cartoon Vector Characters | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/allvectorchars.jpg",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-game-character",
+      "page_url": "https://opengameart.org/content/game-character",
+      "style_leads": [
+        "D01"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "47d71dfd59a45176a5afebd91327a83e33fc70ba94be91e654cead26b7871b30",
+      "title": "Game character | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/game_character.png",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-animated-boy",
+      "page_url": "https://opengameart.org/content/animated-boy",
+      "style_leads": [
+        "D03",
+        "D06"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "6695e582530def6908abef775d908eb8bf28c5f44eb84ed15d143cb8fad68a16",
+      "title": "Animated Boy | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/BoyFront0015.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/BoySheet_2.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/BoySheet_1.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-walking-girl",
+      "page_url": "https://opengameart.org/content/walking-girl",
+      "style_leads": [
+        "D03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "d334e58fc48fa4f0ca63f2338d0b47b71cd6f76c6f519527082b8c80b3b54794",
+      "title": "walking girl | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/r4t4_0.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/r4t4.gif",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-pixvoxel-colorful-isometric-wargame-sprites",
+      "page_url": "https://opengameart.org/content/pixvoxel-colorful-isometric-wargame-sprites",
+      "style_leads": [
+        "P09",
+        "M04"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "cb5066a6136029ab9e57542fd4da743eac05c04e230b544e9053112265409a66",
+      "title": "[PixVoxel] Colorful Isometric Wargame Sprites | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/PixVoxel_logo_vivid.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Infantry_P_attack_1_animated.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Factory_explosion_animated_0.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Boat_S_attack_1_animated.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-meadow-background",
+      "page_url": "https://opengameart.org/content/meadow-background",
+      "style_leads": [
+        "D09"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "22cb1ec89876bc2d9be0a71cadf2fc720b8d60eed9a394f2518a2ad055178f84",
+      "title": "Meadow background | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/meadow.jpg.preview.jpg",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/meadow.jpg",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-ps1-style-rpg-pre-rendered-backgrounds",
+      "page_url": "https://opengameart.org/content/ps1-style-rpg-pre-rendered-backgrounds",
+      "style_leads": [
+        "P10"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "eec115753e6692273a4800d37dd3c068cd6fdf62a77a9f62440c1c318ac917d2",
+      "title": "PS1 Style RPG Pre-rendered Backgrounds | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/background_previews.png",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-swordsman-static-64x64",
+      "page_url": "https://opengameart.org/content/swordsman-static-64x64",
+      "style_leads": [
+        "P11"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "3c121d7157a6deb7f688c650968c9b06ad938618127dee35f526cd4d1561a848",
+      "title": "Swordsman [static] [64x64] | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/swordsman_t.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/swordsman_t_0.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/swordsman_enchanted.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/swordsman_stone.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/swordsman_holy.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/swordsman_unholy.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/swordsman_gold.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-animated-wild-animals",
+      "page_url": "https://opengameart.org/content/animated-wild-animals",
+      "style_leads": [
+        "P11"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "ef4e5f2eee7303a1527f6066a5375bf5ece8dfce8ddb9c283938bac25a129f8a",
+      "title": "Animated Wild Animals | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/Wild%20Animals%20Cover.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Wild%20Animals%20Gif_3.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Bear%20Preview_0.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Wolf%20Preview_0.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Fox%20Preview_0.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Boar%20Preview_3.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Rabbit%20Preview_2.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-cat-sprites",
+      "page_url": "https://opengameart.org/content/cat-sprites",
+      "style_leads": [
+        "P07"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "cd1be0ea0f6e8b748d48e088dcfde5cbc6b13d2b2d90d7488eda295385c15930",
+      "title": "Cat sprites | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/cat-preview.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-dog-sprites",
+      "page_url": "https://opengameart.org/content/dog-sprites",
+      "style_leads": [
+        "P07"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "f636f81a738093413f05847916d74b03f71a28fd8eca5d5ee55ac549990497dd",
+      "title": "Dog Sprites | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/dog_preview.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/dog_sprite_sheetx4.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-animated-horse",
+      "page_url": "https://opengameart.org/content/animated-horse",
+      "style_leads": [
+        "P11"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "9182d1e16d65fdddc88bad99be2505957d4ce9e436fa50e9fb55cd4c0cae16a7",
+      "title": "Animated Horse | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/HorseRun_4.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/HorseIdle_7.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/HorseEat_0.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/HorseWalk_0.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-top-sci-fi-cga-tileset",
+      "page_url": "https://opengameart.org/content/top-sci-fi-cga-tileset",
+      "style_leads": [
+        "P04"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "30350faae99d277f54177dc20d5bda6e0212f8f65cf50838be4e642044698519",
+      "title": "Top sci-fi CGA tileset | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/licenses/by-sa/3.0/"
+      ],
+      "license_display": "License(s): CC-BY-SA 3.0",
+      "creator": null,
+      "license_status": "review_required",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/s02-a.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Jerom_topRL_CCBYSA3_0.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Jerom_topRL_CCBYSA3.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-animated-particle-effects-1",
+      "page_url": "https://opengameart.org/content/animated-particle-effects-1",
+      "style_leads": [
+        "F02",
+        "F03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "764deaac7efbdb38c21f6f9d5fdcb7ee8d5f7e9f66e5901d1151f3c869905134",
+      "title": "Animated particle effects #1 | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/particlefx1_preview.jpg",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/magicexplosion2.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/smokeblast.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-animated-particle-effects-2",
+      "page_url": "https://opengameart.org/content/animated-particle-effects-2",
+      "style_leads": [
+        "F02",
+        "F03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "1c8405ee58dcaefc63875a8506e7d2a5826d6ea44049998d6d461403fa14dd19",
+      "title": "Animated particle effects #2 | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/particlefx-2-preview.jpg",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/air_bubbles_02.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blood_hit_1-4.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fire_01.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fire_02.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/teleporter_hit.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/air_bubbles_01.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/air_bubbles_02.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blood_hit_01.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blood_hit_02.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blood_hit_03.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blood_hit_04.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blood_hit_05.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blood_hit_06.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blood_hit_07.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blood_hit_08.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fire_01.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fire_01b.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fire_01c.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fire_02.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/lighter_flame_01.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/teleporter_01.png",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/teleporter_hit.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-25-special-effects-rendered-with-blender",
+      "page_url": "https://opengameart.org/content/25-special-effects-rendered-with-blender",
+      "style_leads": [
+        "F02",
+        "F03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "8a0018d553125f398c81c4d57c009ee9b75a0f901d120e0a33074c0b77c60c15",
+      "title": "25 special effects rendered with blender | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/blender-particle-effects-preview.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blender-particle-effects-preview-2.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/blender-particle-effects-preview-3.png",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-fire-fx-burning-fire-animation",
+      "page_url": "https://opengameart.org/content/fire-fx-burning-fire-animation",
+      "style_leads": [
+        "F02",
+        "F03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "e35e431b4c31f5b428bd2c12057a2fcad48d92fbf61c382fa52d7f3a6bf95b45",
+      "title": "Fire FX - Burning Fire Animation | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/fire_1_40.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fire_1_40_black.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-2d-spell-effects",
+      "page_url": "https://opengameart.org/content/2d-spell-effects",
+      "style_leads": [
+        "F02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "b3e3dc5503f7ba054c5cea472209d74e1281f5122364063a0437e62e685fa386",
+      "title": "2D Spell Effects | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/fx8_lighteningBall.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fx1_blue_topEffect.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fx2_swordFire.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fx3_fireBall.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fx4_sign_of_fire.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fx5_fire_scissors.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fx6_eaterFire.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fx7_energyBall.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fx9_rainOnGround.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fx10_blackExplosion.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-animated-water-platformer-16x16",
+      "page_url": "https://opengameart.org/content/animated-water-platformer-16x16",
+      "style_leads": [
+        "F01",
+        "F04"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "ce5f8765cf96e776f84980c056469f092cedcb162e67ca556b81731a262d9b8f",
+      "title": "Animated water platformer 16x16 | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/water_00_preview_1.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/water_00_preview.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/water_00_1.gif",
+          "role": "sprite_sheet_or_image_file"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/water_00_strip4.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-simple-animated-water",
+      "page_url": "https://opengameart.org/content/simple-animated-water",
+      "style_leads": [
+        "F01",
+        "F04"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "16ffc15499efa012163ce6a1391d66b0ad7bbb38304d08fe52bcaccca4ad6736",
+      "title": "Simple Animated Water | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/water_5.gif",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/water_img.PNG",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/Water_SheetE-export.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-2d-explosion-animations-frame-by-frame",
+      "page_url": "https://opengameart.org/content/2d-explosion-animations-frame-by-frame",
+      "style_leads": [
+        "F01"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "6e97e204f020cdea46bfdb56dbc7fe3c1b26d648dd3ed5da77f4c792921089d8",
+      "title": "2D Explosion Animations | Frame by frame | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/i1kMVZ.png",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/kckhDn.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-lightning-animation",
+      "page_url": "https://opengameart.org/content/lightning-animation",
+      "style_leads": [
+        "F02"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "b9d3a36fcd2f0fb118856ef5be14e2a3c14b749b107f75b36b8ccebd4ce91c64",
+      "title": "Lightning animation | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/0_11.png",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-thick-fog",
+      "page_url": "https://opengameart.org/content/thick-fog",
+      "style_leads": [
+        "F03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "cd31ea4f9ad194789f2037922246f15adf71f12c5a4645f6da7707c43984a644",
+      "title": "Thick Fog | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/fog_preview.jpg",
+          "role": "preview"
+        },
+        {
+          "url": "https://opengameart.org/sites/default/files/fog01.png",
+          "role": "sprite_sheet_or_image_file"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "oga-water-caustics-effect-small",
+      "page_url": "https://opengameart.org/content/water-caustics-effect-small",
+      "style_leads": [
+        "F04"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "8ac7e299fd8423c842f98b70a4010a54ba94af2f2ecd08c1487e0ea1ad1d0e44",
+      "title": "Water Caustics Effect (Small) | OpenGameArt.org",
+      "license_links": [
+        "http://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "license_display": "License(s): CC0",
+      "creator": null,
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://opengameart.org/sites/default/files/preview_1.gif",
+          "role": "preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "rgs-square",
+      "page_url": "https://rgsdev.itch.io/hand-drawn-square-characters-animated-8-directions-top-down-free-cc0",
+      "style_leads": [
+        "D06",
+        "D03"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "04ef68c8283242a36a568e8ce05c352c98add02f7a97705a577689d0893cc755",
+      "title": "Hand-Drawn Square Characters Animated 8 Directions Top Down free cc0 by RGS_Dev",
+      "license_links": [],
+      "creator": "RGS_Dev",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI4NTEwMi8xMzU0Mjc1Ny5naWY=/original/UScWjp.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI4NTEwMi8xMzU0Mjc1OC5naWY=/original/6W5vf9.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI4NTEwMi8xMzU0Mjc1NS5naWY=/original/GA9GX3.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI4NTEwMi8xMzU0Mjc1Ni5naWY=/original/sc8Y5E.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI4NTEwMi8xMzU0Mjc1OS5naWY=/original/GxsH0N.gif",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "rgs-stick",
+      "page_url": "https://rgsdev.itch.io/animated-stick-figure-character-2d-free-cc0",
+      "style_leads": [
+        "D07",
+        "D12"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "af2d84439b7f0aed72b542702c466c943a7368425c8d6e02293a6d47a7c7ffef",
+      "title": "Animated Stick Figure Character 2D Free CC0 by RGS_Dev",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/deed.pt_BR"
+      ],
+      "creator": "RGS_Dev",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgyNS5naWY=/original/uj4Uy1.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDg0MC5naWY=/original/fMaMYO.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzOC5naWY=/original/CYLndr.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgyOS5naWY=/original/iUk14K.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDg0MS5naWY=/original/ZMQEYa.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzNy5naWY=/original/GYE7SZ.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzNC5naWY=/original/r5qNAU.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDg0My5naWY=/original/ZGcw8R.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzOS5naWY=/original/O0GPVV.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzMi5naWY=/original/0mPzA5.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDg0Mi5naWY=/original/sZRjm3.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzNi5naWY=/original/tBTdu%2F.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzMS5naWY=/original/YKNdvb.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgyOC5naWY=/original/qA1vBN.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzMC5naWY=/original/OWoyZ%2B.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzNS5naWY=/original/Nck%2FQk.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgzMy5naWY=/original/zat049.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgyNy5naWY=/original/ofOIJ1.gif",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjI2OTgyOS8xMzQ1MDgyNi5naWY=/original/efpd9z.gif",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-110565",
+      "page_url": "https://clevelandart.org/art/1929.13",
+      "title": "Fighting Horses",
+      "creator": "Th\u00e9odore G\u00e9ricault (French, 1791\u20131824)",
+      "medium": "watercolor over graphite",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=watercolor",
+      "api_record_sha256": "2a4e6d4c9d4a4183b5372be52a6f9b8a4a4690d1c81fb210060611b66f7e641a",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D09"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1929.13/1929.13_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-172894",
+      "page_url": "https://clevelandart.org/art/1923.2490",
+      "title": "Amaryllis",
+      "creator": "Charles Demuth (American, 1883\u20131935)",
+      "medium": "watercolor over graphite",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=watercolor",
+      "api_record_sha256": "6e62bea127b89c88604a77efc41b720c69bd7f3d3b898580f8ba786e922c1ab4",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D09"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1923.2490/1923.2490_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-173965",
+      "page_url": "https://clevelandart.org/art/1930.851",
+      "title": "Lighthouse Village (also known as Cape Elizabeth)",
+      "creator": "Edward Hopper (American, 1882\u20131967)",
+      "medium": "Watercolor with graphite and scraping on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=watercolor",
+      "api_record_sha256": "ae784e4a99e8f562b86a2a92f17488ba571b0bfea51273f038de9b94945d2505",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D09"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1930.851/1930.851_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-131337",
+      "page_url": "https://clevelandart.org/art/1954.128",
+      "title": "Boy with Anchor",
+      "creator": "Winslow Homer (American, 1836\u20131910)",
+      "medium": "Watercolor and graphite on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=watercolor",
+      "api_record_sha256": "dee24467cebc89d7bed034937c1f509c8f8f47461770041aa5409746dc26da74",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D09"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1954.128/1954.128_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-147393",
+      "page_url": "https://clevelandart.org/art/1973.142",
+      "title": "Leaping Trout",
+      "creator": "Winslow Homer (American, 1836\u20131910)",
+      "medium": "watercolor over graphite",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=watercolor",
+      "api_record_sha256": "f0b5c419157ae01e708782118e832543afe1885e01642e16ab06d26aae01cbda",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D09"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1973.142/1973.142_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-131338",
+      "page_url": "https://clevelandart.org/art/1954.129",
+      "title": "Fl\u00fcelen, from the Lake of Lucerne",
+      "creator": "Joseph Mallord William Turner (British, 1775\u20131851)",
+      "medium": "watercolor with gouache and scratch-away",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=watercolor",
+      "api_record_sha256": "0890dad53b6c072f56bb8393620c3b72430ded7c4865ad8daa845511418bae2f",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D09"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1954.129/1954.129_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-173962",
+      "page_url": "https://clevelandart.org/art/1930.849",
+      "title": "The Sun Through the Trees",
+      "creator": "Charles Burchfield (American, 1893\u20131967)",
+      "medium": "Watercolor and opaque watercolor",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=watercolor",
+      "api_record_sha256": "a8c43f4e473b0c0a9d2aa0b2d548d63e9677aa7ac5d0d40648ed59e8d04170dd",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D09"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1930.849/1930.849_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-159770",
+      "page_url": "https://clevelandart.org/art/1997.138",
+      "title": "The Valley of the Tyne, My Native Country near Henshaw",
+      "creator": "John Martin (British, 1789\u20131854)",
+      "medium": "watercolor, gouache and gum arabic with graphite underdrawing, sanding, and scraping",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=watercolor",
+      "api_record_sha256": "ef4240c1710531ff74025bd23d5054aeef04945d3a19760429deaf6c664ca203",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D09"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1997.138/1997.138_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-145195",
+      "page_url": "https://clevelandart.org/art/1970.362",
+      "title": "Jacob's Dream",
+      "creator": "Joseph Goupy (British, 1686\u2013before.1770)",
+      "medium": "gouache",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=gouache",
+      "api_record_sha256": "6c01ca1a019cb6daf8d0a207a3ef4a2c3c524691c56f30d6b0ef34db2724682b",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1970.362/1970.362_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-101498",
+      "page_url": "https://clevelandart.org/art/1920.279",
+      "title": "The Old Market, Cleveland",
+      "creator": "Frank Wilcox (American, 1887\u20131964)",
+      "medium": "gouache",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=gouache",
+      "api_record_sha256": "b3232e4c63b0aaaeadeff9c04a629e3d639e92c6639bfa99a4dd68282dbd9a81",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1920.279/1920.279_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-156571",
+      "page_url": "https://clevelandart.org/art/1992.278",
+      "title": "God of War",
+      "creator": "Paul Klee (German, 1879\u20131940)",
+      "medium": "Gouache and tempera",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=gouache",
+      "api_record_sha256": "edd8cb2931a338ac08dfd29789f09526e8679036b4581dc52dc531013240f5fa",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1992.278/1992.278_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-140334",
+      "page_url": "https://clevelandart.org/art/1964.285",
+      "title": "Portrait of a Child (Anton Peschka Jr.)",
+      "creator": "Egon Schiele (Austrian, 1890\u20131918)",
+      "medium": "Gouache, watercolor, and graphite",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=gouache",
+      "api_record_sha256": "b705b6be3095507f127e00f2b234cc70590a3e2d5d74ce3fc6d29b0d82511056",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1964.285/1964.285_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-118157",
+      "page_url": "https://clevelandart.org/art/1939.267",
+      "title": "A Rishi Stirring Up a Storm",
+      "creator": "John La Farge (American, 1835\u20131910)",
+      "medium": "watercolor and gouache over graphite",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=gouache",
+      "api_record_sha256": "0e5be9dfead879122edfc7bbcf9e00fc51244a7580814e0006636d6d437d9378",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1939.267/1939.267_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-452866",
+      "page_url": "https://clevelandart.org/art/2022.3",
+      "title": "Balaam and the Ass",
+      "creator": "Hans Bol (Flemish, 1534\u20131593)",
+      "medium": "Gouache heightened with gold on vellum laid down on panel",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=gouache",
+      "api_record_sha256": "5701abdc03b0fd49d6b2c13484ae3aa6f9c2d7f73078ba38b524e29f1976293a",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/2022.3/2022.3_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-150176",
+      "page_url": "https://clevelandart.org/art/1980.91",
+      "title": "Classical Landscape",
+      "creator": "Pierre Henri de Valenciennes (French, 1750\u20131819)",
+      "medium": "black gouache and  brush and gray wash, over black chalk and graphite, heightened with white gouache",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=gouache",
+      "api_record_sha256": "1aa2d6db5b5f74271f7b36f306f38f63b172c39914e2427ba30b5f6d3b8e76e7",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1980.91/1980.91_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-117901",
+      "page_url": "https://clevelandart.org/art/1938.56",
+      "title": "Smelting Works at Denver",
+      "creator": "Thomas Moran (American, born England, 1837\u20131926)",
+      "medium": "watercolor and gouache",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=gouache",
+      "api_record_sha256": "2a468299a7d68129c64471b42e8e86ffbd4d5a7cf1f85bcf8768ea3e8becf5b6",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1938.56/1938.56_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-110180",
+      "page_url": "https://clevelandart.org/art/1928.8",
+      "title": "The Race Track (Death on a Pale Horse)",
+      "creator": "Albert Pinkham Ryder (American, 1847\u20131917)",
+      "medium": "oil on canvas",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=oil+on+canvas",
+      "api_record_sha256": "91b00466496337289691cd33b965251138a533a24f5e1a1a792643be18e48c09",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1928.8/1928.8_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-148758",
+      "page_url": "https://clevelandart.org/art/1976.2",
+      "title": "The Crucifixion of Saint Andrew",
+      "creator": "Caravaggio (Italian, 1571\u20131610)",
+      "medium": "oil on canvas",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=oil+on+canvas",
+      "api_record_sha256": "3978ca231997f5470caf5e5ebd6a4ae35ec6cec6de80225469759ce0a9eabb35",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1976.2/1976.2_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-150389",
+      "page_url": "https://clevelandart.org/art/1981.18",
+      "title": "The Holy Family on the Steps",
+      "creator": "Nicolas Poussin (French, 1594\u20131665)",
+      "medium": "oil on canvas",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=oil+on+canvas",
+      "api_record_sha256": "39956b0467d4269be174d7a9ca90f1525521592e78c9a9b6376b48513b15e7af",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1981.18/1981.18_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-92844",
+      "page_url": "https://clevelandart.org/art/2020.110",
+      "title": "Blessing of a Yacht on the Belon River",
+      "creator": "Maurice Denis (French, 1870\u20131943)",
+      "medium": "oil on canvas",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=oil+on+canvas",
+      "api_record_sha256": "e7973f17e3bd8f67e158f42300f80507598578fff1ac065e3885aeac053e4a86",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/2020.110/2020.110_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-136911",
+      "page_url": "https://clevelandart.org/art/1961.39",
+      "title": "View of Florence",
+      "creator": "Thomas Cole (American, born England,1801\u20131848)",
+      "medium": "oil on canvas",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=oil+on+canvas",
+      "api_record_sha256": "c4f663f7cbba0046cf80574343df8a6b51cfc408464b25502a76dbe70c905990",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1961.39/1961.39_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-136510",
+      "page_url": "https://clevelandart.org/art/1960.81",
+      "title": "Water Lilies (Agapanthus)",
+      "creator": "Claude Monet (French, 1840\u20131926)",
+      "medium": "oil on canvas",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=oil+on+canvas",
+      "api_record_sha256": "6b0bbca651b1eec5d483743220a84313563f6f64d8a70d425741ea0c1521674f",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1960.81/1960.81_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-143772",
+      "page_url": "https://clevelandart.org/art/1968.21",
+      "title": "Trees on a Rocky Hillside",
+      "creator": "Asher B. Durand (American, 1796\u20131886)",
+      "medium": "oil on canvas",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=oil+on+canvas",
+      "api_record_sha256": "37aec69d12c700b16be8bcdd64fa6f315b0f70687aa3b75acae81f25c7c05b30",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1968.21/1968.21_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-151904",
+      "page_url": "https://clevelandart.org/art/1927.1984",
+      "title": "The Biglin Brothers Turning the Stake",
+      "creator": "Thomas Eakins (American, 1844\u20131916)",
+      "medium": "oil on canvas",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=oil+on+canvas",
+      "api_record_sha256": "47a18ce1516677e06754b8808a5a0dcc65c29f268c3dfacaa1f4581f8f09963c",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1927.1984/1927.1984_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-392753",
+      "page_url": "https://clevelandart.org/art/2020.228",
+      "title": "Coffret with Woodcut of Saint Veronica's Vernicle",
+      "creator": "Hans Burgkmair the Elder (German, 1473\u20131531)",
+      "medium": "Wood, leather, iron, textile, woodcut with stenciled coloring",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=woodcut",
+      "api_record_sha256": "02265128e894807288bc070a11662b161409e955232d8cbcdb448a0d0dba99f1",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/2020.228/2020.228_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-128048",
+      "page_url": "https://clevelandart.org/art/1950.72",
+      "title": "Equestrian Portrait of the Emperor Maximilian",
+      "creator": "Hans Burgkmair (German, 1473\u20131531)",
+      "medium": "woodcut, in black and white on paper washed blue",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=woodcut",
+      "api_record_sha256": "9c328f3335f496f6ccaf1eaeedcf51478159482acfb3f3779db8026c74605655",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1950.72/1950.72_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-108380",
+      "page_url": "https://clevelandart.org/art/1926.112",
+      "title": "The Last Supper",
+      "creator": "Albrecht D\u00fcrer (German, 1471\u20131528)",
+      "medium": "woodcut",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=woodcut",
+      "api_record_sha256": "76d73c8fa56e7a8cc95a47d8a22d908f0ccff7d65eda7ea94231346d99f6dc55",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1926.112/1926.112_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-129875",
+      "page_url": "https://clevelandart.org/art/1952.296",
+      "title": "The Submersion of Pharaoh's Army in the Red Sea",
+      "creator": "Titian (Italian, c. 1488\u20131576); Domenico dalle Greche (Italian, 1503\u20131603)",
+      "medium": "woodcut",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=woodcut",
+      "api_record_sha256": "91d8298f07be9bea8ba579a406660e69097b54962bd8e0fe2447ae0711b9fb5b",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1952.296/1952.296_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-136178",
+      "page_url": "https://clevelandart.org/art/1959.99.14",
+      "title": "The Flight into Egypt",
+      "creator": "Albrecht D\u00fcrer (German, 1471\u20131528)",
+      "medium": "woodcut",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=woodcut",
+      "api_record_sha256": "fe870d54abbde8ff433f7af9035ccef9be274f987b74118a64936797728c286f",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1959.99.14/1959.99.14_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-114942",
+      "page_url": "https://clevelandart.org/art/1935.117",
+      "title": "The Power of Women: Samson and Delilah",
+      "creator": "Lucas van Leyden (Netherlandish, 1494\u2013about 1533)",
+      "medium": "woodcut",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=woodcut",
+      "api_record_sha256": "d9baeafadbaeae25377db52ba5f5db91a21e08337c00c9174d874f2842c4cbac",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1935.117/1935.117_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-129843",
+      "page_url": "https://clevelandart.org/art/1952.271",
+      "title": "Landscape with Saint Jerome and Two Lions",
+      "creator": "Domenico Campagnola (Italian, 1500\u20131564)",
+      "medium": "woodcut",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=woodcut",
+      "api_record_sha256": "7a3da419f1a0fd88a123c717edc20a1e6f7f4864746d94d55e89fdc514aa9623",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1952.271/1952.271_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-146164",
+      "page_url": "https://clevelandart.org/art/1971.60",
+      "title": "St. George and the Dragon",
+      "creator": "Wolfgang Huber (Austrian, 1490\u20131553)",
+      "medium": "woodcut",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=woodcut",
+      "api_record_sha256": "b0b9db88e9097d8d084818b547ccccf1c95f48d5498f5a682ae0574189c30d28",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1971.60/1971.60_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-144846",
+      "page_url": "https://clevelandart.org/art/1969.70",
+      "title": "Cupid Drawing His Bow",
+      "creator": "Federico Barocci (Italian, 1528\u20131612)",
+      "medium": "black chalk with pastel (stumped in places), heightened with white chalk, squared with black chalk; framing lines in graphite",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=ink+drawing",
+      "api_record_sha256": "e57bb555bec125c62af9b237b15e1589b2ba43f8ef0cc7f0acab38b65ec83c97",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1969.70/1969.70_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-126219",
+      "page_url": "https://clevelandart.org/art/1948.440",
+      "title": "Salome with the Head of St. John the Baptist",
+      "creator": "Albrecht Altdorfer (German, c. 1480\u20131538)",
+      "medium": "pen and brown ink and brush and brown wash and white gouache; framing lines in pen and black ink",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=ink+drawing",
+      "api_record_sha256": "1f73a89ab640a5c770900433f5e66c96f06d56e3806342a427a95d1f4e8b1049",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07",
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1948.440/1948.440_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-129221",
+      "page_url": "https://clevelandart.org/art/1952.113",
+      "title": "The Laundress",
+      "creator": "Henri de Toulouse-Lautrec (French, 1864\u20131901)",
+      "medium": "black and gray wash with white paint, scratched away in places, on gray cardboard prepared with white ground",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=ink+drawing",
+      "api_record_sha256": "f18c3ecfd7bd4e08ea59000d4b77ca03814c9e965857bf3e18430b602f5436ef",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1952.113/1952.113_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-145430",
+      "page_url": "https://clevelandart.org/art/1970.80",
+      "title": "Ink Plum",
+      "creator": "Peng Xu (Chinese, active 1488\u20131521)",
+      "medium": "hanging scroll, ink on silk",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=ink+drawing",
+      "api_record_sha256": "73b5161bb80a5c8e5dd6b849f6353f6871d273f0e5b04057150d712b2a1160e6",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07",
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1970.80/1970.80_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-149378",
+      "page_url": "https://clevelandart.org/art/1978.38",
+      "title": "Shah Jahan",
+      "creator": "Rembrandt van Rijn (Dutch, 1606\u20131669)",
+      "medium": "pen and brown ink and brush and brown wash",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=ink+drawing",
+      "api_record_sha256": "c87af5be7c44e9d89064d97ba09e2ce000ce880c136182907a626d5687bc77de",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07",
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1978.38/1978.38_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-144840",
+      "page_url": "https://clevelandart.org/art/1969.65",
+      "title": "Drawing of an Elephant",
+      "creator": "",
+      "medium": "ink on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=ink+drawing",
+      "api_record_sha256": "04ab9e3ddea792c4218a82b3c34d86579224c373e0947167d88e16da655fce7a",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07",
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1969.65/1969.65_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-144216",
+      "page_url": "https://clevelandart.org/art/1968.66",
+      "title": "Madonna Nursing the Christ Child",
+      "creator": "Bartolom\u00e9 Esteban Murillo (Spanish, 1617\u20131682)",
+      "medium": "pen and brown ink and brush and brown wash over red and black chalk, with traces of white; framing lines in pen and brown ink",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=ink+drawing",
+      "api_record_sha256": "d8a119c6be7e7a58555ec06a1893c6833d3cd6dce3ebd823efa0f829e8204da0",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07",
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1968.66/1968.66_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-134951",
+      "page_url": "https://clevelandart.org/art/1957.498",
+      "title": "Farmhouse on the Slope of a Hill",
+      "creator": "Fra Bartolommeo (Italian, 1472\u20131517)",
+      "medium": "pen and brown ink",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=ink+drawing",
+      "api_record_sha256": "e7f285ce07a57f543f09b8d1f0df40cd483b4009189f61cf9fdca72d333f1fdc",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07",
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1957.498/1957.498_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-139454",
+      "page_url": "https://clevelandart.org/art/1963.262",
+      "title": "Landscape",
+      "creator": "S\u014dami (Japanese, d. 1525)",
+      "medium": "hanging scroll; ink on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=cut+paper",
+      "api_record_sha256": "c8d0911d2ec4a280db0d0b15ba3565e3edf683f2b9dc604de42e70f356826fdb",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1963.262/1963.262_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-154973",
+      "page_url": "https://clevelandart.org/art/1989.53",
+      "title": "Southern Portion of the Rock-cut Temple of Hathor, Abu Simbel",
+      "creator": "Maxime Du Camp (French, 1822\u20131894); Gide et J. Baudry",
+      "medium": "salted paper print from calotype negative, Blanquart-\u00c9vrard process",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=cut+paper",
+      "api_record_sha256": "f6ff63404c520ab93858e27234d8be20a02f9e03910eaa3b92e7874e885b84cc",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "R04"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1989.53/1989.53_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-679101",
+      "page_url": "https://clevelandart.org/art/2025.73",
+      "title": "A Newly Cut Print: Scenes from the First Part of Outlaws of the Marsh",
+      "creator": "",
+      "medium": "Polychrome woodblock print; ink and color on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=cut+paper",
+      "api_record_sha256": "972f559369594e93aec72df8e602722492486ace319882fc06bf697f97f1e1e5",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/2025.73/2025.73_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-679099",
+      "page_url": "https://clevelandart.org/art/2025.71",
+      "title": "A Newly-Cut Print: Scenes from the Second Part of Record of the Three Kingdoms",
+      "creator": "",
+      "medium": "Polychrome woodblock print; ink and color on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=cut+paper",
+      "api_record_sha256": "1a5bbfc96b901ebdd8428f6719e405a0a44ba7f3b40c7cc8ddd3cbc542dcd217",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/2025.71/2025.71_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-679100",
+      "page_url": "https://clevelandart.org/art/2025.72",
+      "title": "A Newly-Cut Print of Illustrations from The Classic of Mountains and Seas",
+      "creator": "",
+      "medium": "Polychrome woodblock print; ink and color on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=cut+paper",
+      "api_record_sha256": "6df1a40497ea47f018653f953577b377a49d9b8a97ad533edf6e1fbb1a107e6c",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/2025.72/2025.72_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-155615",
+      "page_url": "https://clevelandart.org/art/1990.6",
+      "title": "Sketch of Ibaraki-d\u014dji",
+      "creator": "Shibata Zeshin (Japanese, 1807\u20131891)",
+      "medium": "hanging scroll, ink on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=cut+paper",
+      "api_record_sha256": "f247db2fe82228643f4875efc3b5d34671aac6ab7e9f830488e357f97001bb3d",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1990.6/1990.6_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-120848",
+      "page_url": "https://clevelandart.org/art/1941.570",
+      "title": "Portrait of M. de Viapre",
+      "creator": "John I Smart (British, 1741\u20131811)",
+      "medium": "graphite and wash on laid paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=cut+paper",
+      "api_record_sha256": "f6897336f58ff1f04efbe1ee0e51fb2ac0efa8d3254c562f99ddafc3d4a7aa64",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1941.570/1941.570_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-142315",
+      "page_url": "https://clevelandart.org/art/1966.143",
+      "title": "Ravana addresses Sita in the garden of Lanka, from Chapters 53 and 54 of the Aranya Kanda (Book of the Forest) of a Ramayana (Rama\u2019s Journey)",
+      "creator": "",
+      "medium": "Gum tempera, gold, and silver on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=cut+paper",
+      "api_record_sha256": "9f1625216f90c8f49ae8bc97d7d80fc0868765644b773879f680310a5a4f0076",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D10"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1966.143/1966.143_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-138880",
+      "page_url": "https://clevelandart.org/art/1963.251",
+      "title": "Satyress and Child",
+      "creator": "Clodion (French, 1738\u20131814)",
+      "medium": "terracotta",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=terracotta+animal",
+      "api_record_sha256": "a953bafc32d9726f435dc1332fc6df10f929a43a86509b2495e04f1cc15b2564",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M02"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1963.251/1963.251_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-135567",
+      "page_url": "https://clevelandart.org/art/1958.93",
+      "title": "Animal",
+      "creator": "",
+      "medium": "terracotta",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=terracotta+animal",
+      "api_record_sha256": "29b4c093f0d9e070689d96746f250a0e8b22fcfb0cabe8cb5267110b6d0e3ca7",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M02"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1958.93/1958.93_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-156897",
+      "page_url": "https://clevelandart.org/art/1993.10",
+      "title": "Embroidery from a Cloud Collar: Ocean, Rocks, and Peonies",
+      "creator": "",
+      "medium": "silk and silver thread, silvered paper; needleloop embroidery",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=embroidery",
+      "api_record_sha256": "0d41481128f2e24c29db58984f2eb6474cc811819b2a5c6f08aa89846653e346",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M03"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1993.10/1993.10_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-95470",
+      "page_url": "https://clevelandart.org/art/1916.1208",
+      "title": "Rumal with Vishnu temple and subsidiary shrines",
+      "creator": "",
+      "medium": "Silk and silver embroidery on cotton tabby ground",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=embroidery",
+      "api_record_sha256": "ca1cbe92c7870fe868b6371610136c68054a3dd9595a73d446a5c852c653cfa1",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M03"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1916.1208/1916.1208_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-112982",
+      "page_url": "https://clevelandart.org/art/1931.75",
+      "title": "Panel for a Headdress",
+      "creator": "",
+      "medium": "Linen: plain weave; silk: embroidery",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=embroidery",
+      "api_record_sha256": "fe02574a1bef7e599e7f9f8a4840139715645eee11963c5d313ee685fbbab7ec",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M03"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1931.75/1931.75_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-159635",
+      "page_url": "https://clevelandart.org/art/1996.349",
+      "title": "Rumal with Rama and Krishna scenes",
+      "creator": "",
+      "medium": "Silk and silver wire on cotton; embroidery",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=embroidery",
+      "api_record_sha256": "2d6de2826772431b09a58104989e8806a5d30124e77caf2731212040ad655074",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M03"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1996.349/1996.349_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-144912",
+      "page_url": "https://clevelandart.org/art/1970.124",
+      "title": "Part of a Chasuble",
+      "creator": "",
+      "medium": "Silk, gold fil\u00e9; appliqu\u00e9, embroidery: couching stitches  Velvet: solid pile, silk",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=embroidery",
+      "api_record_sha256": "031f7a7f2e4a3d07808854dcf95579511772b48d5bbc66e90e9a881d456a032b",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M03"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1970.124/1970.124_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-157565",
+      "page_url": "https://clevelandart.org/art/1994.96",
+      "title": "Embroidery with Birds",
+      "creator": "",
+      "medium": "embroidery, silk thread on silk ground",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=embroidery",
+      "api_record_sha256": "aa64666da7fe05acdafc3582c52cb14d32dd8465e31f817b7e80db983ae5a209",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M03"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1994.96/1994.96_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-130364",
+      "page_url": "https://clevelandart.org/art/1953.129",
+      "title": "Embroidered Tondo from an Altar Frontal: The Coronation of the Virgin",
+      "creator": "",
+      "medium": "Embroidery with gold, silver, and silk thread; split, satin, and couching stitches, or nu\u00e9 (shaded gold)",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=embroidery",
+      "api_record_sha256": "9c74fcc327f476fc1ea8023a44e4a099c7e77f4babf453cc11ce73c3e18e2205",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M03"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1953.129/1953.129_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-126139",
+      "page_url": "https://clevelandart.org/art/1948.352",
+      "title": "Altar Cloth",
+      "creator": "",
+      "medium": "embroidery: linen",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=embroidery",
+      "api_record_sha256": "bca9a885724774feb190dc7d817115b53fc1fdea2835294ab0d48cf4f322f46a",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M03"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1948.352/1948.352_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-543334",
+      "page_url": "https://clevelandart.org/art/2023.120",
+      "title": "Lilac",
+      "creator": "Philipp Otto Runge (German, 1777\u20131810)",
+      "medium": "Silhouette cut from off-white laid paper mounted to modern blue laid paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=silhouette",
+      "api_record_sha256": "baffa142f45173ae6a6f3b507abc0db1e334f5cc70514086bc1f980a2730264d",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "M01",
+        "D12"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/2023.120/2023.120_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-125563",
+      "page_url": "https://clevelandart.org/art/1947.495",
+      "title": "Jug with Running Animals",
+      "creator": "",
+      "medium": "fritware with design in carved and underglaze-painted slip (\"silhouette\" ware)",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=silhouette",
+      "api_record_sha256": "bfed7d5b25a039737bf5302c9ac93c6a50ef272dff92c5e036d3540a80ae4464",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D12"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1947.495/1947.495_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-149950",
+      "page_url": "https://clevelandart.org/art/1980.183",
+      "title": "Ewer (aigui\u00e8re)",
+      "creator": "Jean Baptiste Claude Odiot (French)",
+      "medium": "silver gilt",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=silhouette",
+      "api_record_sha256": "e01896d8b1acabb55121fc4629fd47d39e1bd7a076b314cb6be688c021399f0e",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "R04"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1980.183/1980.183_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-129112",
+      "page_url": "https://clevelandart.org/art/1951.59",
+      "title": "Berthe Morisot in Silhouette",
+      "creator": "\u00c9douard Manet (French, 1832\u20131883); Auguste Clot (French, 1858\u20131936); Lemercier & Cie.",
+      "medium": "lithograph on chine coll\u00e9, laid down on wove paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=silhouette",
+      "api_record_sha256": "daf57cca689074b0fb601ec85aa493f2896f00cc3ec9f2a797ae832a7090a942",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D07"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1951.59/1951.59_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-147977",
+      "page_url": "https://clevelandart.org/art/1974.73",
+      "title": "Food Container (Gui)",
+      "creator": "",
+      "medium": "bronze",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=silhouette",
+      "api_record_sha256": "d524ec291e06d61f62bc3240045196a57b8f5564919b7e763ee5c40185d91377",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "R04"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1974.73/1974.73_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-148239",
+      "page_url": "https://clevelandart.org/art/1975.22.4",
+      "title": "Album of Miscellaneous Subjects, Leaf 4",
+      "creator": "Fan Qi (Chinese, 1616\u2013after 1694)",
+      "medium": "album leaf, ink and color on silk",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=silhouette",
+      "api_record_sha256": "68f9046962b3d00b35208796f16b25291be9b235efc237bf55eb539339acd704",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1975.22.4/1975.22.4_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-152555",
+      "page_url": "https://clevelandart.org/art/1985.370",
+      "title": "Water Village",
+      "creator": "Wen Boren (Chinese, 1502\u20131575)",
+      "medium": "handscroll; ink and light color on paper",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=silhouette",
+      "api_record_sha256": "51978901f0967645e965b353adad2b99003af21022ad64662e3452951c5b5af6",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D11"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1985.370/1985.370_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "cma-152312",
+      "page_url": "https://clevelandart.org/art/1985.175",
+      "title": "Black-Figure Kantharos (Drinking Cup): Lizards Flanking Tree (A); Ducks (B)",
+      "creator": "",
+      "medium": "ceramic",
+      "license_status": "institution_declares_CC0",
+      "license_links": [
+        "https://www.clevelandart.org/open-access"
+      ],
+      "api_url": "https://openaccess-api.clevelandart.org/api/artworks/?has_image=1&cc0=1&limit=8&q=silhouette",
+      "api_record_sha256": "26185e67b88562e4be024895216dde1997da09b17ca39b7cd5dbbbcb1196996a",
+      "checked_at": "2026-10-30",
+      "style_leads": [
+        "D12"
+      ],
+      "scope": "historical appearance/material reference only; not an animation, test output or timing authority",
+      "images": [
+        {
+          "url": "https://openaccess-cdn.clevelandart.org/1985.175/1985.175_web.jpg",
+          "role": "appearance_or_material_only"
+        }
+      ],
+      "conditioning_status": "not_curated",
+      "review_note": "Check role, visual suitability, overlays/logos and reference-family separation before model attachment. A source declaration is not a human approval."
+    },
+    {
+      "id": "kenney-input-prompts",
+      "page_url": "https://kenney-assets.itch.io/input-prompts",
+      "style_leads": [
+        "E12"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "28b5273c92b79d7d2cf50e1d1700c4d2fc8f9160ca3bc633542d2b214086d127",
+      "title": "Input Prompts by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8yMDU1MDIzOC5wbmc=/original/PsycQL.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8yMDU1MDIzOS5wbmc=/original/kshjc0.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8yMDU1MDI0MC5wbmc=/original/TZIYvC.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8xNTI2Mzc3My5wbmc=/original/KPEu9o.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8xNTI2Mzc3NC5wbmc=/original/u4aN8x.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8xNTI2Mzc3NS5wbmc=/original/gRAQTA.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8xNTI2Mzc3OC5wbmc=/original/s87Kjf.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8xNTI2Mzc3Ny5wbmc=/original/QADtl6.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8xNTI2Mzc3OS5wbmc=/original/M%2BrE%2FE.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8xNTI2Mzc4MS5wbmc=/original/5NZKOJ.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8xNTI2Mzc4Mi5wbmc=/original/%2BfOpPM.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8yMDU1MDI2MC5wbmc=/original/ETlezR.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8yMDU1MDI1OS5wbmc=/original/xvF5In.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8yMDYwOTA4Mi5wbmc=/original/RVlaWJ.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8yMDYwOTA4My5wbmc=/original/8RD76s.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8yMDYwOTA4NC5wbmc=/original/BMClEp.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQ4Nzk5OC8yMDYwOTA4NS5wbmc=/original/ptSNTM.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated"
+    },
+    {
+      "id": "kenney-ui-pack",
+      "page_url": "https://kenney-assets.itch.io/ui-pack",
+      "style_leads": [
+        "E12"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "2cb23eaca922f64cd75ef2a1d494710673585e7f1ef3e226ca21c192e3329e9a",
+      "title": "UI Pack by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjc3NzYyOS8xNjU3NDYwNi5wbmc=/original/tPhk3T.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjc3NzYyOS8xNjU3NDYwNy5wbmc=/original/fYU3yT.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated"
+    },
+    {
+      "id": "kenney-conveyor-kit",
+      "page_url": "https://kenney-assets.itch.io/conveyor-kit",
+      "style_leads": [
+        "E10"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "6698cd2d106b31b8c0e7bf082b8eb77287423da1cc849e7279f5bf4ab6d4fb9a",
+      "title": "Conveyor Kit by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQwNzEyOS8xNDI0ODg0OS5wbmc=/original/hHAcnU.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQwNzEyOS8xNDI0ODg0OC5wbmc=/original/2QvjqU.png",
+          "role": "creator_preview"
+        },
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMjQwNzEyOS8xNDI0ODg0Ny5wbmc=/original/aY9i5f.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated"
+    },
+    {
+      "id": "kenney-pattern-pixel-pack",
+      "page_url": "https://kenney-assets.itch.io/pattern-pixel-pack",
+      "style_leads": [
+        "E06"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "7ca6b1c36dcee4b5e2b26a6d50ec08211125b93bffc58f328acbd3394e3b7d2f",
+      "title": "Pattern Pixel Pack by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTgwODkwOC8xNzAyNzQ1Mi5wbmc=/original/NI5ulG.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated"
+    },
+    {
+      "id": "kenney-crosshair-pack",
+      "page_url": "https://kenney-assets.itch.io/crosshair-pack",
+      "style_leads": [
+        "E12"
+      ],
+      "checked_at": "2026-10-30",
+      "scope": "external style/motion reference; not a Muse-generated test result",
+      "http_status": 200,
+      "page_sha256": "3cf2eedfb947bdd794b90ba2c5eb9800ed6826cfb003eeaf4765315d39c6b2d8",
+      "title": "Crosshair Pack by Kenney (Assets)",
+      "license_links": [
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "creator": "Kenney",
+      "license_display": "CC0",
+      "license_status": "publisher_declares_CC0",
+      "images": [
+        {
+          "url": "https://img.itch.zone/aW1hZ2UvMTE2NTM1My82NzgwMzY5LnBuZw==/original/LtGdtl.png",
+          "role": "creator_preview"
+        }
+      ],
+      "conditioning_status": "not_curated"
+    }
+  ]
+}
