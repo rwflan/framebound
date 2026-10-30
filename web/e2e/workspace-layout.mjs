@@ -108,7 +108,7 @@ try {
   for (const [i, top] of [...laneTops, sheetTop].entries())
     assert(
       tabs[i].top < top + 28 && tabs[i].bottom > top,
-      "Translucent row legends overlap the upper frame edge",
+      "Row labels overlap the upper frame edge",
     );
   const firstMetric = (
     await page.locator(".measurement-cell .frame-measure").first().boundingBox()
@@ -176,6 +176,10 @@ try {
     1,
   );
   await page.keyboard.press("Space");
+  // Playback may stop on a visible frame away from the camera centre.
+  // Explicit frame navigation restores the centering precondition for the checks below.
+  await page.locator(".reel-camera").focus();
+  await page.keyboard.press("Home");
   await page.locator(".frame-inspector .text-button").click();
   assert.equal(
     await page.locator("dialog[open]").count(),
