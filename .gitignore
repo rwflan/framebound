@@ -13,3 +13,6 @@ web/test/*.bundle.mjs
 # Packaged desk build is generated from web/dist via scripts/sync_desk_build.py
 # before building a wheel; source checkouts serve web/dist directly.
 framebound/desk/
+
+.playwright-cli/
+output/playwright/

@@ -47,7 +47,7 @@ async function ensureDeskSession() {
   return deskSession;
 }
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
+export async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     ...deskHeaders,
     ...((init?.headers as Record<string, string>) || {}),
