@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Framebound · Design preview</title>
+    <link rel="icon" href="../review-desk/favicon.svg" />
+    <link rel="stylesheet" href="preview.css" />
+    <script src="../review-desk/fixture.js" defer></script>
+    <script src="preview.js" defer></script>
+  </head>
+  <body>
+    <div class="desktop">
+      <div class="window">
+        <header class="titlebar">
+          <a class="brand" href="index.html" aria-label="Framebound home"
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg
+            >Framebound</a
+          >
+          <button
+            class="search-launch"
+            data-search
+            aria-label="Find a sequence"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <circle cx="8" cy="8" r="5" />
+              <path d="m12 12 5 5" /></svg
+            ><span>Find sequence</span><kbd>⌘ K</kbd>
+          </button>
+          <button
+            class="about-button"
+            data-about
+            aria-label="About this preview"
+          >
+            ?
+          </button>
+        </header>
+        <div class="app">
+          <aside class="sidebar">
+            <nav class="navigation" aria-label="Review navigation">
+              <button data-view="interventions" aria-current="page">
+                <span class="nav-symbol inbox-icon"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  >
+                    <path d="m3 15 3-9h12l3 9v5H3z" />
+                    <path
+                      d="M3 15h5l2 3h4l2-3h5M12 2v9m-3-3 3 3 3-3"
+                    /></svg></span
+                >Interventions <span data-count></span>
+              </button>
+              <button data-view="timeline">
+                <span class="nav-symbol timeline-icon"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  >
+                    <path d="M7 3v18M7 6h13M7 12h9M7 18h13" />
+                    <path
+                      d="M4 6h6M4 12h6M4 18h6"
+                      stroke-width="3"
+                    /></svg></span
+                >Timeline
+              </button>
+            </nav>
+            <div class="queue-heading">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.3"
+              >
+                <path d="M2 5V3h6l2 2h8v12H2z" /></svg
+              ><span data-queue-title>Character animation</span
+              ><span data-queue-count></span>
+            </div>
+            <div class="queue" data-queue></div>
+            <div class="sidebar-footer">
+              <button data-next-review>
+                Next intervention <span>↓ J</span>
+              </button>
+            </div>
+          </aside>
+          <main>
+            <div class="tabbar" data-tabs hidden></div>
+            <div class="workspace">
+              <section class="viewer">
+                <header class="pane-title viewer-title">
+                  <span class="file-icon" aria-hidden="true"
+                    ><svg
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.3"
+                    >
+                      <rect x="2" y="2" width="16" height="16" rx="1" />
+                      <path
+                        d="M5 2v16M15 2v16M2 6h3m-3 4h3m-3 4h3m10-8h3m-3 4h3m-3 4h3"
+                      /></svg
+                  ></span>
+                  <h1 data-heading>Run <span>r02</span></h1>
+                  <div class="title-grip" aria-hidden="true"></div>
+                  <div class="document-states" data-states></div>
+                  <button
+                    data-expand
+                    class="window-control"
+                    aria-label="Expand film workspace"
+                    aria-pressed="false"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.3"
+                    >
+                      <path d="M6 2H2v4m8-4h4v4M2 10v4h4m8-4v4h-4" />
+                    </svg>
+                  </button>
+                </header>
+                <div class="viewer-toolbar">
+                  <select data-compare aria-label="Comparison source">
+                    <option value="reference">Phase reference</option>
+                    <option value="baseline">Previous revision</option>
+                  </select>
+                  <div
+                    class="zoom-controls"
+                    role="group"
+                    aria-label="Film zoom"
+                  >
+                    <button data-zoom="-1" aria-label="Zoom out">−</button
+                    ><button data-reset-zoom title="Reset zoom">100%</button
+                    ><button data-zoom="1" aria-label="Zoom in">+</button
+                    ><button data-fit>Fit</button>
+                  </div>
+                </div>
+                <div class="film-area">
+                  <div class="lane-label reference-label">Reference</div>
+                  <div class="lane-label candidate-label">Candidate</div>
+                  <div
+                    class="film-scroll"
+                    data-film-scroll
+                    tabindex="0"
+                    aria-label="Draggable animation film"
+                  >
+                    <div class="film-content" data-film-content></div>
+                  </div>
+                </div>
+                <footer class="transport">
+                  <div class="frame-navigation">
+                    <button data-step="-1" aria-label="Previous frame">‹</button
+                    ><button data-play aria-label="Play animation">▶</button
+                    ><button data-step="1" aria-label="Next frame">›</button>
+                  </div>
+                  <span class="frame-position" data-position></span
+                  ><span class="frame-phase" data-phase></span
+                  ><span class="frame-ticks" data-ticks></span
+                  ><label class="speed"
+                    ><select data-speed aria-label="Playback speed">
+                      <option value="0.5">0.5×</option>
+                      <option value="1" selected>1×</option>
+                      <option value="2">2×</option>
+                    </select></label
+                  >
+                </footer>
+              </section>
+              <aside class="inspector">
+                <div class="pane-title inspector-heading">
+                  <span class="selection-icon" aria-hidden="true">⌖</span
+                  ><strong data-frame-heading>Frame 04</strong>
+                  <div class="title-grip" aria-hidden="true"></div>
+                  <span data-native>96 × 96</span>
+                </div>
+                <div class="inspector-content">
+                  <div class="selected-stage">
+                    <img
+                      data-selected
+                      alt="Selected candidate frame"
+                      draggable="false"
+                    />
+                    <div
+                      class="frame-regions"
+                      data-regions
+                      aria-hidden="true"
+                    ></div>
+                  </div>
+                  <section class="findings">
+                    <header>
+                      <h2>Checks</h2>
+                      <button
+                        class="text-button"
+                        data-evidence
+                        aria-label="View all evaluation checks"
+                      >
+                        All ↗
+                      </button>
+                    </header>
+                    <div data-measurements></div>
+                  </section>
+                  <section class="corrections">
+                    <header>
+                      <h2>Corrections</h2>
+                      <span data-issue-count>0</span>
+                    </header>
+                    <div data-corrections></div>
+                    <button class="correction-button" data-correction>
+                      ＋ Correction
+                    </button>
+                  </section>
+                  <section
+                    class="reference-stills"
+                    aria-label="Frozen visual references"
+                  >
+                    <button data-reference="identity">
+                      <img
+                        src="../review-desk/fixture/pip-identity.png"
+                        alt="Frozen character identity"
+                      /><span>Identity</span></button
+                    ><button data-reference="style">
+                      <img
+                        src="../review-desk/fixture/pip-style.png"
+                        alt="Frozen style reference"
+                      /><span>Style</span>
+                    </button>
+                  </section>
+                </div>
+                <div class="review-actions">
+                  <div class="review-state">
+                    <span>Human review</span
+                    ><strong data-acceptance>Unreviewed</strong>
+                  </div>
+                  <button class="primary" data-decision>
+                    Decision <span>↗</span>
+                  </button>
+                </div>
+              </aside>
+              <aside class="evidence-drawer" data-evidence-drawer hidden>
+                <header class="pane-title">
+                  <strong data-evidence-title>Checks</strong>
+                  <div class="title-grip" aria-hidden="true"></div>
+                  <button
+                    class="window-control"
+                    data-close-evidence
+                    aria-label="Close evidence"
+                  >
+                    ×
+                  </button>
+                </header>
+                <div data-evidence-body></div>
+              </aside>
+            </div>
+          </main>
+        </div>
+        <footer class="statusbar">
+          <span data-status>Frame 04 · A flight</span
+          ><span class="key-hints"
+            ><kbd>←</kbd><kbd>→</kbd> frame <kbd>Space</kbd> play</span
+          >
+        </footer>
+      </div>
+    </div>
+    <dialog data-dialog>
+      <div class="dialog-title">
+        <strong data-dialog-title></strong>
+        <div class="title-grip" aria-hidden="true"></div>
+        <button data-close aria-label="Close dialog">×</button>
+      </div>
+      <div data-dialog-body></div>
+    </dialog>
+    <div class="toast" role="status" hidden data-toast></div>
+  </body>
+</html>
