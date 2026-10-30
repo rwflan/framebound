@@ -28,7 +28,16 @@ def is_agent_selection(con,rids):
 def closure(con,rids):
     all_revisions=rows(con,'agent_clip_revisions')
     run_ids={all_revisions[rid]['run_id'] for rid in rids}
-    runs={k:v for k,v in rows(con,'agent_runs').items() if k in run_ids}
+    all_runs=rows(con,'agent_runs');specs=rows(con,'agent_task_specs')
+    pending=list(run_ids)
+    while pending:
+        run_id=pending.pop()
+        for rid in all_runs[run_id]['submission_ids']:
+            source=specs[all_revisions[rid]['task_id']]['spec'].get('source_correspondence')
+            source_id=source.get('source_revision_id') if source else None
+            if source_id in all_revisions and all_revisions[source_id]['run_id'] not in run_ids:
+                extra=all_revisions[source_id]['run_id'];run_ids.add(extra);pending.append(extra)
+    runs={k:v for k,v in all_runs.items() if k in run_ids}
     revisions={rid:all_revisions[rid] for run in runs.values() for rid in run['submission_ids']}
     # Always include the complete selected run trajectory, not just its best output.
     specs=rows(con,'agent_task_specs');task_ids={r['task_id'] for r in revisions.values()}
@@ -47,6 +56,20 @@ def closure(con,rids):
     registrations=rows(con,'registrations');registrations={f['registration_id']:registrations[f['registration_id']] for f in frames.values()}
     all_assets=rows(con,'assets');asset_ids={f['asset_id'] for f in frames.values()}
     asset_ids.update(i['asset_id'] for t in tasks.values() for i in t['spec']['inputs'])
+    asset_ids.update(aid for t in tasks.values() for aid in (t['spec'].get('source_correspondence') or {}).get('frame_asset_ids',[]))
+    source_records={}
+    for tid,task in tasks.items():
+        source=task['spec'].get('source_correspondence')
+        if not source:continue
+        source_id=source.get('source_revision_id');raw=None
+        if source_id:
+            raw=all_revisions.get(source_id)
+            if raw is None:raw=S.get(con,'clip_revisions',source_id)[0]
+        source_records[tid]=dict(id=tid,source_revision_id=source_id,
+            source_schema_version=raw.get('schema_version') if raw else None,
+            origin_record_sha256=E.digest(raw) if raw else None,
+            frame_asset_ids=source['frame_asset_ids'],timing=source['timing'],loop=source['loop'],
+            designated_by=source['designated_by'],designation_basis=source['designation_basis'],provenance=source['provenance'])
     pending=list(asset_ids)
     while pending:
         aid=pending.pop()
@@ -73,7 +96,7 @@ def closure(con,rids):
             raw_artifacts='not packaged; structured generation brief and evidence pixels retained')
     return dict(runs=runs,revisions=revisions,tasks=tasks,evaluations=evaluations,feedback=feedback,
                 events=events,interventions=marks,completions=completions,frames=frames,
-                registrations=registrations,assets=assets,provider_sources=provider_sources)
+                registrations=registrations,assets=assets,provider_sources=provider_sources,source_records=source_records)
 
 
 def _asset_reasons(asset,policy,assets=None,seen=None,provider_sources=None):
@@ -110,7 +133,7 @@ def _revision_labels(graph,policy):
         decision=graph['events'].get(run.get('human_decision_id',''))
         approved=bool(decision and decision['source']=='human' and decision['event']=='approve'
                       and decision['revision_id']==rid and decision['evaluation_id']==evaluation['id'])
-        controls=[graph['assets'][i['asset_id']] for i in task['spec']['inputs']]
+        controls=[graph['assets'][aid] for aid in [i['asset_id'] for i in task['spec']['inputs']]+(task['spec'].get('source_correspondence') or {}).get('frame_asset_ids',[])]
         if any(_asset_reasons(a,policy,graph['assets'],provider_sources=graph['provider_sources']) for a in controls):reasons.append('conditioning_input_excluded')
         human=approved and not reasons
         auto=(not reasons and task['spec']['completion']['id']=='technical-unreviewed-v1'
@@ -132,7 +155,7 @@ def _families(graph,project,asset_files=None):
     for rid,revision in graph['revisions'].items():
         run=graph['runs'][revision['run_id']];task=graph['tasks'][revision['task_id']]
         keys=[('animation',run['project_id'],run['animation_id'])]
-        aids=revision['frame_asset_ids']+[i['asset_id'] for i in task['spec']['inputs']]
+        aids=revision['frame_asset_ids']+[i['asset_id'] for i in task['spec']['inputs']]+(task['spec'].get('source_correspondence') or {}).get('frame_asset_ids',[])
         for aid in aids:
             asset=graph['assets'][aid];keys.append(('pixel',asset.get('pixel_sha256') or asset['byte_sha256']))
             keys.extend(('lineage',p) for p in [aid]+asset.get('parent_asset_ids',[]))
@@ -198,7 +221,9 @@ def plan(project,con,rids,policy):
     for rid,revision in graph['revisions'].items():
         label=labels[rid]
         task=graph['tasks'][revision['task_id']]
-        control_ids=[i['asset_id'] for i in task['spec']['inputs']]
+        control_ids=[i['asset_id'] for i in task['spec']['inputs']]+(task['spec'].get('source_correspondence') or {}).get('frame_asset_ids',[])
+        if revision['run_id'] not in {graph['revisions'][r]['run_id'] for r in rids}:
+            label=dict(label,human=False,automatic=False,reasons=label['reasons']+['source_dependency_not_selected_for_training'])
         full_assets_available=all(a in asset_files for a in revision['frame_asset_ids']+control_ids)
         for fid in revision['frame_instance_ids']:
             frame=graph['frames'][fid];asset=graph['assets'][frame['asset_id']]
@@ -291,7 +316,7 @@ def build_into(project,name,rids,out,policy,digest,con):
         write(rel,''.join(json.dumps(row,sort_keys=True)+'\n' for row in data))
     write('README.md','# Framebound agent trajectories\n\nVersion 3 requires explicit reader support. `hf/` contains exact human-accepted positives only; `automatically_verified/` is a separate technical-policy view. Research/withheld data retain rights, source and missing-evidence labels. No preference pairs are inferred. Snapshot transport does not grant training rights. Missing generation metadata remains null. Controlled declared-region measurements do not certify arbitrary creative quality.\n')
     files={str(p.relative_to(out)):_h(p.read_bytes()) for p in out.rglob('*') if p.is_file()}
-    manifest=dict(snapshot=name,dataset_version=VERSION,schemas={'domain':'3.0'},reader_capabilities=['agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1'],
+    manifest=dict(snapshot=name,dataset_version=VERSION,schemas={'domain':'3.0'},reader_capabilities=['agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1']+(['source-correspondence-v1'] if graph['source_records'] else []),
         inputs_digest=digest,clip_revisions=rids,policy=dict(policy,agent_export_policy=POLICY),files=files,exclusions=exclusions,
         families={m['revision_id']:m['family'] for m in membership},split_semantics='animation/derivation/shared-input/exact-pixel and 64-bit dHash distance <=4 components; conservative grouping only, not quality judgment',
         counts=dict(images=len(coco_images),annotations=len(coco_annotations),positives=len(views['human_accepted']),automatically_verified=len(views['automatically_verified']),
