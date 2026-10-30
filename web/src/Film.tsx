@@ -1,16 +1,15 @@
 import {
   forwardRef,
-  useEffect,
+  useLayoutEffect,
   useImperativeHandle,
   useRef,
   useState,
 } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { ReelCamera } from "./reel-camera";
-import { Icon } from "./shared";
 
 export type FilmHandle = {
-  reveal: (index: number) => void;
+  reveal: (index: number, center?: boolean) => void;
   zoom: (step: number) => void;
   reset: () => void;
   fit: () => void;
@@ -53,9 +52,9 @@ export const Film = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
-      reveal: (i) => {
+      reveal: (i, center = false) => {
         const c = camera.current;
-        if (c) c.reveal(i, c.trackWidth / count);
+        if (c) c.reveal(i, c.trackWidth / count, center);
       },
       zoom: (step) => {
         const c = camera.current;
@@ -76,7 +75,7 @@ export const Film = forwardRef<
     }),
     [count],
   );
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!viewport.current || !track.current || !count) return;
     const v = viewport.current,
       t = track.current;
@@ -86,16 +85,24 @@ export const Film = forwardRef<
         Math.round(Math.max(0, Math.min(1, p)) * 1000),
       );
       v.dataset.zoomDetail =
-        (c.trackWidth / count) * z >= 300 ? "expanded" : "compact";
+        (c.trackWidth / count) * z < 65
+          ? "micro"
+          : (c.trackWidth / count) * z < 130
+            ? "compact"
+            : "expanded";
     });
+    c.centerEdges = Boolean(sequence);
     camera.current = c;
     c.onResize = () =>
-      c.reveal(callbacks.current.selected, c.trackWidth / count);
+      c.reveal(callbacks.current.selected, c.trackWidth / count, true);
     const old = positions.get(filmKey);
     c.zoom = c.targetZoom = old?.zoom || 1;
     c.bounds();
-    c.jump(old?.x ?? c.max, old?.y || 0);
-    c.reveal(callbacks.current.selected, c.trackWidth / count);
+    c.jump(
+      c.width / 2 -
+        (((callbacks.current.selected + 0.5) * c.trackWidth) / count) * c.zoom,
+      0,
+    );
     return () => {
       positions.set(filmKey, { x: c.x, y: c.y, zoom: c.zoom });
       c.destroy();
@@ -149,7 +156,10 @@ export const Film = forwardRef<
         <div className="reel-lane-labels" aria-hidden="true">
           {labels.map((l, i) => (
             <div
-              className={"reel-lane-label " + (i ? "candidate" : "")}
+              className={
+                "reel-lane-label " +
+                (i === 1 ? "candidate" : i === 2 ? "checks" : "reference")
+              }
               key={i}
             >
               <strong>{l}</strong>
@@ -166,94 +176,4 @@ export function useFilm() {
     [zoom, setZoom] = useState(100),
     [position, setPosition] = useState(0);
   return { film, zoom, setZoom, position, setPosition };
-}
-export function FilmDock({
-  controls,
-  index,
-  count,
-  caption,
-  children,
-  onSelect,
-  itemName = "frame",
-}: {
-  controls: ReturnType<typeof useFilm>;
-  index: number;
-  count: number;
-  caption: ReactNode;
-  children: ReactNode;
-  onSelect: (i: number) => void;
-  itemName?: string;
-}) {
-  return (
-    <footer className="review-controls" aria-label="Film controls">
-      <div
-        className="control-transport"
-        role="group"
-        aria-label="Frame navigation"
-      >
-        <button
-          className="control-icon"
-          aria-label={`Previous ${itemName}`}
-          disabled={index <= 0}
-          onClick={() => onSelect(index - 1)}
-        >
-          <Icon name="left" />
-        </button>
-        <output className="control-counter" aria-live="off">
-          {count ? String(index + 1).padStart(2, "0") : "00"} /{" "}
-          {String(count).padStart(2, "0")}
-        </output>
-        <button
-          className="control-icon"
-          aria-label={`Next ${itemName}`}
-          disabled={index >= count - 1 || !count}
-          onClick={() => onSelect(index + 1)}
-        >
-          <Icon name="right" />
-        </button>
-      </div>
-      <div className="control-caption">{caption}</div>
-      <div className="control-zoom" role="group" aria-label="Film zoom">
-        <button
-          aria-label="Zoom out"
-          disabled={!count || controls.zoom <= 5}
-          onClick={() => controls.film.current?.zoom(-1)}
-        >
-          −
-        </button>
-        <button
-          className="zoom-value"
-          aria-label={`Zoom ${controls.zoom}%. Reset to 100%.`}
-          onClick={() => controls.film.current?.reset()}
-        >
-          {controls.zoom}%
-        </button>
-        <button
-          aria-label="Zoom in"
-          disabled={!count || controls.zoom >= 200}
-          onClick={() => controls.film.current?.zoom(1)}
-        >
-          +
-        </button>
-        <button disabled={!count} onClick={() => controls.film.current?.fit()}>
-          Fit
-        </button>
-      </div>
-      <label className="control-position">
-        <span className="sr-only">Film position</span>
-        <input
-          type="range"
-          aria-label="Film position"
-          min="0"
-          max="1000"
-          disabled={!count}
-          value={controls.position}
-          onChange={(e) =>
-            controls.film.current?.pan(Number(e.target.value) / 1000)
-          }
-        />
-      </label>
-      <div className="control-actions">{children}</div>
-    </footer>
-  );
 }

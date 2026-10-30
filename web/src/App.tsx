@@ -5,7 +5,6 @@ import type {
   IssueDetailDto,
   ReferencesDto,
 } from "./api-types";
-import { Film, FilmDock, useFilm } from "./Film";
 import { PacketWorkspace } from "./PacketWorkspace";
 import {
   CompareView,
@@ -17,6 +16,7 @@ import {
 } from "./Operations";
 import {
   actionName,
+  attentionSlot,
   boundLabel,
   chronology,
   needsReview,
@@ -29,11 +29,8 @@ import {
 import type { Bundle, DeskEvent } from "./review-model";
 import { Err, Icon, nav, parseHash, stamp, words } from "./shared";
 import { Modal } from "./Modal";
-import "./desk.css";
-import "./controls.css";
-import "./film-stock.css";
 import { useAutomaticUpdates } from "./useAutomaticUpdates";
-
+import "./desk.css";
 type DeskData = {
   bundles: Bundle[];
   issues: IssueDetailDto[];
@@ -78,54 +75,65 @@ async function loadDesk(): Promise<DeskData> {
   };
 }
 
+const shortRevision = (b: Bundle) =>
+  revisionId(b).match(/r\d+$/i)?.[0] || revisionId(b);
+const workspaces = [
+  ["corrections", "Corrections"],
+  ["issues", "Issues"],
+  ["references", "References"],
+  ["export", "Export"],
+  ["status", "Status"],
+] as const;
+
 export default function App() {
   const [view, setView] = useState(parseHash);
-  const [data, setData] = useState<DeskData | null>(null),
-    [error, setError] = useState<unknown>(null),
-    [version, setVersion] = useState(0),
-    [activeNavigation, setActiveNavigation] = useState<"inbox" | "activity">(
-      "inbox",
-    );
+  const [data, setData] = useState<DeskData | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [version, setVersion] = useState(0);
+  const [navigation, setNavigation] = useState<"inbox" | "activity">("inbox");
+  const [source, setSource] = useState("all"),
+    [order, setOrder] = useState("oldest");
+  const [detail, setDetail] = useState<DeskEvent | null>(null);
+  const [searching, setSearching] = useState(false),
+    [query, setQuery] = useState("");
+  const [searchIndex, setSearchIndex] = useState(0);
+  const [opened, setOpened] = useState<string[]>([]);
+  const retained = useRef<string | null>(
+    view.name === "packet" ? view.id : null,
+  );
   useEffect(() => {
-    const update = () => {
-      setView(parseHash());
-      setVersion((n) => n + 1);
-    };
+    const update = () => setView(parseHash());
     window.addEventListener("hashchange", update);
     return () => window.removeEventListener("hashchange", update);
   }, []);
   useEffect(() => {
+    if (view.name === "inbox" || view.name === "activity")
+      setNavigation(view.name);
+    if (view.name === "packet") retained.current = view.id;
+  }, [view]);
+  useEffect(() => {
     let live = true;
-    setError(null);
     loadDesk()
       .then((d) => {
-        if (live) setData(d);
+        if (live) {
+          setData(d);
+          setError(null);
+        }
       })
       .catch((e) => {
         if (live) setError(e);
       });
-
     return () => {
       live = false;
     };
   }, [version]);
   const refresh = useCallback(() => setVersion((n) => n + 1), []);
   useAutomaticUpdates(refresh);
-  const scoped = data?.bundles || [];
-  useEffect(() => {
-    if (view.name === "inbox" || view.name === "activity")
-      setActiveNavigation(view.name);
-  }, [view.name]);
-  const inFilm = ["inbox", "packet", "activity"].includes(view.name);
-  const current =
-    view.name === "packet" && data
-      ? data.bundles.find((b) => packetId(b) === view.id)
-      : null;
-  const projects = data?.projects || [];
+  const bundles = data?.bundles || [];
   const interventions = useMemo(() => {
     const latest = new Map<string, Bundle>();
-    scoped.forEach((b) => latest.set(String(b.contract.id), b));
-    return scoped
+    bundles.forEach((b) => latest.set(String(b.contract.id), b));
+    return bundles
       .filter(
         (b) =>
           (latest.get(String(b.contract.id)) === b ||
@@ -140,12 +148,10 @@ export default function App() {
         (a, b) =>
           priority(a, data?.issues || []) - priority(b, data?.issues || []),
       );
-  }, [scoped, data]);
-  const [source, setSource] = useState("all"),
-    [order, setOrder] = useState("oldest");
+  }, [data]);
   const timeline = useMemo(
     () =>
-      chronology(data?.bundles || [], data?.events || [])
+      chronology(bundles, data?.events || [])
         .filter((e) => source === "all" || e.source === source)
         .sort(
           (a, b) =>
@@ -154,6 +160,98 @@ export default function App() {
         ),
     [data, source, order],
   );
+  const inFilm = ["inbox", "packet", "activity"].includes(view.name);
+  const current =
+    view.name === "packet"
+      ? bundles.find((b) => packetId(b) === view.id)
+      : bundles.find((b) => packetId(b) === retained.current) ||
+        interventions[0] ||
+        bundles[bundles.length - 1];
+  useEffect(() => {
+    if (!current || !inFilm) return;
+    const id = packetId(current);
+    retained.current = id;
+    setOpened((ids) => (ids.includes(id) ? ids : [...ids, id]));
+  }, [current?.packet.id, inFilm]);
+  const labelProject = (id: string) =>
+    data?.projects.find((p) => p.id === id)?.name ||
+    (id === "unassigned" ? "Unassigned" : id);
+  const eventProject = (event: DeskEvent) =>
+    event.bundle
+      ? projectId(event.bundle, data?.refs || null)
+      : data?.refs.character_revisions.find(
+          (c) => c.id === event.review?.clip_revision_id,
+        )?.project_id || "unassigned";
+  const rows: {
+    id: string;
+    bundle?: Bundle;
+    event?: DeskEvent;
+    project: string;
+  }[] =
+    navigation === "activity"
+      ? timeline.map((event) => ({
+          id: event.id,
+          bundle: event.bundle,
+          event,
+          project: eventProject(event),
+        }))
+      : interventions.map((bundle) => ({
+          id: packetId(bundle),
+          bundle,
+          project: projectId(bundle, data?.refs || null),
+        }));
+  const grouped = new Map<string, typeof rows>();
+  rows.forEach((row) =>
+    grouped.set(row.project, [...(grouped.get(row.project) || []), row]),
+  );
+  const matching = bundles.filter((b) =>
+    `${actionName(b)} ${revisionId(b)} ${labelProject(projectId(b, data?.refs || null))}`
+      .toLowerCase()
+      .includes(query.toLowerCase().trim()),
+  );
+  const nextReview = useCallback(
+    (direction = 1) => {
+      if (!interventions.length) return;
+      const index = interventions.findIndex(
+        (b) => packetId(b) === retained.current,
+      );
+      nav({
+        name: "packet",
+        id: packetId(
+          interventions[
+            (index + direction + interventions.length) % interventions.length
+          ],
+        ),
+      });
+    },
+    [interventions],
+  );
+  useEffect(() => {
+    const keyboard = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (!document.querySelector("dialog[open]")) {
+          setSearching(true);
+          setQuery("");
+          setSearchIndex(0);
+        }
+        return;
+      }
+      if (
+        e.metaKey ||
+        e.ctrlKey ||
+        e.altKey ||
+        (e.target as HTMLElement).closest("dialog,input,textarea,select")
+      )
+        return;
+      if (inFilm && ["j", "k"].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+        nextReview(e.key.toLowerCase() === "j" ? 1 : -1);
+      }
+    };
+    window.addEventListener("keydown", keyboard);
+    return () => window.removeEventListener("keydown", keyboard);
+  }, [inFilm, nextReview]);
   const loadMore = async () => {
     if (!data?.more) return;
     try {
@@ -179,161 +277,303 @@ export default function App() {
   };
   return (
     <div className="desk-shell">
-      <header className="app-header streamlined-header">
-        <button
-          className="brand"
-          onClick={() => nav({ name: "inbox" })}
-          aria-label="Framebound"
-        >
-          <Icon name="frame" />
-          <span>Framebound</span>
-        </button>
-        <nav className="review-navigation" aria-label="Review views">
+      <div className="desk-window">
+        <header className="app-header">
           <button
-            aria-current={
-              activeNavigation === "inbox" && inFilm ? "page" : undefined
-            }
+            className="brand"
+            onClick={() => nav({ name: "inbox" })}
+            aria-label="Framebound"
+          >
+            <Icon name="frame" />
+            <span>Framebound</span>
+          </button>
+          <button
+            className="search-launch"
+            aria-label="Find sequence"
             onClick={() => {
-              nav({ name: "inbox" });
+              setSearching(true);
+              setQuery("");
+              setSearchIndex(0);
             }}
           >
-            <span className="nav-icon">
-              <Icon name="inbox" />
-              <span className="nav-count">{interventions.length}</span>
-            </span>
-            <span>Interventions</span>
+            <Icon name="search" />
+            <span>Find sequence</span>
+            <kbd>⌘ K</kbd>
           </button>
-          <button
-            aria-current={
-              activeNavigation === "activity" && inFilm ? "page" : undefined
-            }
-            onClick={() => nav({ name: "activity" })}
-          >
-            <span className="nav-icon">
-              <Icon name="history" />
-            </span>
-            <span>Timeline</span>
-          </button>
-        </nav>
-        <details className="workspace-switcher">
-          <summary aria-label="More workspaces">•••</summary>
-          <nav aria-label="Workspaces">
-            {[
-              ["corrections", "Corrections"],
-              ["issues", "Issues"],
-              ["references", "References"],
-              ["export", "Export"],
-              ["status", "Status"],
-            ].map(([name, label]) => (
+          <details className="workspace-switcher">
+            <summary aria-label="More workspaces">•••</summary>
+            <nav aria-label="Workspaces">
+              {workspaces.map(([name, label]) => (
+                <button
+                  key={name}
+                  aria-current={view.name === name ? "page" : undefined}
+                  onClick={(e) => {
+                    e.currentTarget.closest("details")?.removeAttribute("open");
+                    nav({ name });
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+          </details>
+        </header>
+        <div className="desktop-body">
+          <aside className="review-sidebar">
+            <nav className="review-navigation" aria-label="Review views">
               <button
-                key={name}
-                onClick={(e) => {
-                  e.currentTarget.closest("details")?.removeAttribute("open");
-                  nav({ name: name as "export" });
-                }}
+                aria-current={
+                  navigation === "inbox" && inFilm ? "page" : undefined
+                }
+                onClick={() => nav({ name: "inbox" })}
               >
-                {label}
+                <span className="nav-symbol inbox-icon">
+                  <Icon name="inbox" />
+                </span>
+                <span>Interventions</span>
+                <span className="nav-count">{interventions.length}</span>
               </button>
-            ))}
-          </nav>
-        </details>
-      </header>
-      <main
-        className={inFilm ? "film-desk" : "operations-desk"}
-        data-film-view={
-          view.name === "packet"
-            ? "sequence"
-            : view.name === "activity"
-              ? "timeline"
-              : "interventions"
-        }
-      >
-        {view.name === "activity" && (
-          <div className="timeline-tools">
-            <span>History</span>
-            <div>
-              <select
-                aria-label="Activity source"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
+              <button
+                aria-current={
+                  navigation === "activity" && inFilm ? "page" : undefined
+                }
+                onClick={() => nav({ name: "activity" })}
               >
-                <option value="all">All activity</option>
-                <option value="framework">Framework</option>
-                <option value="human">Human review</option>
-              </select>
-              <select
-                aria-label="Chronological order"
-                value={order}
-                onChange={(e) => setOrder(e.target.value)}
-              >
-                <option value="oldest">Oldest first</option>
-                <option value="newest">Newest first</option>
-              </select>
-              {data?.more && (
-                <button onClick={loadMore}>Load more history</button>
+                <span className="nav-symbol timeline-icon">
+                  <Icon name="history" />
+                </span>
+                <span>Timeline</span>
+              </button>
+            </nav>
+            {navigation === "activity" && (
+              <div className="timeline-tools">
+                <select
+                  aria-label="Activity source"
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                >
+                  <option value="all">All activity</option>
+                  <option value="framework">Framework</option>
+                  <option value="human">Human review</option>
+                </select>
+                <select
+                  aria-label="Chronological order"
+                  value={order}
+                  onChange={(e) => setOrder(e.target.value)}
+                >
+                  <option value="oldest">Oldest first</option>
+                  <option value="newest">Newest first</option>
+                </select>
+              </div>
+            )}
+            <div
+              className="review-queue"
+              aria-label={
+                navigation === "activity"
+                  ? "Project timeline"
+                  : "Intervention queue"
+              }
+            >
+              {[...grouped].map(([project, entries]) => (
+                <section key={project} className="queue-project">
+                  <header className="queue-heading">
+                    <Icon name="folder" />
+                    <span>{labelProject(project)}</span>
+                    <small>{entries.length}</small>
+                  </header>
+                  {entries.map(({ id, bundle: b, event }) => {
+                    const frame =
+                      b?.frames[attentionSlot(b, data?.issues || [])];
+                    const openIssues = b
+                      ? data?.issues.filter(
+                          (i) =>
+                            i.clip_revision_id === revisionId(b) &&
+                            !["resolved", "cancelled"].includes(
+                              i.task_status || "open",
+                            ),
+                        ) || []
+                      : [];
+                    const flagged =
+                      b?.evaluation.results.filter((c) =>
+                        ["fail", "error", "unmeasured"].includes(c.outcome),
+                      ).length || 0;
+                    const description = event
+                      ? words(event.title)
+                      : openIssues.length
+                        ? `${openIssues.length} correction${openIssues.length === 1 ? "" : "s"}`
+                        : flagged
+                          ? `${flagged} flagged check${flagged === 1 ? "" : "s"}`
+                          : b?.evaluation.coverage_status !== "complete"
+                            ? `${words(b?.evaluation.coverage_status)} coverage`
+                            : b?.evaluation.technical_status !== "pass"
+                              ? `Technical ${words(b?.evaluation.technical_status)}`
+                              : ["rejected", "needs_changes"].includes(
+                                    String(b?.current_decision.acceptance),
+                                  )
+                                ? words(b?.current_decision.acceptance)
+                                : b?.packet.comparison_revision_id
+                                  ? "Replacement"
+                                  : "Visual review";
+                    return (
+                      <div
+                        className={"queue-row" + (event ? " timeline-row" : "")}
+                        key={id}
+                      >
+                        <button
+                          className="queue-item"
+                          aria-current={
+                            b && current && packetId(b) === packetId(current)
+                              ? "true"
+                              : undefined
+                          }
+                          aria-label={
+                            event
+                              ? `${event.title} ${b ? revisionId(b) : event.actor}`
+                              : `${b ? actionName(b) : "Review"} ${b ? revisionId(b) : ""}`
+                          }
+                          onClick={() =>
+                            b
+                              ? nav({ name: "packet", id: packetId(b) })
+                              : event && setDetail(event)
+                          }
+                        >
+                          <span
+                            className={
+                              "queue-thumb " +
+                              (b?.evaluation.technical_status || "")
+                            }
+                          >
+                            {frame ? (
+                              <img
+                                draggable={false}
+                                src={frame.asset_url}
+                                alt=""
+                                loading="lazy"
+                              />
+                            ) : (
+                              <Icon name="check" />
+                            )}
+                          </span>
+                          <span>
+                            <strong>
+                              {b ? actionName(b) : words(event?.title)}
+                            </strong>
+                            <small>{description}</small>
+                            {event && (
+                              <time dateTime={event.at} title={event.at}>
+                                {stamp(event.at)}
+                              </time>
+                            )}
+                          </span>
+                          {b && (
+                            <span
+                              className="queue-revision"
+                              title={revisionId(b)}
+                            >
+                              {shortRevision(b)}
+                            </span>
+                          )}
+                        </button>
+                        {event && b && (
+                          <button
+                            className="event-details-button"
+                            aria-label={`Event details: ${event.title} ${revisionId(b)}`}
+                            onClick={() => setDetail(event)}
+                          >
+                            ···
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </section>
+              ))}
+              {data && !rows.length && (
+                <p className="queue-empty">
+                  {navigation === "activity"
+                    ? "No activity"
+                    : "No interventions"}
+                </p>
+              )}
+              {navigation === "activity" && data?.more && (
+                <button className="load-history" onClick={loadMore}>
+                  Load earlier activity
+                </button>
               )}
             </div>
-          </div>
-        )}
-        {Boolean(error) && (
-          <div className="desk-error">
-            <Err e={error} />
-            <button onClick={refresh}>Retry</button>
-          </div>
-        )}
-        {!data && !error && (
-          <div className="reel-empty" role="status">
-            Loading review desk…
-          </div>
-        )}
-        {data && (
-          <>
-            {view.name === "inbox" && (
-              <Collection
-                key="interventions"
-                bundles={interventions}
-                issues={data.issues}
-                events={null}
-                projectLabel={(id) =>
-                  projects.find((p) => p.id === id)?.name || id
-                }
-                refs={data.refs}
-                filmKey="interventions"
-              />
+            <div className="sidebar-footer">
+              <button
+                disabled={!interventions.length}
+                onClick={() => nextReview()}
+              >
+                Next intervention <span>↓ J</span>
+              </button>
+            </div>
+          </aside>
+          <main
+            className={inFilm ? "film-desk" : "operations-desk"}
+            data-film-view={
+              view.name === "activity"
+                ? "timeline"
+                : view.name === "packet"
+                  ? "sequence"
+                  : "interventions"
+            }
+          >
+            {Boolean(error) && (
+              <div className="desk-error">
+                <Err e={error} />
+                <button onClick={refresh}>Retry</button>
+              </div>
             )}
-            {view.name === "activity" && (
-              <Collection
-                key={"timeline" + source + order}
-                bundles={[]}
-                issues={data.issues}
-                events={timeline}
-                projectLabel={(id) =>
-                  projects.find((p) => p.id === id)?.name || id
-                }
-                refs={data.refs}
-                filmKey={"timeline" + source + order}
-              />
+            {!data && !error && (
+              <div className="reel-empty" role="status">
+                Loading…
+              </div>
             )}
-            {view.name === "packet" &&
-              (current ? (
-                <PacketWorkspace
-                  key={view.id}
-                  bundle={current}
-                  refs={data.refs}
-                  issues={data.issues}
-                  bundles={data.bundles}
-                  choices={scoped}
-                  onRefresh={refresh}
-                />
-              ) : (
-                <div className="reel-empty">
-                  Review packet unavailable.{" "}
-                  <button onClick={() => nav({ name: "inbox" })}>
-                    Back to review
-                  </button>
-                </div>
-              ))}
-            {!inFilm && (
+            {data && inFilm && (
+              <>
+                {opened.length > 1 && (
+                  <nav className="document-tabs" aria-label="Open sequences">
+                    {opened
+                      .map((id) => bundles.find((b) => packetId(b) === id))
+                      .filter((b): b is Bundle => Boolean(b))
+                      .map((b) => (
+                        <button
+                          key={packetId(b)}
+                          aria-current={
+                            current && packetId(b) === packetId(current)
+                              ? "page"
+                              : undefined
+                          }
+                          onClick={() =>
+                            nav({ name: "packet", id: packetId(b) })
+                          }
+                        >
+                          {actionName(b)} · {shortRevision(b)}
+                        </button>
+                      ))}
+                  </nav>
+                )}
+                {current ? (
+                  <PacketWorkspace
+                    key={packetId(current)}
+                    bundle={current}
+                    refs={data.refs}
+                    issues={data.issues}
+                    bundles={bundles}
+                    onRefresh={refresh}
+                  />
+                ) : (
+                  <div className="reel-empty">
+                    {view.name === "packet"
+                      ? "Review packet unavailable"
+                      : "No sequences"}
+                  </div>
+                )}
+              </>
+            )}
+            {data && !inFilm && (
               <div className="operations-content" key={view.name}>
                 {view.name === "compare" && (
                   <CompareView base={view.base} other={view.other} />
@@ -347,272 +587,118 @@ export default function App() {
                 {view.name === "status" && <StatusView />}
               </div>
             )}
-          </>
-        )}
-      </main>
-    </div>
-  );
-}
-
-function Collection({
-  bundles,
-  issues,
-  events,
-  refs,
-  projectLabel,
-  filmKey,
-}: {
-  bundles: Bundle[];
-  issues: IssueDetailDto[];
-  events: DeskEvent[] | null;
-  refs: ReferencesDto;
-  projectLabel: (id: string) => string;
-  filmKey: string;
-}) {
-  const controls = useFilm(),
-    [index, setIndex] = useState(0),
-    [detail, setDetail] = useState<DeskEvent | null>(null);
-  const focusedId = useRef<string | null>(null);
-  const items = events
-    ? events.map((e) => ({ id: e.id, bundle: e.bundle, event: e }))
-    : bundles.map((b) => ({ id: packetId(b), bundle: b, event: undefined }));
-  const retained = items.findIndex((item) => item.id === focusedId.current);
-  const selected =
-      retained >= 0 ? retained : Math.min(index, Math.max(0, items.length - 1)),
-    item = items[selected];
-  useEffect(() => {
-    if (!focusedId.current && item) focusedId.current = item.id;
-  }, [item]);
-  const select = (i: number) => {
-    focusedId.current = items[i]?.id || null;
-    setIndex(i);
-    controls.film.current?.reveal(i);
-  };
-  const open = (i: number) => {
-    const entry = items[i];
-    if (entry?.bundle) nav({ name: "packet", id: packetId(entry.bundle) });
-    else if (entry?.event) setDetail(entry.event);
-  };
-  return (
-    <>
-      {items.length ? (
-        <Film
-          ref={controls.film}
-          count={items.length}
-          filmKey={filmKey}
-          selected={selected}
-          onStep={select}
-          onZoom={controls.setZoom}
-          onPosition={controls.setPosition}
-        >
-          <div className="reel-stock">
-            <div className="reel-shot-row">
-              {items.map(({ id, bundle: b, event }, i) => {
-                const character = refs.character_revisions.find(
-                  (c) => c.id === event?.review?.clip_revision_id,
-                );
-                const frame =
-                    b?.frames[Math.min(3, b.frames.length - 1)] ||
-                    (character?.identity_asset_ids[0]
-                      ? {
-                          asset_url: api.assetUrl(
-                            character.identity_asset_ids[0],
-                          ),
-                        }
-                      : undefined),
-                  openIssues = b
-                    ? issues.filter(
-                        (iss) =>
-                          iss.clip_revision_id === revisionId(b) &&
-                          !["resolved", "cancelled"].includes(
-                            iss.task_status || "open",
-                          ),
-                      )
-                    : [];
-                const title =
-                  event?.title ||
-                  (openIssues.length
-                    ? `${openIssues.length} correction${openIssues.length > 1 ? "s" : ""}`
-                    : b?.evaluation.technical_status !== "pass"
-                      ? "Check evidence"
-                      : "Visual review");
-                return (
-                  <button
-                    key={id}
-                    className="reel-shot"
-                    aria-pressed={i === selected}
-                    aria-label={`${event?.title || actionName(b!)} ${b ? revisionId(b) : event?.actor}`}
-                    onClick={() => {
-                      select(i);
-                      if (events) open(i);
-                    }}
-                    onDoubleClick={() => open(i)}
-                  >
-                    <span className="shot-aperture">
-                      {frame ? (
-                        <img
-                          draggable={false}
-                          loading="lazy"
-                          src={frame.asset_url}
-                          alt={b ? actionName(b) : ""}
-                        />
-                      ) : (
-                        <span className="event-glyph">
-                          <Icon name="check" />
-                        </span>
-                      )}
-                      <span
-                        className={
-                          "shot-outcome " +
-                          (b?.evaluation.technical_status || "")
-                        }
-                      >
-                        {event
-                          ? stamp(event.at)
-                          : words(b?.evaluation.technical_status)}
-                      </span>
-                      <span className="shot-caption">
-                        <span className="shot-project">
-                          {b
-                            ? projectLabel(projectId(b, refs))
-                            : character?.project_id
-                              ? projectLabel(character.project_id)
-                              : event?.actor}
-                        </span>
-                        <strong>{event ? words(title) : actionName(b!)}</strong>
-                        <span>
-                          {b ? revisionId(b) : event?.review?.clip_revision_id}
-                        </span>
-                        <span>
-                          {event
-                            ? event.actor
-                            : `${title} · ${words(b?.evaluation.coverage_status)} coverage`}
-                        </span>
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </Film>
-      ) : (
-        <div className="reel-empty">
-          {events
-            ? "No recorded activity."
-            : "No review items in this project."}
+          </main>
         </div>
-      )}
-      <FilmDock
-        controls={controls}
-        index={selected}
-        count={items.length}
-        onSelect={select}
-        itemName={events ? "event" : "sequence"}
-        caption={
-          <>
-            <strong>{item?.bundle ? actionName(item.bundle) : "Review"}</strong>
-            <span>
-              {items.length} {events ? "events" : "sequences"}
-            </span>
-          </>
-        }
-      >
-        {item?.event && item.bundle && (
-          <button
-            className="reel-secondary"
-            onClick={() => setDetail(item.event!)}
-          >
-            Event details
-          </button>
-        )}
-        <button
-          className="reel-primary"
-          disabled={!item}
-          onClick={() => open(selected)}
-        >
-          {events && item?.bundle
-            ? "Open sequence"
-            : events
-              ? "Details"
-              : "Review"}
-          <Icon name="right" />
-        </button>
-      </FilmDock>
-      {detail && (
-        <Modal title={words(detail.title)} onClose={() => setDetail(null)}>
-          <div className="event-traversal">
-            <button
-              aria-label="Previous event"
-              disabled={items.findIndex((e) => e.id === detail.id) <= 0}
-              onClick={() => {
-                const i = items.findIndex((e) => e.id === detail.id) - 1;
-                select(i);
-                setDetail(items[i].event!);
-              }}
-            >
-              <Icon name="left" />
-            </button>
-            <span>
-              {items.findIndex((e) => e.id === detail.id) + 1} / {items.length}
-            </span>
-            <button
-              aria-label="Next event"
-              disabled={
-                items.findIndex((e) => e.id === detail.id) >= items.length - 1
-              }
-              onClick={() => {
-                const i = items.findIndex((e) => e.id === detail.id) + 1;
-                select(i);
-                setDetail(items[i].event!);
-              }}
-            >
-              <Icon name="right" />
-            </button>
-          </div>
-          <div className="event-meta">
-            <time dateTime={detail.at} title={detail.at}>
-              {stamp(detail.at)}
-            </time>
-            <span>{detail.actor}</span>
-          </div>
-          <p>{detail.review?.note}</p>
-          <dl className="facts">
-            <dt>Revision</dt>
-            <dd>
-              {detail.bundle
-                ? revisionId(detail.bundle)
-                : detail.review?.clip_revision_id || "—"}
-            </dd>
-            <dt>Source</dt>
-            <dd>{detail.source}</dd>
-            <dt>Event</dt>
-            <dd>{detail.id}</dd>
-          </dl>
-          {detail.checks?.map((c, i) => (
-            <div className={"check-row " + c.outcome} key={i}>
-              <strong>{words(c.constraint_id)}</strong>
-              <span>
-                {c.scope} · {words(c.outcome)}
-              </span>
-              <p>
-                {valueLabel(c)} · {boundLabel(c)} · {c.reason}
-              </p>
+        <footer className="app-statusbar">
+          <span>
+            <kbd>←</kbd>
+            <kbd>→</kbd> frame <kbd>Space</kbd> play
+          </span>
+          <span>
+            <kbd>J</kbd>
+            <kbd>K</kbd> intervention <kbd>⌘ K</kbd> find
+          </span>
+        </footer>
+        {searching && (
+          <Modal title="Find sequence" onClose={() => setSearching(false)}>
+            <div className="command-palette">
+              <input
+                autoFocus
+                aria-label="Search sequences"
+                placeholder="Sequence or revision…"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSearchIndex(0);
+                }}
+                onKeyDown={(e) => {
+                  if (["ArrowDown", "ArrowUp"].includes(e.key)) {
+                    e.preventDefault();
+                    setSearchIndex(
+                      (i) =>
+                        (i +
+                          (e.key === "ArrowDown" ? 1 : -1) +
+                          matching.length) %
+                        Math.max(1, matching.length),
+                    );
+                  }
+                  if (e.key === "Enter" && matching[searchIndex]) {
+                    e.preventDefault();
+                    setSearching(false);
+                    nav({
+                      name: "packet",
+                      id: packetId(matching[searchIndex]),
+                    });
+                  }
+                }}
+              />
+              <div className="search-results">
+                {matching.map((b, i) => (
+                  <button
+                    className={i === searchIndex ? "active" : ""}
+                    key={packetId(b)}
+                    onClick={() => {
+                      setSearching(false);
+                      nav({ name: "packet", id: packetId(b) });
+                    }}
+                  >
+                    <strong>
+                      {actionName(b)} · {shortRevision(b)}
+                    </strong>
+                    <small>
+                      {labelProject(projectId(b, data?.refs || null))} ·{" "}
+                      {words(b.evaluation.technical_status)}
+                    </small>
+                  </button>
+                ))}
+                {!matching.length && <p>No matches</p>}
+              </div>
             </div>
-          ))}
-          {detail.bundle && (
-            <button
-              className="primary"
-              onClick={() => {
-                setDetail(null);
-                nav({ name: "packet", id: packetId(detail.bundle!) });
-              }}
-            >
-              Open sequence <Icon name="right" />
-            </button>
-          )}
-        </Modal>
-      )}
-    </>
+          </Modal>
+        )}
+        {detail && (
+          <Modal title={words(detail.title)} onClose={() => setDetail(null)}>
+            <div className="event-detail">
+              <time dateTime={detail.at}>{stamp(detail.at)}</time>
+              <p>{detail.review?.note}</p>
+              <dl className="facts">
+                <dt>Revision</dt>
+                <dd>
+                  {detail.bundle
+                    ? revisionId(detail.bundle)
+                    : detail.review?.clip_revision_id || "—"}
+                </dd>
+                <dt>Actor</dt>
+                <dd>{detail.actor}</dd>
+                <dt>Source</dt>
+                <dd>{detail.source}</dd>
+              </dl>
+              {detail.checks?.map((c, i) => (
+                <div className={"check-row " + c.outcome} key={i}>
+                  <strong>{words(c.constraint_id)}</strong>
+                  <span>
+                    {c.scope} · {words(c.outcome)}
+                  </span>
+                  <p>
+                    {valueLabel(c)} · {boundLabel(c)} · {c.reason}
+                  </p>
+                </div>
+              ))}
+              {detail.bundle && (
+                <button
+                  className="primary"
+                  onClick={() => {
+                    setDetail(null);
+                    nav({ name: "packet", id: packetId(detail.bundle!) });
+                  }}
+                >
+                  Open sequence <Icon name="right" />
+                </button>
+              )}
+            </div>
+          </Modal>
+        )}
+      </div>
+    </div>
   );
 }

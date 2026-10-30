@@ -146,7 +146,10 @@ export function Icon({
     | "refresh"
     | "frame"
     | "inbox"
-    | "history";
+    | "history"
+    | "search"
+    | "expand"
+    | "film";
 }) {
   const paths = {
     left: "m14 6-6 6 6 6",
@@ -160,6 +163,9 @@ export function Icon({
     refresh: "M20 8a8 8 0 1 0 0 8M20 3v5h-5",
     frame: "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5",
     inbox: "M4 4h16v16H4ZM4 14h5l1 3h4l1-3h5",
+    search: "m16 16 5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
+    film: "M3 3h18v18H3ZM7 3v18M17 3v18M3 8h4m-4 8h4M17 8h4m-4 8h4",
+    expand: "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5",
     history: "M4 8a9 9 0 1 1-1 7M4 3v5h5M12 7v5l3 2",
   };
   return (

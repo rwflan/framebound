@@ -122,3 +122,81 @@ test("timeline deduplicates immutable artifacts, orders real timestamps and neve
   );
   assert.equal(projectId(b, null), "unassigned");
 });
+
+test("first attention follows authored frame order, not analyzer check order", async () => {
+  const { attentionSlot } = await import("./review-model.bundle.mjs");
+  const b = bundle();
+  b.frames = Array.from({ length: 8 }, (_, i) => ({
+    hold_ticks: 4,
+    frame_instance_id: `frame-${i}`,
+  }));
+  b.evaluation.results = [
+    { scope: "slot 5", outcome: "fail" },
+    { scope: "slot 2", outcome: "unmeasured" },
+    { scope: "slot 1", outcome: "pass" },
+    { scope: "clip", outcome: "error" },
+  ];
+  assert.equal(attentionSlot(b, []), 2);
+  b.evaluation.results.reverse();
+  assert.equal(attentionSlot(b, []), 2);
+  assert.equal(
+    attentionSlot(b, [
+      {
+        clip_revision_id: "baseline",
+        frame_range: [4, 7],
+        task_status: "open",
+      },
+    ]),
+    1,
+  );
+  assert.equal(
+    attentionSlot(b, [
+      {
+        clip_revision_id: "candidate",
+        frame_range: [0, 3],
+        task_status: "resolved",
+      },
+      {
+        clip_revision_id: "unrelated",
+        frame_range: [0, 3],
+        task_status: "open",
+      },
+    ]),
+    2,
+  );
+});
+test("attention respects nonuniform holds, instance-only issues, coverage gaps and clean clips", async () => {
+  const { attentionSlot } = await import("./review-model.bundle.mjs");
+  const b = bundle();
+  b.frames = [2, 7, 3, 5].map((hold_ticks, i) => ({
+    hold_ticks,
+    frame_instance_id: `frame-${i}`,
+  }));
+  assert.equal(attentionSlot(b, []), 0);
+  assert.equal(
+    attentionSlot(b, [
+      {
+        clip_revision_id: "candidate",
+        frame_range: [9, 11],
+        task_status: "awaiting_comparison",
+      },
+    ]),
+    2,
+  );
+  assert.equal(
+    attentionSlot(b, [
+      {
+        clip_revision_id: "candidate",
+        frame_instance_id: "frame-3",
+        task_status: "reopened",
+      },
+    ]),
+    3,
+  );
+  b.evaluation.coverage_status = "partial";
+  b.evaluation.results = [
+    { scope: "slot 3", outcome: "unmeasured" },
+    { scope: "slot 1", outcome: "not_applicable" },
+  ];
+  assert.equal(attentionSlot(b, []), 1);
+});
