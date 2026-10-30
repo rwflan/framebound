@@ -70,9 +70,14 @@ def _negotiate(spec):
     from ..evaluate import supported_families, validate_observations
     try:
         validate_observations(spec)
+        from .. import correspondence
+        correspondence.validate(spec)
     except ValueError as exc:
         raise InvalidInput(str(exc)) from exc
     families = supported_families(spec)
+    if spec.source_correspondence:
+        requested.append(('source-fidelity','source_fidelity',True))
+        families.add('source_fidelity')
     if spec.profile == 'fixed-subject-v1':
         requested += [(f'profile-{family}', family, True)
                       for family in ('feature', 'appearance', 'contact', 'continuity', 'moving')]
@@ -84,8 +89,8 @@ def _negotiate(spec):
         out.append(NegotiatedRequirement(
             id=rid, check=check, required=required,
             applicability='supported' if supported else 'unsupported',
-            method={'media': 'declared-regions-v2:media', 'timing': 'declared-regions-v2:timing'}.get(check, 'declared-regions-v2' if check in families else 'none'),
-            limitation=('Establishes structural validity only; animation quality is not verified.'
+            method={'media': 'declared-regions-v2:media', 'timing': 'declared-regions-v2:timing','source_fidelity':'source-correspondence-v1'}.get(check, 'declared-regions-v2' if check in families else 'none'),
+            limitation=(spec.source_correspondence.limitation if check=='source_fidelity' and spec.source_correspondence else 'Establishes structural validity only; animation quality is not verified.'
                         if check in {'media', 'timing'} else 'Only task-authored regions, colors and event bounds are measured; arbitrary anatomy and prose action correctness are not established.' if supported else 'No usable task-authored measurement is available for this requirement.'),
             ways_forward=[] if supported else ['Obtain independently reviewed annotations and a validated evaluator.',
                         'Create a new specification revision with a recorded scope change.']))
@@ -106,6 +111,30 @@ def create(project_dir: str, payload: dict) -> dict:
                 blob = S.blob_path(project_dir, asset['byte_sha256'])
                 if not blob.is_file() or S.sha256_bytes(blob.read_bytes()) != asset['byte_sha256']:
                     raise InvalidInput(f'input asset {binding.asset_id} is unavailable or corrupt')
+            if spec.source_correspondence:
+                source=spec.source_correspondence
+                for aid in source.frame_asset_ids:
+                    asset,_=S.get(con,'assets',aid)
+                    path=S.blob_path(project_dir,asset['byte_sha256'])
+                    if not path.is_file() or S.sha256_bytes(path.read_bytes())!=asset['byte_sha256']:
+                        raise InvalidInput(f'known-good source asset {aid} is unavailable or corrupt')
+                    if (asset['width'],asset['height'])!=(spec.canvas.width,spec.canvas.height):
+                        raise InvalidInput('known-good source must use the declared native canvas')
+                if source.source_revision_id:
+                    row=con.execute("SELECT name FROM sqlite_master WHERE name='agent_clip_revisions'").fetchone()
+                    stored=con.execute('SELECT data FROM agent_clip_revisions WHERE id=?',(source.source_revision_id,)).fetchone() if row else None
+                    if stored:
+                        revision=json.loads(stored['data'])
+                        prior=_get(con,revision['task_id']).spec
+                        aids=revision['frame_asset_ids'];timing=prior.timing;source_loop=prior.loop
+                    else:
+                        revision,_=S.get(con,'clip_revisions',source.source_revision_id)
+                        contract,_=S.get(con,'contract_revisions',revision['contract_revision_id'])
+                        from ...v2.domain import Timing
+                        timing=Timing.model_validate(contract['timing']);source_loop=contract['action']['loop']
+                        aids=[S.get(con,'frame_instances',fid)[0]['asset_id'] for fid in revision['frame_instance_ids']]
+                    if aids!=source.frame_asset_ids or timing!=source.timing or source_loop!=source.loop:
+                        raise InvalidInput('source designation differs from the actual stored source revision')
             if spec.supersedes:
                 parent = _get(con, spec.supersedes)
                 if (parent.spec.project_id, parent.spec.animation_id) != (spec.project_id, spec.animation_id):
@@ -162,7 +191,19 @@ def compile_inputs(project_dir: str, task_id: str) -> dict:
         raise InvalidInput(f'missing task input: {exc}') from exc
     finally:
         con.close()
-    return {'schema_version': '3.0', 'task_id': task_id,
+    source=record['spec'].get('source_correspondence')
+    source_assets=[]
+    if source:
+        con=S.connect(project_dir)
+        try:
+            for aid in source['frame_asset_ids']:
+                asset,_=S.get(con,'assets',aid);blob=S.blob_path(project_dir,asset['byte_sha256'])
+                if not blob.is_file() or S.sha256_bytes(blob.read_bytes())!=asset['byte_sha256']:
+                    raise InvalidInput(f'known-good source asset {aid} is unavailable or corrupt')
+                source_assets.append(dict(id=aid,byte_sha256=asset['byte_sha256'],pixel_sha256=asset.get('pixel_sha256'),
+                                          blob_path=str(blob.relative_to(Path(project_dir))),http_path=f'/api/asset/{aid}'))
+        finally:con.close()
+    return {'source_assets':source_assets,'schema_version': '3.0', 'task_id': task_id,
             'spec_sha256': record['spec_sha256'], 'assets': assets, 'intent': record['spec']['intent'],
             'spec': record['spec'], 'requirements': record['requirements'],
             'execution': 'external_agent', 'provider_execution_authorized': False,

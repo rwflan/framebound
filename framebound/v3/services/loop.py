@@ -129,7 +129,7 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
             from . import interventions as I
             if parent_revision_id and spec.repair_scope == 'declared_regions' and not any(m['authorize_edit_scope'] for m in I.open_in(con, run_id)):
                 raise InvalidInput('declared-region edit permissions need a saved intervention grant; full-clip permission cannot be inferred')
-            if spec.canvas.width * spec.canvas.height * len(frame_asset_ids) > run['limits'].get('max_evaluation_pixels', 16777216):
+            if spec.canvas.width * spec.canvas.height * (len(frame_asset_ids)+(len(spec.source_correspondence.frame_asset_ids) if spec.source_correspondence else 0)) > run['limits'].get('max_evaluation_pixels', 16777216):
                 raise InvalidInput('frozen evaluation pixel budget exceeded; negotiate a new task before allocating frames')
             images, manifest, fids = [], [], []
             for slot, aid in enumerate(frame_asset_ids):
@@ -157,6 +157,21 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                                             pixels_baked=True, verified_by='external-import'))
                 fids.append(fid)
             results, evidence, evidence_digest = E.evaluate(spec, images, manifest, holds)
+            if spec.source_correspondence:
+                from .. import correspondence as C
+                source_images=[];source_assets=[]
+                for aid in spec.source_correspondence.frame_asset_ids:
+                    asset,_=S.get(con,'assets',aid);blob=S.blob_path(project,asset['byte_sha256']);image=None
+                    if blob.is_file() and S.sha256_bytes(blob.read_bytes())==asset['byte_sha256']:
+                        try:image=load_native_image(blob)
+                        except (OSError,ValueError):pass
+                    source_images.append(image)
+                    source_assets.append(dict(id=aid,byte_sha256=asset['byte_sha256'],pixel_sha256=asset.get('pixel_sha256'),
+                                              blob_path=str(blob.relative_to(Path(project))),http_path=f'/api/asset/{aid}'))
+                source_results,source_evidence=C.evaluate(spec,images,source_images,source_assets)
+                results.extend(source_results)
+                source_evidence['implementation_sha256']=S.sha256_bytes(Path(C.__file__).read_bytes())
+                evidence['source_correspondence']=source_evidence
             preservation = I.preservation_in(con, project, run, images, spec)
             results.extend(preservation)
             for result in results:
@@ -164,7 +179,7 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
             required_by_check = {check: any(r.required for r in task.requirements if r.check == check)
                                  for check in {r.check for r in task.requirements}}
             for result in results:
-                result['required'] = (True if result['family'] in {'media', 'timing', 'edit_preservation'}
+                result['required'] = (True if result['family'] in {'media', 'timing', 'edit_preservation','source_fidelity'}
                                       else required_by_check.get(result['family'], True))
             for requirement in task.requirements:
                 if requirement.applicability != 'supported':
@@ -260,6 +275,9 @@ def _feedback(run, task, revision, evaluation, regressions):
             evidence_assets=[evaluation['evidence']['assets'][s] for s in result['slots']],
             desired_outcome=result['reason'], uncertainty=result['confidence'],
             suggested_operation='recover_media_or_evidence' if result['outcome'] in {'error', 'unmeasured'} else 'regenerate_within_task_scope'))
+        if result.get('source_asset'):
+            targets[-1]['evidence_assets'].append(result['source_asset'])
+            targets[-1]['source_correspondence']=dict(source_slot=result['source_slot'],preservation=result['preservation'])
     return dict(schema_version='3.0', bundle_version=1, id=f"feedback:{revision['id']}",
         project_id=task.spec.project_id, animation_id=task.spec.animation_id, run_id=run['id'], task_id=task.id,
         spec_sha256=task.spec_sha256, baseline_revision_id=revision['id'], evaluation_id=evaluation['id'],
