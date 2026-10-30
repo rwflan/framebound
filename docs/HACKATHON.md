@@ -38,3 +38,7 @@ Event: Meta Global AI Developer Hackathon (Meta × Cerebral Valley), virtual, 26
 ## Positioning line
 
 Framebound bounds AI animation work so models can verify themselves — and exports every bound, failure, and fix as training data, so they eventually don't need it.
+
+## Muse-generated animation test corpus
+
+The [Muse animation corpus plan](MUSE_ANIMATION_CORPUS_PLAN.md) specifies Muse-generated benchmark artwork, Muse Spark 1.3 Contributor through Muse Code as the preferred parent, separate image-generator provenance, a 48-style research matrix and a downloaded reference catalogue. It stages a small measured hackathon pilot before a larger reviewed corpus. The references and plan are research artifacts; proposed Muse generations, runtime provenance features and independent quality reviews are not yet implemented or observed.
