@@ -305,3 +305,70 @@ Pillow identities. Earlier v3 evaluations missing this identity remain historica
 evidence; exports retain them as research rather than retroactively strengthening
 their training eligibility. New evidence uses `declared-regions-v2`; stored task
 negotiation and earlier evidence are never rewritten.
+
+## Optional known-good enhancement and interpolation
+
+A task may bind `source_correspondence` to a source sequence. This is an explicit
+source designation with `designated_by`, `designation_basis` and `provenance`,
+not inferred human acceptance or automatic promotion of a previous revision.
+The source names its `frame_asset_ids`, original `timing` and `loop` behavior,
+optional actual `source_revision_id`, declared enhancement/interpolation `goal`,
+complete `time_map` and `protected_keys`. If a stored v2/v3 revision is named, its
+actual pixels, timing and loop behavior must match this declaration.
+
+```json
+{
+  "frame_asset_ids": ["source-0", "source-1", "source-2"],
+  "timing": {"ticks_per_second": 30, "holds": [4, 4, 4]},
+  "loop": true,
+  "designated_by": "parent-agent",
+  "designation_basis": "User designated this sequence as the enhancement source",
+  "provenance": "Imported source animation",
+  "goal": "enhancement_and_interpolation",
+  "time_map": [
+    {"source_tick": 0, "output_tick": 0},
+    {"source_tick": 12, "output_tick": 24}
+  ],
+  "protected_keys": [
+    {"source_tick": 0, "output_tick": 0, "preservation": "alpha_geometry"},
+    {"source_tick": 4, "output_tick": 8, "preservation": "alpha_geometry"},
+    {"source_tick": 8, "output_tick": 16, "preservation": "alpha_geometry"}
+  ]
+}
+```
+
+For output timing `{ "ticks_per_second": 60, "holds": [4,4,4,4,4,4] }`,
+this preserves a 0.4-second source while adding three drawings. Time points use
+exact rational arithmetic, not array index. Source/output maps must cover both
+complete durations, be strictly increasing and preserve real-time timing; this
+profile does not silently retime motion. Loop/terminal behavior must match. Every
+original source drawing start needs an explicit protected output key at an actual
+output drawing start, agreeing with the frozen time map. Changed timing or source
+keys require a new valid task specification; they cannot be edited mid-run.
+
+`exact_pixels` compares native canonical RGBA. `alpha_geometry` preserves the exact
+alpha channel while permitting palette/texture changes. Either rule may be scoped
+to a native ROI. Detail enhancement therefore does not blindly require palette or
+whole-image color similarity. Missing source evidence produces required-unmeasured
+fidelity, with re-import/recovery feedback. It cannot obtain automatic success.
+Generation-input compilation returns the resolvable source assets and their hashes.
+
+Compare known-good source is explicit in the workspace. Its film projects source
+hold intervals onto the candidate's authored timeline; protected-key and source
+motion-interval correspondence remain visible. Synchronized playback uses that
+same map, including unequal frame counts and tick rates. An inserted frame never
+claims exact same-frame source authority. Candidate-only viewing remains default.
+
+Snapshots retain source designation, pixels, protected keys, correspondence and
+source-record hashes. A named v3 source also brings its dependency trajectory into
+closure; source-only dependencies stay research unless separately selected for
+training. V2 source records retain their original schema identity without inventing
+guide approval. The `source-correspondence-v1` reader capability is advertised when
+needed. Older v3 snapshots without optional source records still validate. Moved
+validation independently checks key fidelity and authored correspondence against
+packaged source/candidate pixels.
+
+This establishes the declared preservation and timing checks. More inserted
+frames are not a fluidity score, and alpha/pixel anchors do not prove motion,
+contact or camera behavior outside the explicitly evaluated requirements. Required
+region/contact/event checks remain part of the full task matrix.
