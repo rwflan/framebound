@@ -5,7 +5,7 @@ import json
 from ...v2 import domain as D, storage as S
 from ...v2.media.canonical import load_native_image
 from ...v2.services.errors import InvalidInput
-from .. import evaluate as E
+from .. import evaluate as E, provenance as P
 from . import tasks
 
 TABLES = ('agent_runs', 'agent_clip_revisions', 'agent_evaluations', 'agent_feedback', 'agent_completions', 'agent_run_events', 'agent_interventions','agent_preferences')
@@ -94,6 +94,7 @@ def _score(evaluation):
 
 def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=None,
            feedback_id=None, presented_holds=None, generation_metadata=None):
+    attribution = P.parse(generation_metadata)
     if not isinstance(revision_id, str) or not 1 <= len(revision_id) <= 90:
         raise InvalidInput('revision ID must contain 1–90 characters')
     if presented_holds is not None:
@@ -126,6 +127,15 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 raise S.StaleRevisionError('submission parent differs from current revision; fetch current feedback and explicitly rebase')
             if (parent_revision_id or run.get('feedback_id')) and feedback_id != run.get('feedback_id', f'feedback:{parent_revision_id}'):
                 raise S.StaleRevisionError('child submission must bind current saved feedback')
+            ancestors = []
+            ancestor_id = parent_revision_id
+            while ancestor_id:
+                ancestor = get_in(con, 'agent_clip_revisions', ancestor_id)
+                ancestors.append(ancestor)
+                ancestor_id = ancestor['parent_revision_id']
+            if attribution and attribution.style_board != spec.style_board:
+                raise InvalidInput('generation style board differs from the frozen task')
+            P.validate_in(con, project, attribution, frame_asset_ids, list(reversed(ancestors)))
             if len(frame_asset_ids) != len(spec.timing.holds):
                 raise InvalidInput('frame count must equal the frozen authored hold count')
             from . import interventions as I
@@ -218,6 +228,14 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 parent = get_in(con, 'agent_clip_revisions', parent_revision_id)
                 revision['changed_slots'] = [i for i,b in enumerate(frame_asset_ids) if i>=len(parent['frame_asset_ids']) or parent['frame_asset_ids'][i]!=b]
                 revision['removed_slots']=list(range(len(frame_asset_ids),len(parent['frame_asset_ids'])))
+            if attribution:
+                prior_parent = P.parse(ancestors[0].get('generation_metadata')) if ancestors else None
+                if attribution.parent != (prior_parent.parent if prior_parent else None):
+                    insert(con, 'agent_run_events', dict(id=f'{run_id}:parent:{revision_id}', run_id=run_id,
+                        project_id=run['project_id'], animation_id=run['animation_id'], task_id=task.id,
+                        event='parent_changed', revision_id=revision_id, source='external_agent',
+                        parent=attribution.parent.model_dump(mode='json') if attribution.parent else None,
+                        created_at=D.utcnow(), ordinal=run['version']+1))
             insert(con, 'agent_clip_revisions', revision)
             insert(con, 'agent_evaluations', evaluation)
             fingerprint = E.digest([a['pixel_sha256'] or a['byte_sha256'] for a in manifest])
@@ -306,6 +324,7 @@ def _feedback(run, task, revision, evaluation, regressions):
         'blocked' if run['lifecycle'] in {'blocked','cancelled'} else 'awaiting_decision' if run['lifecycle'] == 'awaiting_decision' else 'awaiting_input' if run['lifecycle'] == 'awaiting_input' else 'continue',
         reason=run['stop_reason'], technical_status=evaluation['technical_status'], coverage=evaluation['coverage'],
         creative_status=run['creative_status'], best_revision_id=run['best_revision_id'], current_revision_id=revision['id'],
+        provenance=P.summary(revision.get('generation_metadata')),
         targets=targets, regressions=regressions, preserve=spec.preserve,
         allowed_changes=spec.allowed_changes, repair_scope=spec.repair_scope,
         timing=spec.timing.model_dump(), remaining_submissions=max(0,run['limits']['max_submissions']-len(run['submission_ids'])),
