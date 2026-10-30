@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "maxLength": 60,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "revision_id": {
+      "maxLength": 90,
+      "minLength": 1,
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "evaluation_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Evaluation Id",
+      "type": "string"
+    },
+    "action": {
+      "pattern": "^(approve|reject|needs_changes)$",
+      "title": "Action",
+      "type": "string"
+    },
+    "note": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Note",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "revision_id",
+    "evaluation_id",
+    "action"
+  ],
+  "title": "DecisionRequest",
+  "type": "object"
+}

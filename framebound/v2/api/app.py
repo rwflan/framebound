@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import Field
 
 from ...v3.domain import TaskSpec, TaskRecord
+from ...v3.services.interventions import MarkRequest, ResolveRequest, DecisionRequest
 from .. import domain as D
 from .. import storage as S
 from ..services.authz import Actor
@@ -25,6 +26,17 @@ from .dto import ChangesDto, DeskSessionDto
 from .dto import (AnimationStartBodyDto,AnimationRunDto,ProviderGrantDto,ProviderGrantViewDto,
                   ProviderGrantRevokeResultDto,ExpectedVersionBodyDto,ProviderReceiptBodyDto,
                   ProviderReconcileResultDto,ReferenceRevokeBodyDto,ReferenceRevokeResultDto,JobSubmitRequestDto)
+
+
+class AgentSatisfactionBody(D.Strict):
+    revision_id: str = Field(min_length=1, max_length=90)
+    evaluation_id: str = Field(min_length=1, max_length=128)
+    note: str = Field(default='', max_length=2000)
+
+
+class HandoffRebaseBody(D.Strict):
+    expected_revision_id: str = Field(min_length=1, max_length=90)
+    expected_feedback_id: str = Field(min_length=1, max_length=256)
 
 
 class AgentRunStartBody(D.Strict):
@@ -102,6 +114,72 @@ def create_app(project_dir: str) -> FastAPI:
     app = FastAPI(title="Framebound v2 review API", version="2.0.0a1")
     app.state.project_dir = project_dir
 
+
+    @app.post('/v3/runs/{run_id}/agent-satisfaction')
+    def agent_satisfaction(run_id: str, body: AgentSatisfactionBody, x_actor_id: str | None = Header(default=None)):
+        from ...v3.services import interventions as I
+        return I.agent_satisfied(project_dir, Actor(type='orchestrator',id=x_actor_id or 'http-parent-agent'),run_id, **body.model_dump())
+
+    @app.post('/v3/runs/{run_id}/interventions')
+    def agent_mark(run_id: str, body: MarkRequest, x_session_token: str | None = Header(default=None),
+                   x_actor_id: str | None = Header(default=None)):
+        from ...v3.services import interventions as I
+        result = I.mark(project_dir, actor(x_session_token, x_actor_id), run_id, body.model_dump(mode='json'))
+        publish({'type':'agent_intervention_saved','run_id':run_id,'intervention_id':result['id']})
+        return result
+
+    @app.get('/v3/interventions/{intervention_id}')
+    def agent_intervention_get(intervention_id: str):
+        from ...v3.services import interventions as I
+        return I.get(project_dir, intervention_id)
+
+    @app.post('/v3/interventions/{intervention_id}/resolve')
+    def agent_intervention_resolve(intervention_id: str, body: ResolveRequest,
+                                  x_session_token: str | None = Header(default=None),
+                                  x_actor_id: str | None = Header(default=None)):
+        from ...v3.services import interventions as I
+        result = I.resolve(project_dir, actor(x_session_token,x_actor_id), intervention_id, body.model_dump(mode='json'))
+        publish({'type':'agent_intervention_resolved','intervention_id':intervention_id})
+        return result
+
+    @app.post('/v3/interventions/{intervention_id}/reopen')
+    def agent_intervention_reopen(intervention_id: str, body: ResolveRequest,
+                                 x_session_token: str | None = Header(default=None),
+                                 x_actor_id: str | None = Header(default=None)):
+        from ...v3.services import interventions as I
+        result = I.resolve(project_dir, actor(x_session_token,x_actor_id), intervention_id, body.model_dump(mode='json'), reopen=True)
+        publish({'type':'agent_intervention_reopened','intervention_id':intervention_id})
+        return result
+
+    @app.post('/v3/runs/{run_id}/decisions')
+    def agent_decision(run_id: str, body: DecisionRequest, x_session_token: str | None = Header(default=None),
+                       x_actor_id: str | None = Header(default=None)):
+        from ...v3.services import interventions as I
+        result = I.decision(project_dir, actor(x_session_token,x_actor_id), run_id, body.model_dump(mode='json'))
+        publish({'type':'agent_decision_saved','run_id':run_id})
+        return result
+
+    @app.get('/v3/feedback/{feedback_id}')
+    def agent_handoff(feedback_id: str):
+        from ...v3.services import interventions as I
+        return I.handoff(project_dir, feedback_id)
+
+    @app.get('/v3/feedback/{feedback_id}/text')
+    def agent_handoff_download(feedback_id: str):
+        from ...v3.services import interventions as I
+        result = I.handoff(project_dir, feedback_id)
+        return Response(result['text'], media_type='text/plain', headers={
+            'Content-Disposition':'attachment; filename="framebound-instructions.txt"',
+            'X-Framebound-Handoff-Stale':str(result['stale']).lower()})
+
+    @app.post('/v3/feedback/{feedback_id}/rebase')
+    def agent_handoff_rebase(feedback_id: str, body: HandoffRebaseBody,
+                            x_session_token: str | None = Header(default=None),
+                            x_actor_id: str | None = Header(default=None)):
+        from ...v3.services import interventions as I
+        result = I.rebase(project_dir, actor(x_session_token,x_actor_id), feedback_id, **body.model_dump())
+        publish({'type':'agent_handoff_rebased','run_id':result['run_id']})
+        return result
 
     @app.get('/v3/revisions/{revision_id}')
     def agent_revision_get(revision_id: str):

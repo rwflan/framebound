@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "expected_version": {
+      "minimum": 1,
+      "title": "Expected Version",
+      "type": "integer"
+    },
+    "revision_id": {
+      "maxLength": 90,
+      "minLength": 1,
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "evaluation_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Evaluation Id",
+      "type": "string"
+    },
+    "note": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Note",
+      "type": "string"
+    }
+  },
+  "required": [
+    "expected_version",
+    "revision_id",
+    "evaluation_id"
+  ],
+  "title": "ResolveRequest",
+  "type": "object"
+}

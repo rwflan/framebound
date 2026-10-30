@@ -8,6 +8,23 @@ from mcp.server.mcpserver import MCPServer
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
+    @server.tool(name='agent_satisfaction_record', description='Record parent-agent creative satisfaction on an exact revision; never human approval or resolution')
+    def agent_satisfaction_record(run_id: str, revision_id: str, evaluation_id: str, note: str = '') -> dict:
+        from ...v3.services import interventions
+        from ..services.authz import Actor
+        return interventions.agent_satisfied(project_dir, Actor(type='orchestrator',id='mcp-parent-agent'),run_id,
+                                            revision_id=revision_id,evaluation_id=evaluation_id,note=note)
+
+    @server.tool(name='agent_handoff_get', description='Read saved feedback as text/JSON and verify whether its revision binding is stale')
+    def agent_handoff_get(feedback_id: str) -> dict:
+        from ...v3.services import interventions
+        return interventions.handoff(project_dir, feedback_id)
+
+    @server.tool(name='agent_intervention_get', description='Read an exact saved human correction and its owner-controlled status')
+    def agent_intervention_get(intervention_id: str) -> dict:
+        from ...v3.services import interventions
+        return interventions.get(project_dir, intervention_id)
+
     @server.tool(name='agent_revision_get', description='Fetch an exact immutable revision, evaluation manifest and saved feedback')
     def agent_revision_get(revision_id: str) -> dict:
         from ...v3.services import loop
