@@ -86,3 +86,4 @@ Live specialist work additionally requires genuinely approved references, an ope
 
 ## Licence
 
+Code: MIT. Procedural demo art is original. Downloaded research references retain their recorded source licences and credits; they are not demo art or Muse-generated benchmark outputs. Publisher screenshots are research references, not an automatic generation or training grant.
