@@ -83,6 +83,10 @@ def main(argv=None):
         ('provider-grant-revoke','Revoke provider authority',[('--project',True),('--grant-id',True),('--expected-version',True),('--operator-secret',False)]),
         ('provider-reconcile','Attach an operator receipt to an unknown send',[('--project',True),('--job-id',True),('--receipt',True),('--operator-secret',False)]),
         ('provider-grant', 'Authorize a bounded provider grant (operator only)', [('--project',True),('--grant',True),('--operator-secret',False)]),
+        ('task-create', 'Register an immutable v3 agent task', [('--project', True), ('--spec', True)]),
+        ('task-get', 'Read a frozen v3 agent task', [('--project', True), ('--task-id', True)]),
+        ('task-compile-inputs', 'Compile external generation inputs', [('--project', True), ('--task-id', True)]),
+        ('task-migration-report', 'Read-only v3 migration report', [('--project', True)]),
         ("project-create", "Create or resume a project", [("--project", True), ("--project-id", True), ("--name", False)]),
         ("character-propose", "Propose an immutable character", [("--project", True), ("--character", True)]),
         ("asset-import", "v2: import an image asset", [("--src", True), ("--asset-id", True), ("--project", True)]),
@@ -236,7 +240,7 @@ def main(argv=None):
         _s = _bs(args.project)
         _aio.run(_s.run_stdio_async())
         return 0
-    if args.cmd in ("provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
+    if args.cmd in ("task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
                     "orchestrator-send", "capabilities", "correction-claim", "correction-submit",

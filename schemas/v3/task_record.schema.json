@@ -1,0 +1,500 @@
+{
+  "$defs": {
+    "Canvas": {
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 2048,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 2048,
+          "title": "Height",
+          "type": "integer"
+        },
+        "units": {
+          "const": "native_px",
+          "default": "native_px",
+          "title": "Units",
+          "type": "string"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "Canvas",
+      "type": "object"
+    },
+    "CompletionPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "default": "technical-unreviewed-v1",
+          "enum": [
+            "technical-unreviewed-v1",
+            "human-reviewed-v1"
+          ],
+          "title": "Id",
+          "type": "string"
+        },
+        "creative_owner": {
+          "default": "agent",
+          "enum": [
+            "agent",
+            "human"
+          ],
+          "title": "Creative Owner",
+          "type": "string"
+        }
+      },
+      "title": "CompletionPolicy",
+      "type": "object"
+    },
+    "InputBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "identity",
+            "style",
+            "keyframe",
+            "mask",
+            "known_good_animation",
+            "design_proposal"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "provenance": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Provenance",
+          "type": "string"
+        },
+        "designated_by": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Designated By",
+          "type": "string"
+        },
+        "basis": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Basis",
+          "type": "string"
+        },
+        "tick_range": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tick Range"
+        }
+      },
+      "required": [
+        "asset_id",
+        "role",
+        "provenance",
+        "designated_by",
+        "basis"
+      ],
+      "title": "InputBinding",
+      "type": "object"
+    },
+    "Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_submissions": {
+          "default": 8,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Submissions",
+          "type": "integer"
+        },
+        "max_unchanged": {
+          "default": 2,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Unchanged",
+          "type": "integer"
+        },
+        "provider_execution": {
+          "const": "external_only",
+          "default": "external_only",
+          "title": "Provider Execution",
+          "type": "string"
+        }
+      },
+      "title": "Limits",
+      "type": "object"
+    },
+    "NegotiatedRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "check": {
+          "title": "Check",
+          "type": "string"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "applicability": {
+          "enum": [
+            "supported",
+            "missing_evidence",
+            "unsupported"
+          ],
+          "title": "Applicability",
+          "type": "string"
+        },
+        "method": {
+          "title": "Method",
+          "type": "string"
+        },
+        "limitation": {
+          "title": "Limitation",
+          "type": "string"
+        },
+        "ways_forward": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ways Forward",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "check",
+        "required",
+        "applicability",
+        "method",
+        "limitation"
+      ],
+      "title": "NegotiatedRequirement",
+      "type": "object"
+    },
+    "Requirement": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "check": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Check",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "desired_outcome": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Desired Outcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "check",
+        "desired_outcome"
+      ],
+      "title": "Requirement",
+      "type": "object"
+    },
+    "TaskSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "3.0",
+          "default": "3.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "project_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Project Id",
+          "type": "string"
+        },
+        "animation_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Animation Id",
+          "type": "string"
+        },
+        "intent": {
+          "maxLength": 8000,
+          "minLength": 1,
+          "title": "Intent",
+          "type": "string"
+        },
+        "subjects": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Subjects",
+          "type": "string"
+        },
+        "appearance": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Appearance",
+          "type": "string"
+        },
+        "scene_camera": {
+          "default": "fixed canvas, controlled view",
+          "maxLength": 2000,
+          "title": "Scene Camera",
+          "type": "string"
+        },
+        "interactions": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Interactions",
+          "type": "string"
+        },
+        "canvas": {
+          "$ref": "#/$defs/Canvas"
+        },
+        "timing": {
+          "$ref": "#/$defs/Timing"
+        },
+        "loop": {
+          "default": true,
+          "title": "Loop",
+          "type": "boolean"
+        },
+        "delivery": {
+          "default": "ordered native PNG frames with authored holds",
+          "maxLength": 2000,
+          "title": "Delivery",
+          "type": "string"
+        },
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/InputBinding"
+          },
+          "maxItems": 512,
+          "title": "Inputs",
+          "type": "array"
+        },
+        "preserve": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 128,
+          "title": "Preserve",
+          "type": "array"
+        },
+        "allowed_changes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 128,
+          "title": "Allowed Changes",
+          "type": "array"
+        },
+        "repair_scope": {
+          "default": "full_clip",
+          "enum": [
+            "full_clip",
+            "declared_regions"
+          ],
+          "title": "Repair Scope",
+          "type": "string"
+        },
+        "profile": {
+          "default": "structural-v1",
+          "enum": [
+            "structural-v1",
+            "fixed-subject-v1"
+          ],
+          "title": "Profile",
+          "type": "string"
+        },
+        "requirements": {
+          "items": {
+            "$ref": "#/$defs/Requirement"
+          },
+          "maxItems": 128,
+          "title": "Requirements",
+          "type": "array"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "completion": {
+          "$ref": "#/$defs/CompletionPolicy"
+        },
+        "intervention": {
+          "default": "blockers_only",
+          "enum": [
+            "blockers_only",
+            "explicit_review"
+          ],
+          "title": "Intervention",
+          "type": "string"
+        },
+        "supersedes": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Supersedes"
+        },
+        "change_reason": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Change Reason"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "project_id",
+        "animation_id",
+        "intent",
+        "subjects",
+        "canvas",
+        "timing"
+      ],
+      "title": "TaskSpec",
+      "type": "object"
+    },
+    "Timing": {
+      "additionalProperties": false,
+      "properties": {
+        "ticks_per_second": {
+          "default": 60,
+          "exclusiveMinimum": 0,
+          "maximum": 240,
+          "title": "Ticks Per Second",
+          "type": "integer"
+        },
+        "holds": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 512,
+          "minItems": 1,
+          "title": "Holds",
+          "type": "array"
+        }
+      },
+      "required": [
+        "holds"
+      ],
+      "title": "Timing",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "3.0",
+      "default": "3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "spec": {
+      "$ref": "#/$defs/TaskSpec"
+    },
+    "requirements": {
+      "items": {
+        "$ref": "#/$defs/NegotiatedRequirement"
+      },
+      "title": "Requirements",
+      "type": "array"
+    },
+    "spec_sha256": {
+      "title": "Spec Sha256",
+      "type": "string"
+    },
+    "evaluator_version": {
+      "const": "task-negotiator-v1",
+      "default": "task-negotiator-v1",
+      "title": "Evaluator Version",
+      "type": "string"
+    },
+    "animation_quality_verified": {
+      "const": false,
+      "default": false,
+      "title": "Animation Quality Verified",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "spec",
+    "requirements",
+    "spec_sha256"
+  ],
+  "title": "TaskRecord",
+  "type": "object"
+}

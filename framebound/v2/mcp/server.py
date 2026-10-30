@@ -8,6 +8,21 @@ from mcp.server.mcpserver import MCPServer
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
+    @server.tool(name='task_create', description='Register an immutable v3 task without a motion guide or reviewer approval')
+    def task_create(spec: dict) -> dict:
+        from ...v3.services import tasks
+        return tasks.create(project_dir, spec)
+
+    @server.tool(name='task_get', description='Fetch a frozen task and negotiated capability gaps')
+    def task_get(task_id: str) -> dict:
+        from ...v3.services import tasks
+        return tasks.get(project_dir, task_id)
+
+    @server.tool(name='task_compile_inputs', description='Compile intent and optional inputs for external generation; does not authorize provider spending')
+    def task_compile_inputs(task_id: str) -> dict:
+        from ...v3.services import tasks
+        return tasks.compile_inputs(project_dir, task_id)
+
     @server.tool(name='animation_compile', description='Compile frozen human-approved controls and bounded repair policy')
     def animation_compile(contract_id: str) -> dict:
         from ..services.auto_repair import compile_plan
