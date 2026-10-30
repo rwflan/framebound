@@ -59,7 +59,7 @@ def test_dry_run_and_backup(tmp_path):
 def test_quality_requirements_remain_explicitly_unsupported(tmp_path):
     create_project(str(tmp_path), {'id': 'p'})
     record = tasks.create(str(tmp_path), spec(profile='fixed-subject-v1'))
-    assert len([r for r in record['requirements'] if r['required'] and r['applicability'] == 'unsupported']) == 3
+    assert len([r for r in record['requirements'] if r['required'] and r['applicability'] == 'unsupported']) == 6
     assert tasks.compile_inputs(str(tmp_path), 'task')['capability_gaps']
 
 
@@ -111,3 +111,19 @@ def test_cli_and_mcp_use_shared_task_service(tmp_path):
     server = build_server(str(tmp_path))
     tools = asyncio.run(server.list_tools())
     assert {'task_create', 'task_get', 'task_compile_inputs'} <= {t.name for t in tools}
+
+
+def test_older_v3_record_keeps_its_original_fields_and_digest(tmp_path):
+    from framebound.v3.evaluate import digest
+    create_project(str(tmp_path), {'id':'p'})
+    original=tasks.create(str(tmp_path),spec())
+    # Represent the v1 negotiator's pre-extension serialized task shape.
+    original['spec'].pop('region_observations'); original['spec'].pop('temporal_observations')
+    original['spec']['limits'].pop('max_evaluation_pixels')
+    original['spec_sha256']=digest(original['spec'])
+    original['evaluator_version']='task-negotiator-v1'
+    con=tasks._connect(str(tmp_path))
+    con.execute('UPDATE agent_task_specs SET data=? WHERE id=?',(json.dumps(original),'task'));con.commit();con.close()
+    loaded=tasks.get(str(tmp_path),'task')
+    assert loaded==original
+    assert digest(loaded['spec'])==loaded['spec_sha256']
