@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "Roi": {
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "minimum": 0,
+          "title": "Left",
+          "type": "integer"
+        },
+        "top": {
+          "minimum": 0,
+          "title": "Top",
+          "type": "integer"
+        },
+        "right": {
+          "minimum": 0,
+          "title": "Right",
+          "type": "integer"
+        },
+        "bottom": {
+          "minimum": 0,
+          "title": "Bottom",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "left",
+        "top",
+        "right",
+        "bottom"
+      ],
+      "title": "Roi",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "maxLength": 60,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "revision_id": {
+      "maxLength": 90,
+      "minLength": 1,
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "evaluation_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Evaluation Id",
+      "type": "string"
+    },
+    "desired_outcome": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Desired Outcome",
+      "type": "string"
+    },
+    "tick_range": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "Tick Range",
+      "type": "array"
+    },
+    "roi": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Roi"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "authorize_edit_scope": {
+      "default": false,
+      "title": "Authorize Edit Scope",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "revision_id",
+    "evaluation_id",
+    "desired_outcome",
+    "tick_range"
+  ],
+  "title": "MarkRequest",
+  "type": "object"
+}

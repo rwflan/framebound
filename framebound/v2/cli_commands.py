@@ -6,6 +6,31 @@ import json
 
 def dispatch(args) -> dict:
     cmd = args.cmd
+    if cmd == 'agent-satisfaction-record':
+        from pathlib import Path
+        from ..v3.services import interventions as I
+        from .services.authz import Actor
+        return I.agent_satisfied(args.project,Actor(type='orchestrator',id='cli-parent-agent'),args.run_id,**json.loads(Path(args.action).read_text()))
+    if cmd in {'agent-handoff-get','agent-intervention-get','agent-intervention-mark','agent-intervention-resolve','agent-intervention-reopen','agent-decision'}:
+        import os
+        from pathlib import Path
+        from ..v3.services import interventions as I
+        from .services import sessions
+        from .services.authz import Actor
+        from .services.errors import AuthorizationError
+        if cmd == 'agent-handoff-get':
+            return I.handoff(args.project,args.feedback_id)
+        if cmd == 'agent-intervention-get':
+            return I.get(args.project,args.intervention_id)
+        token=args.session_token or os.environ.get('FRAMEBOUND_REVIEWER_TOKEN','')
+        reviewer=sessions.resolve_session(args.project,token)
+        if reviewer is None:
+            raise AuthorizationError('reviewer session required; provide --session-token or FRAMEBOUND_REVIEWER_TOKEN')
+        actor=Actor(type='reviewer',id=reviewer)
+        payload=json.loads(Path(args.action).read_text())
+        if cmd == 'agent-intervention-mark':return I.mark(args.project,actor,args.run_id,payload)
+        if cmd == 'agent-decision':return I.decision(args.project,actor,args.run_id,payload)
+        return I.resolve(args.project,actor,args.intervention_id,payload,reopen=cmd=='agent-intervention-reopen')
     if cmd == 'agent-revision-get':
         from ..v3.services import loop
         return loop.revision_get(args.project, args.revision_id)
