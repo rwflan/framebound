@@ -98,6 +98,11 @@ try {
       nodes.map((node) => node.getBoundingClientRect().toJSON()),
     );
   assert.equal(tabs.length, 3);
+  const viewportLeft = (await page.locator(".reel-camera").boundingBox()).x;
+  assert(
+    tabs.every((tab) => Math.abs(tab.left - viewportLeft) < 1),
+    "Row tabs attach flush to the left container edge",
+  );
   const laneTops = await page
     .locator(".reel-lane .frame-aperture")
     .evaluateAll((nodes) => [
