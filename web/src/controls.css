@@ -1,113 +1,3 @@
-/* Shared surface, spacing and state rules for the review app's controls. */
-.desk-shell {
-  --control-size: 44px;
-  --surface-raised: #19253a;
-  --surface-tonal: #293c58;
-  --control-outline: #9cb4d330;
-  --control-focus: #c7ddff;
-}
-.streamlined-header {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  height: 72px;
-  min-height: 72px;
-  gap: 24px;
-  padding: 0 24px;
-}
-.streamlined-header .brand {
-  grid-column: 1;
-  grid-row: 1;
-}
-.streamlined-header .review-navigation {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: center;
-  height: auto;
-  gap: 8px;
-}
-.streamlined-header .review-navigation button {
-  min-height: 40px;
-  border-radius: 24px;
-  padding: 10px 16px;
-  gap: 8px;
-  font-size: 13px;
-  color: #a8bad5;
-  transition:
-    background 0.16s,
-    color 0.16s;
-}
-.streamlined-header .review-navigation button:hover {
-  background: #8caed51a;
-  color: #e8f1ff;
-}
-.streamlined-header .review-navigation button[aria-current="page"] {
-  background: #354a686e;
-  color: #edf5ff;
-}
-.streamlined-header .review-navigation button[aria-current="page"]:after {
-  display: none;
-}
-.streamlined-header .review-navigation button > span {
-  border: 0;
-  border-radius: 6px;
-  background: #8facc21a;
-  color: #b9cce7;
-  min-width: 20px;
-  line-height: 20px;
-}
-.streamlined-header > .workspace-switcher {
-  grid-column: 3;
-  grid-row: 1;
-}
-.streamlined-header .workspace-switcher summary {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  padding: 0;
-  transition: background 0.16s;
-}
-.streamlined-header .workspace-switcher summary:hover {
-  background: #8caed51a;
-}
-.workspace-switcher nav {
-  border-radius: 16px;
-  background: #1c2a40f5;
-  box-shadow: 0 12px 36px #0006;
-}
-.sequence-context {
-  gap: 16px;
-  padding: 0 24px 12px;
-  min-height: 56px;
-}
-.sequence-context .sequence-picker,
-.sequence-context > select:not(.sequence-picker) {
-  min-height: 40px;
-  border-radius: 12px;
-  border: 1px solid var(--control-outline);
-  background-color: #26375044;
-  padding: 8px 28px 8px 12px;
-}
-.sequence-context .sequence-picker {
-  font-size: 15px;
-  font-weight: 500;
-}
-.sequence-context > select:not(.sequence-picker) {
-  font-size: 12px;
-  max-width: 170px;
-}
-.sequence-status {
-  gap: 16px;
-}
-.timeline-tools {
-  padding-inline: 24px;
-  min-height: 56px;
-}
-.timeline-tools select {
-  min-height: 40px;
-  border-radius: 12px;
-  padding: 8px 12px;
-}
 /* Each control group occupies a named area; rows never depend on flex wrapping. */
 .review-controls {
   display: grid;
@@ -117,14 +7,12 @@
   gap: 8px 16px;
   flex: 0 0 auto;
   min-width: 0;
-  margin: 12px 24px 20px;
+  margin: 12px 24px 24px;
   padding: 12px 16px 16px;
-  border: 1px solid #a1b5d125;
-  border-radius: 20px;
-  background: linear-gradient(160deg, #24334a88, #172236f2);
-  box-shadow:
-    0 8px 28px #0004,
-    inset 0 1px 0 #d9e6ff08;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
   position: relative;
   z-index: 8;
 }
@@ -139,7 +27,7 @@
   display: block;
   font-size: 12px;
   line-height: 1.3;
-  color: #c7d8ef;
+  color: var(--ink);
   text-align: center;
   white-space: nowrap;
 }
@@ -154,14 +42,14 @@
 .control-caption strong {
   font-size: 12px;
   font-weight: 500;
-  color: #d5e3f8;
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .control-caption > span {
   font-size: 11px;
-  color: #9cb1d0;
+  color: var(--muted);
   white-space: nowrap;
 }
 .review-controls button {
@@ -175,7 +63,7 @@
   margin: 0;
   border: 1px solid var(--control-outline);
   border-radius: 24px;
-  color: #c0d1eb;
+  color: var(--primary);
   background: transparent;
   box-shadow: none;
   font-size: 12px;
@@ -189,12 +77,12 @@
     color 0.16s;
 }
 .review-controls button:hover {
-  background: #9cb9e019;
-  border-color: #9cb9e05c;
-  color: #f2f7ff;
+  background: var(--surface-container);
+  border-color: var(--outline);
+  color: var(--ink);
 }
 .review-controls button:active {
-  background: #9cb9e02b;
+  background: var(--primary-container);
 }
 .review-controls button:focus-visible {
   outline: 2px solid var(--control-focus);
@@ -224,7 +112,7 @@
   padding: 0;
   border: 1px solid var(--control-outline);
   border-radius: 24px;
-  background: #0b152640;
+  background: var(--surface-low);
   overflow: hidden;
 }
 .review-controls .control-zoom button {
@@ -243,7 +131,7 @@
 }
 .review-controls .control-zoom button:focus-visible {
   outline-offset: -4px;
-  border-radius: 20px;
+  border-radius: 24px;
 }
 .control-position {
   grid-area: position;
@@ -268,12 +156,12 @@
 .control-position input::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 4px;
-  background: #60799d70;
+  background: #bdcdb6;
 }
 .control-position input::-moz-range-track {
   height: 4px;
   border-radius: 4px;
-  background: #60799d70;
+  background: #bdcdb6;
 }
 .control-position input::-webkit-slider-thumb {
   appearance: none;
@@ -283,16 +171,16 @@
   margin-top: -5px;
   border: 0;
   border-radius: 50%;
-  background: #c1d7f6;
-  box-shadow: 0 0 0 4px #a8c5f017;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px #315c3f15;
 }
 .control-position input::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border: 0;
   border-radius: 50%;
-  background: #c1d7f6;
-  box-shadow: 0 0 0 4px #a8c5f017;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px #315c3f15;
 }
 .control-position input:disabled {
   opacity: 0.3;
@@ -306,35 +194,23 @@
   min-width: 0;
 }
 .review-controls .control-actions > .reel-icon {
-  background: #8baee821;
-  border-color: #9cb9e039;
-  color: #d4e5ff;
+  background: var(--primary-container);
+  border-color: var(--primary-container);
+  color: var(--on-primary-container);
 }
 .review-controls .control-actions > .reel-primary {
-  background: #e0ebfc;
-  border-color: #e0ebfc;
-  color: #19273d;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
   padding-inline: 20px;
 }
 .review-controls .control-actions > .reel-primary:hover {
-  background: #f4f8ff;
-  border-color: #f4f8ff;
-  color: #101b2b;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  color: var(--on-primary);
 }
 .review-controls .correction-action span {
   display: inline;
-}
-.inspector {
-  border-radius: 20px;
-}
-.inspector button:not(.check-row):not(.frame-measure) {
-  min-height: 36px;
-  border-radius: 18px;
-}
-.inspector input:not([type="range"]),
-.inspector select,
-.inspector textarea {
-  border-radius: 10px;
 }
 @media (max-width: 1100px) {
   .review-controls {
@@ -347,45 +223,6 @@
   }
 }
 @media (max-width: 620px) {
-  .streamlined-header {
-    height: auto;
-    min-height: 108px;
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding: 10px 16px 4px;
-    gap: 4px 16px;
-  }
-  .streamlined-header .brand {
-    grid-column: 1;
-  }
-  .streamlined-header > .workspace-switcher {
-    grid-column: 2;
-  }
-  .streamlined-header .review-navigation {
-    grid-column: 1/-1;
-    grid-row: 2;
-    justify-self: start;
-    gap: 4px;
-  }
-  .streamlined-header .review-navigation button {
-    padding-inline: 14px;
-  }
-  .sequence-context {
-    padding: 0 16px 8px;
-    min-height: 52px;
-    gap: 8px;
-  }
-  .sequence-context .sequence-picker {
-    max-width: 135px;
-    font-size: 14px;
-  }
-  .sequence-context > select:not(.sequence-picker) {
-    max-width: 142px;
-    font-size: 11px;
-    padding-inline: 10px 22px;
-  }
-  .timeline-tools {
-    padding-inline: 16px;
-  }
   .review-controls {
     grid-template-columns: 144px minmax(0, 1fr);
     grid-template-areas: "caption position" "transport zoom" "actions actions";
