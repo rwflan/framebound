@@ -69,12 +69,10 @@ export class ReelCamera {
     this.trackWidth = this.track.offsetWidth;
     this.trackHeight = this.track.offsetHeight;
     this.lanes = [...this.track.querySelectorAll(".reel-lane")].map((row) => ({
-      top: row.offsetTop,
+      top:
+        row.offsetTop + (row.querySelector(".reel-shot-row")?.offsetTop || 0),
       height:
-        row.offsetHeight -
-        (row.querySelector(".frame-evidence")
-          ? row.querySelector(".frame-evidence").offsetHeight + 14
-          : 0),
+        row.querySelector(".frame-aperture")?.offsetHeight || row.offsetHeight,
     }));
     this.labels = [...this.viewport.querySelectorAll(".reel-lane-label")];
     this.bounds();
