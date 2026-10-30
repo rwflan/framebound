@@ -7,8 +7,12 @@ Status: proposed implementation plan, 2026-10-30. This document records the targ
 The task-registration foundation is implemented in the additive v3 service; see
 [Agent task registration](AGENT_TASKS.md) for the public CLI/MCP/HTTP operations,
 backup behaviour and exact capability boundary. This establishes immutable
-reference-free intent and generation-input compilation. It does not implement or
-claim completion of the reference-free quality loop or phases 2–7 below.
+reference-free intent and generation-input compilation. The [external-agent loop](AGENT_LOOP.md) now provides declared-region evaluation,
+localized fail/repair/pass feedback, immutable submissions, persistent stopping
+limits and separate automatic output eligibility. Its controlled procedural
+benchmark does not claim arbitrary generated-art quality. Interventions, live UI,
+training closure, optional source correspondence and broader profiles remain
+active implementation work.
 
 ## Goal
 

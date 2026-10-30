@@ -27,6 +27,24 @@ from .dto import (AnimationStartBodyDto,AnimationRunDto,ProviderGrantDto,Provide
                   ProviderReconcileResultDto,ReferenceRevokeBodyDto,ReferenceRevokeResultDto,JobSubmitRequestDto)
 
 
+class AgentRunStartBody(D.Strict):
+    task_id: str = Field(min_length=1, max_length=128)
+    run_id: str = Field(min_length=1, max_length=128)
+
+
+class AgentCancelBody(D.Strict):
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class AgentSubmissionBody(D.Strict):
+    revision_id: str = Field(min_length=1, max_length=90)
+    frame_asset_ids: list[str] = Field(min_length=1, max_length=512)
+    parent_revision_id: str | None = None
+    feedback_id: str | None = None
+    presented_holds: list[D.StrictInt] | None = None
+    generation_metadata: dict | None = None
+
+
 class IssueBody(D.Strict):
     id: str | None = Field(default=None, min_length=1, max_length=128)
     clip_revision_id: str = Field(min_length=1, max_length=128)
@@ -84,6 +102,36 @@ def create_app(project_dir: str) -> FastAPI:
     app = FastAPI(title="Framebound v2 review API", version="2.0.0a1")
     app.state.project_dir = project_dir
 
+
+    @app.get('/v3/revisions/{revision_id}')
+    def agent_revision_get(revision_id: str):
+        from ...v3.services import loop
+        return loop.revision_get(project_dir, revision_id)
+
+    @app.post('/v3/runs')
+    def agent_run_start(body: AgentRunStartBody):
+        from ...v3.services import loop
+        return loop.start(project_dir, body.task_id, body.run_id)
+
+    @app.get('/v3/runs/{run_id}')
+    def agent_run_get(run_id: str):
+        from ...v3.services import loop
+        return loop.get(project_dir, run_id)
+
+    @app.get('/v3/runs/{run_id}/eligibility')
+    def agent_run_eligibility(run_id: str):
+        from ...v3.services import loop
+        return loop.eligibility(project_dir, run_id)
+
+    @app.post('/v3/runs/{run_id}/cancel')
+    def agent_run_cancel(run_id: str, body: AgentCancelBody):
+        from ...v3.services import loop
+        return loop.cancel(project_dir, run_id, body.reason)
+
+    @app.post('/v3/runs/{run_id}/submissions')
+    def agent_run_submit(run_id: str, body: AgentSubmissionBody):
+        from ...v3.services import loop
+        return loop.submit(project_dir, run_id, **body.model_dump())
 
     @app.post('/v3/tasks', response_model=TaskRecord)
     def task_create(spec: TaskSpec):

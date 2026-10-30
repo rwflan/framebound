@@ -27,6 +27,24 @@ def migration_report(project_dir: str) -> dict:
         con.close()
 
 
+def backup_database(project_dir, name):
+    """Caller holds the schema writer lock; copy committed WAL state atomically."""
+    backup = Path(project_dir) / 'backups' / name
+    if backup.exists():
+        return
+    reader = sqlite3.connect(str(Path(project_dir) / 'framebound.sqlite3'))
+    temporary = backup.with_name(f'.agent-v3-{uuid.uuid4().hex}.sqlite3')
+    target = sqlite3.connect(str(temporary))
+    try:
+        reader.backup(target)
+        target.close()
+        temporary.replace(backup)
+    finally:
+        target.close()
+        reader.close()
+        temporary.unlink(missing_ok=True)
+
+
 def _connect(project_dir):
     # Back up the entire pre-v3 database, including WAL, before adding v3 tables.
     con = S.connect(project_dir)
@@ -36,17 +54,7 @@ def _connect(project_dir):
         if not exists:
             backup = Path(project_dir) / 'backups' / 'before-agent-v3.sqlite3'
             if not backup.exists():
-                reader = sqlite3.connect(str(Path(project_dir) / 'framebound.sqlite3'))
-                temporary = backup.with_name(f'.agent-v3-{uuid.uuid4().hex}.sqlite3')
-                target = sqlite3.connect(str(temporary))
-                try:
-                    reader.backup(target)
-                    target.close()
-                    temporary.replace(backup)
-                finally:
-                    target.close()
-                    reader.close()
-                    temporary.unlink(missing_ok=True)
+                backup_database(project_dir, backup.name)
             con.execute(f'CREATE TABLE {TABLE}(id TEXT PRIMARY KEY, data TEXT NOT NULL)')
         con.commit()
         return con
@@ -56,22 +64,29 @@ def _connect(project_dir):
 
 
 def _negotiate(spec):
-    # Structural checks are the only currently established reference-free capability.
+    # Negotiate only methods with actual declared inputs; persist gaps unchanged.
     requested = [('media', 'media', True), ('timing', 'timing', True)]
     requested += [(r.id, r.check, r.required) for r in spec.requirements]
+    from ..evaluate import supported_families, validate_observations
+    try:
+        validate_observations(spec)
+    except ValueError as exc:
+        raise InvalidInput(str(exc)) from exc
+    families = supported_families(spec)
     if spec.profile == 'fixed-subject-v1':
-        requested += [('profile-feature', 'feature_continuity', True),
-                      ('profile-action', 'action_correctness', True),
-                      ('profile-temporal', 'temporal_consistency', True)]
+        requested += [(f'profile-{family}', family, True)
+                      for family in ('feature', 'appearance', 'contact', 'continuity', 'moving')]
+        if spec.loop:
+            requested.append(('profile-loop', 'loop', True))
     out = []
     for rid, check, required in requested:
-        supported = check in {'media', 'timing'}
+        supported = check in {'media', 'timing'} or check in families
         out.append(NegotiatedRequirement(
             id=rid, check=check, required=required,
             applicability='supported' if supported else 'unsupported',
-            method={'media': 'v2:native_registration', 'timing': 'v2:locked_cadence'}.get(check, 'none'),
+            method={'media': 'declared-regions-v1:media', 'timing': 'declared-regions-v1:timing'}.get(check, 'declared-regions-v1' if check in families else 'none'),
             limitation=('Establishes structural validity only; animation quality is not verified.'
-                        if supported else 'No validated reference-free evaluator is available for this requirement.'),
+                        if check in {'media', 'timing'} else 'Only task-authored regions, colors and event bounds are measured; arbitrary anatomy and prose action correctness are not established.' if supported else 'No usable task-authored measurement is available for this requirement.'),
             ways_forward=[] if supported else ['Obtain independently reviewed annotations and a validated evaluator.',
                         'Create a new specification revision with a recorded scope change.']))
     if len({r.id for r in out}) != len(out):
@@ -100,7 +115,7 @@ def create(project_dir: str, payload: dict) -> dict:
                 old = TaskRecord.model_validate_json(existing['data'])
                 if old.spec.model_dump(exclude={'created_at'}) != spec.model_dump(exclude={'created_at'}):
                     raise S.ConflictError('task ID already bound to a different immutable specification')
-                return old.model_dump(mode='json')
+                return old.model_dump(mode='json', exclude_unset=True)
             digest = hashlib.sha256(json.dumps(spec.model_dump(mode='json'), sort_keys=True,
                                                separators=(',', ':')).encode()).hexdigest()
             record = TaskRecord(id=spec.id, spec=spec, requirements=_negotiate(spec), spec_sha256=digest)
@@ -122,7 +137,7 @@ def _get(con, task_id):
 def get(project_dir: str, task_id: str) -> dict:
     con = _connect(project_dir)
     try:
-        return _get(con, task_id).model_dump(mode='json')
+        return _get(con, task_id).model_dump(mode='json', exclude_unset=True)
     finally:
         con.close()
 
