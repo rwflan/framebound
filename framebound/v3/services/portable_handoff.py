@@ -44,7 +44,22 @@ def archive(project,feedback_id):
         revision_ids={bundle['baseline_revision_id']}
         if run.get('edit_baseline_revision_id'):revision_ids.add(run['edit_baseline_revision_id'])
         revisions={rid:loop.get_in(con,'agent_clip_revisions',rid) for rid in revision_ids}
+        pending=list(revisions.values())
+        while pending:
+            ancestor=pending.pop().get('parent_revision_id')
+            if ancestor and ancestor not in revisions:
+                if len(revisions)>=1000: raise InvalidInput('handoff ancestry exceeds 1000 revisions')
+                revisions[ancestor]=loop.get_in(con,'agent_clip_revisions',ancestor)
+                pending.append(revisions[ancestor])
+        for revision in revisions.values():
+            tid=revision['task_id']
+            if tid not in specs: specs[tid]=tasks._get(con,tid).model_dump(mode='json',exclude_unset=True)
         aids={aid for rev in revisions.values() for aid in rev['frame_asset_ids']}
+        from ..provenance import parse
+        for revision in revisions.values():
+            attribution=parse(revision.get('generation_metadata'))
+            if attribution:
+                aids.update(ref.asset_id for e in attribution.generations for ref in e.conditioning)
         for task in specs.values():
             aids.update(i['asset_id'] for i in task['spec']['inputs'])
             aids.update((task['spec'].get('source_correspondence') or {}).get('frame_asset_ids',[]))
@@ -60,10 +75,23 @@ def archive(project,feedback_id):
                 if total>134217728:raise InvalidInput('portable handoff exceeds the 128 MiB pixel budget; use authorized project access instead')
                 blobs[rel]=data
         evaluation=loop.get_in(con,'agent_evaluations',bundle['evaluation_id'])
-        # Whitelist revision fields: generation metadata and hidden provider settings are not part of a handoff.
+        # Whitelist fields; typed attribution is portable, arbitrary provider settings stay private.
         portable_revisions={rid:{k:r[k] for k in ('id','task_id','frame_asset_ids','frame_instance_ids','parent_revision_id')} for rid,r in revisions.items()}
+        from ..provenance import summary, parse, blob_hashes
+        for rid, rev in revisions.items():
+            portable_revisions[rid]['provenance'] = summary(rev.get('generation_metadata'))
+            attribution = parse(rev.get('generation_metadata'))
+            if attribution:
+                for sha in blob_hashes(attribution):
+                    data = S.blob_path(project, sha).read_bytes()
+                    if S.sha256_bytes(data) != sha: raise InvalidInput('corrupt provenance blob')
+                    rel='provenance/' + sha
+                    if rel not in blobs:
+                        total+=len(data)
+                        if total>134217728: raise InvalidInput('portable handoff exceeds the 128 MiB artifact budget')
+                        blobs[rel] = data
         manifest=dict(format='framebound-handoff-1.0',feedback=bundle,feedback_digest=digest(bundle),
-            task_specs=specs,evaluation=evaluation,revisions=portable_revisions,assets=assets,
+            reader_capabilities=['revision-provenance-v1'],task_specs=specs,evaluation=evaluation,revisions=portable_revisions,assets=assets,
             current_task_id=run['task_id'],limits=run['limits'],remaining_submissions=run['limits']['max_submissions']-len(run['submission_ids']),
             import_operation='agent-handoff-import',rights_semantics='Asset origin/rights records are retained; this transfer grants neither provider execution authority nor training rights.')
         text=I.render(bundle,portable=True)

@@ -72,6 +72,9 @@ def closure(con,rids):
             origin_record_sha256=E.digest(raw) if raw else None,
             frame_asset_ids=source['frame_asset_ids'],timing=source['timing'],loop=source['loop'],
             designated_by=source['designated_by'],designation_basis=source['designation_basis'],provenance=source['provenance'])
+    from ...v3.provenance import parse
+    provenance = {rid: parse(rev.get('generation_metadata')) for rid, rev in revisions.items()}
+    asset_ids.update(ref.asset_id for value in provenance.values() if value for event in value.generations for ref in event.conditioning)
     pending=list(asset_ids)
     while pending:
         aid=pending.pop()
@@ -79,8 +82,9 @@ def closure(con,rids):
             if parent not in asset_ids:asset_ids.add(parent);pending.append(parent)
     assets={aid:all_assets[aid] for aid in asset_ids}
     all_jobs=rows(con,'jobs');provider_sources={}
-    for asset in assets.values():
-        jid=asset.get('source_job_id')
+    job_ids = {a.get('source_job_id') for a in assets.values()}
+    job_ids.update(e.provider_job_id for value in provenance.values() if value for e in value.generations)
+    for jid in job_ids:
         if not jid:continue
         job=all_jobs.get(jid)
         if not job:
@@ -92,13 +96,13 @@ def closure(con,rids):
             if isinstance(value,list):return [redact(v) for v in value]
             return value
         provider_sources[jid]=dict(id=jid,available=True,
-            metadata={k:job.get(k) for k in ('kind','provider','origin','status','payload_sha256','cost_actual','cost_estimate','dispatch_count')},
+            metadata={k:job.get(k) for k in ('kind','provider','origin','status','payload_sha256','cost_actual','cost_estimate','dispatch_count','output_asset_ids','provider_response_id')},
             generation_brief=redact(job.get('request_brief')),
             hidden_provider_settings='omitted',artifact_hashes={k:job.get(k) for k in ('request_artifact','response_artifact')},
             raw_artifacts='not packaged; structured generation brief and evidence pixels retained')
     return dict(runs=runs,revisions=revisions,tasks=tasks,evaluations=evaluations,feedback=feedback,
                 events=events,interventions=marks,completions=completions,frames=frames,
-                registrations=registrations,assets=assets,provider_sources=provider_sources,source_records=source_records,preferences=preferences)
+                registrations=registrations,assets=assets,provider_sources=provider_sources,source_records=source_records,preferences=preferences,provenance={rid:dict(id=rid, attribution=value.model_dump(mode='json')) for rid,value in provenance.items() if value})
 
 
 def _asset_reasons(asset,policy,assets=None,seen=None,provider_sources=None):
@@ -158,6 +162,13 @@ def _families(graph,project,asset_files=None):
         run=graph['runs'][revision['run_id']];task=graph['tasks'][revision['task_id']]
         keys=[('animation',run['project_id'],run['animation_id'])]
         aids=revision['frame_asset_ids']+[i['asset_id'] for i in task['spec']['inputs']]+(task['spec'].get('source_correspondence') or {}).get('frame_asset_ids',[])
+        from ...v3.provenance import parse
+        attribution=parse(revision.get('generation_metadata'))
+        if attribution:
+            if attribution.style_board: keys.append(('style-board',attribution.style_board.id))
+            for event in attribution.generations:
+                aids += [ref.asset_id for ref in event.conditioning]
+                keys.extend(('generation-original',sha) for sha in event.original_output_sha256)
         for aid in aids:
             asset=graph['assets'][aid];keys.append(('pixel',asset.get('pixel_sha256') or asset['byte_sha256']))
             keys.extend(('lineage',p) for p in [aid]+asset.get('parent_asset_ids',[]))
@@ -270,6 +281,19 @@ def build_into(project,name,rids,out,policy,digest,con):
         p.write_text(value if isinstance(value,str) else json.dumps(value,sort_keys=True,indent=2))
     write('.framebound-output',{'tool':'framebound-export-snapshot','snapshot':name,'dataset_version':VERSION})
     for table,records in graph.items():write(f'closure/{table}.jsonl',''.join(json.dumps(row,sort_keys=True)+'\n' for row in records.values()))
+    from ...v3.provenance import RevisionProvenance, blob_hashes
+    for record in graph['provenance'].values():
+        attribution = RevisionProvenance.model_validate(record['attribution'])
+        for event in attribution.generations:
+            bound_ids = event.output_asset_ids + [r.asset_id for r in event.conditioning]
+            if any(graph['assets'][aid]['rights'] not in policy['rights_allow'] for aid in bound_ids):
+                raise ValueError('provenance blob export requires permitted output and conditioning rights')
+        for sha in blob_hashes(attribution):
+            raw = S.blob_path(project, sha).read_bytes()
+            if S.sha256_bytes(raw) != sha: raise ValueError('corrupt provenance blob')
+            path = out/'closure/provenance_blobs'/sha
+            path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_bytes(raw)
     for aid,rel in asset_files.items():
         path=out/rel;path.parent.mkdir(parents=True,exist_ok=True)
         if not path.exists():path.write_bytes(S.blob_path(project,graph['assets'][aid]['byte_sha256']).read_bytes())
@@ -329,7 +353,7 @@ def build_into(project,name,rids,out,policy,digest,con):
         write(rel,''.join(json.dumps(row,sort_keys=True)+'\n' for row in data))
     write('README.md','# Framebound agent trajectories\n\nVersion 3 requires explicit reader support. `hf/` contains exact human-accepted positives only; `automatically_verified/` is a separate technical-policy view. Research/withheld data retain rights, source and missing-evidence labels. No preference pairs are inferred. Snapshot transport does not grant training rights. Missing generation metadata remains null. Controlled declared-region measurements do not certify arbitrary creative quality.\n')
     files={str(p.relative_to(out)):_h(p.read_bytes()) for p in out.rglob('*') if p.is_file()}
-    manifest=dict(snapshot=name,dataset_version=VERSION,schemas={'domain':'3.0'},reader_capabilities=['agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1']+(['pre-submission-feedback-v1'] if any(f['baseline_revision_id'] is None for f in graph['feedback'].values()) else [])+(['source-correspondence-v1'] if graph['source_records'] else [])+(['explicit-human-preferences-v1'] if graph['preferences'] else [])+(['feedback-groups-v2'] if any(f.get('bundle_version',1)>=2 for f in graph['feedback'].values()) else [])+(['declared-color-camera-tracks-v1'] if any(t['spec'].get('scene') for t in graph['tasks'].values()) else []),
+    manifest=dict(snapshot=name,dataset_version=VERSION,schemas={'domain':'3.0'},reader_capabilities=['agent-tasks-v3','honest-label-sources-v1','optional-input-closure-v1']+(['revision-provenance-v1'] if graph['provenance'] else [])+(['pre-submission-feedback-v1'] if any(f['baseline_revision_id'] is None for f in graph['feedback'].values()) else [])+(['source-correspondence-v1'] if graph['source_records'] else [])+(['explicit-human-preferences-v1'] if graph['preferences'] else [])+(['feedback-groups-v2'] if any(f.get('bundle_version',1)>=2 for f in graph['feedback'].values()) else [])+(['declared-color-camera-tracks-v1'] if any(t['spec'].get('scene') for t in graph['tasks'].values()) else []),
         inputs_digest=digest,clip_revisions=rids,policy=dict(policy,agent_export_policy=POLICY),files=files,exclusions=exclusions,
         families={m['revision_id']:m['family'] for m in membership},split_semantics='animation/derivation/shared-input/exact-pixel and 64-bit dHash distance <=4 components; conservative grouping only, not quality judgment',
         counts=dict(images=len(coco_images),annotations=len(coco_annotations),positives=len(views['human_accepted']),automatically_verified=len(views['automatically_verified']),
