@@ -1,5 +1,7 @@
 # Design
 
+> Target product direction (2026-10-30): see the [agent-led animation workflow plan](AGENT_ANIMATION_WORKFLOW_PLAN.md). It replaces mandatory phase references and routine human review as workflow assumptions, while preserving truthful evidence and approval labels. The target is not yet implemented; the historical design and current v2 notes below remain implementation context.
+
 > Status (2026-10-28): the v1 prototype design below is historical. The
 > implementation went through corrective passes R0–R8 (see
 > IMPLEMENTATION_STATUS.md): schema `2.0` contracts, typed services
