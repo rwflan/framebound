@@ -113,3 +113,66 @@ coverage and run state; it is separate from the legacy human-reviewed release
 route. Internal provider execution is unavailable on this path: the external
 agent owns generation and provider spending. A frozen evaluation pixel budget
 bounds local raster allocation.
+
+## Saved interventions and parent-agent handoff
+
+A reviewer can save a correction against the current exact revision/evaluation
+with `POST /v3/runs/RUN/interventions`. The JSON body contains `id`, `revision_id`,
+`evaluation_id`, `desired_outcome`, a half-open authored `tick_range`, optional
+native `roi`, and `authorize_edit_scope` (false by default). The saved action
+creates a human-owned correction using the established correction status model,
+a timeline event and an immutable feedback bundle. `handoff_id` identifies that
+saved bundle. No copy action is offered for a transient selection.
+
+`GET /v3/feedback/ID` returns the same bundle and concise text, a `stale` flag,
+current revision/feedback identities and an explanation when bindings changed.
+`GET /v3/feedback/ID/text` downloads exactly that rendered text. MCP
+`agent_handoff_get(feedback_id)` and CLI `agent-handoff-get --feedback-id ID`
+provide the same result. Evidence includes asset IDs, content hashes and project
+blob/HTTP locations; access to the project is required. Pasted text is not a
+credential. It includes actual import/submission operations, preservation rules,
+expected bounds, full-matrix re-evaluation and remaining budget. Hidden provider
+configuration and generation metadata are excluded from the renderer.
+
+After another saved action or submission, old feedback cannot authorize a child
+submission. A reviewer may explicitly request a new bundle with
+`POST /v3/feedback/ID/rebase`, including `expected_revision_id` and
+`expected_feedback_id`. Rebase records an event and reloads current requirements
+and still-open human corrections; it does not silently change an old bundle.
+
+Read a correction with `GET /v3/interventions/ID`, MCP `agent_intervention_get`
+or CLI `agent-intervention-get`. Resolve/reopen with
+`POST /v3/interventions/ID/resolve` or `/reopen`, passing `expected_version`, exact
+`revision_id`/`evaluation_id` and optional `note`. Only its recorded owner can
+resolve/reopen it. Resolution inspects an actual submitted replacement, while
+technical success alone leaves the subjective correction open. Reopen restores
+the task without replenishing submission or no-progress budgets.
+
+An explicit edit grant freezes a preservation baseline and checks exact canonical
+RGBA outside the union of saved authorized ranges/regions, including other
+frames. A failed attempt cannot move this baseline; a preservation-passing child
+can advance it. Markup without the grant is localization only. Initial generation
+has no parent preservation baseline. Scoped child edits require a saved grant;
+free text does not authorize broader edits or override execution limits.
+
+Reviewer decisions use `POST /v3/runs/RUN/decisions` with `id`, exact bindings,
+`action` (`approve`, `reject`, `needs_changes`) and optional `note`. Rejections and
+change requests create unresolved corrections and saved continuation instructions.
+Approval does not manufacture technical coverage or resolve open corrections.
+The named human-reviewed policy checks the exact saved decision. Explicit-review
+intervention policy also waits for a decision rather than ordinary automatic
+completion.
+
+Trusted CLI integrations use `agent-intervention-mark`,
+`agent-intervention-resolve`, `agent-intervention-reopen`, and `agent-decision`
+with an `--action JSON_FILE`, project/run or intervention IDs and a real reviewer
+session (`--session-token` or `FRAMEBOUND_REVIEWER_TOKEN`). Browser writes use the
+existing local reviewer session boundary. MCP agents can retrieve human work,
+not mint reviewer authority.
+
+Parent-agent satisfaction is a separate judgment: MCP
+`agent_satisfaction_record`, CLI `agent-satisfaction-record --action JSON_FILE`,
+or `POST /v3/runs/RUN/agent-satisfaction` binds `revision_id`, `evaluation_id` and
+optional `note`. It neither creates human approval nor closes human corrections.
+A new revision starts with unreviewed creative status, preserving prior judgments
+as historical events.

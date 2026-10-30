@@ -83,6 +83,13 @@ def main(argv=None):
         ('provider-grant-revoke','Revoke provider authority',[('--project',True),('--grant-id',True),('--expected-version',True),('--operator-secret',False)]),
         ('provider-reconcile','Attach an operator receipt to an unknown send',[('--project',True),('--job-id',True),('--receipt',True),('--operator-secret',False)]),
         ('provider-grant', 'Authorize a bounded provider grant (operator only)', [('--project',True),('--grant',True),('--operator-secret',False)]),
+        ('agent-satisfaction-record', 'Record exact parent-agent creative judgment', [('--project', True), ('--run-id', True), ('--action', True)]),
+        ('agent-handoff-get', 'Read saved handoff text, JSON and stale binding', [('--project', True), ('--feedback-id', True)]),
+        ('agent-intervention-get', 'Read an exact saved correction', [('--project', True), ('--intervention-id', True)]),
+        ('agent-intervention-mark', 'Save reviewer correction', [('--project', True), ('--run-id', True), ('--action', True), ('--session-token', False)]),
+        ('agent-intervention-resolve', 'Resolve reviewer correction', [('--project', True), ('--intervention-id', True), ('--action', True), ('--session-token', False)]),
+        ('agent-intervention-reopen', 'Reopen reviewer correction', [('--project', True), ('--intervention-id', True), ('--action', True), ('--session-token', False)]),
+        ('agent-decision', 'Save exact reviewer decision', [('--project', True), ('--run-id', True), ('--action', True), ('--session-token', False)]),
         ('agent-revision-get', 'Read exact revision and evidence', [('--project', True), ('--revision-id', True)]),
         ('agent-run-eligibility', 'Check automatic output policy', [('--project', True), ('--run-id', True)]),
         ('agent-run-cancel', 'Cancel external-agent work', [('--project', True), ('--run-id', True), ('--reason', True)]),
@@ -246,7 +253,7 @@ def main(argv=None):
         _s = _bs(args.project)
         _aio.run(_s.run_stdio_async())
         return 0
-    if args.cmd in ("agent-revision-get", "agent-run-eligibility", "agent-run-cancel", "agent-run-start", "agent-run-get", "agent-run-submit", "task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
+    if args.cmd in ("agent-satisfaction-record", "agent-handoff-get", "agent-intervention-get", "agent-intervention-mark", "agent-intervention-resolve", "agent-intervention-reopen", "agent-decision", "agent-revision-get", "agent-run-eligibility", "agent-run-cancel", "agent-run-start", "agent-run-get", "agent-run-submit", "task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
                     "orchestrator-send", "capabilities", "correction-claim", "correction-submit",

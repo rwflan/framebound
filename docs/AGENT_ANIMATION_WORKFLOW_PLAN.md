@@ -10,9 +10,9 @@ backup behaviour and exact capability boundary. This establishes immutable
 reference-free intent and generation-input compilation. The [external-agent loop](AGENT_LOOP.md) now provides declared-region evaluation,
 localized fail/repair/pass feedback, immutable submissions, persistent stopping
 limits and separate automatic output eligibility. Its controlled procedural
-benchmark does not claim arbitrary generated-art quality. Interventions, live UI,
-training closure, optional source correspondence and broader profiles remain
-active implementation work.
+benchmark does not claim arbitrary generated-art quality. Saved reviewer corrections, exact decisions and shared stale-aware handoff rendering
+are implemented in the same loop. Live workspace integration, training closure,
+optional source correspondence and broader profiles remain active implementation work.
 
 ## Goal
 
