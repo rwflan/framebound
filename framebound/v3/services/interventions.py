@@ -104,6 +104,8 @@ def augment_in(con, bundle, run=None):
             resolution_owner=mark['owner'], status=mark['correction']['status']))
     from ..feedback import groups
     bundle['correction_groups']=groups(bundle)
+    from ..provenance import summary
+    bundle['provenance']=summary(revision.get('generation_metadata'))
     bundle['bundle_version']=2
     return bundle
 
