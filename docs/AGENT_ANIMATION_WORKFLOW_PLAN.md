@@ -24,6 +24,8 @@ generated-art validation and the final quality acceptance remains open. The [imp
 records the full requirement/evidence mapping, broad verification and the remaining
 reviewed-generated-art evidence gap.
 
+The next corpus/provenance work is specified in the [Muse animation corpus plan](MUSE_ANIMATION_CORPUS_PLAN.md): Muse-generated animation tests, parent/image-model attribution in storage and the web app, a broad style matrix and curated visual references. That plan provides the route to the remaining generated-art evidence; its research references are not benchmark results.
+
 ## Goal
 
 Framebound helps an external agent produce accurate, complex image-generated animations through repeated, evidence-based correction. The agent generates the art, calls the framework, receives actionable feedback, corrects the animation and submits a new revision. Framebound checks the result, records the process and returns the next action until the declared requirements are met or the run reaches an explicit stopping condition.

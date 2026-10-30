@@ -81,6 +81,8 @@ proof.
 
 ## Remaining acceptance evidence
 
+The [Muse animation corpus plan](MUSE_ANIMATION_CORPUS_PLAN.md) now specifies how to generate this evidence with Muse models, retain distinct parent/image-model provenance, curate style references and obtain actual independent labels. Its downloaded external references are research inputs; they do not close this acceptance gate.
+
 Supply a corpus directory with actual generated native animation frames,
 generation/provenance records and independently reviewed defect labels. Use the
 versioned quality-benchmark schema to retain those actual label sources, known
