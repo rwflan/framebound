@@ -83,8 +83,8 @@ Live specialist work additionally requires genuinely approved references, an ope
 
 ## Corpus research
 
-The [Muse animation corpus plan](docs/MUSE_ANIMATION_CORPUS_PLAN.md) covers Muse-generated tests across 48 proposed styles, parent/image-model provenance in the framework and web app, and a [local visual reference catalogue](docs/research/muse-animation/index.html). This is researched future work; downloaded references are not Muse-generated benchmark results.
+The [Muse animation corpus plan](docs/MUSE_ANIMATION_CORPUS_PLAN.md) now starts from established games with distinctive 2D art. Browse the [game-led reference gallery](docs/research/game-art/index.html). It covers Muse generation and parent/image-model provenance; runtime changes remain planned.
 
 ## Licence
 
-Code: MIT. Procedural demo art is original. Downloaded research references retain their recorded source licences and credits; they are not demo art or Muse-generated benchmark outputs. See the [reference catalogue notes](docs/research/muse-animation/README.md).
+Code: MIT. Procedural demo art is original. Downloaded research references retain their recorded source licences and credits; they are not demo art or Muse-generated benchmark outputs. Publisher screenshots are research references, not an automatic generation or training grant.
