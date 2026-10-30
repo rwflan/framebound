@@ -8,6 +8,40 @@ from mcp.server.mcpserver import MCPServer
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
+    @server.tool(name='agent_revision_get', description='Fetch an exact immutable revision, evaluation manifest and saved feedback')
+    def agent_revision_get(revision_id: str) -> dict:
+        from ...v3.services import loop
+        return loop.revision_get(project_dir, revision_id)
+
+    @server.tool(name='agent_run_eligibility', description='Check automatic output policy and current evidence freshness; never implies human acceptance')
+    def agent_run_eligibility(run_id: str) -> dict:
+        from ...v3.services import loop
+        return loop.eligibility(project_dir, run_id)
+
+    @server.tool(name='agent_run_cancel', description='Cancel a run with a durable reason')
+    def agent_run_cancel(run_id: str, reason: str) -> dict:
+        from ...v3.services import loop
+        return loop.cancel(project_dir, run_id, reason)
+
+    @server.tool(name='agent_run_start', description='Start or resume a bounded external-agent run against an immutable task')
+    def agent_run_start(task_id: str, run_id: str) -> dict:
+        from ...v3.services import loop
+        return loop.start(project_dir, task_id, run_id)
+
+    @server.tool(name='agent_run_get', description='Fetch durable current/best revisions and saved feedback')
+    def agent_run_get(run_id: str) -> dict:
+        from ...v3.services import loop
+        return loop.get(project_dir, run_id)
+
+    @server.tool(name='agent_run_submit', description='Atomically register and evaluate an external revision; stale bindings are rejected')
+    def agent_run_submit(run_id: str, revision_id: str, frame_asset_ids: list[str],
+                         parent_revision_id: str | None = None, feedback_id: str | None = None,
+                         presented_holds: list[int] | None = None, generation_metadata: dict | None = None) -> dict:
+        from ...v3.services import loop
+        return loop.submit(project_dir, run_id, revision_id, frame_asset_ids,
+                           parent_revision_id=parent_revision_id, feedback_id=feedback_id,
+                           presented_holds=presented_holds, generation_metadata=generation_metadata)
+
     @server.tool(name='task_create', description='Register an immutable v3 task without a motion guide or reviewer approval')
     def task_create(spec: dict) -> dict:
         from ...v3.services import tasks

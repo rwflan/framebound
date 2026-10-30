@@ -50,10 +50,8 @@ pre-v3 database to `backups/before-agent-v3.sqlite3`. The dry-run report opens a
 existing database read-only and never creates a project. No v2 data or labels are
 rewritten. JSON schemas are in `schemas/v3/`.
 
-Current capability: registration and external generation-input compilation only.
-Structural media/timing methods are negotiable, but v3 submission/evaluation is
-not yet implemented. `fixed-subject-v1` records required feature, action and
-temporal capabilities as unsupported. No task registration or successful input
-compilation establishes animation quality or completion. The remaining agent
-loop, interventions, UI, training closure, source correspondence and broader
-profiles remain work in the workflow plan.
+The [external-agent loop](AGENT_LOOP.md) now implements immutable submissions,
+declared-region evaluation, durable feedback, bounded stopping and automatic
+technical output policy. Unsupported quality requirements remain explicit gaps.
+The narrower methods and procedural benchmark do not establish arbitrary
+animation quality or human acceptance.

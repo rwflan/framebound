@@ -8,6 +8,7 @@ pending-reason links.
 from __future__ import annotations
 
 ROWS = [
+    ('cli/mcp/api', 'v3 external-agent start/get/submit', 'supported', 'atomic fail-repair-pass loop; declared-region checks; durable best/current selection and limits; arbitrary action correctness unsupported'),
     ('cli/mcp/api', 'v3 task create/get/compile inputs', 'supported', 'immutable reference-free intent and optional inputs; external generation only; quality evaluation unsupported'),
     ('cli', 'task-migration-report', 'supported', 'read-only additive migration inventory; pre-v3 database backup'),
     ('cli', 'project-create/character-propose/guide-propose', 'supported', 'public immutable setup; identical replay'),

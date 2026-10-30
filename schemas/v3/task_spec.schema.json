@@ -129,6 +129,13 @@
     "Limits": {
       "additionalProperties": false,
       "properties": {
+        "max_evaluation_pixels": {
+          "default": 16777216,
+          "maximum": 67108864,
+          "minimum": 1,
+          "title": "Max Evaluation Pixels",
+          "type": "integer"
+        },
         "max_submissions": {
           "default": 8,
           "maximum": 1000,
@@ -151,6 +158,92 @@
         }
       },
       "title": "Limits",
+      "type": "object"
+    },
+    "RegionObservation": {
+      "additionalProperties": false,
+      "description": "A task-authored measurement, not a generated annotation or reviewer decision.",
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "family": {
+          "enum": [
+            "feature",
+            "appearance",
+            "contact"
+          ],
+          "title": "Family",
+          "type": "string"
+        },
+        "slot": {
+          "minimum": 0,
+          "title": "Slot",
+          "type": "integer"
+        },
+        "roi": {
+          "$ref": "#/$defs/Roi"
+        },
+        "rgba": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "title": "Rgba",
+          "type": "array"
+        },
+        "minimum": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Minimum",
+          "type": "integer"
+        },
+        "maximum": {
+          "minimum": 0,
+          "title": "Maximum",
+          "type": "integer"
+        },
+        "visibility": {
+          "default": "visible",
+          "enum": [
+            "visible",
+            "occluded"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        },
+        "provenance": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Provenance",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "user_declared",
+            "agent_proposed",
+            "model_proposed",
+            "procedural"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "family",
+        "slot",
+        "roi",
+        "rgba",
+        "maximum",
+        "provenance",
+        "source"
+      ],
+      "title": "RegionObservation",
       "type": "object"
     },
     "Requirement": {
@@ -186,6 +279,125 @@
         "desired_outcome"
       ],
       "title": "Requirement",
+      "type": "object"
+    },
+    "Roi": {
+      "additionalProperties": false,
+      "properties": {
+        "left": {
+          "minimum": 0,
+          "title": "Left",
+          "type": "integer"
+        },
+        "top": {
+          "minimum": 0,
+          "title": "Top",
+          "type": "integer"
+        },
+        "right": {
+          "minimum": 0,
+          "title": "Right",
+          "type": "integer"
+        },
+        "bottom": {
+          "minimum": 0,
+          "title": "Bottom",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "left",
+        "top",
+        "right",
+        "bottom"
+      ],
+      "title": "Roi",
+      "type": "object"
+    },
+    "TemporalObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "family": {
+          "enum": [
+            "continuity",
+            "moving",
+            "loop"
+          ],
+          "title": "Family",
+          "type": "string"
+        },
+        "left_slot": {
+          "minimum": 0,
+          "title": "Left Slot",
+          "type": "integer"
+        },
+        "right_slot": {
+          "minimum": 0,
+          "title": "Right Slot",
+          "type": "integer"
+        },
+        "left_region_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Left Region Id"
+        },
+        "right_region_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Right Region Id"
+        },
+        "max_distance_px": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Max Distance Px",
+          "type": "number"
+        },
+        "provenance": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Provenance",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "user_declared",
+            "agent_proposed",
+            "model_proposed",
+            "procedural"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "family",
+        "left_slot",
+        "right_slot",
+        "provenance",
+        "source"
+      ],
+      "title": "TemporalObservation",
       "type": "object"
     },
     "Timing": {
@@ -329,6 +541,22 @@
       ],
       "title": "Profile",
       "type": "string"
+    },
+    "region_observations": {
+      "items": {
+        "$ref": "#/$defs/RegionObservation"
+      },
+      "maxItems": 4096,
+      "title": "Region Observations",
+      "type": "array"
+    },
+    "temporal_observations": {
+      "items": {
+        "$ref": "#/$defs/TemporalObservation"
+      },
+      "maxItems": 4096,
+      "title": "Temporal Observations",
+      "type": "array"
     },
     "requirements": {
       "items": {
