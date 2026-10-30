@@ -189,7 +189,7 @@
   font-size: 11px;
   color: #6b665b;
 }
-/* Row legends use the window-header typography and grooves, with the pixels visible through them. */
+/* Row labels are solid pieces of the same window chrome as the rest of the desk. */
 .reel-lane-labels {
   position: absolute;
   inset: 0;
@@ -198,10 +198,18 @@
   overflow: hidden;
 }
 .reel-lane-label {
+  --label-surface: #ede7d9;
+  --label-border: #b7ac97;
   position: absolute;
   left: 0;
   width: 170px;
   pointer-events: none;
+}
+.reel-lane-label.candidate {
+  --label-surface: #f4e5c8;
+}
+.reel-lane-label.checks {
+  --label-surface: #f1eadb;
 }
 .reel-lane-label strong {
   position: absolute;
@@ -210,51 +218,33 @@
   transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: var(--legend-width, 166px);
+  gap: 8px;
+  width: fit-content;
+  max-width: var(--legend-width, 128px);
   min-height: 26px;
-  padding: 5px 24px 5px 10px;
-  isolation: isolate;
+  padding: 5px 8px;
   white-space: nowrap;
   font-size: 11px;
   line-height: 1.2;
   font-weight: 600;
-  color: #322f29;
-  text-shadow:
-    0 1px 1px #fff9,
-    0 0 3px #f6eedb60;
-}
-.reel-lane-label strong:before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(
-    90deg,
-    #f3ead66b 0,
-    #f3ead657 45%,
-    #f3ead61f 78%,
-    transparent 100%
-  );
-  border-bottom: 1px solid #6a5f4226;
-  mask-image: linear-gradient(90deg, #000 0, #000 60%, transparent);
+  color: var(--ink);
+  background: var(--label-surface);
+  border: 1px solid var(--label-border);
+  border-radius: 3px;
+  box-shadow: 0 1px 0 #b9ad96;
 }
 .reel-lane-label strong:after {
   content: "";
-  width: 32px;
+  width: 24px;
   height: 7px;
   flex-shrink: 0;
   background: repeating-linear-gradient(
     0deg,
-    #786d5340 0,
-    #786d5340 1px,
-    transparent 1px,
-    transparent 3px
+    #b9ad96 0,
+    #b9ad96 1px,
+    var(--label-surface) 1px,
+    var(--label-surface) 3px
   );
-  mask-image: linear-gradient(90deg, #000, transparent);
-}
-.reel-lane-label.checks strong:before {
-  background: linear-gradient(90deg, #fffcf54d, #fffcf526 65%, transparent);
 }
 .reel-vignette {
   display: none;
@@ -430,9 +420,9 @@
   }
   .reel-lane-label strong {
     font-size: 10px;
-    width: var(--legend-width, 140px);
+    width: fit-content;
     min-height: 23px;
-    padding: 4px 20px 4px 8px;
+    padding: 4px 7px;
     gap: 8px;
   }
   .reel-lane-label strong:after {
