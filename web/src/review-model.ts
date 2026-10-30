@@ -149,3 +149,47 @@ export function chronology(
     (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id),
   );
 }
+
+/** Earliest authored frame needing attention, independent of analyzer result order. */
+export function attentionSlot(b: Bundle, issues: IssueDetailDto[]): number {
+  const slots = b.evaluation.results
+    .filter(
+      (c) =>
+        ["fail", "error", "unmeasured"].includes(c.outcome) ||
+        (c.outcome === "not_applicable" &&
+          b.evaluation.coverage_status !== "complete"),
+    )
+    .map(scopeSlot)
+    .filter(
+      (slot): slot is number =>
+        slot !== null && slot >= 0 && slot < b.frames.length,
+    );
+  const related = new Set([
+    revisionId(b),
+    String(b.packet.comparison_revision_id || ""),
+  ]);
+  for (const issue of issues) {
+    if (
+      !related.has(issue.clip_revision_id) ||
+      ["resolved", "cancelled"].includes(issue.task_status || "open")
+    )
+      continue;
+    if (issue.frame_range) {
+      let start = 0;
+      for (let i = 0; i < b.frames.length; i++) {
+        const end = start + b.frames[i].hold_ticks - 1;
+        if (issue.frame_range[0] <= end && issue.frame_range[1] >= start) {
+          slots.push(i);
+          break;
+        }
+        start = end + 1;
+      }
+    } else if (issue.frame_instance_id) {
+      const index = b.frames.findIndex(
+        (frame) => frame.frame_instance_id === issue.frame_instance_id,
+      );
+      if (index >= 0) slots.push(index);
+    } else slots.push(0);
+  }
+  return slots.length ? Math.min(...slots) : 0;
+}

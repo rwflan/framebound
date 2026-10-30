@@ -53,14 +53,18 @@ export class ReelCamera {
       if (
         width !== this.width ||
         height !== this.height ||
-        trackWidth !== this.trackWidth ||
-        trackHeight !== this.trackHeight
+        trackWidth !== this.trackWidth
       ) {
         this.jump(this.x, this.y);
         this.onResize?.();
+      } else if (trackHeight !== this.trackHeight) {
+        // New correction notes may grow the paper track without moving the viewed frame.
+        this.y = this.clampY(this.y);
+        this.paint();
       }
     });
     this.resize.observe(viewport);
+    this.resize.observe(track);
     this.measure();
   }
   measure() {
@@ -68,7 +72,9 @@ export class ReelCamera {
     this.height = this.viewport.clientHeight;
     this.trackWidth = this.track.offsetWidth;
     this.trackHeight = this.track.offsetHeight;
-    this.lanes = [...this.track.querySelectorAll(".reel-lane")].map((row) => ({
+    this.lanes = [
+      ...this.track.querySelectorAll(".reel-lane, .measurement-track"),
+    ].map((row) => ({
       top:
         row.offsetTop + (row.querySelector(".reel-shot-row")?.offsetTop || 0),
       height:
@@ -80,7 +86,13 @@ export class ReelCamera {
   bounds() {
     const width = this.trackWidth * this.zoom,
       height = this.trackHeight * this.zoom;
-    if (width <= this.width - 48)
+    if (this.centerEdges) {
+      const cell =
+        this.track.querySelector(".reel-frame-unit")?.offsetWidth ||
+        this.trackWidth;
+      this.max = this.width / 2 - (cell * this.zoom) / 2;
+      this.min = this.width / 2 - width + (cell * this.zoom) / 2;
+    } else if (width <= this.width - 48)
       this.min = this.max = (this.width - width) / 2;
     else {
       this.max = 24;
@@ -106,17 +118,20 @@ export class ReelCamera {
         : x;
   }
   paint() {
+    this.viewport.style?.setProperty("--film-scale", this.zoom);
     this.track.style.transform = `translate3d(${this.x.toFixed(3)}px,${this.y.toFixed(3)}px,0) scale(${this.zoom.toFixed(5)})`;
     const centers = this.lanes.map(
-      (row) =>
+      (row, index) =>
         this.height / 2 +
         this.y +
-        (row.top - this.trackHeight / 2 + row.height / 2) * this.zoom,
+        (row.top - this.trackHeight / 2) * this.zoom +
+        (index === 2 ? -10 : row.height * this.zoom >= 80 ? 14 : 0),
     );
-    if (centers.length === 2 && centers[1] - centers[0] < 28) {
-      const middle = (centers[0] + centers[1]) / 2;
-      centers[0] = middle - 14;
-      centers[1] = middle + 14;
+    if (centers.some((center, i) => i > 0 && center - centers[i - 1] < 28)) {
+      const middle = (centers[0] + centers[centers.length - 1]) / 2;
+      centers.forEach((_, i) => {
+        centers[i] = middle + (i - (centers.length - 1) / 2) * 28;
+      });
     }
     this.labels.forEach((node, i) => {
       const row = this.lanes[i];
@@ -128,6 +143,19 @@ export class ReelCamera {
         height = row.height * this.zoom;
       node.style.visibility =
         top + height < 12 || top > this.height - 12 ? "hidden" : "visible";
+      const cell =
+        (this.track.querySelector?.(".reel-frame-unit")?.offsetWidth ||
+          this.trackWidth) * this.zoom;
+      const firstComplete =
+        this.x + Math.max(0, Math.ceil(-this.x / cell)) * cell;
+      const legendWidth = Math.max(76, Math.min(166, cell - 12));
+      const left =
+        cell >= 80 && cell <= this.width
+          ? firstComplete + 10
+          : Math.max(4, Math.min(10, this.x + 5));
+      node.style.left =
+        Math.max(4, Math.min(this.width - legendWidth - 4, left)) + "px";
+      node.style.setProperty("--legend-width", legendWidth + "px");
       node.style.top = top + "px";
       node.style.height = height + "px";
       node.style.setProperty(
@@ -188,7 +216,13 @@ export class ReelCamera {
     };
     this.raf = requestAnimationFrame(tick);
   }
-  zoomTo(value, px = this.width / 2, py = this.height / 2, direct = false) {
+  zoomTo(
+    value,
+    px = this.width / 2,
+    py = this.height / 2,
+    direct = false,
+    centered = false,
+  ) {
     const target = Math.max(0.05, Math.min(2, value)),
       start = this.zoom,
       worldX = (px - this.x) / start,
@@ -199,8 +233,10 @@ export class ReelCamera {
     const apply = (z) => {
       this.zoom = z;
       this.bounds();
-      this.x = this.clamp(px - worldX * z);
-      this.y = this.clampY(py - this.height / 2 - worldY * z);
+      this.x = this.clamp(
+        centered ? (this.width - this.trackWidth * z) / 2 : px - worldX * z,
+      );
+      this.y = centered ? 0 : this.clampY(py - this.height / 2 - worldY * z);
       this.paint();
     };
     if (direct || reduced.matches) {
@@ -223,6 +259,10 @@ export class ReelCamera {
         (this.height - 24) / this.trackHeight,
         1,
       ),
+      this.width / 2,
+      this.height / 2,
+      false,
+      true,
     );
   }
   local(e) {

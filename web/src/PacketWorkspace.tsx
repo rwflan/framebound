@@ -6,10 +6,11 @@ import type {
   IssueDetailDto,
   ReferencesDto,
 } from "./api-types";
-import { Film, FilmDock, useFilm } from "./Film";
+import { Film, useFilm } from "./Film";
 import { Modal } from "./Modal";
 import {
   actionName,
+  attentionSlot,
   boundLabel,
   frameIssues,
   packetId,
@@ -29,14 +30,12 @@ export function PacketWorkspace({
   refs,
   issues,
   bundles,
-  choices,
   onRefresh,
 }: {
   bundle: Bundle;
   refs: ReferencesDto;
   issues: IssueDetailDto[];
   bundles: Bundle[];
-  choices: Bundle[];
   onRefresh: () => void;
 }) {
   const id = packetId(b),
@@ -50,25 +49,15 @@ export function PacketWorkspace({
   const holds = useMemo(() => b.frames.map((f) => f.hold_ticks), [b.frames]),
     width = canvas.width || 64,
     height = canvas.height || 64;
+  const initialSlot = useRef(attentionSlot(b, issues));
   const clock = usePresentationClock({
     holds,
     tps: timing.ticks_per_second || 60,
     loop: Boolean((b.contract.action as { loop?: boolean }).loop),
     resetKey: id,
     autoPlay: false,
+    initialTick: tickOfSlot(holds, initialSlot.current),
   });
-  useEffect(() => {
-    clock.setPlaying(false);
-    const finding = b.evaluation.results.find(
-      (c) =>
-        ["fail", "error", "unmeasured"].includes(c.outcome) &&
-        scopeSlot(c) !== null,
-    );
-    const slot = finding ? scopeSlot(finding)! : 0;
-    clock.selectSlot(slot);
-    setSelected([slot]);
-    anchor.current = slot;
-  }, [id]);
   const [compare, setCompare] = useState<"reference" | "baseline">("reference");
   const base =
     typeof b.packet.comparison_revision_id === "string"
@@ -78,9 +67,14 @@ export function PacketWorkspace({
     base ? api.compare(base, revision) : Promise.resolve(null),
   );
   const [tab, setTab] = useState<Tab | null>(null),
-    [selected, setSelected] = useState([0]),
+    [selected, setSelected] = useState([initialSlot.current]),
     [issueId, setIssueId] = useState<string | null>(null);
-  const anchor = useRef(0);
+  const anchor = useRef(initialSlot.current);
+  const [expanded, setExpanded] = useState(false);
+  const [referenceAsset, setReferenceAsset] = useState<{
+    label: string;
+    id: string;
+  } | null>(null);
   const [range, setRange] = useState("0-" + (holds[0] - 1)),
     [category, setCategory] = useState("torso-pulse"),
     [note, setNote] = useState(""),
@@ -161,7 +155,7 @@ export function PacketWorkspace({
           )
         : [i],
     );
-    controls.film.current?.reveal(i);
+    controls.film.current?.reveal(i, true);
   };
   useEffect(() => {
     if (clock.playing) controls.film.current?.reveal(clock.slot);
@@ -169,7 +163,10 @@ export function PacketWorkspace({
   useEffect(() => {
     const keyboard = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.closest("dialog,input,textarea,select,button,[role=region]"))
+      if (
+        e.defaultPrevented ||
+        target.closest("dialog,input,textarea,select,button")
+      )
         return;
       if (e.code === "Space") {
         e.preventDefault();
@@ -220,7 +217,7 @@ export function PacketWorkspace({
       ctx.drawImage(image, 0, 0, width, height);
     }
     if (roi) {
-      ctx.strokeStyle = "#eac19b";
+      ctx.strokeStyle = "#e95725";
       ctx.lineWidth = Math.max(1, width / 128);
       ctx.strokeRect(
         roi[0] + 0.5,
@@ -335,306 +332,609 @@ export function PacketWorkspace({
       Number(["pass", "not_applicable"].includes(a.outcome)) -
       Number(["pass", "not_applicable"].includes(z.outcome)),
   );
+  const evidencePanel = (
+    <>
+      <div className="reference-line">
+        {[
+          ["Identity", contractRefs?.identity],
+          ["Style", contractRefs?.style],
+          [
+            "Phase",
+            phaseRefs.find((p) => p.slot === clock.slot)?.motion_reference_id,
+          ],
+          [
+            "Editable",
+            guide?.entries.find((e) => e.phase === current.phase)
+              ?.editable_mask_asset_id,
+          ],
+          [
+            "Protected",
+            guide?.entries.find((e) => e.phase === current.phase)
+              ?.protected_mask_asset_id,
+          ],
+        ]
+          .filter(([, asset]) => Boolean(asset))
+          .map(([name, asset]) => (
+            <figure key={name}>
+              {asset && (
+                <img src={api.assetUrl(asset)} alt={name || undefined} />
+              )}
+              <figcaption>{name}</figcaption>
+            </figure>
+          ))}
+        <div>
+          <strong>{words(b.evaluation.coverage_status)} coverage</strong>
+          <p className="muted">
+            {refs.reference_approvals.some(
+              (a) =>
+                a.motion_guide_id === guide?.id &&
+                refs.active_approval_ids.includes(a.id),
+            )
+              ? "Reference authority active"
+              : "Reference authority unavailable"}
+          </p>
+        </div>
+      </div>
+      <div className="evidence-filters">
+        <strong>Evaluation checks</strong>
+        <span>{checks.length} recorded</span>
+      </div>
+      {checks.map((c, i) => (
+        <Check
+          key={i}
+          check={c}
+          selected={scopeSlot(c) === clock.slot}
+          onSelect={() => {
+            const slot = scopeSlot(c);
+            if (slot !== null) focus(slot);
+          }}
+        />
+      ))}
+      <details className="provenance">
+        <summary>Evaluation provenance</summary>
+        <dl className="facts">
+          <dt>Media source</dt>
+          <dd>{sourceKinds.join(", ")}</dd>
+          <dt>Native canvas</dt>
+          <dd>
+            {width} × {height} px · {timing.ticks_per_second || 60} ticks/s
+          </dd>
+          <dt>Packet</dt>
+          <dd>{id}</dd>
+          <dt>Revision</dt>
+          <dd>{revision}</dd>
+          <dt>Evaluation</dt>
+          <dd>{b.evaluation.id}</dd>
+          <dt>Evidence digest</dt>
+          <dd>{b.evaluation.evidence_manifest_sha256 || "Unavailable"}</dd>
+        </dl>
+      </details>
+    </>
+  );
   return (
     <>
-      <div className="sequence-context">
-        <h1
-          className="sr-only"
-          id="packet-title"
-          data-packet-id={id}
-          data-revision-id={revision}
-          data-evaluation-id={b.evaluation.id}
-        >
-          {actionName(b)} {revision}
-        </h1>
-        <select
-          className="sequence-picker"
-          aria-label="Clip revision"
-          title={revision}
-          value={id}
-          onChange={(e) => nav({ name: "packet", id: e.target.value })}
-        >
-          {choices.map((choice) => (
-            <option key={packetId(choice)} value={packetId(choice)}>
-              {actionName(choice)} ·{" "}
-              {revisionId(choice).match(/r\d+$/i)?.[0] || revisionId(choice)}
-            </option>
-          ))}
-        </select>
-        <div className="sequence-status">
-          <span
-            className={"status " + b.evaluation.technical_status}
-            title="Technical evaluation"
-          >
-            {words(b.evaluation.technical_status)}
-          </span>
-          <span title="Evidence coverage">
-            {words(b.evaluation.coverage_status)} coverage
-          </span>
-          <span title="Human review">
-            {words(b.current_decision.acceptance || "unreviewed")}
-          </span>
-        </div>
-        <select
-          aria-label="Compare candidate with"
-          value={compare}
-          onChange={(e) => setCompare(e.target.value as typeof compare)}
-        >
-          <option value="reference">Phase reference</option>
-          {base && (
-            <option value="baseline" disabled={!baselineReady}>
-              Baseline
-              {comparison.data && !baselineReady ? " · timing differs" : ""}
-            </option>
-          )}
-        </select>
-        {base && comparison.data && !baselineReady && (
-          <button
-            onClick={() => nav({ name: "compare", base, other: revision })}
-          >
-            Compare timing
-          </button>
-        )}
-      </div>
-      <Err e={comparison.err} />
-      <Film
-        ref={controls.film}
-        filmKey={"packet-" + id}
-        count={b.frames.length}
-        sequence
-        labels={[
-          compare === "baseline" && baselineReady ? "Baseline" : "Reference",
-          "Candidate",
-        ]}
-        selected={clock.slot}
-        onStep={focus}
-        onZoom={controls.setZoom}
-        onPosition={controls.setPosition}
-      >
-        <div className="reel-ruler">
-          {b.frames.map((f, i) => (
-            <button
-              key={i}
-              aria-label={`Frame ${i + 1}`}
-              aria-pressed={selected.includes(i)}
-              onClick={(e) => focus(i, e.shiftKey)}
+      <div className={"packet-workspace" + (expanded ? " expanded-film" : "")}>
+        <section className="film-window">
+          <header className="pane-title viewer-title">
+            <span className="file-icon">
+              <Icon name="film" />
+            </span>
+            <h1
+              id="packet-title"
+              data-packet-id={id}
+              data-revision-id={revision}
+              data-evaluation-id={b.evaluation.id}
             >
-              {String(i + 1).padStart(2, "0")}
+              {actionName(b)}{" "}
+              <small>{revision.match(/r\d+$/i)?.[0] || revision}</small>
+              <span className="sr-only"> {revision}</span>
+            </h1>
+            <div className="title-grip" aria-hidden="true" />
+            <div className="sequence-status">
+              <span className={"badge " + b.evaluation.technical_status}>
+                Technical {words(b.evaluation.technical_status)}
+              </span>
+              <span
+                className={
+                  "badge coverage " +
+                  (b.evaluation.coverage_status === "complete"
+                    ? ""
+                    : "incomplete")
+                }
+              >
+                {words(b.evaluation.coverage_status)} coverage
+              </span>
+              <span className="sr-only">
+                {words(b.current_decision.acceptance || "unreviewed")}
+              </span>
+            </div>
+            <button
+              className="window-control"
+              aria-label={
+                expanded ? "Restore workspace" : "Expand film workspace"
+              }
+              aria-pressed={expanded}
+              onClick={() => setExpanded(!expanded)}
+            >
+              <Icon name="expand" />
             </button>
-          ))}
-        </div>
-        {[rowFrames, urls].map((row, lane) => (
-          <div
-            className={
-              "reel-stock reel-lane " + (lane ? "candidate" : "reference")
-            }
-            key={lane}
-          >
-            <div className="reel-shot-row">
-              {row.map((url, i) => {
-                const first = tickOfSlot(holds, i),
-                  last = first + holds[i] - 1,
-                  attached = frameIssues(issues, b, first, last);
-                const scoped = b.evaluation.results.filter(
-                  (c) => scopeSlot(c) === i,
-                );
-                const metrics = scoped
-                  .filter(
-                    (c) =>
-                      c.observed_value != null ||
-                      ["unmeasured", "error"].includes(c.outcome),
-                  )
-                  .sort(
-                    (a, z) =>
-                      Number(z.constraint_id.includes("silhouette")) -
-                      Number(a.constraint_id.includes("silhouette")),
-                  )
-                  .slice(0, 2);
-                const attention = scoped.find((c) =>
-                  ["fail", "error", "unmeasured"].includes(c.outcome),
-                );
-                return (
-                  <div className="reel-frame-unit" key={i}>
-                    <button
-                      className={
-                        "reel-frame " + (clock.slot === i ? "is-current" : "")
-                      }
-                      aria-label={`${lane ? "Candidate" : "Reference"}, frame ${i + 1}`}
-                      aria-pressed={selected.includes(i)}
-                      onClick={(e) => focus(i, e.shiftKey)}
-                      onDoubleClick={() => open("film", i)}
-                    >
-                      <span className="frame-aperture">
-                        {url ? (
-                          <img
-                            draggable={false}
-                            id={
-                              lane && clock.slot === i ? "frame-img" : undefined
-                            }
-                            src={url}
-                            alt={`${lane ? "Candidate" : "Reference"} frame ${i + 1}`}
-                          />
-                        ) : (
-                          <span className="missing-reference">
-                            Reference unavailable
+          </header>
+          <div className="viewer-toolbar">
+            <select
+              aria-label="Compare candidate with"
+              value={compare}
+              onChange={(e) => setCompare(e.target.value as typeof compare)}
+            >
+              <option value="reference">Phase reference</option>
+              {base && (
+                <option value="baseline" disabled={!baselineReady}>
+                  Previous revision
+                  {comparison.data && !baselineReady ? " · timing differs" : ""}
+                </option>
+              )}
+            </select>
+            {base && comparison.data && !baselineReady && (
+              <button
+                className="text-button"
+                onClick={() => nav({ name: "compare", base, other: revision })}
+              >
+                Compare timing
+              </button>
+            )}
+            <div className="control-zoom" role="group" aria-label="Film zoom">
+              <button
+                aria-label="Zoom out"
+                disabled={controls.zoom <= 5}
+                onClick={() => controls.film.current?.zoom(-1)}
+              >
+                −
+              </button>
+              <button
+                className="zoom-value"
+                aria-label={`Zoom ${controls.zoom}%. Reset to 100%.`}
+                onClick={() => controls.film.current?.reset()}
+              >
+                {controls.zoom}%
+              </button>
+              <button
+                aria-label="Zoom in"
+                disabled={controls.zoom >= 200}
+                onClick={() => controls.film.current?.zoom(1)}
+              >
+                +
+              </button>
+              <button onClick={() => controls.film.current?.fit()}>Fit</button>
+            </div>
+          </div>
+          <Err e={comparison.err} />
+          <div className="film-stage">
+            <Film
+              ref={controls.film}
+              filmKey={"packet-" + id}
+              count={b.frames.length}
+              sequence
+              labels={[
+                compare === "baseline" && baselineReady
+                  ? "Previous"
+                  : "Reference",
+                "Candidate",
+                "Checks",
+              ]}
+              selected={clock.slot}
+              onStep={focus}
+              onZoom={controls.setZoom}
+              onPosition={controls.setPosition}
+            >
+              <div className="reel-ruler">
+                {b.frames.map((f, i) => (
+                  <button
+                    key={i}
+                    aria-label={`Frame ${i + 1}`}
+                    aria-pressed={selected.includes(i)}
+                    onClick={(e) => focus(i, e.shiftKey)}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                    <small>
+                      {tickOfSlot(holds, i)}–
+                      {tickOfSlot(holds, i) + f.hold_ticks - 1}
+                    </small>
+                  </button>
+                ))}
+              </div>
+              {[rowFrames, urls].map((row, lane) => (
+                <div
+                  className={
+                    "reel-stock reel-lane " + (lane ? "candidate" : "reference")
+                  }
+                  key={lane}
+                >
+                  <div className="reel-shot-row">
+                    {row.map((url, i) => (
+                      <div className="reel-frame-unit" key={i}>
+                        <button
+                          className={
+                            "reel-frame " +
+                            (clock.slot === i ? "is-current" : "")
+                          }
+                          aria-label={`${lane ? "Candidate" : "Reference"}, frame ${i + 1}`}
+                          aria-pressed={selected.includes(i)}
+                          onClick={(e) => focus(i, e.shiftKey)}
+                          onDoubleClick={() => open("film", i)}
+                        >
+                          <span className="frame-aperture">
+                            {url ? (
+                              <img
+                                draggable={false}
+                                id={
+                                  lane && clock.slot === i
+                                    ? "frame-img"
+                                    : undefined
+                                }
+                                src={url}
+                                alt={`${lane ? "Candidate" : "Reference"} frame ${i + 1}`}
+                              />
+                            ) : (
+                              <span className="missing-reference">
+                                Reference unavailable
+                              </span>
+                            )}
                           </span>
-                        )}
-                        {lane === 1 && <span className="frame-focus-mark" />}
-                      </span>
-                    </button>
-                    {lane === 1 && (
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div
+                className="measurement-track"
+                aria-label="Frame measurements"
+              >
+                <div className="measurement-row">
+                  {b.frames.map((f, i) => {
+                    const attached = frameIssues(
+                      issues,
+                      b,
+                      tickOfSlot(holds, i),
+                      tickOfSlot(holds, i) + f.hold_ticks - 1,
+                    );
+                    const scoped = b.evaluation.results.filter(
+                      (c) => scopeSlot(c) === i,
+                    );
+                    const metrics = scoped
+                      .filter(
+                        (c) =>
+                          c.constraint_id.includes("silhouette") ||
+                          ["fail", "error", "unmeasured"].includes(c.outcome),
+                      )
+                      .sort(
+                        (a, z) =>
+                          Number(z.constraint_id.includes("silhouette")) -
+                          Number(a.constraint_id.includes("silhouette")),
+                      );
+                    const attention = scoped.some((c) =>
+                      ["fail", "error", "unmeasured"].includes(c.outcome),
+                    );
+                    return (
                       <div
-                        className="frame-evidence"
-                        aria-label={`Frame ${i + 1} evidence and corrections`}
+                        className={
+                          "measurement-cell" +
+                          (clock.slot === i ? " is-current" : "") +
+                          (attention ? " needs-attention" : "")
+                        }
+                        key={i}
+                        aria-label={`Frame ${i + 1} measurements`}
                       >
-                        {metrics.length ? (
-                          metrics.map((m, n) => (
+                        <div className="measurement-values">
+                          {metrics.map((m, n) => (
                             <button
-                              key={n}
                               className={"frame-measure " + m.outcome}
+                              key={n}
+                              title={`${m.reason} · allowed ${boundLabel(m)}`}
                               aria-label={`${words(m.constraint_id)}, frame ${i + 1}: ${valueLabel(m)}`}
-                              title={m.reason}
                               onClick={() => {
                                 focus(i);
                                 open("evidence", i);
                               }}
                             >
-                              <span>
+                              <span className="measurement-label">
                                 {words(
                                   m.constraint_id.replace("silhouette-", ""),
                                 )}
+                                {m.constraint_id.startsWith("silhouette-")
+                                  ? " Δ"
+                                  : ""}
                               </span>
-                              <strong>{valueLabel(m)}</strong>
-                              <small>{boundLabel(m)}</small>
+                              <strong>
+                                {m.outcome === "unmeasured"
+                                  ? "Unmeasured"
+                                  : valueLabel(m)}
+                              </strong>
+                              <small>
+                                {m.expected_interval?.[1] != null
+                                  ? `/ ${m.units === "fraction" ? Math.round(m.expected_interval[1] * 100) + "%" : m.expected_interval[1]}`
+                                  : words(m.outcome)}
+                              </small>
                             </button>
-                          ))
-                        ) : (
-                          <span className="frame-no-issues">
-                            No measurements recorded
-                          </span>
-                        )}
-                        <div className="frame-corrections">
-                          {attached.length ? (
-                            <button
-                              className={
-                                "frame-issue " +
-                                (attached[0].task_status === "resolved"
-                                  ? "resolved"
-                                  : "open")
-                              }
-                              title={attached
-                                .map(
-                                  (iss) =>
-                                    `${iss.category} · ${iss.task_status} · ${iss.clip_revision_id} · ticks ${iss.frame_range?.join("–") || "all"} · ${iss.note}`,
-                                )
-                                .join("\n")}
-                              onClick={() => {
-                                focus(i);
-                                setIssueId(attached[0].event_id);
-                                open("tasks", i);
-                              }}
-                            >
-                              <span className="issue-dot" />
-                              <span>
-                                <strong>
-                                  {attached.length > 1
-                                    ? `${attached.length} corrections`
-                                    : words(attached[0].category)}
-                                </strong>
-                                <small>
-                                  {words(attached[0].task_status || "open")}
-                                  {attached[0].clip_revision_id !== revision
-                                    ? " · " + attached[0].clip_revision_id
-                                    : ""}
-                                </small>
-                                <span className="correction-note">
-                                  {attached[0].note}
-                                </span>
-                              </span>
-                            </button>
-                          ) : attention ? (
-                            <button
-                              className="frame-unknown"
-                              title={attention.reason}
-                              onClick={() => {
-                                focus(i);
-                                open("evidence", i);
-                              }}
-                            >
-                              {words(attention.constraint_id)}
-                              <span>{words(attention.outcome)}</span>
-                            </button>
-                          ) : (
-                            <span className="frame-no-issues">
-                              Corrections <span>0</span>
-                            </span>
-                          )}
+                          ))}
+                        </div>
+                        {attached.length > 0 && (
                           <button
-                            className="frame-add-correction"
-                            aria-label={`Request correction for frame ${i + 1}`}
+                            className={
+                              "frame-issue " +
+                              (attached[0].task_status === "resolved"
+                                ? "resolved"
+                                : "open")
+                            }
+                            title={attached
+                              .map(
+                                (issue) =>
+                                  `${issue.note} · ${issue.task_status} · ${issue.clip_revision_id}`,
+                              )
+                              .join("\n")}
                             onClick={() => {
                               focus(i);
-                              open("correction", i, true);
+                              setIssueId(attached[0].event_id);
+                              open("tasks", i);
                             }}
                           >
-                            <Icon name="plus" />
+                            <span className="issue-dot" />
+                            <span className="correction-note">
+                              {attached[0].note}
+                            </span>
+                            <small>
+                              {attached.length > 1
+                                ? attached.length
+                                : words(attached[0].task_status || "open")}
+                            </small>
                           </button>
-                        </div>
+                        )}
+                        <span
+                          className="measurement-signal"
+                          aria-hidden="true"
+                        />
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </Film>
           </div>
-        ))}
-      </Film>
-      <FilmDock
-        controls={controls}
-        index={clock.slot}
-        count={b.frames.length}
-        onSelect={focus}
-        caption={
-          <>
+          <footer className="review-controls" aria-label="Film controls">
+            <div className="control-transport">
+              <button
+                aria-label="Previous frame"
+                disabled={clock.slot === 0}
+                onClick={() => focus(clock.slot - 1)}
+              >
+                <Icon name="left" />
+              </button>
+              <button
+                className="transport-play"
+                aria-label={clock.playing ? "Pause" : "Play"}
+                onClick={() => clock.setPlaying(!clock.playing)}
+              >
+                <Icon name={clock.playing ? "pause" : "play"} />
+              </button>
+              <button
+                aria-label="Next frame"
+                disabled={clock.slot === holds.length - 1}
+                onClick={() => focus(clock.slot + 1)}
+              >
+                <Icon name="right" />
+              </button>
+            </div>
+            <output className="control-counter">
+              {String(clock.slot + 1).padStart(2, "0")} /{" "}
+              {String(holds.length).padStart(2, "0")}
+            </output>
+            <div className="control-caption">
+              <strong>
+                {selected.length > 1
+                  ? `${selected.length} frames`
+                  : words(current.phase)}
+              </strong>
+              <span>
+                {tickOfSlot(holds, selectedFirst)}–
+                {tickOfSlot(holds, selectedLast) + holds[selectedLast] - 1}{" "}
+                ticks
+              </span>
+            </div>
+            <span className="transport-tick">tick {clock.tick}</span>
+            <select
+              aria-label="Playback speed"
+              value={clock.speed}
+              onChange={(e) => clock.setSpeed(Number(e.target.value))}
+            >
+              {[0.25, 0.5, 1, 1.5, 2, 4].map((speed) => (
+                <option key={speed} value={speed}>
+                  {speed}×
+                </option>
+              ))}
+            </select>
+          </footer>
+        </section>
+        <aside
+          className={
+            "frame-inspector" + (tab === "evidence" ? " showing-evidence" : "")
+          }
+          aria-label="Selected frame details"
+        >
+          <header className="pane-title inspector-heading">
             <strong>
-              {selected.length > 1
-                ? `${selected.length} frames`
-                : words(current.phase)}
+              {tab === "evidence"
+                ? "Evaluation checks"
+                : `Frame ${String(clock.slot + 1).padStart(2, "0")}`}
             </strong>
-            <span>
-              {tickOfSlot(holds, selectedFirst)}–
-              {tickOfSlot(holds, selectedLast) + holds[selectedLast] - 1} ticks
-            </span>
-          </>
-        }
-      >
-        <button
-          className="reel-icon"
-          aria-label={clock.playing ? "Pause" : "Play"}
-          onClick={() => {
-            if (!clock.playing) open("film");
-            clock.setPlaying(!clock.playing);
-          }}
+            <div className="title-grip" aria-hidden="true" />
+            {tab === "evidence" ? (
+              <button
+                className="window-control"
+                aria-label="Close evidence"
+                onClick={() => setTab(null)}
+              >
+                <Icon name="close" />
+              </button>
+            ) : (
+              <span>
+                {width} × {height}
+              </span>
+            )}
+          </header>
+          {tab === "evidence" ? (
+            <div className="frame-inspector-content evidence-panel">
+              {evidencePanel}
+            </div>
+          ) : (
+            <>
+              <div className="frame-inspector-content">
+                <div
+                  className="selected-stage"
+                  style={{ aspectRatio: `${width}/${height}` }}
+                >
+                  <button
+                    aria-label="Open frame preview"
+                    onClick={() => open("film")}
+                  >
+                    <img
+                      draggable={false}
+                      src={current.asset_url}
+                      alt="Selected candidate frame"
+                    />
+                  </button>
+                  {overlapping
+                    .filter(
+                      (iss) =>
+                        iss.roi &&
+                        !["resolved", "cancelled"].includes(
+                          iss.task_status || "open",
+                        ),
+                    )
+                    .map((iss) => (
+                      <span
+                        className="region-box"
+                        key={iss.event_id}
+                        title={iss.note}
+                        style={{
+                          left: `${(iss.roi!.left / width) * 100}%`,
+                          top: `${(iss.roi!.top / height) * 100}%`,
+                          width: `${((iss.roi!.right - iss.roi!.left) / width) * 100}%`,
+                          height: `${((iss.roi!.bottom - iss.roi!.top) / height) * 100}%`,
+                        }}
+                      />
+                    ))}
+                </div>
+                {media.errors.has(current.asset_url) && (
+                  <p className="error" role="alert">
+                    {media.errors.get(current.asset_url)}
+                  </p>
+                )}
+                <section className="frame-findings">
+                  <header>
+                    <h2>Checks</h2>
+                    <button
+                      className="text-button"
+                      onClick={() => open("evidence")}
+                    >
+                      {checks.length} checks ↗
+                    </button>
+                  </header>
+                  {b.evaluation.results
+                    .filter(
+                      (c) =>
+                        scopeSlot(c) === clock.slot &&
+                        c.constraint_id !== "registration",
+                    )
+                    .map((check, i) => (
+                      <Measure key={i} check={check} />
+                    ))}
+                </section>
+                <section className="frame-corrections">
+                  <header>
+                    <h2>Corrections</h2>
+                    <span>{overlapping.length}</span>
+                  </header>
+                  {overlapping.map((iss) => (
+                    <button
+                      className="inspector-correction"
+                      key={iss.event_id}
+                      onClick={() => {
+                        setIssueId(iss.event_id);
+                        open("tasks");
+                      }}
+                    >
+                      <strong>{iss.note}</strong>
+                      <small>
+                        {words(iss.task_status || "open")} ·{" "}
+                        {iss.frame_range?.join("–") || "all"} ticks
+                        {iss.clip_revision_id !== revision
+                          ? ` · ${iss.clip_revision_id}`
+                          : ""}
+                      </small>
+                    </button>
+                  ))}
+                  <button
+                    className="correction-action"
+                    aria-label="Request correction"
+                    onClick={() => open("correction")}
+                  >
+                    <Icon name="plus" />
+                    Correction
+                  </button>
+                </section>
+                <section
+                  className="reference-stills"
+                  aria-label="Frozen visual references"
+                >
+                  {[
+                    ["Identity", contractRefs?.identity],
+                    ["Style", contractRefs?.style],
+                  ]
+                    .filter(([, asset]) => Boolean(asset))
+                    .map(([label, asset]) => (
+                      <button
+                        key={label}
+                        onClick={() =>
+                          setReferenceAsset({ label: label!, id: asset! })
+                        }
+                      >
+                        <img
+                          src={api.assetUrl(asset!)}
+                          alt={`Frozen ${label?.toLowerCase()} reference`}
+                        />
+                        <span>{label}</span>
+                      </button>
+                    ))}
+                </section>
+              </div>
+              <div className="review-actions">
+                <div className="review-state">
+                  <span>Human review</span>
+                  <strong>
+                    {words(b.current_decision.acceptance || "unreviewed")}
+                  </strong>
+                </div>
+                <button className="primary" onClick={() => open("decision")}>
+                  Decision <Icon name="right" />
+                </button>
+              </div>
+            </>
+          )}
+        </aside>
+      </div>
+      {referenceAsset && (
+        <Modal
+          title={`${referenceAsset.label} reference`}
+          onClose={() => setReferenceAsset(null)}
         >
-          <Icon name={clock.playing ? "pause" : "play"} />
-        </button>
-        <button className="reel-secondary" onClick={() => open("evidence")}>
-          Evidence
-        </button>
-        <button
-          className="reel-secondary correction-action"
-          aria-label="Request correction"
-          onClick={() => open("correction")}
-        >
-          <Icon name="plus" />
-          <span>Correction</span>
-        </button>
-        <button className="reel-primary" onClick={() => open("decision")}>
-          Decision
-          <Icon name="check" />
-        </button>
-      </FilmDock>
-      {tab && (
+          <div className="reference-enlarged">
+            <img
+              src={api.assetUrl(referenceAsset.id)}
+              alt={`${referenceAsset.label} reference`}
+            />
+          </div>
+        </Modal>
+      )}
+      {tab && tab !== "evidence" && (
         <Modal
           wide
           onKeyDown={(e) => {
@@ -823,94 +1123,6 @@ export function PacketWorkspace({
                   </form>
                 )}
               </div>
-            )}
-            {tab === "evidence" && (
-              <>
-                <div className="reference-line">
-                  {[
-                    ["Identity", contractRefs?.identity],
-                    ["Style", contractRefs?.style],
-                    [
-                      "Phase",
-                      phaseRefs.find((p) => p.slot === clock.slot)
-                        ?.motion_reference_id,
-                    ],
-                    [
-                      "Editable",
-                      guide?.entries.find((e) => e.phase === current.phase)
-                        ?.editable_mask_asset_id,
-                    ],
-                    [
-                      "Protected",
-                      guide?.entries.find((e) => e.phase === current.phase)
-                        ?.protected_mask_asset_id,
-                    ],
-                  ]
-                    .filter(([, asset]) => Boolean(asset))
-                    .map(([name, asset]) => (
-                      <figure key={name}>
-                        {asset && (
-                          <img
-                            src={api.assetUrl(asset)}
-                            alt={name || undefined}
-                          />
-                        )}
-                        <figcaption>{name}</figcaption>
-                      </figure>
-                    ))}
-                  <div>
-                    <strong>
-                      {words(b.evaluation.coverage_status)} coverage
-                    </strong>
-                    <p className="muted">
-                      {refs.reference_approvals.some(
-                        (a) =>
-                          a.motion_guide_id === guide?.id &&
-                          refs.active_approval_ids.includes(a.id),
-                      )
-                        ? "Reference authority active"
-                        : "Reference authority unavailable"}
-                    </p>
-                  </div>
-                </div>
-                <div className="evidence-filters">
-                  <strong>Evaluation checks</strong>
-                  <span>{checks.length} recorded</span>
-                </div>
-                {checks.map((c, i) => (
-                  <Check
-                    key={i}
-                    check={c}
-                    selected={scopeSlot(c) === clock.slot}
-                    onSelect={() => {
-                      const slot = scopeSlot(c);
-                      if (slot !== null) focus(slot);
-                    }}
-                  />
-                ))}
-                <details className="provenance">
-                  <summary>Evaluation provenance</summary>
-                  <dl className="facts">
-                    <dt>Media source</dt>
-                    <dd>{sourceKinds.join(", ")}</dd>
-                    <dt>Native canvas</dt>
-                    <dd>
-                      {width} × {height} px · {timing.ticks_per_second || 60}{" "}
-                      ticks/s
-                    </dd>
-                    <dt>Packet</dt>
-                    <dd>{id}</dd>
-                    <dt>Revision</dt>
-                    <dd>{revision}</dd>
-                    <dt>Evaluation</dt>
-                    <dd>{b.evaluation.id}</dd>
-                    <dt>Evidence digest</dt>
-                    <dd>
-                      {b.evaluation.evidence_manifest_sha256 || "Unavailable"}
-                    </dd>
-                  </dl>
-                </details>
-              </>
             )}
             {tab === "tasks" && (
               <div className="issue-stack">
@@ -1133,5 +1345,63 @@ function Check({
       </span>
       <p>{c.reason}</p>
     </button>
+  );
+}
+
+function Measure({ check }: { check: EvalResultDto }) {
+  const label =
+    (
+      {
+        "silhouette-area": "Area drift",
+        "silhouette-width": "Width drift",
+        "visible-torso-span": "Torso span",
+      } as Record<string, string>
+    )[check.constraint_id] || words(check.constraint_id);
+  const ratio =
+    check.units === "fraction" && typeof check.observed_value === "number";
+  const max = check.expected_interval?.[1];
+  return (
+    <div className={"measure " + check.outcome}>
+      <div className="measure-title">
+        <span title={words(check.constraint_id)}>{label}</span>
+        <strong>
+          {check.outcome === "unmeasured"
+            ? "Unmeasured"
+            : check.outcome === "not_applicable"
+              ? "N/A"
+              : valueLabel(check)}
+          {max != null && (
+            <small title="Maximum allowed">
+              {" "}
+              / {ratio ? Math.round(max * 100) + "%" : max}
+            </small>
+          )}
+        </strong>
+      </div>
+      {ratio && max != null ? (
+        <div
+          className="measure-bar"
+          style={
+            {
+              "--value": `${Math.min(100, Number(check.observed_value) * 100)}%`,
+              "--limit": `${max * 100}%`,
+            } as React.CSSProperties
+          }
+          aria-label={`${label} ${valueLabel(check)}, allowed ${boundLabel(check)}`}
+        >
+          <i />
+        </div>
+      ) : (
+        check.outcome !== "pass" && (
+          <p title={check.reason}>
+            {check.outcome === "unmeasured"
+              ? "Needs annotation"
+              : check.outcome === "not_applicable"
+                ? "Occluded in contract"
+                : check.reason}
+          </p>
+        )
+      )}
+    </div>
   );
 }
