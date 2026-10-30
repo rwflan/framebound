@@ -144,7 +144,9 @@ export function Icon({
     | "check"
     | "folder"
     | "refresh"
-    | "frame";
+    | "frame"
+    | "inbox"
+    | "history";
 }) {
   const paths = {
     left: "m14 6-6 6 6 6",
@@ -157,6 +159,8 @@ export function Icon({
     folder: "M3 7V5h6l2 2h10v13H3Z",
     refresh: "M20 8a8 8 0 1 0 0 8M20 3v5h-5",
     frame: "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5",
+    inbox: "M4 4h16v16H4ZM4 14h5l1 3h4l1-3h5",
+    history: "M4 8a9 9 0 1 1-1 7M4 3v5h5M12 7v5l3 2",
   };
   return (
     <svg

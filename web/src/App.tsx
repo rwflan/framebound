@@ -186,7 +186,7 @@ export default function App() {
           aria-label="Framebound"
         >
           <Icon name="frame" />
-          Framebound
+          <span>Framebound</span>
         </button>
         <nav className="review-navigation" aria-label="Review views">
           <button
@@ -197,7 +197,11 @@ export default function App() {
               nav({ name: "inbox" });
             }}
           >
-            Interventions<span>{interventions.length}</span>
+            <span className="nav-icon">
+              <Icon name="inbox" />
+              <span className="nav-count">{interventions.length}</span>
+            </span>
+            <span>Interventions</span>
           </button>
           <button
             aria-current={
@@ -205,7 +209,10 @@ export default function App() {
             }
             onClick={() => nav({ name: "activity" })}
           >
-            Timeline
+            <span className="nav-icon">
+              <Icon name="history" />
+            </span>
+            <span>Timeline</span>
           </button>
         </nav>
         <details className="workspace-switcher">
