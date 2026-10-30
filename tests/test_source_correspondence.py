@@ -162,3 +162,15 @@ def test_earlier_v3_snapshot_without_optional_source_records_still_validates(tmp
     manifest=json.loads((out/'manifest.json').read_text());manifest['files'].pop('closure/source_records.jsonl')
     (out/'manifest.json').write_text(json.dumps(manifest));_resign(out,[])
     report=validate_snapshot(str(out));assert report['ok'],report['issues']
+
+
+def test_output_eligibility_rechecks_source_evidence_after_completion(tmp_path):
+    project,spec,candidate=source_task(tmp_path)
+    tasks.create(project,spec);loop.start(project,'enhance','run');loop.submit(project,'run','enhanced',candidate)
+    assert loop.eligibility(project,'run')['eligible']
+    con=S.connect(project);asset,_=S.get(con,'assets','source-1');con.close()
+    blob=S.blob_path(project,asset['byte_sha256']);original=blob.read_bytes();blob.unlink()
+    result=loop.eligibility(project,'run')
+    assert not result['eligible'] and 'missing_or_changed_asset:source-1' in result['reasons']
+    blob.write_bytes(original)
+    assert loop.eligibility(project,'run')['eligible']

@@ -122,6 +122,7 @@ def test_older_v3_record_keeps_its_original_fields_and_digest(tmp_path):
     original['spec'].pop('source_correspondence',None);original['spec'].pop('scene',None)
     original['spec']['limits'].pop('max_evaluation_pixels')
     original['spec']['limits'].pop('max_measurement_pixels')
+    original['spec']['limits'].pop('max_external_failures');original['spec']['limits'].pop('max_provider_failures')
     original['spec_sha256']=digest(original['spec'])
     original['evaluator_version']='task-negotiator-v1'
     con=tasks._connect(str(tmp_path))

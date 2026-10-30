@@ -520,3 +520,36 @@ than instructing the parent to re-import otherwise readable media. Older saved
 bundles retain version 1 semantics and their original evidence. Portable snapshots
 advertise `feedback-groups-v2` when needed and verify group membership against the
 saved targets.
+
+Current output eligibility rechecks the candidate, bound known-good source and
+contextual input assets, including their immutable asset records and byte hashes.
+Loss of an evidence dependency withholds current output even though the historical
+evaluation remains a recorded pass. Restoring the exact content-addressed bytes
+restores eligibility without fabricating a new artistic decision. The inspector
+shows this named output-policy result separately from evaluation and creative
+status, and identifies when it applies to a different current best revision.
+
+
+Parent-reported execution failures are durable even before the first candidate.
+Use CLI `agent-run-report-failure --project PROJECT --run-id RUN --report report.json`,
+MCP `agent_run_report_failure(run_id, report)` or `POST /v3/runs/RUN/failures`.
+A report has a stable `id`, `kind` (`provider_failure`, `tool_error`, or
+`missing_input`), actual `reason`, strict boolean `outcome_known`, and optional
+`provider`/`external_request_id`. Identical replay returns the original event and
+feedback; reusing an ID for another report fails. These are explicitly parent
+reports, not independently observed provider receipts, reviewer actions or grants
+to spend. No reporting operation dispatches a provider.
+
+`max_external_failures` (default 8) and `max_provider_failures` (default 3) persist
+across restarts and task revisions alongside submission/compute limits. An unknown
+provider outcome stops the run immediately without advertising a blind retry;
+neither a task change nor a creative approval clears that execution stop. Known
+failures within budget return concrete recovery/state instructions. Before pixels
+exist the saved handoff records no baseline, evaluation or fabricated defect.
+Compile task inputs after recovery, import the complete frame list, then bind the
+first submission to that current `feedback_id`. No pixel-repair ZIP is offered
+until there is a candidate; the same saved recovery text remains copyable and
+downloadable. Cancellation and explicit task changes supersede these instructions
+without rewriting the original report. Snapshots retain the full report/feedback
+history and advertise `pre-submission-feedback-v1`; validators check its actual
+parent source and absence of invented evaluation evidence.

@@ -72,3 +72,17 @@ def test_task_revision_validates_version_and_retains_open_human_scope(tmp_path):
     version=loop.get(project,'run')['version']
     with pytest.raises(S.StaleRevisionError):loop.revise_task(project,'run','revised',version-1)
     with pytest.raises(InvalidInput,match='saved human scope'):loop.revise_task(project,'run','revised',version)
+
+
+def test_completion_continuation_checks_eligibility_and_revised_task_can_resume(tmp_path):
+    project,spec,good=setup(tmp_path)
+    complete=loop.submit(project,'run','good',good)
+    assert complete['continuation']==dict(operation='agent_run_eligibility',arguments={'run_id':'run'},submission_allowed=False)
+    assert 'Before delivery' in I.handoff(project,complete['id'])['text']
+    spec['id']='next-task';spec['supersedes']='task';spec['change_reason']='Explicit subsequent task revision'
+    tasks.create(project,spec)
+    loop.revise_task(project,'run','next-task',loop.get(project,'run')['version'])
+    feedback=loop.get(project,'run')['feedback']
+    assert feedback['continuation']['operation']=='agent_run_submit'
+    assert feedback['continuation']['arguments']['parent_revision_id']=='good'
+    assert loop.submit(project,'run','next',good,parent_revision_id='good',feedback_id=feedback['id'])['disposition']=='complete'

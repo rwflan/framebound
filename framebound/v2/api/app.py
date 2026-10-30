@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import Field
 
 from ...v3.domain import TaskSpec, TaskRecord
+from ...v3.services.failures import FailureReport
 from ...v3.services.exports import ExportSelection
 from ...v3.services.interventions import MarkRequest, ResolveRequest, DecisionRequest
 from .. import domain as D
@@ -130,7 +131,7 @@ def create_app(project_dir: str) -> FastAPI:
     def reader_capabilities():
         return {'schema_versions':['2.0','3.0'],'dataset_versions':['2.3','3.0'],
                 'label_views':['human_accepted','automatically_verified','research','withheld'],
-                'automatic_labels_are_human_acceptance':False,'source_correspondence':'source-correspondence-v1','tracked_scene':'declared-color-camera-tracks-v1','preferences':'explicit-human-preferences-v1','feedback_bundle_versions':[1,2],'portable_handoff_formats':['framebound-handoff-1.0']}
+                'automatic_labels_are_human_acceptance':False,'source_correspondence':'source-correspondence-v1','tracked_scene':'declared-color-camera-tracks-v1','preferences':'explicit-human-preferences-v1','feedback_bundle_versions':[1,2],'pre_submission_feedback':'pre-submission-feedback-v1','portable_handoff_formats':['framebound-handoff-1.0']}
 
     @app.post('/v3/exports/preview')
     def agent_export_preview(body: ExportSelection):
@@ -243,6 +244,11 @@ def create_app(project_dir: str) -> FastAPI:
     def agent_run_eligibility(run_id: str):
         from ...v3.services import loop
         return loop.eligibility(project_dir, run_id)
+
+    @app.post('/v3/runs/{run_id}/failures')
+    def agent_run_report_failure(run_id: str, body: FailureReport):
+        from ...v3.services import failures
+        return failures.record(project_dir,run_id,body.model_dump(mode='json'))
 
     @app.post('/v3/runs/{run_id}/cancel')
     def agent_run_cancel(run_id: str, body: AgentCancelBody):

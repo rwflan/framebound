@@ -97,6 +97,7 @@ def main(argv=None):
         ('agent-decision', 'Save exact reviewer decision', [('--project', True), ('--run-id', True), ('--action', True), ('--session-token', False)]),
         ('agent-revision-get', 'Read exact revision and evidence', [('--project', True), ('--revision-id', True)]),
         ('agent-run-eligibility', 'Check automatic output policy', [('--project', True), ('--run-id', True)]),
+        ('agent-run-report-failure', 'Record a bounded parent-reported execution failure', [('--project',True),('--run-id',True),('--report',True)]),
         ('agent-run-cancel', 'Cancel external-agent work', [('--project', True), ('--run-id', True), ('--reason', True)]),
         ('agent-run-revise-task', 'Apply a superseding task without resetting run budgets', [('--project',True),('--run-id',True),('--task-id',True),('--expected-version',True)]),
         ('agent-run-start', 'Start/resume an external-agent run', [('--project', True), ('--task-id', True), ('--run-id', True)]),
@@ -259,7 +260,7 @@ def main(argv=None):
         _s = _bs(args.project)
         _aio.run(_s.run_stdio_async())
         return 0
-    if args.cmd in ("agent-handoff-export", "agent-handoff-import", "agent-run-revise-task", "animation-quality-benchmark", "agent-export-preview", "agent-export-build", "agent-satisfaction-record", "agent-handoff-get", "agent-intervention-get", "agent-intervention-mark", "agent-intervention-resolve", "agent-intervention-reopen", "agent-decision", "agent-revision-get", "agent-run-eligibility", "agent-run-cancel", "agent-run-start", "agent-run-get", "agent-run-submit", "task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
+    if args.cmd in ("agent-run-report-failure", "agent-handoff-export", "agent-handoff-import", "agent-run-revise-task", "animation-quality-benchmark", "agent-export-preview", "agent-export-build", "agent-satisfaction-record", "agent-handoff-get", "agent-intervention-get", "agent-intervention-mark", "agent-intervention-resolve", "agent-intervention-reopen", "agent-decision", "agent-revision-get", "agent-run-eligibility", "agent-run-cancel", "agent-run-start", "agent-run-get", "agent-run-submit", "task-create", "task-get", "task-compile-inputs", "task-migration-report", "provider-reconcile","provider-grant-get","provider-grant-revoke","animation-compile","animation-run","animation-start","animation-step","animation-get","source-calibrate","provider-grant", "project-create", "character-propose", "asset-import", "contract-propose", "clip-create", "clip-evaluate",
                     "brief-compile", "job-submit", "job-get", "job-claim",
                     "job-cancel", "job-reconcile", "orchestrator-run",
                     "orchestrator-send", "capabilities", "correction-claim", "correction-submit",

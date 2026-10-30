@@ -50,6 +50,9 @@ def dispatch(args) -> dict:
     if cmd.startswith('agent-run-'):
         from ..v3.services import loop
         from pathlib import Path
+        if cmd == 'agent-run-report-failure':
+            from ..v3.services import failures
+            return failures.record(args.project,args.run_id,json.loads(Path(args.report).read_text()))
         if cmd == 'agent-run-eligibility':
             return loop.eligibility(args.project, args.run_id)
         if cmd == 'agent-run-cancel':

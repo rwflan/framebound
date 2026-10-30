@@ -237,17 +237,24 @@ def preservation_in(con, project, run, images, spec):
 def render(bundle, *, portable=False):
     """Portable text contains only saved, user-visible instruction and evidence fields."""
     lines = [f"Continue animation run {bundle['run_id']} in project {bundle['project_id']}.",
-             f"Task {bundle['task_id']} targets revision {bundle['baseline_revision_id']}, evaluation {bundle['evaluation_id']}.",
+             (f"Task {bundle['task_id']} targets revision {bundle['baseline_revision_id']}, evaluation {bundle['evaluation_id']}." if bundle['baseline_revision_id'] else f"Task {bundle['task_id']} has no registered candidate or evaluation yet."),
              f"Saved feedback: {bundle['id']}; specification digest: {bundle['spec_sha256']}.",
              ('Open manifest.json and resolve asset IDs through its packaged assets map. Verify the saved hashes before editing.' if portable else 'First fetch agent_run_get and task_get. Verify the current revision and saved feedback ID before editing.'), '']
     if bundle.get('next_task_id'):
         lines.append(f"Task policy explicitly revised: {'read the packaged task' if portable else 'fetch'} {bundle['next_task_id']} with digest {bundle['next_spec_sha256']} before the next submission. Old evaluation evidence remains bound to the old task.")
     lines.append(f"Disposition: {bundle['disposition']}. {bundle.get('reason') or ''}")
+    if bundle.get('external_failure'):lines.append('Parent-reported execution failure: '+bundle['external_failure']['reason']+' This is not independent provider evidence or a grant to spend.')
     if bundle['disposition']=='blocked':
         lines.append('This run is stopped. Fetch agent_run_get for the recorded blocker and report it; do not submit or reset limits under a new run name.')
         return '\n'.join(lines)+'\n'
-    if bundle['disposition']=='complete' and not bundle['targets']:
-        lines.append('The named policy is satisfied; no further edit is requested. Creative status: '+bundle['creative_status']+'.')
+    if bundle['disposition']=='complete':
+        lines.append('The recorded evaluation satisfied the named policy; no further pixel edit is requested. Creative status: '+bundle['creative_status']+'.')
+        if bundle['targets']:lines.append('Advisory targets remain in the saved evidence; they are not proof of artistic completeness.')
+        if not portable:lines.append('Before delivery, fetch agent_run_eligibility (CLI: framebound agent-run-eligibility --project <project-directory> --run-id '+bundle['run_id']+') to verify current evidence availability and output policy.')
+        return '\n'.join(lines)+'\n'
+    if bundle['baseline_revision_id'] is None:
+        lines.append('No candidate has been registered. Recover the reported tool/input/provider failure within configured permissions, then call task_compile_inputs and agent_run_submit with the complete imported frame list and feedback_id '+bundle['id']+'.')
+        lines.append('CLI: framebound task-compile-inputs --project <project-directory> --task-id '+bundle.get('next_task_id',bundle['task_id'])+'; then framebound agent-run-submit --project <project-directory> --submission <bound-submission.json>.')
         return '\n'.join(lines)+'\n'
     for target in sorted(bundle['targets'], key=lambda t: (t['priority'], min(t['slots']), t['id'])):
         lines.append(f"Target {target['id']}: frames {', '.join(map(str,target['display_numbers']))}, ticks [{target['tick_range'][0]}, {target['tick_range'][1]}).")
@@ -304,6 +311,13 @@ def approved_in(con, run_id, revision_id, evaluation_id, run=None):
 
 
 def reconcile_in(con, run, event_id):
+    # Reviewer judgments may be recorded; they cannot replenish execution budgets
+    # or settle an unknown provider outcome. Keep the orchestration stop intact.
+    if (run.get('blocker_kind')=='provider_outcome_unknown'
+        or run.get('external_failures',0)>=run['limits'].get('max_external_failures',8)
+        or run.get('provider_failures',0)>=run['limits'].get('max_provider_failures',3)):
+        run['lifecycle']='blocked'
+        return
     rid = run['current_revision_id']
     evaluation = loop.get_in(con, 'agent_evaluations', f'evaluation:{rid}')
     spec = tasks._get(con, run['task_id']).spec
