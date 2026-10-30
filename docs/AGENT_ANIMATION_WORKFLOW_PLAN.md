@@ -11,8 +11,9 @@ reference-free intent and generation-input compilation. The [external-agent loop
 localized fail/repair/pass feedback, immutable submissions, persistent stopping
 limits and separate automatic output eligibility. Its controlled procedural
 benchmark does not claim arbitrary generated-art quality. Saved reviewer corrections, exact decisions and shared stale-aware handoff rendering
-are implemented in the same loop. Live workspace integration, training closure,
-optional source correspondence and broader profiles remain active implementation work.
+are implemented in the same loop. The live workspace now displays packet-free runs, candidate-first film, current/best
+revision history, exact event navigation, saved markup and copy/download handoffs.
+Training closure, optional source correspondence and broader profiles remain active implementation work.
 
 ## Goal
 

@@ -115,6 +115,16 @@ def create_app(project_dir: str) -> FastAPI:
     app.state.project_dir = project_dir
 
 
+    @app.get('/v3/desk')
+    def agent_desk():
+        from ...v3.services import desk
+        return desk.snapshot(project_dir)
+
+    @app.get('/v3/desk/revisions/{revision_id}')
+    def agent_desk_revision(revision_id: str):
+        from ...v3.services import desk
+        return desk.revision(project_dir,revision_id)
+
     @app.post('/v3/runs/{run_id}/agent-satisfaction')
     def agent_satisfaction(run_id: str, body: AgentSatisfactionBody, x_actor_id: str | None = Header(default=None)):
         from ...v3.services import interventions as I
@@ -354,9 +364,11 @@ def create_app(project_dir: str) -> FastAPI:
         if not reviewer:
             session = SN.create_session(project_dir)
             token, reviewer = session["session_token"], session["reviewer_id"]
-            response.set_cookie("fb_desk_review", token, httponly=True,
-                samesite="strict", secure=request.url.scheme == "https", path="/api",
-                max_age=SN.SESSION_TTL_HOURS * 3600)
+        # Both /api (reviewed guide) and /v3 (agent runs) use the same local reviewer boundary.
+        response.delete_cookie("fb_desk_review", path="/api")
+        response.set_cookie("fb_desk_review", token, httponly=True,
+            samesite="strict", secure=request.url.scheme == "https", path="/",
+            max_age=SN.SESSION_TTL_HOURS * 3600)
         response.headers["Cache-Control"] = "no-store"
         return {"ready": True}
 

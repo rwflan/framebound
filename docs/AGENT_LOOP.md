@@ -176,3 +176,37 @@ or `POST /v3/runs/RUN/agent-satisfaction` binds `revision_id`, `evaluation_id` a
 optional `note`. It neither creates human approval nor closes human corrections.
 A new revision starts with unreviewed creative status, preserving prior judgments
 as historical events.
+
+## Run workspace
+
+When a project has v3 runs, the default desk displays the run-based workspace.
+Interventions contains saved unresolved corrections, blocked/missing-input runs
+and exceptional decisions. An unreviewed automatically completed run does not
+enter that queue. Timeline shows durable events grouped by project, including
+machine/human/parent-agent sources; selecting a revision event opens that exact
+revision. The latest/current and best revisions remain visibly distinct from
+historical inspection. Ordinary runs appear without review packets.
+
+The main film contains the candidate and aligned check/correction track, with
+native pixels on neutral transparency backing. There is no empty reference lane.
+Compare previous is explicit and verifies authored timing before synchronizing
+playback. Contextual identity/style inputs are labeled by their actual role. The
+first actionable chronological frame is selected and centered on opening; live
+updates preserve inspection and unsaved correction text/region. Playback uses one
+main stage and leaves inspector/strip selection stable; pausing adopts its stopped
+frame once. Existing drag/elastic-end camera and zoom are reused.
+
+The correction inspector supports shift-selected frames or authored half-open tick
+ranges and native ROI drawing. Save precedes Copy instructions, and copy rechecks
+the exact saved bundle before accessing the clipboard. Failure exposes selectable
+text and a download of the same text; structured JSON is available. Decision and
+owner resolve/reopen actions use the same reviewer session as the reviewed-guide
+workspace. Reviewed-guide projects remain accessible through the existing routes
+and More workspaces, without converting old approvals to v3 labels.
+
+Read-only run documentation is available at `GET /v3/desk` and
+`GET /v3/desk/revisions/REVISION`. The real browser acceptance script is
+`node web/e2e/agent-workflow.mjs`; it launches a separate API process and drives a
+saved native markup through clipboard/download, a separate parent-agent CLI
+repair, exact owner resolution/reopen, historical event navigation, comparison,
+stable playback, live-update preservation and clipboard fallback.

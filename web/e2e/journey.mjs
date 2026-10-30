@@ -143,7 +143,7 @@ async function main() {
     assert(await page.getByRole('button',{name:'Sequences',exact:true}).count()===0, 'redundant Sequences navigation remains');
     assert(await page.getByLabel('Project',{exact:true}).count()===0, 'project selector remains in header');
     await page.getByRole('button',{name:'Evaluation recorded '+REVIEW_REV,exact:true}).first().click();
-    await page.locator('#packet-title').waitFor();
+    await page.locator(`#packet-title[data-revision-id="${REVIEW_REV}"]`).waitFor();
     assert(await page.locator('#packet-title').getAttribute('data-revision-id')===REVIEW_REV, 'timeline click loaded the wrong sequence');
 
     step = 'open-packet';
