@@ -55,15 +55,17 @@ It runs unittest, the full pytest suite, offline demos, stored verification,
 portable export round-trip, frontend type/type-freshness/unit/build checks and
 both the agent and reviewed-guide browser journeys. Live provider work remains
 explicitly opt-in; skipping it is not counted as a successful participant live
-observation. The full verification run passed: 421 pytest cases passed and 4 were skipped;
+observation. The full verification run passed: 423 pytest cases passed and 4 were skipped;
 the unittest stage, both offline demos, stored verification, export round-trip,
 frontend type/type-freshness/unit/build checks and both real browser journeys
 passed. The legacy browser guard recorded zero external socket attempts. Live
 specialist observation was skipped in offline mode and remains unproven. The
 focused old-task HTTP serialization regression test also passes.
 
-The standard `datasets` imagefolder loader has separately decoded a moved
-reference-free automatic/research snapshot with native pixels. That check used
+The standard `datasets` imagefolder loader has separately decoded all three views
+of a moved reference-free mixed-label snapshot: 3 human-approved procedural fixture
+frames, 9 technical-policy frames and 3 research frames, with their distinct label
+sources and native pixels preserved. That check used
 an isolated interpreter with working `lzma`; the checkout's default interpreter
 lacks that native module. PIL-only fallback is not described as standard-loader
 proof.
