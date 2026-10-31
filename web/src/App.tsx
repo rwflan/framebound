@@ -1,3 +1,4 @@
+import {UtilitiesMenu,UtilityWindow} from './DeskUtilities';
 import {KeyboardGuide} from './KeyboardGuide';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
@@ -79,13 +80,7 @@ async function loadDesk(): Promise<DeskData> {
 
 const shortRevision = (b: Bundle) =>
   revisionId(b).match(/r\d+$/i)?.[0] || revisionId(b);
-const workspaces = [
-  ["corrections", "Corrections"],
-  ["issues", "Issues"],
-  ["references", "References"],
-  ["export", "Export"],
-  ["status", "Status"],
-] as const;
+
 
 export default function App() {
   const {data,error,refresh}=useAgentDesk();
@@ -93,7 +88,7 @@ export default function App() {
   useEffect(()=>{const changed=()=>setHash(location.hash);window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[]);
   if(error)return <Err e={error}/>;
   if(!data)return <p>Loading workspace…</p>;
-  const legacy = /^#\/(packet|compare|issues|references|status|corrections|reviewed-guides)/.test(hash);
+  const legacy = /^#\/(packet|compare|issues|corrections)/.test(hash);
   if(data.runs.length && !legacy)return <AgentDesk data={data} onChange={refresh}/>;
   return <LegacyApp/>;
 }
@@ -313,23 +308,7 @@ function LegacyApp() {
             <span>Find sequence</span>
             <kbd>⌘ K</kbd>
           </button>
-          <details className="workspace-switcher">
-            <summary aria-label="More workspaces">•••</summary>
-            <nav aria-label="Workspaces">
-              {workspaces.map(([name, label]) => (
-                <button
-                  key={name}
-                  aria-current={view.name === name ? "page" : undefined}
-                  onClick={(e) => {
-                    e.currentTarget.closest("details")?.removeAttribute("open");
-                    nav({ name });
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
-          </details>
+          <UtilitiesMenu active={view.name==='references'?'reviewed-guides':view.name} extras={[{href:'#/corrections',title:'Correction tasks'},{href:'#/issues',title:'Issue records'}]}/>
         </header>
         <div className="desktop-body">
           <aside className="review-sidebar">
@@ -587,17 +566,17 @@ function LegacyApp() {
               </>
             )}
             {data && !inFilm && (
-              <div className="operations-content" key={view.name}>
+              <div className={view.name==='compare'?'operations-content':'utility-host'} key={view.name}>
                 {view.name === "compare" && (
                   <CompareView base={view.base} other={view.other} />
                 )}
                 {view.name === "issues" && (
-                  <IssuesView revision={view.revision} />
+                  <UtilityWindow view="issues"><IssuesView revision={view.revision} /></UtilityWindow>
                 )}
-                {view.name === "corrections" && <CorrectionsView />}
-                {view.name === "export" && <ExportView />}
-                {view.name === "references" && <ReferencesView />}
-                {view.name === "status" && <StatusView />}
+                {view.name === "corrections" && <UtilityWindow view="corrections"><CorrectionsView /></UtilityWindow>}
+                {view.name === "export" && <UtilityWindow view="export"><ExportView /></UtilityWindow>}
+                {view.name === "references" && <UtilityWindow view="reviewed-guides"><ReferencesView /></UtilityWindow>}
+                {view.name === "status" && <UtilityWindow view="status"><StatusView /></UtilityWindow>}
               </div>
             )}
           </main>

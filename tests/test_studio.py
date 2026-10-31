@@ -71,3 +71,18 @@ def test_versioned_receipt_reprocessing_does_not_send_or_erase_old_take(tmp_path
     assert after['versions'][-1]['parent']==before['case']['current']
     assert after['case']['current'].endswith('-alpha-v3')
     assert studio.snapshot(p)['budget']['spent']==10000
+
+def test_status_summary_exposes_work_without_feedback_payload_and_hides_superseded_failures(tmp_path):
+    p,c=prepared(tmp_path)
+    studio.submit(p,REVIEWER,c,dict(id='status-job',version_id='base',text='Private feedback'))
+    view=studio.snapshot(p)
+    assert view['work'][0]['state']=='queued'
+    assert 'request' not in view['work'][0] and 'Private feedback' not in str(view['work'])
+    class Timeout:
+        def execute(self,*a,**kw):raise TimeoutError('lost receipt')
+    studio.drain(p,Timeout())
+    assert studio.snapshot(p)['work'][0]['state']=='unknown'
+    assert studio.snapshot(p)['budget']['reserved']==10000
+    with studio.db(p) as con:
+        row=studio.get(con,'feedback','status-job');row.update(state='failed',superseded_by='new-take');studio.put(con,'feedback',row,True)
+    assert studio.snapshot(p)['work']==[]
