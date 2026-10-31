@@ -17,12 +17,12 @@ from .contracts import canonical, digest
 from .transfer import FeatureShard
 
 RECIPE = dict(version='masked-feature-head-v1',learning_rate=0.05,steps=200,seeds=[0,1,2],
-    unknown_loss='masked',features='native-numeric-v1',checkpoint_seconds=600)
+    implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),unknown_loss='masked',features='native-numeric-v1',checkpoint_seconds=600)
 
 
 def eligibility(shard: FeatureShard, categories):
     rows=[r for r in shard.rows if r.split=='train']
-    support={c:sum(r.assessed[CATEGORIES.index(c)] and r.targets[CATEGORIES.index(c)]==1 for r in rows) for c in categories}
+    support={c:sum(r.weight>=0.9 and r.assessed[CATEGORIES.index(c)] and r.targets[CATEGORIES.index(c)]==1 for r in rows) for c in categories}
     reasons=[]
     if len(rows)<300: reasons.append('requires 300 distinct training sequences')
     if len({r.family_id for r in rows})<75: reasons.append('requires 75 training families')
@@ -54,6 +54,7 @@ def _sigmoid(z): return 1/(1+np.exp(-np.clip(z,-40,40)))
 
 def fit(shard: FeatureShard, *, categories, model='linear', seed=0, steps=200, engineering=False, checkpoint=None):
     if any(c not in CATEGORIES for c in categories): raise ValueError('unsupported category')
+    if type(steps) is not int or not 1<=steps<=10000: raise ValueError('bounded positive training steps required')
     gate=eligibility(shard,categories)
     if not gate['eligible'] and not engineering: return dict(status='insufficient_support',gate=gate,checkpoint=None)
     rows=[r for r in shard.rows if r.split=='train']
@@ -88,7 +89,7 @@ def fit(shard: FeatureShard, *, categories, model='linear', seed=0, steps=200, e
             last_checkpoint=time.monotonic()
     artifact=dict(schema_version='feature-detector-1.0',model=model,weights=w.tolist(),bias=b.tolist(),mean=mean.tolist(),scale=scale.tolist(),
         categories=categories,seed=seed,steps=steps,recipe=RECIPE,data_sha256=digest(shard),engineering_only=engineering,
-        seconds=time.monotonic()-start,loss=loss,unsupported=['spatial ROI','severity','anatomy semantics without evaluated labels'])
+        loss=loss,unsupported=['spatial ROI','severity','anatomy semantics without evaluated labels'])
     if checkpoint: checkpoint(dict(step=steps,artifact=artifact))
     return dict(status='trained',gate=gate,checkpoint=artifact)
 
@@ -109,6 +110,20 @@ def wilson(successes,n,z=1.96):
     return [max(0.,float(center-radius)),min(1.,float(center+radius))]
 
 
+def family_precision_interval(scored,index,threshold):
+    groups={}
+    for row,score in scored:
+        group=groups.setdefault(row.family_id,[0,0])
+        if score>=threshold:group[0]+=row.targets[index];group[1]+=1
+    if len(groups)<2:return None
+    values=np.asarray(list(groups.values()),dtype=float)
+    rng=np.random.default_rng(0)
+    sampled=values[rng.integers(0,len(values),(1000,len(values)))].sum(axis=1)
+    valid=sampled[:,1]>0
+    if valid.sum()<950:return None
+    return np.quantile(sampled[valid,0]/sampled[valid,1],[.025,.975]).tolist()
+
+
 def calibrate(artifact,shard: FeatureShard):
     rows=[r for r in shard.rows if r.split=='validation']
     metrics={}
@@ -121,11 +136,12 @@ def calibrate(artifact,shard: FeatureShard):
             tp=sum(r.targets[i] for r in positives);n=len(positives)
             negatives=[r for r in assessed if r.challenge and not r.targets[i]]
             fp=sum(predict(artifact,r)['scores'][c]>=threshold for r in negatives)
-            curves.append(dict(threshold=threshold,precision=tp/n if n else None,precision_interval=wilson(tp,n),positive_support=n,
+            interval=family_precision_interval(scored,i,threshold)
+            curves.append(dict(threshold=threshold,precision=tp/n if n else None,precision_interval=interval,positive_support=n,
                 recall=tp/sum(r.targets[i] for r in assessed) if any(r.targets[i] for r in assessed) else None,
                 coverage=n/len(rows) if rows else 0,assessed_support=len(assessed),abstained=len(rows)-len(assessed),
                 challenge_support=len(negatives),challenge_fpr=fp/len(negatives) if negatives else None))
-        eligible=[v for v in curves if v['positive_support']>=30 and v['precision']>=0.9 and v['challenge_support']>=100 and v['challenge_fpr']<=0.05]
+        eligible=[v for v in curves if v['positive_support']>=30 and v['precision_interval'] is not None and v['precision']>=0.9 and v['challenge_support']>=100 and v['challenge_fpr']<=0.05]
         selected=max(eligible,key=lambda v:v['coverage']) if eligible else None
         metrics[c]=dict(selected=selected,curves=curves,status='eligible_for_comparison' if selected else 'insufficient_support_or_quality')
     return dict(split='validation_only',categories=metrics,promoted=False,
@@ -133,6 +149,10 @@ def calibrate(artifact,shard: FeatureShard):
 
 
 def fit_ranker(pairs, *, seed=0, steps=200):
+    families={}
+    for pair in pairs:
+        if pair['family'] in families and families[pair['family']]!=pair['split']:raise ValueError('ranker family crosses splits')
+        families[pair['family']]=pair['split']
     valid=[p for p in pairs if p['split']=='train' and p.get('preference') in {'baseline','candidate'} and p.get('assessed',False)]
     if len(valid)<30 or len({p['family'] for p in valid})<10:
         return dict(status='insufficient_support',pairs=len(valid),checkpoint=None)
@@ -192,7 +212,7 @@ def train_temporal_torch(shard, *, categories, seed=0, steps=200, checkpoint=Non
 def experiment(root, campaign, shard: FeatureShard, *, categories):
     from .contracts import local_path
     gate=eligibility(shard,categories)
-    folder=local_path(root,f'campaigns/{campaign}/checkpoints/{digest(shard)}')
+    folder=local_path(root,f'campaigns/{campaign}/checkpoints/{digest([digest(shard),digest(RECIPE)])}')
     folder.mkdir(parents=True,exist_ok=True)
     results=[]
     if gate['eligible']:

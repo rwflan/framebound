@@ -1,0 +1,102 @@
+import base64
+import io
+import json
+
+from PIL import Image
+
+from framebound.v3.campaign.contracts import Prices,canonical,curriculum
+from framebound.v3.campaign.dispatch import Response
+from framebound.v3.campaign.ledger import Ledger
+from framebound.v3.campaign.runner import Runner
+from framebound.v3.campaign.assessment import CATEGORIES
+
+
+class EngineeringSpecialist:
+    def __init__(self): self.sends=[]
+    def execute(self,request,*,timeout):
+        self.sends.append(request)
+        op=request['operation']
+        if request['images']:
+            image=Image.new('RGBA',(96,64) if op!='anchor' else (64,64),(50,60,70,255))
+            stream=io.BytesIO();image.save(stream,format='PNG')
+            body=dict(status='completed',output=[dict(type='image_generation_call',result=base64.b64encode(stream.getvalue()).decode())])
+        else:
+            if op=='diagnose':
+                coverage=[dict(category=c,status='absent_within_assessed_scope',slots=list(range(6)),limitations='Synthetic engineering coverage') for c in CATEGORIES]
+                findings=[]
+                if request['attempt']<2:
+                    coverage[1]['status']='present';coverage[1]['slots']=[0]
+                    findings=[dict(id='f',category='parts',slots=[0],tick_range=[0,2],subject='actor',severity='material',visibility='supported',
+                        observed='Engineering inserted defect',expected='Engineering correction',counterexamples='Test-only observation, no real Muse evidence')]
+                text=dict(coverage=coverage,findings=findings)
+            else:text=dict(preference='tie',target_improved=False,material_regression=False,evidence='Synthetic tie',assessed_categories=['parts'])
+            body=dict(status='completed',output=[dict(type='output_text',text=json.dumps(text))])
+        return Response(canonical(body),request['quote'],int(request['images']>0),dict(response_id='TEST-ONLY-'+str(len(self.sends)),observed_model=request['payload']['requested_model']))
+
+
+def configured(tmp_path):
+    config=curriculum('engineering')
+    case=next(c for c in config.cases if c.stage=='pilot' and len(c.holds)==6)
+    config=config.model_copy(update={'cases':[case],'prices':Prices(verified_at='engineering',source='test-only')})
+    ledger=Ledger(tmp_path);ledger.plan(config);ledger.fund(config.id,'api',1000000,evidence='synthetic engineering authority')
+    return config,case
+
+
+def test_unattended_repair_retains_tie_and_replay_sends_nothing(tmp_path):
+    config,case=configured(tmp_path);specialist=EngineeringSpecialist();runner=Runner(tmp_path,config.id,specialist)
+    result=runner.run()
+    assert result['results'][case.id]['outcome']=='unchanged',result
+    assert len(specialist.sends)==7 # anchor, base, two diagnoses, repair, diagnosis, comparison
+    assert runner.run()['results'][case.id]['outcome']=='unchanged'
+    assert len(specialist.sends)==7
+    assert not result['status']['budgets']['api']['reserved']
+
+
+def test_crash_after_comparison_before_terminal_commit_does_not_send_again(tmp_path,monkeypatch):
+    config,case=configured(tmp_path);specialist=EngineeringSpecialist();runner=Runner(tmp_path,config.id,specialist)
+    original=runner.ledger.finish_case
+    def crash(*args,**kwargs): raise RuntimeError('injected before terminal commit')
+    monkeypatch.setattr(runner.ledger,'finish_case',crash)
+    first=runner.run();assert first['status']['stopped']
+    count=len(specialist.sends)
+    monkeypatch.setattr(runner.ledger,'finish_case',original)
+    runner.ledger.resume(config.id)
+    result=runner.run()
+    assert result['results'][case.id]['outcome']=='unchanged',result
+    assert len(specialist.sends)==count
+
+
+def test_workflow_exports_close_actual_receipts_and_failed_candidate(tmp_path):
+    from framebound.v3.campaign.export import export_campaign,validate
+    config,case=configured(tmp_path);runner=Runner(tmp_path,config.id,EngineeringSpecialist())
+    runner.run()
+    result=export_campaign(tmp_path,config.id)
+    assert validate(result['path'])['ok']
+    assert result['manifest']['counts']['detection']==2
+    assert result['manifest']['counts']['editing']==0
+    rows=[json.loads(line) for line in (__import__('pathlib').Path(result['path'])/'detection.jsonl').read_text().splitlines()]
+    assert all(row['provenance_artifacts'] for row in rows)
+
+
+def test_crash_during_materialization_reconsumes_original_paid_result(tmp_path,monkeypatch):
+    config,case=configured(tmp_path);specialist=EngineeringSpecialist();runner=Runner(tmp_path,config.id,specialist)
+    original=runner._save;injected=[False]
+    def crash(area,name,raw):
+        if area=='canonical' and not injected[0]:
+            injected[0]=True;raise RuntimeError('injected before native import completes')
+        return original(area,name,raw)
+    monkeypatch.setattr(runner,'_save',crash)
+    assert runner.run()['status']['stopped']
+    assert len(specialist.sends)==2
+    runner.ledger.resume(config.id)
+    result=runner.run()
+    assert result['results'][case.id]['outcome']=='unchanged',result
+    assert sum(r['operation']=='generate' for r in specialist.sends)==1
+
+
+def test_historical_split_names_preserve_test_and_exclude_unsplit():
+    from framebound.v3.campaign.replay import historical_split
+    assert historical_split('dev')=='train'
+    assert historical_split('test')=='test'
+    assert historical_split('held_out')=='test'
+    assert historical_split('unsplit') is None

@@ -125,7 +125,7 @@ def create_app(project_dir: str) -> FastAPI:
     @app.post('/v3/campaigns/{campaign_id}/{action}')
     def campaign_control(campaign_id: str, action: str, body: dict):
         from ...v3.campaign.service import operate
-        if set(body) - {'root', 'config', 'request'} or action == 'run':
+        if set(body) - {'root', 'config', 'request'} or action in {'run','outbox','modal'}:
             raise HTTPException(422, 'Use CLI for locally pinned specialist execution')
         return operate(body['root'], action, campaign=campaign_id, config=body.get('config'), request=body.get('request'))
 
