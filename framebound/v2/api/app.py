@@ -122,6 +122,13 @@ def create_app(project_dir: str) -> FastAPI:
     app.state.project_dir = project_dir
 
 
+    @app.post('/v3/campaigns/{campaign_id}/{action}')
+    def campaign_control(campaign_id: str, action: str, body: dict):
+        from ...v3.campaign.service import operate
+        if set(body) - {'root', 'config', 'request'} or action == 'run':
+            raise HTTPException(422, 'Use CLI for locally pinned specialist execution')
+        return operate(body['root'], action, campaign=campaign_id, config=body.get('config'), request=body.get('request'))
+
     @app.post('/v3/runs/{run_id}/task-revision')
     def agent_run_revise_task(run_id: str, body: AgentTaskRevisionBody):
         from ...v3.services import loop

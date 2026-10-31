@@ -8,6 +8,11 @@ from mcp.server.mcpserver import MCPServer
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
+    @server.tool(name='campaign_control', description='Local campaign plan/resume/status/stop/report/reserve; no implicit provider dispatch or funding')
+    def campaign_control(root: str, action: str, campaign: str = 'animation-v1', config: dict | None = None, request: dict | None = None) -> dict:
+        from ...v3.campaign.service import operate
+        return operate(root, action, campaign=campaign, config=config, request=request)
+
     @server.tool(name='agent_handoff_export', description='Package a saved handoff and hashed native assets for an external agent without project access')
     def agent_handoff_export(feedback_id: str, out_path: str) -> dict:
         from ...v3.services import portable_handoff as P
