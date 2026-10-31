@@ -143,3 +143,59 @@ def test_legacy_feedback_idempotence_after_bundle_schema_addition(tmp_path):
         row['request'].pop('issues');studio.put(con,'feedback',row,True)
     assert studio.submit(p,REVIEWER,c,request)==row
     assert studio.snapshot(p)['budget']['reserved']==10000
+
+def test_review_reason_is_bound_to_each_take_and_does_not_inherit_parent_checks(tmp_path):
+    p,c=prepared(tmp_path)
+    baseline=studio.snapshot(p,c)
+    assert baseline['case']['review']['technical_status']=='pass'
+    assert baseline['case']['review']['kind']=='first_review'
+    studio.submit(p,REVIEWER,c,dict(id='review-reasons',version_id='base',issues=[dict(id='boot',slots=[1,2],text='Fix the boots')]))
+    studio.drain(p,Fake());view=studio.snapshot(p,c);current=view['versions'][-1]
+    assert current['review']['version_id']==current['id']
+    assert current['review']['technical_status']=='not_run' and current['review']['findings']==[]
+    assert current['review']['kind']=='correction_review'
+    assert current['review']['prior_issues']==[dict(id='boot',slots=[1,2],text='Fix the boots')]
+    assert current['review']['feedback_baseline']=='base'
+    assert view['versions'][0]['review']['technical_status']=='pass'
+    assert studio.snapshot(p)['cases'][0]['review']==view['case']['review']
+    studio.approve(p,REVIEWER,c,current['id'])
+    approved=studio.snapshot(p,c)
+    assert approved['case']['review']['kind']=='approved'
+    assert approved['versions'][0]['review']['kind']=='first_review'
+
+
+def test_replacement_explains_first_review_without_fabricating_findings():
+    case=dict(reason='Isolated 2D replacement · review requested')
+    version=dict(id='new',parent='old',intake=dict(eligible=True))
+    parent_evaluation=dict(id='evaluation:old',revision_id='old',results=[dict(outcome='fail')])
+    context=studio.review_context(case,version,parent_evaluation,[],[])
+    assert context['kind']=='unassessed' and context['technical_status']=='not_run'
+    assert context['findings']==[] and context['evaluation_id'] is None
+    assert 'have not run' in context['summary'] and 'Human approval' in context['summary']
+
+
+def test_review_reason_shows_failed_frames_measurements_and_coverage_gaps(tmp_path):
+    from test_agent_loop import import_frames
+    p,_,_=setup(tmp_path);bad=import_frames(tmp_path,'faulty',{'kind':'flicker'})
+    loop.submit(p,'run','faulty',bad);c=studio.seed(p,'faulty')
+    context=studio.snapshot(p,c)['case']['review']
+    assert context['kind']=='findings' and context['evaluation_id']=='evaluation:faulty'
+    finding=next(f for f in context['findings'] if f['check_id']=='appearance-1')
+    assert finding['outcome']=='fail' and finding['slots']==[1]
+    assert finding['observed'] is not None and finding['expected'] is not None
+    assert finding['source']=='procedural'
+    assert 'Appearance' in context['label'] and 'Frames 2.' in context['summary']
+    v=dict(id='partial',intake=dict(eligible=True))
+    e=dict(id='evaluation:partial',revision_id='partial',technical_status='error',coverage='partial',results=[
+        dict(id='missing',family='media',slots=[2],reason='Decode failed',outcome='error',source='deterministic'),
+        dict(id='gap',family='feature',slots=[1],reason='Feature not measured',outcome='unmeasured',source='deterministic')])
+    context=studio.review_context({},v,e,[],[])
+    assert context['kind']=='findings' and len(context['findings'])==2
+    assert 'errors' in context['label'] and 'unmeasured' in context['label']
+
+
+def test_review_reason_retains_exclusion_instead_of_calling_it_an_animation_defect():
+    v=dict(id='excluded',intake=dict(eligible=False,frames=[dict(reasons=['background_present'])]))
+    context=studio.review_context({},v,None,[],[])
+    assert context['kind']=='excluded' and context['intake_reasons']==['background_present']
+    assert context['technical_status']=='not_run' and context['findings']==[]
