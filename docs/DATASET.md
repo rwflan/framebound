@@ -65,3 +65,9 @@ Built by `python -m framebound export --project proj --snapshot s --out build/s 
 - Splits are validated by character/reference/derivation family + exact pixel duplicates;
   one family across train+test is recorded as a held-out-identity limitation, `strict`
   raises instead.
+
+## Local model supervision
+
+Corpus media, research identities, source URLs, generation prompts and receipts remain outside the checkout. Import an explicit external manifest with `scripts/import_muse_corpus.py`. The importer retains original Muse output hashes and exact crop/resampling ancestry. A repair shares its base run budget and preserves parent frames outside its declared target slots.
+
+`framebound.v2.exports.agent_reader.load_model_annotations(snapshot_dir)` reads explicit model supervision and decoded frames from a validated portable snapshot. `load_model_corrections(snapshot_dir)` reads exact baseline/candidate pairs. Neither requires a human decision or creates human preference labels. Confidence, unresolved findings, model disagreements and unsupported measurements remain available. The reader returns frozen family/split membership to prevent held-out leakage. This prepares training examples; model-weight training is a separate consumer.

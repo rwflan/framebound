@@ -83,6 +83,7 @@ Live specialist work additionally requires genuinely approved references, an ope
 
 ## Corpus research
 
+The [local Muse corpus workflow](docs/MUSE_ANIMATION_CORPUS_PLAN.md) covers external Muse generation, typed attribution, immutable correction ancestry and portable model supervision. All corpus media, reference identities and receipts live outside the repository. Human oversight is optional; model labels retain their source and uncertainty.
 
 ## Licence
 
