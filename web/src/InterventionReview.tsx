@@ -1,7 +1,7 @@
 import {useEffect,useState,useRef} from 'react';
 import {ViewerExpansion,useViewerExpansion} from './ViewerExpansion';
 import {req} from './api';
-import {ReviewReason,ReviewEvidence,ReviewContext} from './ReviewReason';
+import {ReviewTag,ReviewEvidence,ReviewContext} from './ReviewReason';
 import {AnnotationPlayer,Stroke} from './AnnotationPlayer';
 import {AnnotationTools,AnnotationSurface,useAnnotations} from './AnnotationTools';
 import {FilmPlayback,PlaybackControls,ProjectionHandle} from './FilmPlayback';
@@ -51,8 +51,8 @@ export function InterventionReview({caseId,versionId}:{caseId:string;versionId?:
  const history=data.versions.filter(v=>v.intake?.eligible),excluded=data.versions.length-history.length;
  return <div className={"packet-workspace agent-workspace intervention-workspace"+(expansion.expanded?" expanded-film":"")}>
   <section className="film-window">
-   <header className="pane-title viewer-title"><span className="file-icon"><Icon name="film"/></span><strong>{data.case.title}</strong><span className="title-grip"/><span className="badge">{review?.kind==='approved'?'Approved':!eligible?'Intake withheld':review?.kind==='findings'?'Checks need attention':review?.kind==='coverage'?'Checks incomplete':review?.kind==='correction_review'?'Verify corrections':review?.technical_status==='not_run'?'Not assessed':'First review'}</span><ViewerExpansion expanded={expansion.expanded} onToggle={expansion.toggle} onFeedback={()=>{setTab('feedback');expansion.showFeedback();}}/></header>
-   {review&&<ReviewReason context={review} onDetails={()=>{setTab('evidence');if(expansion.expanded)expansion.showFeedback();}}/>}
+   <header className="pane-title viewer-title"><span className="file-icon"><Icon name="film"/></span><strong>{data.case.title}</strong><span className="title-grip"/><ReviewTag context={review} activity={shown.id===current?.id?data.feedback.filter(f=>!f.superseded_by&&f.state!=='completed').slice(-1)[0]?.state:undefined}/><ViewerExpansion expanded={expansion.expanded} onToggle={expansion.toggle} onFeedback={()=>{setTab('feedback');expansion.showFeedback();}}/></header>
+
    {eligible&&<AnnotationTools controls={annotations}/>}
    {eligible?<div className="film-stage agent-film-stage review-film-stage"><FilmPlayback ref={projection} lanes={[{title:'Animation',urls}]} holds={shown.holds} loop={shown.loop} clock={clock} onInspect={inspectPlayback} overlay={()=>!clock.playing&&<AnnotationSurface slot={clock.slot} width={data.case.canvas.width} height={data.case.canvas.height} value={marks} controls={annotations} onChange={writable?strokes=>edit({strokes,...(strokes.length>draft.strokes.length?{slots:[...new Set([...draft.slots,strokes[strokes.length-1].slot])].sort((a,b)=>a-b)}:{})}):undefined} onStart={()=>{selectFrame(clock.slot);setTab('feedback');}}/>}/></div>:<div className="review-intake-empty"><Icon name="film"/><strong>Replacement required</strong><p>This animation contains a background or falls outside isolated 2D subjects. It cannot enter animation review or approval.</p><small>Its original bytes and pilot outcome remain in the local audit.</small></div>}
    <PlaybackControls clock={clock} holds={shown.holds} tps={shown.tps} loop={shown.loop} onToggle={togglePlayback} onInspect={inspectPlayback} onScrub={scrub} disabled={!eligible}/>
