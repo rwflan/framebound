@@ -146,13 +146,13 @@ def run(manifest_path):
         members=[r for r in reports if r['board_id']==bid]
         boards[bid]=dict(cases=len(members),true_positives=sum(r['true_positives'] for r in members),
             misses=sum(r['false_negatives'] for r in members),
-            false_alarms=sum(r['false_positives'] for r in members if r['false_positives'] is not None),
+            false_alarms=(sum(r['false_positives'] for r in members if r['false_positives'] is not None) if any(r['false_positives'] is not None for r in members) else None),
             incomplete_label_cases=sum(r['false_positives'] is None for r in members),
             localization=[x for r in members for x in r['localization']],
             unmeasured=[dict(case_id=r['id'],checks=r['unmeasured_or_errors']) for r in members if r['unmeasured_or_errors']],
             repairs=[r for r in repairs if case_map[r['repair']]['board_id']==bid])
     return dict(schema_version='1.0',per_board=boards,corpus_id=corpus.id,corpus_digest=digest(raw),methodology=corpus.methodology,
-        cases=reports,repairs=repairs,summary=dict(cases=len(reports),true_positives=tp,false_negatives=fn,false_positives=fp,
+        cases=reports,repairs=repairs,summary=dict(cases=len(reports),true_positives=tp,false_negatives=fn,false_positives=fp if comparable else None,
             precision=(sum(r['true_positives'] for r in comparable)/(sum(r['true_positives'] for r in comparable)+fp) if comparable and sum(r['true_positives'] for r in comparable)+fp else None),
             recall=tp/(tp+fn) if tp+fn else None,
             exact_frame_localizations=sum(x['exact_frames'] for r in reports for x in r['localization']),
