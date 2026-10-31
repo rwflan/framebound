@@ -16,3 +16,9 @@ framebound/desk/
 
 .playwright-cli/
 output/playwright/
+
+# Corpus artifacts and private reference research live outside the checkout.
+output/
+docs/research/
+corpus/
+local-corpus/

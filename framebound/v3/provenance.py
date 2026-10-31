@@ -95,7 +95,7 @@ def parse(metadata):
 
 
 def blob_hashes(provenance):
-    hashes = set()
+    hashes = {provenance.style_board.content_sha256} if provenance.style_board else set()
     if provenance.parent and provenance.parent.evidence_sha256:
         hashes.add(provenance.parent.evidence_sha256)
     for event in provenance.generations:
@@ -135,8 +135,13 @@ def validate_in(con, project, provenance, frame_asset_ids, ancestors):
         if not set(event.output_asset_ids) <= set(frame_asset_ids):
             raise InvalidInput('generation outputs must be bound to this revision')
         reachable = set(event.original_output_sha256)
+        inherited_inputs={ref.byte_sha256 for ref in event.conditioning}
+        for previous in prior.values():
+            for aid in previous.output_asset_ids:
+                try: inherited_inputs.add(S.get(con,'assets',aid)[0]['byte_sha256'])
+                except KeyError: pass
         for transform in event.transformations:
-            if transform.input_sha256 not in reachable:
+            if transform.input_sha256 not in reachable | inherited_inputs:
                 raise InvalidInput('postprocessing input is outside original-output ancestry')
             reachable.add(transform.output_sha256)
         for aid in event.output_asset_ids:
