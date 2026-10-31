@@ -1,3 +1,4 @@
+import {KeyboardGuide} from './KeyboardGuide';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import type {
@@ -601,16 +602,7 @@ function LegacyApp() {
             )}
           </main>
         </div>
-        <footer className="app-statusbar">
-          <span>
-            <kbd>←</kbd>
-            <kbd>→</kbd> frame <kbd>Space</kbd> play
-          </span>
-          <span>
-            <kbd>J</kbd>
-            <kbd>K</kbd> intervention <kbd>⌘ K</kbd> find
-          </span>
-        </footer>
+        <KeyboardGuide/>
         {searching && (
           <Modal title="Find sequence" onClose={() => setSearching(false)}>
             <div className="command-palette">

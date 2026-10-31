@@ -309,6 +309,10 @@ export class ReelCamera {
     return { x: e.clientX - box.left, y: e.clientY - box.top };
   }
   down(e) {
+    // Drawing is owned by the native-coordinate annotation surface, never the camera.
+    if (e.target?.closest?.('[data-annotation-active="true"]')) {
+      this.stop();this.suppressUntil=0;return;
+    }
     if (e.button !== 0 || e.target.closest("input,select,textarea")) return;
     this.stop();
     this.suppressUntil = 0;
@@ -436,6 +440,7 @@ export class ReelCamera {
       this.go(this.x, 0, this.y, 0);
   }
   wheel(e) {
+    if (e.target?.closest?.('[data-annotation-drawing="true"]')) {e.preventDefault();return;}
     e.preventDefault();
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? this.width : 1;
     if (e.ctrlKey || e.metaKey) {

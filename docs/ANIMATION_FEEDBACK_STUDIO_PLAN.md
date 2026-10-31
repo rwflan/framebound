@@ -4,6 +4,8 @@ This supersedes the separate feedback studio introduced in PR #95. There is one 
 
 Follow `web/public/designs/posthog/DESIGN.md`: warm stock, compact physical controls, thin borders, restrained shadows, black film and the existing contextual frame window. Reuse `.packet-workspace`, `.film-window`, `.pane-title`, `.frame-inspector`, existing film controls and queue rows. No cards, hero headings or new page shell. The right pane starts with the inspected frame and feedback. Technical findings, provenance and raw evidence are disclosures. Truncate opaque identifiers visually while retaining full values in titles/details.
 
+The hand/pan, pen and broad-marker controls live in the main film window, with distinct icons, pressed states, a colour swatch, stroke width and quiet scoped undo/clear actions. The inspector mirrors marks read-only and retains comments. Keep the on-screen keyboard guide visible for frame/playback, queue/search and drawing commands.
+
 Text and native pen/highlighter marks form one feedback submission bound to the inspected current revision. The existing local durable worker creates the next take, displays the feedback immediately above its result in the film history, and retains prior takes. The reviewer can iterate or approve the exact take. Drafts survive navigation. Pending/unknown sends block duplicate generation; no automatic retry of unknown acceptance. Approval produces a provenance-complete local learning handoff, not invented training or promotion.
 
 ## MVP intake principle

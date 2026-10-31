@@ -225,3 +225,12 @@ test("navigation cancels a pending wheel rebound and short film returns to the c
   assert.equal(c.x, center);
   c.destroy();
 });
+
+test('drawing on a frame keeps the camera fixed and leaves pointer capture to the annotation surface',()=>{
+  const {c,captures}=camera();c.jump(-400);const before={x:c.x,y:c.y,zoom:c.zoom};
+  const target={closest:selector=>selector.includes('data-annotation')?{}:null};
+  c.down({...pointer(200),target});c.move({...pointer(350),target});
+  let prevented=false;c.wheel({...wheel(-120),target,preventDefault(){prevented=true;}});
+  assert.equal(captures.size,0);assert.equal(c.drag,null);assert.equal(prevented,true);
+  assert.deepEqual({x:c.x,y:c.y,zoom:c.zoom},before);c.destroy();
+});
