@@ -40,6 +40,8 @@ class Ledger:
                     state TEXT NOT NULL, permit TEXT, lease_until REAL, receipt TEXT, outcome TEXT);
                 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, request_id TEXT, kind TEXT, at REAL, data TEXT);
             ''')
+            if 'progress' not in {r[1] for r in db.execute('PRAGMA table_info(cases)')}:
+                db.execute("ALTER TABLE cases ADD COLUMN progress TEXT NOT NULL DEFAULT '{}'")
 
     @contextmanager
     def db(self):
@@ -63,6 +65,13 @@ class Ledger:
                 raise ValueError('campaign config changed')
             db.execute('INSERT OR IGNORE INTO campaigns(id,config) VALUES(?,?)', (config.id, canonical(config).decode()))
             db.executemany('INSERT OR IGNORE INTO cases(campaign,id,family) VALUES(?,?,?)', [(config.id,c.id,c.family) for c in config.cases])
+        folder = local_path(self.root, f'campaigns/{config.id}')
+        artifacts = {'curriculum.jsonl': b''.join(canonical(c)+b'\n' for c in config.cases),
+                     'families.json': canonical({c.family:dict(split=c.split,ancestry=c.ancestry) for c in config.cases})}
+        for name,raw in artifacts.items():
+            path=folder/name
+            if path.exists() and path.read_bytes()!=raw: raise ValueError('frozen curriculum/registry differs')
+            if not path.exists(): path.write_bytes(raw)
         return result
 
     def config(self, campaign):
@@ -83,13 +92,15 @@ class Ledger:
             raise ValueError('allocation exceeds frozen release ceiling')
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            committed=db.execute('SELECT COALESCE(SUM(COALESCE(incurred,reserved)),0) FROM requests WHERE campaign=? AND subsystem=?',(campaign,subsystem)).fetchone()[0]
+            if microdollars<committed: raise ValueError('funding cannot erase existing spend/reservations')
             db.execute(f'UPDATE campaigns SET {subsystem}_funding=? WHERE id=?', (microdollars, campaign))
             self._event(db, None, 'funding', dict(campaign=campaign, subsystem=subsystem, allocation=microdollars, evidence=evidence))
 
     def _event(self, db, request_id, kind, data):
         db.execute('INSERT INTO events(request_id,kind,at,data) VALUES(?,?,?,?)', (request_id, kind, time.time(), canonical(data).decode()))
 
-    def reserve(self, campaign, case_id, operation, payload, *, quote, images=0, subsystem='api', attempt=0, parents=()):
+    def reserve(self, campaign, case_id, operation, payload, *, quote, images=0, subsystem='api', attempt=0, parents=(), sheet=0):
         if type(quote) is not int or quote < 0 or type(images) is not int or images < 0 or subsystem not in {'api','modal'}:
             raise ValueError('nonnegative integer resource quote required')
         if operation not in {'anchor','generate','diagnose','recheck','repair','blind_rerun','compare','train','evaluate'}:
@@ -100,6 +111,12 @@ class Ledger:
             raise ValueError('unknown case')
         if spec.stage != config.phase:
             raise Stopped('case is not in this release; final-test cases remain sealed')
+        if type(attempt) is not int or type(sheet) is not int or not 0 <= sheet < config.limits.sheets:
+            raise ValueError('bounded integer attempt and sheet required')
+        if operation in {'anchor','generate','repair','blind_rerun'} and images<1:
+            raise ValueError('image operations require quoted output images')
+        if operation in {'anchor','blind_rerun','recheck'} and attempt != 0:
+            raise Stopped('anchor, matched control or uncertainty recheck cannot be replenished')
         if attempt < 0 or (operation == 'repair' and attempt >= config.limits.repairs):
             raise Stopped('repair attempt limit')
         if images > config.limits.sheets:
@@ -107,11 +124,11 @@ class Ledger:
         if images and (quote < images * config.prices.image_microdollars or subsystem != 'api'):
             raise ValueError('image quote below frozen price')
         request = dict(campaign=campaign, family=spec.family, case_id=case_id, operation=operation, attempt=attempt,
-                       parents=list(parents), payload=payload, quote=quote, images=images, subsystem=subsystem,
+                       parents=list(parents), sheet=sheet, payload=payload, quote=quote, images=images, subsystem=subsystem,
                        config_sha256=digest(config))
         rid = digest(request)
         # A changed prompt or model cannot create a new send for the same attempt.
-        binding = digest([campaign, case_id, operation, attempt])
+        binding = digest([campaign, case_id, operation, attempt, sheet])
         self._disk(config)
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -123,6 +140,8 @@ class Ledger:
             campaign_row = db.execute('SELECT * FROM campaigns WHERE id=?', (campaign,)).fetchone()
             case = db.execute('SELECT * FROM cases WHERE campaign=? AND id=?', (campaign,case_id)).fetchone()
             unknown = db.execute("SELECT 1 FROM requests r JOIN cases c ON c.campaign=r.campaign AND c.id=r.case_id WHERE c.family=? AND r.state IN ('wire_started','unknown_provider_outcome')", (spec.family,)).fetchone()
+            if operation=='anchor' and db.execute("SELECT 1 FROM requests r JOIN cases c ON c.campaign=r.campaign AND c.id=r.case_id WHERE c.family=? AND r.operation='anchor' AND r.state!='cancelled'",(spec.family,)).fetchone():
+                raise Stopped('identity anchor already has a frozen lifetime request; reuse or reconcile it')
             if campaign_row['stopped'] or unknown or case['active_seconds'] >= config.limits.active_seconds:
                 raise Stopped('stopped, unknown family outcome or active processing ceiling')
             if case['state'] in {'accepted','unchanged','rejected','ambiguous','exhausted'}:
@@ -133,9 +152,9 @@ class Ledger:
                 raise Stopped('unfunded or release budget exhausted')
             if lifetime + quote > (125000000 if subsystem == 'api' else 100000000):
                 raise Stopped('lifetime spending ceiling, including unresolved reservations')
-            counts = db.execute("SELECT COALESCE(SUM(images),0), COUNT(*) FROM requests WHERE images>0").fetchone()
-            attempts = db.execute('SELECT COALESCE(SUM(images),0) FROM requests WHERE images>0').fetchone()[0]
-            if counts[0] + images > config.limits.successful_images or attempts + images > config.limits.dispatch_attempts:
+            successful = db.execute("SELECT COALESCE(SUM(CASE WHEN receipt IS NOT NULL THEN json_extract(receipt,'$.successful_images') ELSE images END),0) FROM requests WHERE state!='cancelled'").fetchone()[0]
+            attempts = db.execute("SELECT COALESCE(SUM(images),0) FROM requests WHERE state!='cancelled'").fetchone()[0]
+            if successful + images > config.limits.successful_images or attempts + images > config.limits.dispatch_attempts:
                 raise Stopped('lifetime image/dispatch ceiling')
             db.execute('INSERT INTO requests(id,campaign,case_id,operation,binding,request,subsystem,reserved,images,state) VALUES(?,?,?,?,?,?,?,?,?,?)',
                 (rid,campaign,case_id,operation,binding,canonical(request).decode(),subsystem,quote,images,'reserved'))
@@ -164,6 +183,11 @@ class Ledger:
                 raise Stopped('send permit already consumed, expired or invalid')
             if db.execute('SELECT stopped FROM campaigns WHERE id=?',(row['campaign'],)).fetchone()[0]:
                 raise Stopped('campaign stopped')
+            config = Campaign.model_validate_json(db.execute('SELECT config FROM campaigns WHERE id=?',(row['campaign'],)).fetchone()[0])
+            lane = "images>0" if row['images'] else "images=0 AND subsystem='api'" if row['subsystem']=='api' else "subsystem='modal'"
+            limit = config.limits.generation_workers if row['images'] else config.limits.assessment_workers if row['subsystem']=='api' else config.limits.modal_workers
+            if db.execute(f"SELECT COUNT(*) FROM requests WHERE state IN ('wire_started','unknown_provider_outcome') AND {lane}").fetchone()[0]>=limit:
+                raise Stopped('configured concurrency ceiling')
             db.execute("UPDATE requests SET state='wire_started', permit=NULL WHERE id=?", (rid,))
             self._event(db,rid,'wire_started',{})
             return json.loads(row['request'])
@@ -182,8 +206,6 @@ class Ledger:
                 if row['receipt'] != canonical(receipt).decode():
                     raise ValueError('immutable provider receipt differs')
                 return receipt
-            if successful_images > row['images']:
-                raise ValueError('provider image count exceeds request')
             artifact = local_path(self.root, f"campaigns/{row['campaign']}/originals/{sha}")
             artifact.parent.mkdir(parents=True, exist_ok=True)
             if artifact.exists() and hashlib.sha256(artifact.read_bytes()).hexdigest() != sha:
@@ -196,7 +218,7 @@ class Ledger:
                     os.fsync(stream.fileno())
             # Unquoted excess still counts as actual spend and halts admission.
             db.execute("UPDATE requests SET state='received',incurred=?,receipt=? WHERE id=?", (incurred,canonical(receipt).decode(),rid))
-            if incurred > row['reserved']:
+            if incurred > row['reserved'] or successful_images > row['images']:
                 db.execute('UPDATE campaigns SET stopped=1 WHERE id=?', (row['campaign'],))
             self._event(db,rid,'received',receipt)
         return receipt
@@ -263,3 +285,30 @@ class Ledger:
                 reserved=db.execute('SELECT COALESCE(SUM(reserved),0) FROM requests WHERE campaign=? AND subsystem=? AND incurred IS NULL',(campaign,s)).fetchone()[0]) for s in ('api','modal')}
             stopped = bool(db.execute('SELECT stopped FROM campaigns WHERE id=?',(campaign,)).fetchone()[0])
         return dict(campaign=campaign, stopped=stopped, cases=states, budgets=budgets, requests=requests)
+
+    def progress(self, campaign, case_id, *, state=None, data=None):
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT * FROM cases WHERE campaign=? AND id=?',(campaign,case_id)).fetchone()
+            if not row: raise ValueError('unknown case')
+            if state is not None:
+                if row['result']: raise Stopped('terminal case cannot be rewritten')
+                if state not in {'planned','budget_reserved','generating','generated','canonicalized','measured','semantically_assessed','diagnosis_ready','repair_queued','repair_generated','remeasured','compared','unknown_provider_outcome'}:
+                    raise ValueError('unsupported lifecycle transition')
+                db.execute('UPDATE cases SET state=?,progress=? WHERE campaign=? AND id=?',(state,canonical(data or {}).decode(),campaign,case_id))
+            else: return dict(state=row['state'],active_seconds=row['active_seconds'],data=json.loads(row['progress']),result=json.loads(row['result']) if row['result'] else None)
+
+    def request(self, rid):
+        with self.db() as db:
+            row=db.execute('SELECT * FROM requests WHERE id=?',(rid,)).fetchone()
+            if not row: raise ValueError('unknown request')
+            return dict(row)
+
+    def artifact(self, rid):
+        row=self.request(rid)
+        if row['state']!='received' or not row['receipt']: raise Stopped('request result not received; reconcile before resuming')
+        receipt=json.loads(row['receipt'])
+        path=local_path(self.root,f"campaigns/{row['campaign']}/originals/{receipt['sha256']}")
+        raw=path.read_bytes()
+        if hashlib.sha256(raw).hexdigest()!=receipt['sha256']: raise ValueError('received artifact was modified')
+        return raw,receipt

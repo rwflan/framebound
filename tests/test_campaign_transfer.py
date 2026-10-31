@@ -53,3 +53,18 @@ def test_pure_job_duplicate_results_and_hash_verification():
     one['result']['weights'][0]=9
     with pytest.raises(ValueError,match='hash mismatch'): verify_result(one,job)
     assert job.quote()<10000000
+
+
+def test_dataset_reader_preserves_ties_and_masks(tmp_path):
+    from framebound.v2.exports.agent_reader import load_campaign_examples
+    Image.new('RGBA',(8,8)).save(tmp_path/'frame.png')
+    (tmp_path/'request.json').write_text('{"request":"Engineering-only"}')
+    example=dict(id='test',family='family',split='train',frames=['frame.png'],holds=[1],loop=False,request_file='request.json',
+        conditioning_files=['frame.png'],provenance={'source':'engineering'},baseline_frames=['frame.png'],outcome='unchanged',
+        comparison={'preference':'tie','target_improved':False,'material_regression':False})
+    output=build(tmp_path,'test',[example],version='reader')
+    detection=load_campaign_examples(output['path'])
+    assert not any(v['mask'] for v in detection[0]['metadata']['labels'].values())
+    preference=load_campaign_examples(output['path'],'preference')
+    assert preference[0]['metadata']['comparison']['preference']=='tie'
+    assert not preference[0]['metadata']['binary_training_eligible']

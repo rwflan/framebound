@@ -81,6 +81,15 @@ class Campaign(Identity):
     api_ceiling: StrictInt = Field(default=15000000, ge=0, le=125000000)
     modal_ceiling: StrictInt = Field(default=10000000, ge=0, le=100000000)
     seed: StrictInt = 0
+    treatments: dict[str,str] = Field(default_factory=lambda: {
+        't00':'Flat geometric shapes, restrained palette, clear contour.',
+        't01':'Expressive hand ink, bold variable lines, flat color fills.',
+        't02':'Soft watercolor surfaces, controlled edge variation.',
+        't03':'Crisp pixel drawing, limited palette, readable silhouettes.',
+        't04':'Textured fabric and costume detail with stable material identity.',
+        't05':'Clean cel shading, compact highlights, consistent palette.',
+        't06':'Graphite-like linework with restrained warm color.',
+        't07':'Layered cut-paper shapes with stable material texture.'})
     cases: list[Case] = Field(min_length=1, max_length=800)
     frozen_policy_sha256: str | None = Field(default=None, pattern=r'^[0-9a-f]{64}$')
 
@@ -91,6 +100,8 @@ class Campaign(Identity):
             raise ValueError('duplicate case IDs')
         registry = {}
         for c in self.cases:
+            if c.treatment not in self.treatments or not self.treatments[c.treatment].strip():
+                raise ValueError('case needs a frozen generic style treatment')
             for identity in [c.family, *c.ancestry]:
                 if identity in registry and registry[identity] != c.split:
                     raise ValueError('family/reference ancestry crosses splits')

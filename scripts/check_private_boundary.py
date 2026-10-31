@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -19,6 +20,11 @@ def audit(root, files, private_hashes=()):
         private = bool(set(parts) & DENIED) or any(name.endswith(s) for s in SUFFIXES)
         private |= 'docs/research/' in name or name.startswith('output/')
         if path.is_file() and not unsafe:
+            if path.suffix=='.json':
+                try:
+                    value=json.loads(path.read_text())
+                    private |= isinstance(value,dict) and value.get('schema_version') in {'animation-model-card-1.0','feature-detector-1.0','temporal-convolution-1.0','feature-only-1.0','animation-training-1.0','historical-assessment-replay-1.0'}
+                except (ValueError,UnicodeError):pass
             private |= hashlib.sha256(path.read_bytes()).hexdigest() in private_hashes
         if unsafe or private:
             failures.append(name)
@@ -29,10 +35,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', default='.')
     parser.add_argument('--private-manifest', help='Local-only JSON list of SHA256 hashes; never print or upload it')
+    parser.add_argument('--private-root',default=os.environ.get('FRAMEBOUND_LOCAL_ROOT','/Volumes/datadisk0/data/appdata/framebound-local'),help='Optional existing local corpus root; hashes are never printed or persisted')
     parser.add_argument('--deploy', action='store_true', help='Inspect every file in a prepared deployment context')
     args = parser.parse_args()
     root = Path(args.root)
-    hashes = json.loads(Path(args.private_manifest).read_text()) if args.private_manifest else []
+    hashes = set(json.loads(Path(args.private_manifest).read_text())) if args.private_manifest else set()
+    private_root=Path(args.private_root)
+    if private_root.is_dir():
+        for path in private_root.rglob('*'):
+            if path.is_file() and not path.is_symlink() and path.suffix.lower() in {'.png','.jpg','.jpeg','.webp','.mp4','.gif'}:
+                hashes.add(hashlib.sha256(path.read_bytes()).hexdigest())
     files = [str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()] if args.deploy else subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
     failures = audit(root, [f for f in files if f], hashes)
     print(json.dumps({'ok': not failures, 'rejected_file_count': len(failures)}))

@@ -16,6 +16,7 @@ class Job(Strict):
     payload_sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
     recipe_sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
     image_digest: str = Field(pattern=r'^sha256:[0-9a-f]{64}$')
+    purpose: Literal['profile','train'] = 'train'
     gpu: Literal['L4','L40S'] = 'L4'
     seconds: StrictInt = Field(default=600,ge=1,le=3600)
     startup_seconds: StrictInt = Field(default=120,ge=0,le=600)
@@ -52,8 +53,16 @@ def verify_result(result, job: Job):
 
 
 def submit(ledger, campaign, case_id, raw, job: Job, transport):
-    inspect_payload(raw)
+    shard=inspect_payload(raw)
+    if any(row.split=='test' for row in shard.rows):raise ValueError('held-out final-test features cannot enter training jobs')
     if hashlib.sha256(raw).hexdigest()!=job.payload_sha256: raise ValueError('payload differs from quoted job')
+    if job.purpose=='train':
+        from .learning import eligibility
+        from .assessment import CATEGORIES
+        if not any(eligibility(shard,[c])['eligible'] for c in CATEGORIES):
+            raise ValueError('label-count/family gate must pass before paid training')
+    elif len(shard.rows)<20:
+        raise ValueError('profile requires 20 representative allowlisted cases')
     row=ledger.reserve(campaign,case_id,'train',dict(job=job.model_dump(mode='json')),quote=job.quote(),subsystem='modal')
     permit=ledger.claim(row['id']);ledger.start_wire(row['id'],permit)
     try:

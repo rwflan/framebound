@@ -51,3 +51,40 @@ def profile(paths, holds, *, loop):
     result = extract(frames,holds,loop=loop)
     result['seconds_per_frame'] = (time.monotonic()-started)/len(frames)
     return result
+
+
+def collect(root,campaign,*,version='1'):
+    """Derive learning tensors locally from validated, closed campaign exports."""
+    from .export import export_campaign,load
+    from .assessment import CATEGORIES
+    from .transfer import FeatureRow,FeatureShard,preupload
+    from .contracts import canonical,local_path
+    result=export_campaign(root,campaign,version=version)
+    if result.get('status')=='no_generated_examples':return result
+    rows=[]
+    for example in load(result['path']):
+        metadata=example['metadata'];measurements=extract(example['frames'],metadata['holds'],loop=metadata['loop'])
+        labels={c:dict(v) for c,v in metadata['labels'].items()}
+        corroborating=metadata.get('corroborating_assessments',[])
+        independent=len({a['provenance']['execution_id'] for a in corroborating})>=2 and len({a['provenance']['rubric_sha256'] for a in corroborating})>=2
+        if independent:
+            from .assessment import Assessment
+            targets=[Assessment.model_validate(a).targets() for a in corroborating]
+            for category in CATEGORIES:
+                comparisons=[t[category] for t in targets]
+                if not all(t['mask'] and t['target']==comparisons[0]['target'] and (t['target']==1 or set(t['slots'])==set(comparisons[0]['slots'])) for t in comparisons):
+                    labels[category]['mask']=False
+        for category in CATEGORIES:
+            if labels[category]['target']==0 and set(labels[category]['slots'])!=set(range(len(metadata['holds']))):
+                labels[category]['mask']=False
+        # Weak model labels have a fixed conservative weight; teacher confidence
+        # is never copied into a loss weight or treated as calibrated truth.
+        rows.append(FeatureRow(case_id=digest(metadata['id']),family_id=digest(metadata['family']),split=metadata['split'],
+            features=measurements['features'].tolist(),targets=[labels[c]['target'] if labels[c]['mask'] else 0 for c in CATEGORIES],
+            assessed=[labels[c]['mask'] for c in CATEGORIES],weight=1.0 if independent else 0.5))
+    shard=FeatureShard(rows=rows);raw,manifest=preupload(shard)
+    folder=local_path(root,f'campaigns/{campaign}/features/{version}');folder.mkdir(parents=True,exist_ok=True)
+    path=folder/'features.json'
+    if path.exists() and path.read_bytes()!=raw:raise ValueError('feature version is immutable')
+    path.write_bytes(raw);(folder/'preupload-manifest.json').write_bytes(canonical(manifest))
+    return dict(path=str(path),manifest=manifest,remote_bytes_transferred=0)

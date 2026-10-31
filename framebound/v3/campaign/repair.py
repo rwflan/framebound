@@ -46,8 +46,8 @@ def authorize(project, run_id, assessment: Assessment, independent: Assessment, 
             binding = binding_in(con,run)
             for a in (assessment,independent):
                 a.validate_evidence(binding,spec.timing.holds,(spec.canvas.width,spec.canvas.height))
-            if assessment.provenance.execution_id == independent.provenance.execution_id:
-                raise InvalidInput('independent execution required')
+            if assessment.provenance.execution_id == independent.provenance.execution_id or assessment.provenance.rubric_sha256 == independent.provenance.rubric_sha256:
+                raise InvalidInput('independent execution and separately frozen audit rubric required')
             f = next((f for f in assessment.findings if f.id == finding_id),None)
             if f is None or f.category not in policy.categories or f.visibility != 'supported':
                 raise InvalidInput('unsupported target category or visibility')

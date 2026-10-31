@@ -88,3 +88,9 @@ def load_model_corrections(snapshot_dir):
             label_source='model_review',human_acceptance=False,
             authority='Candidate correction supervised by model annotations; quality and regressions remain measured separately.'))
     return pairs
+
+
+def load_campaign_examples(snapshot_dir, lane='detection'):
+    """Read versioned campaign objectives; never reinterpret these as human DPO."""
+    from ...v3.campaign.export import load
+    return load(snapshot_dir,lane)

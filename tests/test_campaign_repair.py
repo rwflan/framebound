@@ -49,7 +49,7 @@ def test_task_authored_diagnosis_reopens_completed_without_revising_task(tmp_pat
     a['findings']=[dict(id='f',category='parts',slots=[0],tick_range=[0,1],subject='actor',severity='material',
         visibility='supported',observed='Synthetic observation',expected='Synthetic repair',counterexamples='Synthetic occlusion considered')]
     a=Assessment.model_validate(a)
-    independent=a.model_copy(update={'provenance':p.model_copy(update={'execution_id':'diagnosis-2'})})
+    independent=a.model_copy(update={'provenance':p.model_copy(update={'execution_id':'diagnosis-2','rubric_sha256':'c'*64})})
     authority=R.authorize(project,'auto-run',a,independent,'f')
     run=loop.get(project,'auto-run')
     assert run['task_id']==before['task_id'] and run['submission_ids']==before['submission_ids']
