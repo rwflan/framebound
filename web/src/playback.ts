@@ -40,3 +40,12 @@ export function toNative(
     y: Math.max(0, Math.min(nativeH - 1e-6, cssY)),
   };
 }
+
+/** Continuous film position follows the authored hold durations, not a fixed FPS assumption. */
+export function filmPosition(holds: number[], tick: number, loop: boolean): number {
+  const total=totalTicks(holds);
+  if(!holds.length||total<=0)return 0;
+  const t=loop?((tick%total)+total)%total:Math.max(0,Math.min(total-1e-6,tick));
+  const slot=slotAtTick(holds,t, false);
+  return slot+(t-tickOfSlot(holds,slot))/holds[slot];
+}

@@ -1,3 +1,4 @@
+import {FilmPlayback,PlaybackControls} from './FilmPlayback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {Stroke} from './AnnotationPlayer';
 import {AnnotationTools,AnnotationSurface,useAnnotations} from './AnnotationTools';
@@ -7,7 +8,7 @@ import { Film, useFilm } from './Film';
 import { Handoff } from './Handoff';
 import { Provenance } from './Provenance';
 import { Err, Icon, words } from './shared';
-import { tickOfSlot, toNative } from './playback';
+import { slotAtTick, tickOfSlot, toNative } from './playback';
 import { usePresentationClock } from './useClock';
 import { firstActionable, formatMeasurement } from './agent-model';
 import type { AgentBundle, Run, Roi, Mark } from './agent-model';
@@ -37,7 +38,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
   const targets=b.feedback.targets.filter(t=>t.slots.includes(slot));
   const frame=b.frames[slot],marks=run.interventions.filter(m=>m.slots.includes(slot));
   useEffect(()=>{
-    if(wasPlaying.current && !clock.playing) { setSlot(clock.slot);setSelected([clock.slot]);anchor.current=clock.slot; }
+    if(wasPlaying.current && !clock.playing) { setSlot(clock.slot);setSelected([clock.slot]);anchor.current=clock.slot;setRangeStart(tickOfSlot(holds,clock.slot));setRangeEnd(tickOfSlot(holds,clock.slot)+holds[clock.slot]); }
     wasPlaying.current=clock.playing;
   },[clock.playing,clock.slot]);
   useEffect(()=>{
@@ -102,7 +103,10 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
     image.onload=()=>{if(active){const c=canvas.current;c?.getContext('2d')?.drawImage(image,0,0);}};
     return()=>{active=false;};
   },[tab,frame.asset_url]);
-  const annotations=useAnnotations({value:visual,onChange:writable?setVisual:undefined,slot,onSlot:focus,pause:()=>clock.setPlaying(false),onDraw:()=>{setPlayback(false);setTab('correction');},resetKey:b.revision.id,transport:{count:holds.length,playing:clock.playing,toggle:()=>{setPlayback(true);clock.setPlaying(!clock.playing);},fit:()=>controls.film.current?.fit()}});
+  const annotations=useAnnotations({value:visual,onChange:writable?setVisual:undefined,slot,onSlot:focus,pause:()=>clock.setPlaying(false),onDraw:()=>{setPlayback(false);setTab('correction');},resetKey:b.revision.id,transport:{count:holds.length,slot:clock.slot,playing:clock.playing,toggle:togglePlayback,fit:()=>controls.film.current?.fit()}});
+  function togglePlayback(){setPlayback(true);if(!clock.playing&&!spec.loop&&clock.tick>=clock.total-1)clock.selectTick(0);clock.setPlaying(!clock.playing);}
+  function scrub(tick:number){const next=slotAtTick(holds,tick,false);focus(next);clock.selectTick(tick);}
+  function inspectPlayback(index:number){setPlayback(false);focus(index);}
   const projectedSource=b.source_comparison?.frames.map(f=>({id:'source-'+f.output_slot,asset_url:f.asset_url,correspondence:f.correspondence}));
   const sourceAtSlot=b.source_comparison?.frames[slot];
   const rows:{title:string;frames:{id:string;asset_url:string;correspondence?:string}[]}[]=compareSource && projectedSource?
@@ -117,10 +121,10 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
         {b.revision.id!==run.current_revision_id && run.current_revision_id && <button onClick={()=>onRevision(run.current_revision_id!)}>Open current</button>}
         {b.source_comparison && <button aria-pressed={compareSource} onClick={()=>{setCompare(null);setCompareSource(v=>!v);}}>Compare known-good source</button>}
         {b.revision.parent_revision_id && <button aria-pressed={Boolean(compare)} onClick={()=>void comparePrevious()}>Compare previous</button>}
-        <div className="control-zoom"><button aria-label="Zoom out" onClick={()=>controls.film.current?.zoom(-1)}>−</button><output>{controls.zoom}%</output><button aria-label="Zoom in" onClick={()=>controls.film.current?.zoom(1)}>+</button><button onClick={()=>controls.film.current?.fit()}>Fit</button></div>
+        {!playback&&<div className="control-zoom"><button aria-label="Zoom out" onClick={()=>controls.film.current?.zoom(-1)}>−</button><output>{controls.zoom}%</output><button aria-label="Zoom in" onClick={()=>controls.film.current?.zoom(1)}>+</button><button onClick={()=>controls.film.current?.fit()}>Fit</button></div>}
       </div>
       <AnnotationTools controls={annotations}/>
-      <div className={'film-stage agent-film-stage'+((compare||compareSource)?' has-comparison':'')+(playback?' agent-playback-mode':'')}>
+      <div className={'film-stage agent-film-stage'+((compare||compareSource)?' has-comparison':'')}>
         <Film ref={controls.film} filmKey={'agent-'+b.revision.id} count={b.frames.length} sequence selected={slot}
           onZoom={controls.setZoom} onPosition={controls.setPosition} onStep={focus}>
           <div className="reel-ruler">{b.frames.map((f,i)=><button key={f.id} aria-label={`Frame ${i+1}`} aria-pressed={selected.includes(i)} onClick={e=>focus(i,e.shiftKey)}>{String(i+1).padStart(2,'0')}<small>{tickOfSlot(holds,i)}–{tickOfSlot(holds,i)+holds[i]}</small></button>)}</div>
@@ -128,13 +132,10 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
           <div className="measurement-track" aria-label="Checks and corrections"><div className="measurement-row">{b.frames.map((f,i)=>{const issues=b.feedback.targets.filter(t=>t.slots.includes(i));return <button key={f.id} onClick={()=>focus(i)} className={'agent-check-cell '+(issues.length?'has-issue':'')} aria-label={`Frame ${i+1}: ${issues.length?issues.length+' corrections':'checks pass'}`}><strong>{issues.length?issues.length+' corrections':'Pass'}</strong>{issues.slice(0,2).map(t=><small key={t.id}>{words(t.check_id)}</small>)}</button>;})}</div></div>
         </Film>
         <div className="agent-lane-tabs" aria-hidden="true">{rows.map(row=><strong key={row.title}>{row.title}</strong>)}<strong>Checks</strong></div>
-        {playback && <div className="agent-main-playback" aria-label="Main playback">{rows.map(row=><figure key={row.title}><img src={row.frames[clock.slot]?.asset_url} alt={row.title+' playback'} draggable={false}/><figcaption>{row.title}{row.frames[clock.slot]?.correspondence?' · '+words(row.frames[clock.slot].correspondence!):''}</figcaption></figure>)}</div>}
+        {playback&&<FilmPlayback lanes={rows.map(row=>({title:row.title,urls:row.frames.map(f=>f.asset_url)}))} holds={holds} loop={spec.loop} clock={clock} onInspect={inspectPlayback}/>}
       </div>
-      <footer className="review-controls"><div className="control-transport"><button aria-label="Previous frame" onClick={()=>focus(Math.max(0,slot-1))}><Icon name="left"/></button><button aria-label={clock.playing?'Pause':'Play'} onClick={()=>{setPlayback(true);clock.setPlaying(!clock.playing);}}><Icon name={clock.playing?'pause':'play'}/></button><button aria-label="Next frame" onClick={()=>focus(Math.min(holds.length-1,slot+1))}><Icon name="right"/></button></div>
-        <output aria-label="Inspected frame">Frame {slot+1} / {holds.length}</output><button onClick={()=>{clock.setPlaying(false);setPlayback(false);}}>Film</button>
-        <select aria-label="Playback speed" value={clock.speed} onChange={e=>clock.setSpeed(Number(e.target.value))}>{[0.25,0.5,1,2].map(s=><option key={s} value={s}>{s}×</option>)}</select>
-        <span>{words(run.lifecycle)} · {words(run.creative_status)}</span>
-      </footer>
+      <PlaybackControls clock={clock} holds={holds} tps={spec.timing.ticks_per_second} loop={spec.loop} onToggle={togglePlayback} onInspect={inspectPlayback} onScrub={scrub} filmMode={!playback} onFilm={()=>inspectPlayback(clock.slot)}/>
+
       <div className="agent-revisions" aria-label="Revision history">{run.submission_ids.map(rid=><button key={rid} aria-pressed={rid===b.revision.id} onClick={()=>onRevision(rid)}>{rid}{rid===run.best_revision_id?' · best':''}{rid===run.current_revision_id?' · current':''}</button>)}</div>
     </section>
     <aside className="frame-inspector agent-inspector"><header className="pane-title inspector-heading"><strong>Frame {slot+1}</strong><span className="title-grip"/><span>{live?'Current':'Historical'}</span></header>
