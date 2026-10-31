@@ -2,7 +2,7 @@
 import hashlib
 import json
 
-from PIL import Image
+from PIL import Image,ImageDraw
 import pytest
 
 from framebound.v2 import storage as S
@@ -21,8 +21,8 @@ def source(root):
     anchor=root/'anchor.png';Image.new('RGBA',(64,64),(20,30,40,255)).save(anchor)
     anchor_sha=hashlib.sha256(anchor.read_bytes()).hexdigest()
     write_json(root/'anchor.receipt.json',dict(status='completed',output_sha256=anchor_sha,model_requested='muse-image-1.0'))
-    sheet=Image.new('RGBA',(192,128),(200,200,200,255))
-    for slot in range(6):sheet.putpixel(((slot%3)*64+10,(slot//3)*64+10),(slot*30,40,50,255))
+    sheet=Image.new('RGBA',(192,128))
+    for slot in range(6):ImageDraw.Draw(sheet).rectangle(((slot%3)*64+16,(slot//3)*64+12,(slot%3)*64+48,(slot//3)*64+52),fill=(slot*30,40,50,255))
     sheet.save(root/'sheet.png');sha=hashlib.sha256((root/'sheet.png').read_bytes()).hexdigest()
     write_json(root/'sheet.receipt.json',dict(status='completed',output_sha256=sha,model_requested='muse-image-1.0',
         model_observed='muse-image-1.0',response_id='TEST-ONLY',prompt_sha256='a'*64,

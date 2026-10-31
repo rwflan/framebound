@@ -19,6 +19,21 @@ def snapshot(project):
             run['interventions']=[m for m in marks if m['run_id']==run['id']]
             open_marks=[m for m in run['interventions'] if m['correction']['status'] not in {'resolved','cancelled'}]
             run['needs_intervention']=run['lifecycle']!='cancelled' and (bool(open_marks) or run['lifecycle'] in {'blocked','awaiting_input','awaiting_decision'})
+        # One timeline includes local reviewer feedback, generated takes and approvals.
+        from pathlib import Path
+        if (Path(project)/'studio.sqlite3').exists():
+            from . import studio
+            with studio.db(project) as review_con:
+                versions={v['id']:v for v in studio.all_rows(review_con,'versions')}
+                by_run={r['id']:r for r in runs}
+                for f in studio.all_rows(review_con,'feedback'):
+                    run=by_run.get(f['case_id'])
+                    if not run:continue
+                    vid=f.get('version_id') or f['request']['version_id']
+                    events.append(dict(id='review:'+f['id'],run_id=run['id'],project_id=run['project_id'],animation_id=run['animation_id'],event='replacement_'+f['state'] if f.get('replacement') else 'feedback_'+f['state'],revision_id=vid,source='framework' if f.get('replacement') else 'human',created_at=versions.get(vid,{}).get('created_at',f['created_at']),ordinal=0,note=f['request']['text']))
+                for a in studio.all_rows(review_con,'approvals'):
+                    run=by_run.get(a['case_id'])
+                    if run:events.append(dict(id='review:'+a['id'],run_id=run['id'],project_id=run['project_id'],animation_id=run['animation_id'],event='animation_approved',revision_id=a['version_id'],source='human',created_at=a['created_at'],ordinal=1))
         return dict(schema_version='3.0',runs=runs,events=sorted(events,key=lambda e:(e['created_at'],e['ordinal'],e['id'])),projects=projects)
     finally:con.close()
 
@@ -47,6 +62,8 @@ def revision(project, revision_id):
                                    frames=C.frames_at_output_starts(spec))
             for f in source_comparison['frames']:f['asset_url']=f"/api/asset/{f['asset_id']}"
         from ..provenance import summary
-        return dict(provenance=summary(revision.get('generation_metadata')),source_comparison=source_comparison,revision=revision,evaluation=evaluation,task=task,feedback=feedback,frames=frames,
+        from .studio import gate_frames
+        intake=gate_frames(project,revision['frame_asset_ids'])
+        return dict(intake=intake,provenance=summary(revision.get('generation_metadata')),source_comparison=source_comparison,revision=revision,evaluation=evaluation,task=task,feedback=feedback,frames=frames,
                     current_revision_id=run['current_revision_id'],best_revision_id=run['best_revision_id'])
     finally:con.close()

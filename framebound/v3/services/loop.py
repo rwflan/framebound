@@ -174,7 +174,8 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                                             pixels_baked=True, verified_by='external-import'))
                 fids.append(fid)
             results, evidence, evidence_digest = E.evaluate(spec, images, manifest, holds)
-            if spec.source_correspondence:
+            intake_passed=all(r['outcome']=='pass' for r in results if r['id'].startswith('intake-'))
+            if spec.source_correspondence and intake_passed:
                 from .. import correspondence as C
                 source_images=[];source_assets=[]
                 for aid in spec.source_correspondence.frame_asset_ids:
@@ -189,10 +190,12 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 results.extend(source_results)
                 source_evidence['implementation_sha256']=S.sha256_bytes(Path(C.__file__).read_bytes())
                 evidence['source_correspondence']=source_evidence
-            if spec.scene:
+            if spec.scene and intake_passed:
                 from .. import scene
                 scene_results,scene_evidence=scene.evaluate(spec,images)
                 results.extend(scene_results);evidence['scene']=scene_evidence
+            # Edit-scope safety is checked even for an inadmissible candidate;
+            # intake never hides a protected-pixel violation.
             preservation = I.preservation_in(con, project, run, images, spec)
             preservation.extend(automatic.preservation_in(con, project, run, images, spec))
             results.extend(preservation)
@@ -367,6 +370,15 @@ def eligibility(project, run_id):
             path = S.blob_path(project, asset['byte_sha256'])
             if not path.is_file() or S.sha256_bytes(path.read_bytes()) != asset['byte_sha256']:
                 reasons.append(f"missing_or_changed_asset:{asset['id']}")
+        # Recheck current intake without rewriting immutable historical evaluations.
+        from ..intake import inspect
+        revision=get_in(con,'agent_clip_revisions',rid)
+        for aid in revision['frame_asset_ids']:
+            try:
+                asset,_=S.get(con,'assets',aid)
+                gate=inspect(load_native_image(S.blob_path(project,asset['byte_sha256'])))
+                if not gate['eligible']:reasons.append('MVP intake withheld: '+aid+': '+'; '.join(gate['reasons']))
+            except (OSError,ValueError,KeyError):reasons.append('MVP intake unavailable: '+aid)
         if evaluation['technical_status'] != 'pass' or evaluation['coverage'] != 'complete':
             reasons.append('Required technical matrix is not complete and passing.')
         from . import interventions as I

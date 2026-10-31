@@ -329,6 +329,13 @@ class Runner:
             run_id,revision=self._materialize(case,anchor)
             self.ledger.progress(self.campaign,case.id,state='canonicalized',data=dict(run_id=run_id,base_revision=revision))
         else:run_id=progress['data']['run_id'];revision=progress['data']['base_revision']
+        from ..intake import inspect,PRINCIPLE
+        frame_ids=loop.revision_get(self.project,revision)['revision']['frame_asset_ids']
+        intake=[inspect(im) for im in self._frames(frame_ids)]
+        if not all(r['eligible'] for r in intake):
+            result=dict(outcome='rejected',base_revision_id=revision,reason='MVP intake failed before semantic assessment',intake=intake,principle=PRINCIPLE)
+            self.ledger.finish_case(self.campaign,case.id,'rejected',result)
+            return result
         a=self._assess(case,run_id,revision,ordinal=0)
         original_revision=revision
         outcome='ambiguous';authority=None;after=a;corroboration=None

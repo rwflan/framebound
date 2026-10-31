@@ -2,7 +2,7 @@ import base64
 import io
 import json
 
-from PIL import Image
+from PIL import Image,ImageDraw
 
 from framebound.v3.campaign.contracts import Prices,canonical,curriculum
 from framebound.v3.campaign.dispatch import Response
@@ -17,7 +17,11 @@ class EngineeringSpecialist:
         self.sends.append(request)
         op=request['operation']
         if request['images']:
-            image=Image.new('RGBA',(96,64) if op!='anchor' else (64,64),(50,60,70,255))
+            image=Image.new('RGBA',(96,64) if op!='anchor' else (64,64))
+            draw=ImageDraw.Draw(image)
+            for slot in range(6 if op!='anchor' else 1):
+                x=slot%3*32 if op!='anchor' else 0;y=slot//3*32 if op!='anchor' else 0
+                draw.rectangle((x+8,y+8,x+24,y+24),fill=(50,60,70,255))
             stream=io.BytesIO();image.save(stream,format='PNG')
             body=dict(status='completed',output=[dict(type='image_generation_call',result=base64.b64encode(stream.getvalue()).decode())])
         else:
@@ -112,7 +116,7 @@ def test_webp_provider_outputs_are_normalized_without_regeneration(tmp_path):
             if not request['images']:return response
             body=json.loads(response.raw);item=body['output'][0]
             with Image.open(io.BytesIO(base64.b64decode(item['result']))) as image:
-                stream=io.BytesIO();image.convert('RGB').save(stream,format='WEBP')
+                stream=io.BytesIO();image.convert('RGBA').save(stream,format='WEBP',lossless=True)
             item['result']=base64.b64encode(stream.getvalue()).decode()
             return Response(canonical(body),response.incurred,response.successful_images,response.receipt)
     specialist=WebPSpecialist();runner=Runner(tmp_path,config.id,specialist)
@@ -220,3 +224,15 @@ def test_later_corroborated_finding_drives_repair(tmp_path):
     assert result['results'][case.id]['outcome']=='unchanged',result
     assert result['results'][case.id]['corroboration']['eligible_finding_ids']==['f']
     assert sum(r['operation']=='repair' for r in specialist.sends)==1
+
+def test_opaque_generation_is_rejected_before_any_paid_semantic_assessment(tmp_path):
+    config,case=configured(tmp_path)
+    class Opaque(EngineeringSpecialist):
+        def execute(self,request,*,timeout):
+            response=super().execute(request,timeout=timeout)
+            if not request['images']:raise AssertionError('intake must run before diagnosis')
+            im=Image.new('RGBA',(64,64) if request['operation']=='anchor' else (96,64),'white');out=io.BytesIO();im.save(out,format='PNG')
+            return Response(canonical(dict(status='completed',output=[dict(type='image_generation_call',result=base64.b64encode(out.getvalue()).decode())])),response.incurred,1,response.receipt)
+    specialist=Opaque();result=Runner(tmp_path,config.id,specialist).run()
+    assert result['results'][case.id]['outcome']=='rejected'
+    assert [r['operation'] for r in specialist.sends]==['anchor','generate']

@@ -125,12 +125,14 @@ def _asset_reasons(asset,policy,assets=None,seen=None,provider_sources=None):
     return reasons
 
 
-def _revision_labels(graph,policy):
+def _revision_labels(graph,policy,project):
     labels={}
     for rid,revision in graph['revisions'].items():
         run=graph['runs'][revision['run_id']];evaluation=graph['evaluations'][f'evaluation:{rid}']
         task=graph['tasks'][revision['task_id']]
+        from ...v3.services.studio import gate_frames
         reasons=[]
+        if not gate_frames(project,revision['frame_asset_ids'])['eligible']:reasons.append('mvp_intake_failed')
         if not evaluation['evidence'].get('evaluator_identity'):reasons.append('legacy_evaluator_identity_incomplete')
         if evaluation['technical_status']!='pass' or evaluation['coverage']!='complete':reasons.append('required_checks_not_complete_and_passing')
         if run['current_revision_id']!=rid or run['lifecycle']!='completed':reasons.append('not_current_completed_output')
@@ -210,7 +212,7 @@ def plan(project,con,rids,policy):
     if not isinstance(policy.get('rights_allow'),list) or any(not isinstance(r,str) for r in policy['rights_allow']):raise ValueError('rights_allow must be a list of rights labels')
     graph=closure(con,rids)
     if len(graph['frames'])>20000:raise ValueError('export closure exceeds 20000-frame bound; select fewer runs')
-    labels=_revision_labels(graph,policy);families=_families(graph,project)
+    labels=_revision_labels(graph,policy,project);families=_families(graph,project)
     splits={rid:'unsplit' for rid in graph['revisions']}
     for split,selected in policy.get('split',{}).items():
         if split not in {'train','dev','test'}:raise ValueError('unsupported split name')

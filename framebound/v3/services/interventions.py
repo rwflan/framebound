@@ -416,6 +416,10 @@ def decision(project, actor, run_id, payload):
                     raise S.ConflictError('decision ID is already bound to another reviewer action')
                 return dict(event=event, feedback=loop.get_in(con,'agent_feedback',f'handoff:{event_id}'))
             _bound(con, run, request.revision_id, request.evaluation_id)
+            if request.action=='approve':
+                from .studio import gate_frames
+                revision=loop.get_in(con,'agent_clip_revisions',request.revision_id)
+                if not gate_frames(project,revision['frame_asset_ids'])['eligible']:raise InvalidInput('MVP intake failed; approval withheld')
             if run['lifecycle']=='cancelled':
                 raise InvalidInput('cancelled runs cannot be completed by a decision')
             event = _event_in(con, run, actor, request.action, request.revision_id,

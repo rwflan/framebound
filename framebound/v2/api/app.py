@@ -16,7 +16,7 @@ from pydantic import Field
 
 from ...v3.domain import TaskSpec, TaskRecord
 from ...v3.services.failures import FailureReport
-from ...v3.services.studio import Feedback as StudioFeedbackInput
+from ...v3.services.studio import Feedback as StudioFeedbackInput, Replacement as StudioReplacementInput
 from ...v3.services.exports import ExportSelection
 from ...v3.services.interventions import MarkRequest, ResolveRequest, DecisionRequest
 from .. import domain as D
@@ -363,10 +363,28 @@ def create_app(project_dir: str) -> FastAPI:
         with studio.db(project_dir) as con:
             con.execute('BEGIN IMMEDIATE')
             for row in studio.all_rows(con,'feedback'):
-                if row['case_id']==case_id and row['state'] in {'queued','generating','failed'}:
+                if row['case_id']==case_id and not row.get('superseded_by') and row['state'] in {'queued','generating','failed'}:
                     row['state']='queued';studio.put(con,'feedback',row,True)
         studio.start(project_dir)
         return {'resuming':True}
+
+    @app.post('/v3/runs/{run_id}/review')
+    def prepare_review(run_id: str, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import studio,loop
+        from ..services.authz import require_reviewer
+        require_reviewer(actor(x_session_token,None),'mark_issue')
+        con=loop.connect(project_dir)
+        try:run=loop.get_in(con,'agent_runs',run_id)
+        finally:con.close()
+        if not run['current_revision_id']:raise _E.InvalidInput('No animation to review')
+        return {'id':studio.seed(project_dir,run['current_revision_id'])}
+
+    @app.post('/v3/studio/{case_id}/replacement')
+    def isolated_replacement(case_id: str, body: StudioReplacementInput, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import studio
+        result=studio.replace(project_dir,actor(x_session_token,None),case_id,body.model_dump(mode="json"))
+        studio.start(project_dir)
+        return result
 
     @app.get('/v3/studio')
     def studio_list():
