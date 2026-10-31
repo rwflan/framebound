@@ -8,7 +8,7 @@ from ...v2.services.errors import InvalidInput
 from .. import evaluate as E, provenance as P
 from . import tasks
 
-TABLES = ('agent_runs', 'agent_clip_revisions', 'agent_evaluations', 'agent_feedback', 'agent_completions', 'agent_run_events', 'agent_interventions','agent_preferences')
+TABLES = ('agent_runs', 'agent_clip_revisions', 'agent_evaluations', 'agent_feedback', 'agent_completions', 'agent_run_events', 'agent_interventions','agent_preferences','agent_auto_authorities','agent_auto_comparisons')
 
 
 def connect(project):
@@ -57,7 +57,7 @@ def start(project, task_id, run_id):
                 raise S.ConflictError('animation already has a run; resuming or revising must retain its budget')
             run = dict(schema_version='3.0', id=run_id, task_id=task_id, spec_sha256=task.spec_sha256,
                        project_id=task.spec.project_id, animation_id=task.spec.animation_id,
-                       lifecycle='awaiting_agent', current_revision_id=None, best_revision_id=None,
+                       lifecycle='awaiting_agent', learned_coverage_status='not_assessed', current_revision_id=None, best_revision_id=None,
                        submission_ids=[], fingerprints=[], no_progress_count=0,
                        limits=task.spec.limits.model_dump(), created_at=D.utcnow(), version=1,
                        stop_reason=None, creative_status='unreviewed')
@@ -139,7 +139,8 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
             if len(frame_asset_ids) != len(spec.timing.holds):
                 raise InvalidInput('frame count must equal the frozen authored hold count')
             from . import interventions as I
-            if parent_revision_id and spec.repair_scope == 'declared_regions' and not any(m['authorize_edit_scope'] for m in I.open_in(con, run_id)):
+            from ..campaign import repair as automatic
+            if parent_revision_id and spec.repair_scope == 'declared_regions' and not any(m['authorize_edit_scope'] for m in I.open_in(con, run_id)) and not automatic.active_in(con, run_id):
                 raise InvalidInput('declared-region edit permissions need a saved intervention grant; full-clip permission cannot be inferred')
             if spec.canvas.width * spec.canvas.height * (len(frame_asset_ids)+(len(spec.source_correspondence.frame_asset_ids) if spec.source_correspondence else 0)) > run['limits'].get('max_evaluation_pixels', 16777216):
                 raise InvalidInput('frozen evaluation pixel budget exceeded; negotiate a new task before allocating frames')
@@ -193,6 +194,7 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 scene_results,scene_evidence=scene.evaluate(spec,images)
                 results.extend(scene_results);evidence['scene']=scene_evidence
             preservation = I.preservation_in(con, project, run, images, spec)
+            preservation.extend(automatic.preservation_in(con, project, run, images, spec))
             results.extend(preservation)
             for result in results:
                 result.setdefault('required',True)
@@ -255,7 +257,10 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 run['best_revision_id'] = revision_id
             passed = evaluation['technical_status'] == 'pass' and evaluation['coverage'] == 'complete'
             I.after_submission_in(con, run, revision_id, all(r['outcome']=='pass' for r in preservation))
-            if passed and I.open_in(con, run_id):
+            automatic.after_submission_in(con, run, revision_id)
+            if run.get('learned_coverage_status') == 'comparison_pending':
+                run['lifecycle'], run['stop_reason'] = 'awaiting_agent', 'Automatic candidate retained; independent comparison is pending.'
+            elif passed and I.open_in(con, run_id):
                 run['lifecycle'], run['stop_reason'] = 'awaiting_decision', 'Technical checks passed; saved human corrections require explicit owner resolution.'
             elif passed and spec.intervention != 'explicit_review' and spec.completion.id == 'technical-unreviewed-v1':
                 run['best_revision_id']=revision_id

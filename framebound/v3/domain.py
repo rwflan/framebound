@@ -5,6 +5,7 @@ from pydantic import Field, StrictInt, model_validator
 
 from ..v2.domain import Canvas, Timing, Strict, utcnow
 from .provenance import StyleBoard
+from .campaign.repair_policy import AutomaticRepairPolicy
 
 
 class InputBinding(Strict):
@@ -63,6 +64,7 @@ class TaskSpec(Strict):
     inputs: list[InputBinding] = Field(default_factory=list, max_length=512)
     preserve: list[str] = Field(default_factory=list, max_length=128)
     allowed_changes: list[str] = Field(default_factory=list, max_length=128)
+    automatic_repair: AutomaticRepairPolicy | None = None
     repair_scope: Literal['full_clip', 'declared_regions'] = 'full_clip'
     profile: Literal['structural-v1', 'fixed-subject-v1', 'tracked-scene-v1'] = 'structural-v1'
     region_observations: list['RegionObservation'] = Field(default_factory=list, max_length=4096)
