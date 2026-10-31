@@ -187,3 +187,20 @@ def test_empty_negative_scope_is_masked_without_losing_other_coverage(tmp_path):
     assert coverage['identity']=='absent_within_assessed_scope'
     assert coverage['prop']=='not_assessed'
     assert coverage['extraction']=='not_assessed'
+
+
+def test_six_pose_operation_gate_retains_semantic_uncertainty(tmp_path):
+    from framebound.v3.campaign.runner import enable_long_sequences
+    import pytest
+    config=curriculum('engineering')
+    cases=[c for c in config.cases if c.stage=='pilot' and len(c.holds)==6][:2]
+    config=config.model_copy(update={'cases':cases,'prices':Prices(verified_at='engineering',source='test-only')})
+    ledger=Ledger(tmp_path);ledger.plan(config);ledger.fund(config.id,'api',2000000,evidence='synthetic engineering authority')
+    result=Runner(tmp_path,config.id,EngineeringSpecialist()).run()
+    assert len(result['results'])==2
+    path=tmp_path/'campaigns/engineering/capabilities/long-sequences.json'
+    assert path.is_file()
+    gate=json.loads(path.read_text())
+    assert len(gate['evidence'])==2
+    assert 'longer sequence attempts still require measured boundaries' in gate['meaning']
+    assert all(result['outcome'] in {'unchanged','ambiguous'} for result in result['results'].values())
