@@ -1,4 +1,4 @@
-import {FilmPlayback,PlaybackControls} from './FilmPlayback';
+import {FilmPlayback,PlaybackControls,ProjectionHandle} from './FilmPlayback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {Stroke} from './AnnotationPlayer';
 import {AnnotationTools,AnnotationSurface,useAnnotations} from './AnnotationTools';
@@ -14,6 +14,7 @@ import { firstActionable, formatMeasurement } from './agent-model';
 import type { AgentBundle, Run, Roi, Mark } from './agent-model';
 
 export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentBundle;run:Run;onChange:()=>void;onRevision:(rid:string)=>void}) {
+ const projection=useRef<ProjectionHandle>(null);
   const [visual,setVisual]=useState<Stroke[]>([]);
   const spec=b.task.spec, initial=useRef(firstActionable(b));
   const [slot,setSlot]=useState(initial.current), [selected,setSelected]=useState([initial.current]);
@@ -23,7 +24,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
     resetKey:b.revision.id,initialTick:tickOfSlot(holds,initial.current),autoPlay:false});
   const expansion=useViewerExpansion(()=>clock.setPlaying(false));
   const wasPlaying=useRef(false);
-  const [playback,setPlayback]=useState(false),[tab,setTab]=useState<'evidence'|'correction'|'decision'>('evidence');
+  const [tab,setTab]=useState<'evidence'|'correction'|'decision'>('evidence');
   const [note,setNote]=useState(''),[roi,setRoi]=useState<Roi|null>(null),[grant,setGrant]=useState(false);
   const [rangeStart,setRangeStart]=useState(tickOfSlot(holds,initial.current));
   const [rangeEnd,setRangeEnd]=useState(tickOfSlot(holds,initial.current)+holds[initial.current]);
@@ -103,10 +104,10 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
     image.onload=()=>{if(active){const c=canvas.current;c?.getContext('2d')?.drawImage(image,0,0);}};
     return()=>{active=false;};
   },[tab,frame.asset_url]);
-  const annotations=useAnnotations({value:visual,onChange:writable?setVisual:undefined,slot,onSlot:focus,pause:()=>clock.setPlaying(false),onDraw:()=>{setPlayback(false);setTab('correction');},resetKey:b.revision.id,transport:{count:holds.length,slot:clock.slot,playing:clock.playing,toggle:togglePlayback,fit:()=>controls.film.current?.fit()}});
-  function togglePlayback(){setPlayback(true);if(!clock.playing&&!spec.loop&&clock.tick>=clock.total-1)clock.selectTick(0);clock.setPlaying(!clock.playing);}
+  const annotations=useAnnotations({value:visual,onChange:writable?setVisual:undefined,slot,onSlot:focus,pause:()=>clock.setPlaying(false),onDraw:()=>{setTab('correction');},resetKey:b.revision.id,transport:{count:holds.length,slot:clock.slot,playing:clock.playing,toggle:togglePlayback,fit:()=>projection.current?.fit()}});
+  function togglePlayback(){if(!clock.playing&&!spec.loop&&clock.tick>=clock.total-1)clock.selectTick(0);clock.setPlaying(!clock.playing);}
   function scrub(tick:number){const next=slotAtTick(holds,tick,false);focus(next);clock.selectTick(tick);}
-  function inspectPlayback(index:number){setPlayback(false);focus(index);}
+  function inspectPlayback(index:number,shift=false){focus(index,shift);}
   const projectedSource=b.source_comparison?.frames.map(f=>({id:'source-'+f.output_slot,asset_url:f.asset_url,correspondence:f.correspondence}));
   const sourceAtSlot=b.source_comparison?.frames[slot];
   const rows:{title:string;frames:{id:string;asset_url:string;correspondence?:string}[]}[]=compareSource && projectedSource?
@@ -121,7 +122,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
         {b.revision.id!==run.current_revision_id && run.current_revision_id && <button onClick={()=>onRevision(run.current_revision_id!)}>Open current</button>}
         {b.source_comparison && <button aria-pressed={compareSource} onClick={()=>{setCompare(null);setCompareSource(v=>!v);}}>Compare known-good source</button>}
         {b.revision.parent_revision_id && <button aria-pressed={Boolean(compare)} onClick={()=>void comparePrevious()}>Compare previous</button>}
-        {!playback&&<div className="control-zoom"><button aria-label="Zoom out" onClick={()=>controls.film.current?.zoom(-1)}>−</button><output>{controls.zoom}%</output><button aria-label="Zoom in" onClick={()=>controls.film.current?.zoom(1)}>+</button><button onClick={()=>controls.film.current?.fit()}>Fit</button></div>}
+
       </div>
       <AnnotationTools controls={annotations}/>
       <div className={'film-stage agent-film-stage'+((compare||compareSource)?' has-comparison':'')}>
@@ -132,9 +133,9 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
           <div className="measurement-track" aria-label="Checks and corrections"><div className="measurement-row">{b.frames.map((f,i)=>{const issues=b.feedback.targets.filter(t=>t.slots.includes(i));return <button key={f.id} onClick={()=>focus(i)} className={'agent-check-cell '+(issues.length?'has-issue':'')} aria-label={`Frame ${i+1}: ${issues.length?issues.length+' corrections':'checks pass'}`}><strong>{issues.length?issues.length+' corrections':'Pass'}</strong>{issues.slice(0,2).map(t=><small key={t.id}>{words(t.check_id)}</small>)}</button>;})}</div></div>
         </Film>
         <div className="agent-lane-tabs" aria-hidden="true">{rows.map(row=><strong key={row.title}>{row.title}</strong>)}<strong>Checks</strong></div>
-        {playback&&<FilmPlayback lanes={rows.map(row=>({title:row.title,urls:row.frames.map(f=>f.asset_url)}))} holds={holds} loop={spec.loop} clock={clock} onInspect={inspectPlayback}/>}
+        {<FilmPlayback ref={projection} lanes={rows.map(row=>({title:row.title,urls:row.frames.map(f=>f.asset_url)}))} holds={holds} loop={spec.loop} clock={clock} onInspect={inspectPlayback} overlay={lane=>lane.title==='Candidate'&&!clock.playing&&<AnnotationSurface slot={clock.slot} width={spec.canvas.width} height={spec.canvas.height} value={visual} controls={annotations} onChange={writable?setVisual:undefined} onStart={()=>focus(clock.slot,false,false)}/>}/>}
       </div>
-      <PlaybackControls clock={clock} holds={holds} tps={spec.timing.ticks_per_second} loop={spec.loop} onToggle={togglePlayback} onInspect={inspectPlayback} onScrub={scrub} filmMode={!playback} onFilm={()=>inspectPlayback(clock.slot)}/>
+      <PlaybackControls clock={clock} holds={holds} tps={spec.timing.ticks_per_second} loop={spec.loop} onToggle={togglePlayback} onInspect={inspectPlayback} onScrub={scrub}/>
 
       <div className="agent-revisions" aria-label="Revision history">{run.submission_ids.map(rid=><button key={rid} aria-pressed={rid===b.revision.id} onClick={()=>onRevision(rid)}>{rid}{rid===run.best_revision_id?' · best':''}{rid===run.current_revision_id?' · current':''}</button>)}</div>
     </section>

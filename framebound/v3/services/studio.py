@@ -28,14 +28,27 @@ class Stroke(Strict):
     width: float=Field(gt=0,le=64)
     points: list[tuple[float,float]]=Field(min_length=1,max_length=4000)
 
+class FeedbackIssue(Strict):
+    id: str=Field(pattern='^[a-zA-Z0-9-]{1,80}$')
+    slots: list[StrictInt]=Field(min_length=1,max_length=512)
+    text: str=Field(min_length=1,max_length=8000)
+    @model_validator(mode='after')
+    def scope(self):
+        if not self.text.strip():raise ValueError('Describe the issue')
+        if len(set(self.slots))!=len(self.slots) or any(s<0 or s>511 for s in self.slots):raise ValueError('Invalid issue frame scope')
+        return self
+
 class Feedback(Strict):
     id: str=Field(pattern='^[a-zA-Z0-9-]{1,80}$')
     version_id: str=Field(min_length=1,max_length=128)
     text: str=Field(default='',max_length=8000)
     strokes: list[Stroke]=Field(default_factory=list,max_length=100)
+    issues: list[FeedbackIssue]=Field(default_factory=list,max_length=50)
     @model_validator(mode='after')
     def content(self):
-        if not self.text.strip() and not self.strokes:raise ValueError('Describe or mark the issue')
+        if not self.text.strip() and not self.strokes and not self.issues:raise ValueError('Describe or mark the issue')
+        if len({i.id for i in self.issues})!=len(self.issues):raise ValueError('Duplicate issue ID')
+        if len(self.text)+sum(len(i.text) for i in self.issues)>8000:raise ValueError('Feedback bundle is too long')
         if sum(len(s.points) for s in self.strokes)>20000:raise ValueError('Too many annotation points')
         return self
 
@@ -128,12 +141,13 @@ def submit(project,actor,case_id,payload,*,replacement=None):
         old=con.execute('SELECT data FROM feedback WHERE id=?',(request.id,)).fetchone()
         if old:
             row=json.loads(old[0])
-            if row['request']!=request.model_dump(mode='json') or row['case_id']!=case_id or row['owner']!=actor.id:raise S.ConflictError('Feedback ID already used')
+            if Feedback.model_validate(row['request']).model_dump(mode='json')!=request.model_dump(mode='json') or row['case_id']!=case_id or row['owner']!=actor.id:raise S.ConflictError('Feedback ID already used')
             return row
         case=get(con,'cases',case_id);version=get(con,'versions',request.version_id)
         if case['status']=='approved' or case['current']!=request.version_id or version['case_id']!=case_id:raise S.StaleRevisionError('Review the current animation before submitting')
         if any(f['case_id']==case_id and f['state'] in {'queued','generating','unknown'} for f in all_rows(con,'feedback')):raise S.ConflictError('Generation already pending')
         if not replacement and (case['status']=='excluded' or not gate_frames(project,version['frames'])['eligible']):raise InvalidInput('Outside MVP intake; generate an isolated replacement before reviewing')
+        if any(slot>=len(version['frames']) for issue in request.issues for slot in issue.slots):raise InvalidInput('Issue outside native frame')
         for stroke in request.strokes:
             if stroke.slot>=len(version['frames']) or any(not (0<=x<case['canvas']['width'] and 0<=y<case['canvas']['height']) for x,y in stroke.points):raise InvalidInput('Annotation outside native frame')
         sheets=1 if replacement else (len(version['frames'])+5)//6;quote=sheets*10000
@@ -207,6 +221,8 @@ def _generate(project,feedback,specialist):
                             draw.line(points+points[-1:],fill=color,width=max(1,round(stroke['width'])),joint='curve')
                         images.append(png(Image.alpha_composite(im,overlay)))
                 text=case['intent']+'\nAuthored timing: '+canonical(dict(holds=baseline['holds'],ticks_per_second=baseline['tps'],loop=baseline['loop'])).decode()+'\nUser correction: '+feedback['request']['text']+'\nAnnotations are visual feedback only; do not draw their marks into the artwork. Preserve identity and authored timing. Return a row-major 3-by-2 sheet, one pose per cell, for native slots '+str(list(range(sheet*6,min(len(frames),sheet*6+6))))+'. Baseline native frames are attached in order, with marked duplicates only where annotated. '+canonical(feedback['request']['strokes']).decode()
+                if feedback['request'].get('issues'):
+                    text+='\nBundled corrections (zero-based native frame slots; apply every issue together in this take, preserving unmentioned details): '+canonical(feedback['request']['issues']).decode()
                 if replacement:text=replacement['prompt']
                 text+='\nMVP REQUIREMENT: '+PRINCIPLE+' Render clean flat 2D sprite artwork on perfectly uniform pure RGB(255,0,255) magenta in every cell, including enclosed gaps. No magenta in the subject. No texture, grid lines, captions, cast shadows or scenery. Leave generous clear margins in every cell. Local extraction of this explicitly declared key will create alpha. Exactly 3 columns by 2 rows, equally sized square cells, six distinct consecutive poses, no gutters.'
                 w=wire('muse-image-1.0',text,images);w['tools']=[dict(type='image_generation',size='1536x1024',output_format='png',enable_image_search=False,enable_web_search=False)]

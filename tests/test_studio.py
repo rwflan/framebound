@@ -1,4 +1,5 @@
-import base64,io
+import base64,io,json
+from pathlib import Path
 import pytest
 from PIL import Image,ImageDraw
 from framebound.v3.services import studio,loop
@@ -86,3 +87,59 @@ def test_status_summary_exposes_work_without_feedback_payload_and_hides_supersed
     with studio.db(p) as con:
         row=studio.get(con,'feedback','status-job');row.update(state='failed',superseded_by='new-take');studio.put(con,'feedback',row,True)
     assert studio.snapshot(p)['work']==[]
+
+def test_bundled_frame_issues_generate_once_and_keep_native_scope_and_marks(tmp_path):
+    p,c=prepared(tmp_path)
+    request=dict(id='bundle',version_id='base',issues=[
+        dict(id='prop',slots=[0,1],text='Keep the prop visible'),
+        dict(id='foot',slots=[2],text='Keep the planted foot still')],
+        strokes=[dict(slot=2,tool='pen',color='#ffaa00',width=2,points=[[1,1],[3,3]])])
+    row=studio.submit(p,REVIEWER,c,request)
+    assert row['quote']==10000 and studio.snapshot(p)['budget']['reserved']==10000
+    assert studio.submit(p,REVIEWER,c,request)==row
+    class Capture(Fake):
+        def execute(self,request,**kw):
+            self.payload=request
+            return super().execute(request,**kw)
+    fake=Capture();studio.drain(p,fake)
+    view=studio.snapshot(p,c)
+    assert fake.calls==1 and len(view['versions'])==2
+    assert view['feedback'][0]['request']['issues']==request['issues']
+    assert view['feedback'][0]['request']['strokes']==request['strokes']
+    payload=fake.payload['payload']['wire']['input'][0]['content'][0]['text']
+    assert 'Keep the prop visible' in payload and 'Keep the planted foot still' in payload
+    assert '"slots":[0,1]' in payload and '"slots":[2]' in payload
+    assert studio.snapshot(p)['budget']['spent']==10000
+    with pytest.raises(S.StaleRevisionError):studio.submit(p,REVIEWER,c,dict(request,id='stale-bundle'))
+    approval=studio.approve(p,REVIEWER,c,view['case']['current'])
+    assert approval['source']=='human'
+    handoff=json.loads((Path(approval['handoff_path'])/'handoff.json').read_text())
+    assert handoff['feedback'][0]['request']['issues']==request['issues']
+    assert handoff['feedback'][0]['request']['strokes']==request['strokes']
+    assert len(handoff['provider_attempts'])==1
+
+@pytest.mark.parametrize('issues',[
+    [dict(id='x',slots=[9],text='Out of bounds')],
+    [dict(id='x',slots=[0,0],text='Duplicate frames')],
+    [dict(id='x',slots=[],text='No frames')],
+    [dict(id='x',slots=[-1],text='Negative frame')],
+    [dict(id='x',slots=[True],text='Boolean frame')],
+    [dict(id='x',slots=[0],text=' ')],
+    [dict(id='x',slots=[0],text='one'),dict(id='x',slots=[1],text='two')],
+    [dict(id='x',slots=[0],text='x'*8000),dict(id='y',slots=[1],text='y')],
+])
+def test_invalid_bundles_reserve_nothing(tmp_path,issues):
+    from pydantic import ValidationError
+    p,c=prepared(tmp_path)
+    with pytest.raises((InvalidInput,ValidationError)):
+        studio.submit(p,REVIEWER,c,dict(id='bad-bundle',version_id='base',issues=issues))
+    assert studio.snapshot(p)['budget']['reserved']==0
+    assert studio.snapshot(p,c)['feedback']==[]
+
+def test_legacy_feedback_idempotence_after_bundle_schema_addition(tmp_path):
+    p,c=prepared(tmp_path);request=dict(id='legacy',version_id='base',text='Fix pose')
+    row=studio.submit(p,REVIEWER,c,request)
+    with studio.db(p) as con:
+        row['request'].pop('issues');studio.put(con,'feedback',row,True)
+    assert studio.submit(p,REVIEWER,c,request)==row
+    assert studio.snapshot(p)['budget']['reserved']==10000

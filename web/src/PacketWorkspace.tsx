@@ -1,4 +1,4 @@
-import {FilmPlayback,PlaybackControls} from './FilmPlayback';
+import {FilmPlayback,PlaybackControls,ProjectionHandle} from './FilmPlayback';
 import {ViewerExpansion,useViewerExpansion} from './ViewerExpansion';
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {Stroke} from "./AnnotationPlayer";
@@ -42,6 +42,7 @@ export function PacketWorkspace({
   bundles: Bundle[];
   onRefresh: () => void;
 }) {
+  const projection=useRef<ProjectionHandle>(null);
   const [visual,setVisual]=useState<Stroke[]>([]);
   const id = packetId(b),
     revision = revisionId(b),
@@ -56,7 +57,7 @@ export function PacketWorkspace({
     height = canvas.height || 64;
   const initialSlot = useRef(attentionSlot(b, issues));
   const [inspectionSlot, setInspectionSlot] = useState(initialSlot.current);
-  const [viewMode, setViewMode] = useState<"frames" | "playback">("frames");
+  const [viewMode, setViewMode] = useState<"frames" | "playback">("playback");
   const wasPlaying = useRef(false);
   const clock = usePresentationClock({
     holds,
@@ -158,7 +159,7 @@ export function PacketWorkspace({
       anchor.current = index;
     }
     if (next !== "evidence") {
-      setViewMode("frames");
+      setViewMode("playback");
       controls.film.current?.reveal(index, true);
     }
     setTab(next);
@@ -224,10 +225,10 @@ export function PacketWorkspace({
   };
   const returnToFilm = () => {
     pausePlayback();
-    setViewMode("frames");
+    setViewMode("playback");
     controls.film.current?.reveal(clock.slot, true);
   };
-  const annotations=useAnnotations({value:visual,onChange:setVisual,slot:inspectionSlot,onSlot:focus,pause:pausePlayback,onDraw:()=>{returnToFilm();setTab('correction');},resetKey:id,fit:()=>controls.film.current?.fit()});
+  const annotations=useAnnotations({value:visual,onChange:setVisual,slot:inspectionSlot,onSlot:focus,pause:pausePlayback,onDraw:()=>{returnToFilm();setTab('correction');},resetKey:id,fit:()=>projection.current?.fit()});
   useEffect(() => {
     // Inspection follows deliberate pauses/one-shot completion, never a running playhead.
     if (
@@ -550,39 +551,7 @@ export function PacketWorkspace({
                 Compare timing
               </button>
             )}
-            {viewMode === "playback" ? (
-              <button className="return-to-film" onClick={returnToFilm}>
-                <Icon name="film" />
-                Film strip
-              </button>
-            ) : (
-              <div className="control-zoom" role="group" aria-label="Film zoom">
-                <button
-                  aria-label="Zoom out"
-                  disabled={controls.zoom <= 5}
-                  onClick={() => controls.film.current?.zoom(-1)}
-                >
-                  −
-                </button>
-                <button
-                  className="zoom-value"
-                  aria-label={`Zoom ${controls.zoom}%. Reset to 100%.`}
-                  onClick={() => controls.film.current?.reset()}
-                >
-                  {controls.zoom}%
-                </button>
-                <button
-                  aria-label="Zoom in"
-                  disabled={controls.zoom >= 200}
-                  onClick={() => controls.film.current?.zoom(1)}
-                >
-                  +
-                </button>
-                <button onClick={() => controls.film.current?.fit()}>
-                  Fit
-                </button>
-              </div>
-            )}
+
           </div>
           <AnnotationTools controls={annotations}/>
           <Err e={comparison.err} />
@@ -783,9 +752,9 @@ export function PacketWorkspace({
                 </div>
               </div>
             </Film>
-            {viewMode==='playback'&&<FilmPlayback lanes={[{title:compare==='baseline'&&baselineReady?'Previous':'Reference',urls:rowFrames},{title:'Candidate',urls}]} holds={holds} loop={Boolean((b.contract.action as {loop?:boolean}).loop)} clock={clock} onInspect={i=>{setViewMode('frames');focus(i);}}/>}
+            {<FilmPlayback ref={projection} lanes={[{title:compare==='baseline'&&baselineReady?'Previous':'Reference',urls:rowFrames},{title:'Candidate',urls}]} holds={holds} loop={Boolean((b.contract.action as {loop?:boolean}).loop)} clock={clock} onInspect={(i,shift)=>{setViewMode('playback');focus(i,shift);}} overlay={lane=>lane.title==='Candidate'&&!clock.playing&&<AnnotationSurface slot={clock.slot} width={width} height={height} value={visual} controls={annotations} onChange={setVisual} onStart={()=>focus(clock.slot,false,false)}/>}/>}
           </div>
-          <PlaybackControls clock={clock} holds={holds} tps={timing.ticks_per_second||60} loop={Boolean((b.contract.action as {loop?:boolean}).loop)} onToggle={()=>togglePlayback()} onInspect={i=>{setViewMode('frames');focus(i);}} onScrub={inspectTick} disabled={!playbackReady} filmMode={viewMode==='frames'} onFilm={returnToFilm}/>
+          <PlaybackControls clock={clock} holds={holds} tps={timing.ticks_per_second||60} loop={Boolean((b.contract.action as {loop?:boolean}).loop)} onToggle={()=>togglePlayback()} onInspect={(i,shift)=>{setViewMode('playback');focus(i,shift);}} onScrub={inspectTick} disabled={!playbackReady}/>
 
         </section>
         <aside

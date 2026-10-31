@@ -1,0 +1,10 @@
+# Stable projection and bundled feedback
+
+Reuse the desk shell, existing film window, pinned frame inspector, queue and history. Follow the fixed [PostHog design rules](../web/public/designs/posthog/DESIGN.md).
+
+- Paused and playing use the same large projection with a persistent moving film strip. Clicking or dragging the strip pauses and inspects; the timeline remains an exact authored-tick scrubber. Draw on the large paused image. Zoom, pan, fit, keyboard help and expanded mode remain available. Remove the Inspect film mode switch and redundant alpha line. Keep speed typography compact and give the select chevron explicit space.
+- The inspector holds one bundle for the current take: describe an issue, select its affected frames, and add it to the list. Repeat for other issues. Edit/remove entries locally. Submit & generate sends the whole bundle, including any unadded current comment and all native-frame marks. The quote covers the bundle's sheet count; issues do not multiply provider sends.
+- Keep existing saved text and annotations when migrating browser drafts. Original feedback requests remain readable and idempotent. Persist issue IDs, zero-based native slots, text, annotations and exact baseline version in the durable feedback request. Validate scopes, duplicate IDs, text totals and annotation bounds before reserving money.
+- Compile all bundled issues into the existing frozen sheet requests. Retain one send per six-frame sheet, existing reservations, receipts, unknown-acceptance protection, ancestry, intake and explicit human approval. A bundle does not promise successful fixes or grant pixel-edit authority. History and the local approval handoff retain all issue scopes.
+
+Validation: offline provider test proves two distinct frame issues travel in a single send and cost one sheet; invalid scopes reserve nothing; historical feedback remains idempotent. Browser review covers paused/play layout, scrubbing, speed, full size, drawing and adding/editing/removing issues without making paid requests.
