@@ -34,6 +34,7 @@ class Finding(Strict):
     slots: list[StrictInt] = Field(min_length=1,max_length=24)
     tick_range: tuple[StrictInt,StrictInt]
     subject: str = Field(min_length=1,max_length=128)
+    subject_id: Literal['scene_canvas'] | None = None
     part: str | None = Field(default=None,max_length=128)
     severity: Literal['minor','material','critical']
     confidence: float | None = Field(default=None,ge=0,le=1)
@@ -67,6 +68,8 @@ class Assessment(Strict):
             raise ValueError('duplicate finding IDs')
         covered = {c.category:c for c in self.coverage}
         for f in self.findings:
+            if f.subject_id=='scene_canvas' and f.category!='artifacts':
+                raise ValueError('scene_canvas identity is only valid for canvas artifacts')
             c = covered[f.category]
             if c.status != 'present' or not set(f.slots).issubset(c.slots):
                 raise ValueError('finding is outside explicitly present scope')

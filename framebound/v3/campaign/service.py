@@ -35,6 +35,9 @@ def operate(root, action, *, campaign='animation-v1', config=None, request=None,
     if action == 'plan':
         frozen = Campaign.model_validate(config) if config is not None else curriculum(campaign)
         return ledger.plan(frozen)
+    if action == 'audit':
+        from .corroboration import replay
+        return replay(root,campaign)
     if action == 'status':
         return ledger.status(campaign)
     if action == 'stop':
@@ -100,7 +103,7 @@ def operate(root, action, *, campaign='animation-v1', config=None, request=None,
 
 def register_cli(sub):
     parser = sub.add_parser('campaign', help='v3 local animation campaign controller')
-    parser.add_argument('action',choices=['plan','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal'])
+    parser.add_argument('action',choices=['plan','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal','audit'])
     parser.add_argument('--root',required=True)
     parser.add_argument('--campaign',default='animation-v1')
     parser.add_argument('--config',help='Frozen config JSON file for plan')

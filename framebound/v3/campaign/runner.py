@@ -243,7 +243,7 @@ class Runner:
             anchor=S.blob_path(self.project,anchor_asset['byte_sha256']).read_bytes()
         finally:con.close()
         frames=self._frames(revision['frame_asset_ids']);features=extract(frames,case.holds,loop=case.loop)
-        context=dict(request=case.request,binding=binding.model_dump(),holds=case.holds,ticks_per_second=case.ticks_per_second,
+        context=dict(request=case.request,binding=binding.model_dump(),subject_registry={'scene_canvas':'The whole native canvas; use subject_id=scene_canvas only for composition/canvas artifacts. For actor/part/prop identity, leave subject_id null and name the exact subject; never alias different entities.'},holds=case.holds,ticks_per_second=case.ticks_per_second,
             image_order='identity anchor, then ordered native frames',windows=temporal_windows(case.holds,loop=case.loop),measurement_proposals=features['proposals'],schema=Assessment.model_json_schema())
         rubric=DIAGNOSIS_RUBRIC+(' Independent preservation audit: inspect each subject, legitimate deformation and event order without seeing another assessment.' if ordinal%2 else '')
         text=rubric+'\nFor any assessed category, list actual native slots (0 to '+str(len(frames)-1)+'). No props or no extraction means not_assessed, not an empty-scope negative label. Include a visibility field in every finding.\nCoverage present means a DEFECT exists in that category, never that an entity or property exists. Every present category MUST have a corresponding localized finding. Explicitly include visibility=supported only when the pose and observations support a defect. Opaque backdrops do not establish extraction defects unless extraction was actually performed.\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
@@ -331,7 +331,7 @@ class Runner:
         else:run_id=progress['data']['run_id'];revision=progress['data']['base_revision']
         a=self._assess(case,run_id,revision,ordinal=0)
         original_revision=revision
-        outcome='ambiguous';authority=None;after=a
+        outcome='ambiguous';authority=None;after=a;corroboration=None
         for attempt in range(self.config.limits.repairs):
             targets=[f for f in a.findings if f.severity in {'material','critical'} and f.visibility=='supported']
             if not targets:
@@ -339,7 +339,13 @@ class Runner:
                 if attempt==0:outcome='unchanged' if all(c.status=='absent_within_assessed_scope' for c in a.coverage) else 'ambiguous'
                 break
             independent=self._assess(case,run_id,revision,ordinal=attempt*2+1)
-            target=sorted(targets,key=lambda f:(f.severity!='critical',f.id))[0]
+            from .corroboration import audit
+            corroboration=audit(a,independent)
+            self._save('comparisons','corroboration-'+digest([a.provenance.execution_id,independent.provenance.execution_id])+'.json',canonical(corroboration))
+            eligible=corroboration['eligible_finding_ids']
+            if not eligible:
+                outcome='ambiguous';break
+            target=next(f for f in targets if f.id==eligible[0])
             con=loop.connect(self.project)
             try:
                 previous=[json.loads(r['data']) for r in con.execute('SELECT data FROM agent_auto_authorities')
@@ -354,7 +360,7 @@ class Runner:
             if outcome!='accepted':break
             revision=candidate;a=after
         result=dict(outcome=outcome,base_revision_id=original_revision,after_assessment=after.model_dump(mode='json'),
-            authority_id=authority['id'] if authority else None)
+            authority_id=authority['id'] if authority else None,corroboration=corroboration)
         allocation=controls(self.config)
         if authority and case.id in {r['case_id'] for r in allocation['cases']}:
             result['control']=self._control(case,anchor,original_revision,authority,outcome)
