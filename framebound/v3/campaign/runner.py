@@ -22,7 +22,7 @@ from ...v2.services.assets import import_asset
 from ...v2.services.projects import create_project
 from ...v2.services.provenance import write_derived
 from ..services import loop, tasks
-from .assessment import Assessment, Binding, CATEGORIES, Provenance, DIAGNOSIS_RUBRIC, COMPARISON_RUBRIC, temporal_windows
+from .assessment import Assessment, Binding, CATEGORIES, Provenance, abstention, DIAGNOSIS_RUBRIC, COMPARISON_RUBRIC, temporal_windows
 from .contracts import canonical, digest, local_path
 from .dispatch import dispatch
 from .features import extract
@@ -245,7 +245,7 @@ class Runner:
         context=dict(request=case.request,binding=binding.model_dump(),holds=case.holds,ticks_per_second=case.ticks_per_second,
             image_order='identity anchor, then ordered native frames',windows=temporal_windows(case.holds,loop=case.loop),measurement_proposals=features['proposals'],schema=Assessment.model_json_schema())
         rubric=DIAGNOSIS_RUBRIC+(' Independent preservation audit: inspect each subject, legitimate deformation and event order without seeing another assessment.' if ordinal%2 else '')
-        text=rubric+'\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
+        text=rubric+'\nCoverage present means a DEFECT exists in that category, never that an entity or property exists. Every present category MUST have a corresponding localized finding. Explicitly include visibility=supported only when the pose and observations support a defect. Opaque backdrops do not establish extraction defects unless extraction was actually performed.\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
         rid,raw,receipt=self._call(case,'diagnose',text,[anchor,*[png(f) for f in frames]],attempt=ordinal,parents=[revision_id])
         response=json.loads(raw)
         if response.get('status')=='incomplete':
@@ -254,11 +254,18 @@ class Runner:
             original_rid=rid
             rid,raw,receipt=self._call(case,'recheck',text,[anchor,*[png(f) for f in frames]],
                 attempt=0,parents=[revision_id,original_rid],sheet=ordinal%self.config.limits.sheets)
-        body=extract_text(raw)
-        if set(body)!={'coverage','findings'}:raise ValueError('unexpected teacher fields')
+        # Provenance describes the actual frozen request, including legacy requests.
+        actual_request=json.loads(self.ledger.request(rid)['request'])
         p=Provenance(provider='meta',requested_model='muse-spark-1.3',observed_model=receipt['provider'].get('observed_model'),
-            observed_version=receipt['provider'].get('observed_version'),rubric_sha256=digest(rubric),raw_sha256=hashlib.sha256(raw).hexdigest(),execution_id=rid)
-        assessment=Assessment(binding=binding,provenance=p,**body).validate_evidence(binding,case.holds,frames[0].size)
+            observed_version=receipt['provider'].get('observed_version'),rubric_sha256=digest(actual_request['payload']['wire']['input'][0]['content'][0]['text'].split('\nReturn only')[0]),raw_sha256=hashlib.sha256(raw).hexdigest(),execution_id=rid)
+        try:
+            body=extract_text(raw)
+            if set(body)!={'coverage','findings'}:raise ValueError('unexpected teacher fields')
+            assessment=Assessment(binding=binding,provenance=p,**body).validate_evidence(binding,case.holds,frames[0].size)
+        except ValueError as error:
+            self._save('annotations',rid+'-quarantine.json',canonical(dict(raw_sha256=p.raw_sha256,reason=str(error),
+                normalization='No semantic targets inferred; invalid teacher schema retained separately')))
+            assessment=abstention(binding,p,list(range(len(frames))),'Teacher response failed the bounded evidence contract; raw response retained and case quarantined.')
         self._save('annotations',rid+'.json',canonical(assessment))
         return assessment
 

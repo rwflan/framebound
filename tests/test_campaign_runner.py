@@ -151,3 +151,20 @@ def test_incomplete_diagnosis_gets_one_recheck_without_new_artwork(tmp_path):
     assert sum(r['operation']=='recheck' for r in specialist.sends)==1
     assert sum(r['operation']=='generate' for r in specialist.sends)==1
     count=len(specialist.sends);runner.run();assert len(specialist.sends)==count
+
+
+def test_inconsistent_teacher_labels_are_quarantined_without_paid_retries(tmp_path):
+    config,case=configured(tmp_path)
+    class InvalidTeacher(EngineeringSpecialist):
+        def execute(self,request,*,timeout):
+            response=super().execute(request,timeout=timeout)
+            if request['images']:return response
+            body=json.loads(response.raw);text=json.loads(body['output'][0]['text'])
+            text['coverage'][3]['status']='present'
+            body['output'][0]['text']=json.dumps(text)
+            return Response(canonical(body),response.incurred,0,response.receipt)
+    specialist=InvalidTeacher();runner=Runner(tmp_path,config.id,specialist);result=runner.run()
+    assert result['results'][case.id]['outcome']=='ambiguous',result
+    assert len(specialist.sends)==3
+    assert list((runner.folder/'annotations').glob('*-quarantine.json'))
+    assert not result['status']['stopped']

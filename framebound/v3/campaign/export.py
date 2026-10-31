@@ -128,6 +128,7 @@ def export_campaign(root,campaign,*,version='1'):
             request_path.write_bytes(canonical([json.loads(ledger.request(rid)['request']) for rid in request_ids]))
             assessment=None;corroborating=[]
             for path in sorted((folder/'annotations').glob('*.json')):
+                if path.name.endswith('-quarantine.json'):continue
                 candidate=Assessment.model_validate_json(path.read_bytes())
                 if candidate.binding.revision_sha256==digest(revision):
                     evaluation=loop.get_in(con,'agent_evaluations','evaluation:'+revision['id'])
