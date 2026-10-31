@@ -108,7 +108,10 @@ def snapshot(project,case_id=None):
         budget=json.loads(setting[0]) if setting else dict(ceiling=0)
         sends=all_rows(con,'sends');reserved=sum(s['quote'] for s in sends if s['state'] in {'reserved','wire_started','unknown'})
         spent=sum(s.get('incurred',s['quote']) for s in sends if s['state']=='received')
-        return dict(cases=cases,budget=dict(ceiling=budget['ceiling'],spent=spent,reserved=reserved))
+        titles={c['id']:c['title'] for c in cases}
+        work=[dict(id=f['id'],case_id=f['case_id'],title=titles.get(f['case_id'],f['case_id']),state=f['state'],error=f.get('error'))
+              for f in all_rows(con,'feedback') if f['state']!='completed' and not f.get('superseded_by')]
+        return dict(cases=cases,work=work,budget=dict(ceiling=budget['ceiling'],spent=spent,reserved=reserved))
 
 def allocate(project,microdollars):
     if type(microdollars) is not int or microdollars<0:raise InvalidInput('Invalid allocation')

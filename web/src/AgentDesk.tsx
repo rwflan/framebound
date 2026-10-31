@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {UtilitiesMenu,UtilityWindow} from './DeskUtilities';
+import {DeskStatus} from './DeskStatus';
+import {ReferencesView} from './Operations';
 import {KeyboardGuide} from './KeyboardGuide';
 import {InterventionReview} from './InterventionReview';
 import { req } from './api';
@@ -19,11 +22,13 @@ export function useAgentDesk() {
   return {data,error,refresh};
 }
 
-function route(){const [path,query]=location.hash.replace(/^#\/?/,'').split('?'),parts=path.split('/');return {legacyCase:parts[0]==='studio'?new URLSearchParams(query).get('case')||'':'',export:parts[0]==='export',run:parts[0]==='run'?decodeURIComponent(parts[1]||''):'',revision:new URLSearchParams(query).get('revision')};}
+function route(){const [path,query]=location.hash.replace(/^#\/?/,'').split('?'),parts=path.split('/');return {legacyCase:parts[0]==='studio'?new URLSearchParams(query).get('case')||'':'',utility:['export','status','reviewed-guides','references'].includes(parts[0])?(parts[0]==='references'?'reviewed-guides':parts[0]) as 'export'|'status'|'reviewed-guides':null,run:parts[0]==='run'?decodeURIComponent(parts[1]||''):'',revision:new URLSearchParams(query).get('revision')};}
 export function AgentDesk({data,onChange}:{data:AgentDeskData;onChange:()=>void}) {
   const [studioCases,setStudioCases]=useState<{id:string;title:string;reason:string;status:string;thumbnail_url?:string|null}[]>([]);
   useEffect(()=>{let active=true;const load=()=>req<{cases:typeof studioCases}>('/v3/studio').then(x=>{if(active)setStudioCases(x.cases);}).catch(()=>{});load();const t=setInterval(load,3000);return()=>{active=false;clearInterval(t);};},[]);
   const [selection,setSelection]=useState(route),[navigation,setNavigation]=useState<'interventions'|'timeline'>('interventions');
+  const returnToReview=useRef('#/');
+  useEffect(()=>{if(selection.run)returnToReview.current=location.hash;},[selection.run,selection.revision]);
   const search=useRef<HTMLInputElement>(null),queueView=useRef<HTMLDivElement>(null);
   const [source,setSource]=useState('all'),[query,setQuery]=useState('');
   const [bundle,setBundle]=useState<AgentBundle|null>(null),[error,setError]=useState<unknown>(null);
@@ -32,7 +37,7 @@ export function AgentDesk({data,onChange}:{data:AgentDeskData;onChange:()=>void}
   const fallbackRun=reviewCases.find(c=>c.status==='review')?.id||reviewCases[0]?.id||interventions[0]?.id;
   const caseId=selection.legacyCase||selection.run||fallbackRun;
   const reviewCase=studioCases.find(c=>c.id===caseId);
-  useEffect(()=>{if(!selection.run&&!selection.legacyCase&&!selection.export&&fallbackRun)location.hash='/run/'+encodeURIComponent(fallbackRun);},[selection.run,selection.legacyCase,selection.export,fallbackRun]);
+  useEffect(()=>{if(!selection.run&&!selection.legacyCase&&!selection.utility&&fallbackRun)location.hash='/run/'+encodeURIComponent(fallbackRun);},[selection.run,selection.legacyCase,selection.utility,fallbackRun]);
   useEffect(()=>{queueView.current?.querySelector('[aria-current="true"]')?.scrollIntoView({block:'nearest'});},[caseId,navigation,studioCases.length,query]);
   const run=data.runs.find(r=>r.id===caseId);
   // Freeze the first inspected revision. Live updates never replace inspection or unsaved edits.
@@ -55,7 +60,7 @@ export function AgentDesk({data,onChange}:{data:AgentDeskData;onChange:()=>void}
       const target=e.target as HTMLElement,key=e.key.toLowerCase();
       if((e.metaKey||e.ctrlKey)&&key==='k'){e.preventDefault();search.current?.focus();search.current?.select();return;}
       if(e.defaultPrevented||e.metaKey||e.ctrlKey||e.altKey||target.closest('input,textarea,select,[contenteditable="true"],dialog,[role="dialog"]'))return;
-      if(key!=='j'&&key!=='k')return;
+      if(selection.utility||(key!=='j'&&key!=='k'))return;
       const matching=reviewCases.filter(c=>`${c.title} ${c.reason}`.toLowerCase().includes(query.toLowerCase()));
       const queue=[...matching.map(c=>c.id),...interventions.filter(r=>`${r.animation_id} ${r.stop_reason||''}`.toLowerCase().includes(query.toLowerCase())).map(r=>r.id)];
       if(!queue.length)return;
@@ -63,14 +68,14 @@ export function AgentDesk({data,onChange}:{data:AgentDeskData;onChange:()=>void}
       setNavigation('interventions');location.hash='/run/'+encodeURIComponent(next);
     };
     window.addEventListener('keydown',keyboard);return()=>window.removeEventListener('keydown',keyboard);
-  },[caseId,query,reviewCases,interventions]);
+  },[caseId,query,reviewCases,interventions,selection.utility]);
   return <div className="desk-shell"><div className="desk-window"><header className="app-header"><button className="brand" onClick={()=>{setNavigation('interventions');location.hash='/';}}><Icon name="frame"/><span>Framebound</span></button>
     <label className="agent-search-wrap"><Icon name="search"/><input ref={search} className="agent-search" aria-label="Find animation or event" aria-keyshortcuts="Meta+K Control+K" placeholder="Find animation or event" onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(query)setQuery('');else e.currentTarget.blur();}}} value={query} onChange={e=>setQuery(e.target.value)}/><kbd aria-hidden="true">{/Mac/.test(navigator.platform)?'⌘':'Ctrl'} K</kbd></label>
-    <details className="workspace-switcher"><summary aria-label="More workspaces">•••</summary><nav><a href="#/export">Export</a><a href="#/status">Status</a><a href="#/reviewed-guides">Reviewed guides</a></nav></details></header>
-    <div className="desktop-body"><aside className="review-sidebar"><nav className="review-navigation" aria-label="Review views"><button aria-current={navigation==='interventions'&&!selection.export?'page':undefined} onClick={()=>{setNavigation('interventions');location.hash='/';}}><span className="nav-symbol"><Icon name="inbox"/></span><span>Interventions</span><span className="nav-count">{interventions.length+reviewCases.length}</span></button><button aria-current={navigation==='timeline'&&!selection.export?'page':undefined} onClick={()=>{setNavigation('timeline');location.hash='/';}}><span className="nav-symbol"><Icon name="history"/></span><span>Timeline</span></button></nav>
+    <UtilitiesMenu active={selection.utility||undefined}/></header>
+    <div className="desktop-body"><aside className="review-sidebar"><nav className="review-navigation" aria-label="Review views"><button aria-current={navigation==='interventions'&&!selection.utility?'page':undefined} onClick={()=>{setNavigation('interventions');location.hash='/';}}><span className="nav-symbol"><Icon name="inbox"/></span><span>Interventions</span><span className="nav-count">{interventions.length+reviewCases.length}</span></button><button aria-current={navigation==='timeline'&&!selection.utility?'page':undefined} onClick={()=>{setNavigation('timeline');location.hash='/';}}><span className="nav-symbol"><Icon name="history"/></span><span>Timeline</span></button></nav>
       {navigation==='timeline' && <div className="timeline-tools"><select aria-label="Activity source" value={source} onChange={e=>setSource(e.target.value)}><option value="all">All activity</option><option value="framework">Framework</option><option value="human">Human</option><option value="external_agent">Parent agent</option></select></div>}
       <div ref={queueView} className="review-queue" aria-label={navigation==='interventions'?'Intervention queue':'Project timeline'}>{navigation==='interventions'&&reviewCases.length>0&&<section className="queue-project"><header className="queue-heading"><Icon name="folder"/><span>Animation review</span><small>{reviewCases.length}</small></header>{reviewCases.filter(c=>`${c.title} ${c.reason}`.toLowerCase().includes(query.toLowerCase())).map(c=><div className="queue-row" key={c.id}><button className="queue-item" aria-current={c.id===caseId?'true':undefined} onClick={()=>{location.hash='/run/'+encodeURIComponent(c.id);}}><span className="queue-thumb">{c.thumbnail_url?<img src={c.thumbnail_url} alt=""/>:<Icon name="film"/>}</span><span><strong title={c.title}>{c.title}</strong><small title={c.reason}>{c.status==='excluded'?'Intake rejected · replacement pending':c.reason.replace('Isolated 2D replacement · ','')}</small></span></button></div>)}</section>}{[...groups].map(([pid,entries])=><section className="queue-project" key={pid}><header className="queue-heading"><Icon name="folder"/><span>{data.projects.find(p=>p.id===pid)?.name||pid}</span><small>{entries.length}</small></header>{entries.map(row=><div className="queue-row" key={row.id}><button className="queue-item" aria-label={`${row.title} ${row.revision||''}`} aria-current={row.run.id===run?.id && row.revision===inspected?'true':undefined} onClick={()=>open(row.run,row.revision)}><span className="queue-thumb"><Icon name="film"/></span><span><strong>{row.title}</strong><small>{row.detail}</small>{row.at && <time dateTime={row.at}>{stamp(row.at)} · {words(row.source)}</time>}</span><span className="queue-revision">{row.revision}</span></button></div>)}</section>)}{!filtered.length&&!(navigation==='interventions'&&reviewCases.length)&&<p className="queue-empty">{navigation==='interventions'?'No interventions':'No activity'}</p>}</div>
-    </aside><main className={selection.export?"operations-desk":"film-desk"} data-film-view="agent-run"><Err e={error}/>{selection.export?<AgentExport data={data}/>:reviewCase?<InterventionReview key={reviewCase.id} caseId={reviewCase.id} versionId={selection.revision||undefined}/>:run && bundle && bundle.revision.id===inspected && bundle.revision.run_id===run.id?<AgentWorkspace key={bundle.revision.id} bundle={bundle} run={run} onChange={onChange} onRevision={rid=>open(run,rid)}/>:<section className="agent-export"><p>{run?(run.current_revision_id?'Loading animation…':run.stop_reason||'Awaiting the first agent submission.'):'Select a run from the timeline.'}</p>{run?.feedback_id && !run.current_revision_id && <Handoff feedbackId={run.feedback_id}/>}</section>}</main></div>
+    </aside><main className={selection.utility?"operations-desk":"film-desk"} data-film-view="agent-run"><Err e={error}/>{selection.utility?<UtilityWindow view={selection.utility} back={returnToReview.current}>{selection.utility==='export'?<AgentExport data={data}/>:selection.utility==='status'?<DeskStatus data={data}/>:<ReferencesView/>}</UtilityWindow>:reviewCase?<InterventionReview key={reviewCase.id} caseId={reviewCase.id} versionId={selection.revision||undefined}/>:run && bundle && bundle.revision.id===inspected && bundle.revision.run_id===run.id?<AgentWorkspace key={bundle.revision.id} bundle={bundle} run={run} onChange={onChange} onRevision={rid=>open(run,rid)}/>:<section className="agent-export"><p>{run?(run.current_revision_id?'Loading animation…':run.stop_reason||'Awaiting the first agent submission.'):'Select a run from the timeline.'}</p>{run?.feedback_id && !run.current_revision_id && <Handoff feedbackId={run.feedback_id}/>}</section>}</main></div>
     <KeyboardGuide/>
   </div></div>;
 }

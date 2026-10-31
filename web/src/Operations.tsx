@@ -512,7 +512,7 @@ export function ExportView() {
   );
 }
 
-export function StatusView() {
+export function StatusView({showPending=true}:{showPending?:boolean}={}) {
   // Concise capability truth + pending model work with evidence links.
   // A review tool, not a manual editor: open items go to the model's queue.
   const caps = useLoad("capabilities", api.capabilities);
@@ -525,7 +525,7 @@ export function StatusView() {
       <h2>Status</h2>
       <Err e={caps.err} />
       <Err e={open.err} />
-      <h3>Pending model work</h3>
+      {showPending&&<><h3>Pending model work</h3>
       {!open.data ? (
         <p>Loading…</p>
       ) : ((open.data.open ?? []) as Record<string, unknown>[]).length === 0 ? (
@@ -564,7 +564,8 @@ export function StatusView() {
           )}
         </ul>
       )}
-      <h3>Evidence</h3>
+      </>}
+      <Err e={awaiting.err}/><h3>Evidence</h3>
       <p>
         <small>
           Checked-in release evidence. Test reviewers do not represent entrant
@@ -645,237 +646,12 @@ export function StatusView() {
 }
 
 export function ReferencesView() {
-  const [data, setData] = useState<Awaited<
-    ReturnType<typeof api.references>
-  > | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const refresh = useCallback(
-    () => api.references().then(setData).catch(setError),
-    [],
-  );
-  useEffect(() => {
-    void refresh();
-    const changed = () => {
-      void refresh();
-    };
-    window.addEventListener("framebound:changed", changed);
-    return () => window.removeEventListener("framebound:changed", changed);
-  }, [refresh]);
-  return (
-    <section aria-label="Reference proposals">
-      <h2>Reference proposals</h2>
-      <Err e={error} />
-      {!data && <p>Loading references…</p>}
-      {data && data.motion_guides.length === 0 && <p>No guide proposals.</p>}
-      {data?.motion_guides.map((guide) => {
-        const char = data.character_revisions.find(
-          (c) => c.id === guide.character_revision_id,
-        );
-        const approval = data.reference_approvals.find(
-          (a) =>
-            a.character_revision_id === guide.character_revision_id &&
-            a.motion_guide_id === guide.id &&
-            data.active_approval_ids.includes(a.id),
-        );
-        const approved = Boolean(approval);
-        return (
-          <article
-            key={guide.id}
-            style={{ borderTop: "1px solid #ccc", padding: "20px 0" }}
-          >
-            <h3>
-              {guide.character_revision_id} · {guide.id}
-            </h3>
-            <h4>Automatic repair authority</h4>
-            {guide.repair_policy ? (
-              <dl
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "max-content 1fr",
-                  gap: "6px 20px",
-                  fontSize: 14,
-                }}
-              >
-                <dt>Allowed operations</dt>
-                <dd>
-                  {Array.isArray(guide.repair_policy.operators)
-                    ? guide.repair_policy.operators.join(", ")
-                    : "None"}
-                </dd>
-                <dt>Translation limit</dt>
-                <dd>
-                  {String(guide.repair_policy.translation_budget_px)} native
-                  pixels
-                </dd>
-                <dt>Attempts per phase</dt>
-                <dd>{String(guide.repair_policy.max_local_attempts)}</dd>
-                <dt>Compute steps</dt>
-                <dd>{String(guide.repair_policy.max_compute_steps)}</dd>
-                <dt>Provider dispatches</dt>
-                <dd>
-                  {guide.repair_policy.generation_allowed
-                    ? String(guide.repair_policy.max_provider_dispatches)
-                    : "Disabled"}
-                </dd>
-              </dl>
-            ) : (
-              <p>Manual work only</p>
-            )}
-            {guide.source_calibration && (
-              <p>
-                Fixed source conversion:{" "}
-                {String(guide.source_calibration.source_width)} ×{" "}
-                {String(guide.source_calibration.source_height)}, crop{" "}
-                {JSON.stringify(guide.source_calibration.crop)}, nearest
-                neighbour.
-              </p>
-            )}
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                flexWrap: "wrap",
-                margin: "16px 0",
-              }}
-            >
-              {guide.entries.map((entry) => (
-                <div
-                  key={"scope-" + entry.phase}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "64px 64px",
-                    gap: 4,
-                    border: "1px solid #ddd",
-                    padding: 8,
-                  }}
-                >
-                  <small style={{ gridColumn: "1 / -1" }}>
-                    {entry.phase} · editable / protected
-                  </small>
-                  {entry.editable_mask_asset_id && (
-                    <img
-                      width={64}
-                      height={64}
-                      style={{ imageRendering: "pixelated" }}
-                      src={api.assetUrl(entry.editable_mask_asset_id)}
-                      alt={entry.phase + " editable mask"}
-                    />
-                  )}
-                  {entry.protected_mask_asset_id && (
-                    <img
-                      width={64}
-                      height={64}
-                      style={{ imageRendering: "pixelated" }}
-                      src={api.assetUrl(entry.protected_mask_asset_id)}
-                      alt={entry.phase + " protected mask"}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-              {char &&
-                [
-                  ["Identity", char.identity_asset_ids],
-                  ["Style", char.style_asset_ids],
-                ].map(([label, ids]) => (
-                  <div key={String(label)}>
-                    <h4>{String(label)}</h4>
-                    {(ids as string[]).map((id) => (
-                      <figure
-                        key={id}
-                        style={{ display: "inline-block", margin: 8 }}
-                      >
-                        <img
-                          alt={`${label}: ${id}`}
-                          src={api.assetUrl(id)}
-                          width={128}
-                          height={128}
-                          style={{
-                            objectFit: "contain",
-                            imageRendering: "pixelated",
-                            background: "#eee",
-                          }}
-                        />
-                        <figcaption>{id}</figcaption>
-                      </figure>
-                    ))}
-                  </div>
-                ))}
-              <div>
-                <h4>Phase guide</h4>
-                {guide.entries.map((entry) => (
-                  <figure
-                    key={entry.phase}
-                    style={{ display: "inline-block", margin: 8 }}
-                  >
-                    <img
-                      alt={`Phase ${entry.phase}`}
-                      src={api.assetUrl(entry.asset_id)}
-                      width={128}
-                      height={128}
-                      style={{
-                        objectFit: "contain",
-                        imageRendering: "pixelated",
-                        background: "#eee",
-                      }}
-                    />
-                    <figcaption>{entry.phase}</figcaption>
-                  </figure>
-                ))}
-              </div>
-            </div>
-            <button
-              disabled={approved || busy !== null}
-              onClick={async () => {
-                setBusy(guide.id);
-                setError(null);
-                try {
-                  await api.approveReferences(
-                    guide.character_revision_id,
-                    guide.id,
-                    `ref-${crypto.randomUUID()}`,
-                  );
-                  await refresh();
-                } catch (e) {
-                  setError(e);
-                } finally {
-                  setBusy(null);
-                }
-              }}
-            >
-              {approved
-                ? "References approved"
-                : busy === guide.id
-                  ? "Recording…"
-                  : "Approve these references"}
-            </button>
-            {approval && (
-              <button
-                disabled={busy === guide.id}
-                onClick={async () => {
-                  setBusy(guide.id);
-                  setError(null);
-                  try {
-                    await api.revokeReference(
-                      approval.id,
-                      `revoke-${crypto.randomUUID()}`,
-                    );
-                    await refresh();
-                  } catch (e) {
-                    setError(e);
-                  } finally {
-                    setBusy(null);
-                  }
-                }}
-              >
-                Revoke reference approval
-              </button>
-            )}
-          </article>
-        );
-      })}
-    </section>
-  );
+  const [data,setData]=useState<Awaited<ReturnType<typeof api.references>>|null>(null),[error,setError]=useState<unknown>(null),[busy,setBusy]=useState<string|null>(null),[selected,setSelected]=useState('');
+  const refresh=useCallback(()=>api.references().then(setData).catch(setError),[]);
+  useEffect(()=>{void refresh();const changed=()=>{void refresh();};window.addEventListener('framebound:changed',changed);return()=>window.removeEventListener('framebound:changed',changed);},[refresh]);
+  const guide=data?.motion_guides.find(g=>g.id===selected)||data?.motion_guides[0];
+  const char=data?.character_revisions.find(c=>c.id===guide?.character_revision_id);
+  const approval=guide&&data?.reference_approvals.find(a=>a.character_revision_id===guide.character_revision_id&&a.motion_guide_id===guide.id&&data.active_approval_ids.includes(a.id));
+  async function approve(revoke=false){if(!guide||busy)return;setBusy(guide.id);setError(null);try{if(revoke&&approval)await api.revokeReference(approval.id,`revoke-${crypto.randomUUID()}`);else await api.approveReferences(guide.character_revision_id,guide.id,`ref-${crypto.randomUUID()}`);await refresh();}catch(e){setError(e);}finally{setBusy(null);}}
+  return <div className="utility-guides" aria-label="Reference proposals"><section className="utility-section"><header><h2>Reference library</h2><span className="utility-caption">{data?.motion_guides.length??'…'} guides</span></header><p className="utility-intro">Frozen identity, style and phase references. Reference approval grants scoped authority; it does not approve an animation.</p><Err e={error}/>{!data?error?<button onClick={()=>void refresh()}>Reload references</button>:<p role="status">Loading references…</p>:!guide?<div className="utility-empty"><strong>No guide proposals</strong><p>This workspace has no authored phase guides. Image-only review does not require invented references.</p><a href="#/">Return to review →</a></div>:<div className="utility-guide-layout"><nav className="utility-guide-list" aria-label="Reference guides">{data.motion_guides.map(g=>{const approved=data.reference_approvals.some(a=>a.character_revision_id===g.character_revision_id&&a.motion_guide_id===g.id&&data.active_approval_ids.includes(a.id));return <button key={g.id} aria-current={g.id===guide.id?'page':undefined} onClick={()=>setSelected(g.id)}>{g.entries[0]&&<img src={api.assetUrl(g.entries[0].asset_id)} alt=""/>}<span><strong>{g.id}</strong><small>{g.character_revision_id} · {approved?'Approved':'Proposed'}</small></span></button>;})}</nav><article className="utility-guide-detail"><header><h3>{guide.id}</h3><span className={'badge '+(approval?'pass':'')}>{approval?'References approved':'Proposed references'}</span></header>{char&&<div className="utility-reference-images">{[['Identity',char.identity_asset_ids],['Style',char.style_asset_ids]].map(([label,ids])=><section key={String(label)}><h4>{String(label)}</h4><div className="utility-thumbnails">{(ids as string[]).map(id=><figure key={id}><a href={api.assetUrl(id)} target="_blank" rel="noreferrer"><img src={api.assetUrl(id)} alt={`${label}: ${id}`}/></a><figcaption title={id}>{id}</figcaption></figure>)}</div></section>)}</div>}<h4>Phase guide</h4><div className="utility-thumbnails">{guide.entries.map(entry=><figure key={entry.phase}><a href={api.assetUrl(entry.asset_id)} target="_blank" rel="noreferrer"><img src={api.assetUrl(entry.asset_id)} alt={`Phase ${entry.phase}`}/></a><figcaption>{entry.phase}</figcaption></figure>)}</div><details className="utility-disclosure"><summary>Repair authority and masks</summary>{guide.repair_policy?<dl className="utility-definition"><dt>Operations</dt><dd>{Array.isArray(guide.repair_policy.operators)?guide.repair_policy.operators.join(', '):'None'}</dd><dt>Translation</dt><dd>{String(guide.repair_policy.translation_budget_px)} native pixels</dd><dt>Attempts / phase</dt><dd>{String(guide.repair_policy.max_local_attempts)}</dd><dt>Compute steps</dt><dd>{String(guide.repair_policy.max_compute_steps)}</dd><dt>Provider sends</dt><dd>{guide.repair_policy.generation_allowed?String(guide.repair_policy.max_provider_dispatches):'Disabled'}</dd></dl>:<p>No automatic repair authority.</p>}<div className="utility-mask-list">{guide.entries.map(entry=><section key={entry.phase}><strong>{entry.phase}</strong><div>{[['Editable',entry.editable_mask_asset_id],['Protected',entry.protected_mask_asset_id]].map(([label,id])=><figure key={label}><figcaption>{label}</figcaption>{id?<img src={api.assetUrl(id)} alt={`${entry.phase} ${label} mask`}/>:<small>Not supplied</small>}</figure>)}</div></section>)}</div></details>{guide.source_calibration&&<details className="utility-disclosure"><summary>Source conversion</summary><p>{String(guide.source_calibration.source_width)} × {String(guide.source_calibration.source_height)} · nearest neighbour</p><code>Crop {JSON.stringify(guide.source_calibration.crop)}</code></details>}<div className="utility-actions"><button disabled={Boolean(approval)||busy!==null} onClick={()=>void approve()}>{approval?'References approved':busy===guide.id?'Recording…':'Approve references'}</button>{approval&&<button className="utility-danger" disabled={busy!==null} onClick={()=>void approve(true)}>Revoke approval</button>}</div></article></div>}</section></div>;
 }

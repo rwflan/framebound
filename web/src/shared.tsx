@@ -22,6 +22,7 @@ export function parseHash(): View {
     return { name: "packet", id: decodeURIComponent(parts[1]) };
   if (path === "compare" && q.get("base") && q.get("other"))
     return { name: "compare", base: q.get("base")!, other: q.get("other")! };
+  if(path==='reviewed-guides')return {name:'references'};
   if (path === "issues")
     return { name: "issues", revision: q.get("revision") || undefined };
   if (
