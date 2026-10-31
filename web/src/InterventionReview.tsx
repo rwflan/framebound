@@ -1,4 +1,5 @@
 import {useEffect,useState,useRef} from 'react';
+import {ViewerExpansion,useViewerExpansion} from './ViewerExpansion';
 import {req} from './api';
 import {AnnotationPlayer,Stroke} from './AnnotationPlayer';
 import {AnnotationTools,AnnotationSurface,useAnnotations} from './AnnotationTools';
@@ -18,8 +19,9 @@ export function InterventionReview({caseId,versionId}:{caseId:string;versionId?:
  const current=data?.versions.find(v=>v.id===data.case.current),shown=data?.versions.find(v=>v.id===(inspected||current?.id))||current;
  const eligible=shown?.intake?.eligible===true,urls=eligible?shown!.urls:[];
  const film=useFilm(),clock=usePresentationClock({holds:shown?.holds||[1],tps:shown?.tps||12,loop:shown?.loop||false,resetKey:shown?.id||'',autoPlay:false});
+ const expansion=useViewerExpansion(()=>clock.setPlaying(false));
  const historyEnd=useRef<HTMLDivElement>(null);
- useEffect(()=>{if(historyEnd.current)historyEnd.current.scrollTop=historyEnd.current.scrollHeight;},[data?.case.current,data?.feedback.length]);
+ useEffect(()=>{if(historyEnd.current)historyEnd.current.scrollTop=historyEnd.current.scrollHeight;},[data?.case.current,data?.feedback.length,expansion.expanded]);
  const key=caseId+':'+current?.id;
  useEffect(()=>{try{setDraft(JSON.parse(localStorage.getItem('studio-draft:'+key)||'null')||{key,text:'',strokes:[]});}catch{setDraft({key,text:'',strokes:[]});}},[key]);
  function edit(update:Partial<typeof draft>){const next={...draft,...update,key};setDraft(next);localStorage.setItem('studio-draft:'+key,JSON.stringify(next));}
@@ -32,9 +34,9 @@ export function InterventionReview({caseId,versionId}:{caseId:string;versionId?:
  function selectFrame(slot:number){clock.setPlaying(false);clock.selectSlot(slot);film.film.current?.reveal(slot,true);}
  if(!data||!shown)return <div className="packet-workspace"><p>Loading intervention…</p><Err e={error}/></div>;
  const history=data.versions.filter(v=>v.intake?.eligible),excluded=data.versions.length-history.length;
- return <div className="packet-workspace agent-workspace intervention-workspace">
+ return <div className={"packet-workspace agent-workspace intervention-workspace"+(expansion.expanded?" expanded-film":"")}>
   <section className="film-window">
-   <header className="pane-title viewer-title"><span className="file-icon"><Icon name="film"/></span><strong>{data.case.title}</strong><span className="title-grip"/><span className="badge">{data.case.status==='approved'?'Approved':eligible?'For review':'Intake withheld'}</span></header>
+   <header className="pane-title viewer-title"><span className="file-icon"><Icon name="film"/></span><strong>{data.case.title}</strong><span className="title-grip"/><span className="badge">{data.case.status==='approved'?'Approved':eligible?'For review':'Intake withheld'}</span><ViewerExpansion expanded={expansion.expanded} onToggle={expansion.toggle} onFeedback={()=>{setTab('feedback');expansion.showFeedback();}}/></header>
    <div className="viewer-toolbar"><span>{eligible?'Isolated 2D sprite · alpha verified':'Original excluded from the MVP'}</span><span className="title-grip"/>{eligible&&<div className="control-zoom"><button aria-label="Zoom out" onClick={()=>film.film.current?.zoom(-1)}>−</button><output>{film.zoom}%</output><button aria-label="Zoom in" onClick={()=>film.film.current?.zoom(1)}>+</button><button onClick={()=>film.film.current?.fit()}>Fit</button></div>}</div>
    {eligible&&<AnnotationTools controls={annotations}/>}
    {eligible?<div className="film-stage agent-film-stage review-film-stage"><Film ref={film.film} filmKey={shown.id} count={urls.length} sequence selected={clock.slot} onZoom={film.setZoom} onPosition={film.setPosition} onStep={selectFrame}>

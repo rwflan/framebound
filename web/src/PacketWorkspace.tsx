@@ -1,3 +1,4 @@
+import {ViewerExpansion,useViewerExpansion} from './ViewerExpansion';
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {Stroke} from "./AnnotationPlayer";
 import {AnnotationTools,AnnotationSurface,useAnnotations} from "./AnnotationTools";
@@ -76,7 +77,7 @@ export function PacketWorkspace({
     [selected, setSelected] = useState([initialSlot.current]),
     [issueId, setIssueId] = useState<string | null>(null);
   const anchor = useRef(initialSlot.current);
-  const [expanded, setExpanded] = useState(false);
+  const expansion=useViewerExpansion(()=>clock.setPlaying(false)),expanded=expansion.expanded;
   const [referenceAsset, setReferenceAsset] = useState<{
     label: string;
     id: string;
@@ -521,16 +522,7 @@ export function PacketWorkspace({
                 {words(b.current_decision.acceptance || "unreviewed")}
               </span>
             </div>
-            <button
-              className="window-control"
-              aria-label={
-                expanded ? "Restore workspace" : "Expand film workspace"
-              }
-              aria-pressed={expanded}
-              onClick={() => setExpanded(!expanded)}
-            >
-              <Icon name="expand" />
-            </button>
+            <ViewerExpansion expanded={expanded} onToggle={expansion.toggle} onFeedback={()=>{setTab('correction');expansion.showFeedback();}}/>
           </header>
           <div className="viewer-toolbar">
             <select
