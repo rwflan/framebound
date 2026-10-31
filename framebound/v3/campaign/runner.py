@@ -245,7 +245,7 @@ class Runner:
         context=dict(request=case.request,binding=binding.model_dump(),holds=case.holds,ticks_per_second=case.ticks_per_second,
             image_order='identity anchor, then ordered native frames',windows=temporal_windows(case.holds,loop=case.loop),measurement_proposals=features['proposals'],schema=Assessment.model_json_schema())
         rubric=DIAGNOSIS_RUBRIC+(' Independent preservation audit: inspect each subject, legitimate deformation and event order without seeing another assessment.' if ordinal%2 else '')
-        text=rubric+'\nCoverage present means a DEFECT exists in that category, never that an entity or property exists. Every present category MUST have a corresponding localized finding. Explicitly include visibility=supported only when the pose and observations support a defect. Opaque backdrops do not establish extraction defects unless extraction was actually performed.\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
+        text=rubric+'\nFor any assessed category, list actual native slots (0 to '+str(len(frames)-1)+'). No props or no extraction means not_assessed, not an empty-scope negative label. Include a visibility field in every finding.\nCoverage present means a DEFECT exists in that category, never that an entity or property exists. Every present category MUST have a corresponding localized finding. Explicitly include visibility=supported only when the pose and observations support a defect. Opaque backdrops do not establish extraction defects unless extraction was actually performed.\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
         rid,raw,receipt=self._call(case,'diagnose',text,[anchor,*[png(f) for f in frames]],attempt=ordinal,parents=[revision_id])
         response=json.loads(raw)
         if response.get('status')=='incomplete':
@@ -261,6 +261,21 @@ class Runner:
         try:
             body=extract_text(raw)
             if set(body)!={'coverage','findings'}:raise ValueError('unexpected teacher fields')
+            # Downgrade unsupported claims only; never fill absent scope from
+            # another category or invent negative/positive training evidence.
+            downgrades=[]
+            for coverage in body['coverage']:
+                category=coverage['category']
+                unsupported=(coverage['status'] in {'present','absent_within_assessed_scope'} and not coverage.get('slots'))
+                unsupported|=coverage['status']=='present' and not any(f.get('category')==category for f in body['findings'])
+                unsupported|=category=='extraction'  # this pipeline performs no matting
+                if unsupported:
+                    downgrades.append(category)
+                    coverage['status']='not_assessed'
+                    coverage['limitations']='Unsupported scope or absent extraction operation. Original teacher claim retained in the raw response.'
+                    body['findings']=[f for f in body['findings'] if f.get('category')!=category]
+            if downgrades:self._save('annotations',rid+'-normalization.json',canonical(dict(raw_sha256=p.raw_sha256,
+                downgraded_categories=downgrades,operator='unsupported-coverage-abstention-v1')))
             assessment=Assessment(binding=binding,provenance=p,**body).validate_evidence(binding,case.holds,frames[0].size)
         except ValueError as error:
             self._save('annotations',rid+'-quarantine.json',canonical(dict(raw_sha256=p.raw_sha256,reason=str(error),
