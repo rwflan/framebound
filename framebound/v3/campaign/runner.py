@@ -393,7 +393,20 @@ class Runner:
             for case in self.config.cases:
                 if case.stage!=self.config.phase:continue
                 if self.ledger.status(self.campaign)['stopped']:break
-                try:results[case.id]=self.case(case)
+                try:
+                    results[case.id]=self.case(case)
+                    gate=self.folder/'capabilities/long-sequences.json'
+                    if not gate.exists():
+                        evidence=[]
+                        for candidate in self.config.cases:
+                            if candidate.stage!=self.config.phase or len(candidate.holds)!=6:continue
+                            result=self.ledger.progress(self.campaign,candidate.id)['result']
+                            assessment=(result or {}).get('after_assessment') or (result or {}).get('assessment')
+                            if assessment and any(c['status'] in {'present','absent_within_assessed_scope'} and c['slots'] for c in assessment['coverage']):
+                                evidence.append(candidate.id)
+                            if len(evidence)==2:
+                                enable_long_sequences(self.root,self.campaign,evidence)
+                                break
                 except Stopped as exc:deferred[case.id]=str(exc)
                 except Exception as exc:
                     # One malformed schema/shape stops the batch before the same
@@ -417,8 +430,25 @@ def enable_long_sequences(root,campaign,case_ids):
         spec=next((c for c in config.cases if c.id==cid),None)
         if not spec or len(spec.holds)!=6:raise ValueError('capability evidence must use six native poses')
         progress=ledger.progress(campaign,cid)
-        if not progress['result'] or progress['result'].get('outcome') not in {'accepted','unchanged'}:
+        result=progress['result']
+        assessment=(result or {}).get('after_assessment') or (result or {}).get('assessment')
+        if not result or result.get('outcome') not in {'accepted','unchanged','ambiguous'} or not assessment:
             raise ValueError('six-pose cases require completed assessed evidence')
+        validated=Assessment.model_validate(assessment)
+        if not any(c.status in {'present','absent_within_assessed_scope'} and c.slots for c in validated.coverage):
+            raise ValueError('six-pose capability requires actual scoped assessment, not blanket abstention')
+        project=str(local_path(root,f'campaigns/{campaign}/project'))
+        rid=result.get('base_revision_id') or result.get('revision_id')
+        revision=loop.revision_get(project,rid)['revision']
+        if len(revision['frame_asset_ids'])!=6:raise ValueError('six native imported frames required')
+        con=S.connect(project)
+        try:
+            from ...v2.media.canonical import load_native_image
+            for aid in revision['frame_asset_ids']:
+                asset,_=S.get(con,'assets',aid);raw=S.blob_path(project,asset['byte_sha256']).read_bytes()
+                if S.sha256_bytes(raw)!=asset['byte_sha256']:raise ValueError('native capability evidence changed')
+                load_native_image(raw)
+        finally:con.close()
         with ledger.db() as db:
             requests=[dict(r) for r in db.execute("SELECT * FROM requests WHERE campaign=? AND case_id=? AND operation='generate'",(campaign,cid))]
         if not requests or any(r['state']!='received' for r in requests):raise ValueError('generation receipts unresolved')
