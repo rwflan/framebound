@@ -204,3 +204,19 @@ def test_six_pose_operation_gate_retains_semantic_uncertainty(tmp_path):
     assert len(gate['evidence'])==2
     assert 'longer sequence attempts still require measured boundaries' in gate['meaning']
     assert all(result['outcome'] in {'unchanged','ambiguous'} for result in result['results'].values())
+
+
+def test_later_corroborated_finding_drives_repair(tmp_path):
+    config,case=configured(tmp_path)
+    class MultipleTargets(EngineeringSpecialist):
+        def execute(self,request,*,timeout):
+            response=super().execute(request,timeout=timeout)
+            if request['operation']!='diagnose' or request['attempt']!=0:return response
+            body=json.loads(response.raw);text=json.loads(body['output'][0]['text'])
+            unmatched=dict(text['findings'][0],id='a-unmatched',subject='Different actor')
+            text['findings'].insert(0,unmatched);body['output'][0]['text']=json.dumps(text)
+            return Response(canonical(body),response.incurred,response.successful_images,response.receipt)
+    specialist=MultipleTargets();runner=Runner(tmp_path,config.id,specialist);result=runner.run()
+    assert result['results'][case.id]['outcome']=='unchanged',result
+    assert result['results'][case.id]['corroboration']['eligible_finding_ids']==['f']
+    assert sum(r['operation']=='repair' for r in specialist.sends)==1

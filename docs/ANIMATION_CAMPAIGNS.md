@@ -108,3 +108,15 @@ Primary execution references checked 31 October 2026:
 - [Modal resource prices](https://modal.com/pricing)
 - [Modal budgets and net spend limits](https://modal.com/docs/guide/budgets)
 - [Modal container replay behavior](https://modal.com/docs/guide/retries)
+
+`campaign audit` replays saved assessment pairs without provider calls or authority
+creation. It distinguishes quarantined second responses, abstention/disagreement,
+overlapping categories requiring identity/scope resolution, and different defects.
+The controller examines every supported material target, retaining a diagnostic
+record rather than silently discarding the authorization refusal. Matching permits
+only Unicode/case/whitespace formatting normalization, exact slot/part/ROI support
+and overlapping authored time. It never treats a shared category or overlapping
+frames as sufficient corroboration. Future whole-canvas artifact findings can use
+explicit `subject_id: scene_canvas`; that ID cannot identify actors or parts.
+Historical evidence is never assigned this ID by inference. Pilot outcomes and
+frozen assessments remain unchanged by audit replay.

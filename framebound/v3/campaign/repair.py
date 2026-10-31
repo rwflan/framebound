@@ -51,8 +51,8 @@ def authorize(project, run_id, assessment: Assessment, independent: Assessment, 
             f = next((f for f in assessment.findings if f.id == finding_id),None)
             if f is None or f.category not in policy.categories or f.visibility != 'supported':
                 raise InvalidInput('unsupported target category or visibility')
-            agreement = any(g.category == f.category and g.subject == f.subject and g.visibility == 'supported'
-                and set(g.slots) == set(f.slots) and g.severity in {'material','critical'} for g in independent.findings)
+            from .corroboration import compare
+            agreement=any(compare(f,g)['matched'] for g in independent.findings)
             if f.severity not in {'material','critical'} or not agreement:
                 raise InvalidInput('material target lacks independent corroboration')
             if not set(f.slots) <= set(policy.allowed_slots) or (f.roi is None and not policy.allow_full_frame):
@@ -67,7 +67,7 @@ def authorize(project, run_id, assessment: Assessment, independent: Assessment, 
                 raise InvalidInput('persistent submission limit')
             record = dict(id=authority_id,run_id=run_id,task_id=run['task_id'],baseline_revision_id=run['current_revision_id'],
                 binding=binding.model_dump(),source='task_authored_automatic',scope=Scope(slots=f.slots,roi=f.roi).model_dump(),
-                assessment=assessment.model_dump(mode='json'),independent=independent.model_dump(mode='json'),finding_id=f.id,
+                assessment=assessment.model_dump(mode='json'),independent=independent.model_dump(mode='json'),finding_id=f.id,corroboration_version='scoped-corroboration-v1',
                 candidate_revision_id=None,status='authorized',instruction=f'Correct {f.category} on {f.subject}: {f.observed}. '
                     f'Expected: {f.expected}. Preserve identity, props, palette, timing and every pixel outside declared support.')
             loop.insert(con,'agent_auto_authorities',record)
