@@ -54,6 +54,9 @@ def prepare(manifest_path, project, *, review_path=None, native_size=256):
     """
     path = Path(manifest_path).resolve(); root = path.parent
     manifest = json.loads(path.read_text())
+    if manifest.get('schema_version') == '2.0':
+        from .campaign.sequence import import_manifest
+        return import_manifest(path, project, review_path=review_path, native_size=native_size)
     if not isinstance(native_size, int) or not 16 <= native_size <= 512:
         raise InvalidInput('native size must be an integer between 16 and 512')
     raw_cases = manifest.get('cases', [])
