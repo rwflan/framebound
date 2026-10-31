@@ -56,12 +56,21 @@ class Runner:
         if hasattr(self,'_case_started') and time.monotonic()-self._case_started+self._case_initial_active>=self.config.limits.active_seconds:
             raise Stopped('case active processing ceiling')
         model='muse-image-1.0' if image else 'muse-spark-1.3'
-        # Conservative input ceiling is frozen with each executable request.
-        tokens=65536;output=4096
-        quote=self.config.prices.image_microdollars if image else math.ceil(tokens*1.25+output*4.25)
-        payload=dict(provider='meta',requested_model=model,wire=wire(model,text,images,max_output_tokens=None if image else output),
-            input_token_ceiling=None if image else tokens,output_token_ceiling=None if image else output)
-        row=self.ledger.reserve(self.campaign,case.id,operation,payload,quote=quote,images=int(image),attempt=attempt,sheet=sheet,parents=parents)
+        # Reuse frozen executable requests across software changes. Only a known
+        # incomplete diagnosis can consume the one explicit recheck lane.
+        with self.ledger.db() as db:
+            existing=db.execute("SELECT * FROM requests WHERE campaign=? AND case_id=? AND operation=? AND json_extract(request,'$.attempt')=? AND json_extract(request,'$.sheet')=?",
+                (self.campaign,case.id,operation,attempt,sheet)).fetchone()
+        if existing:
+            row=dict(existing)
+        else:
+            tokens=65536;output=8192
+            request_wire=wire(model,text,images,max_output_tokens=None if image else output)
+            if not image:request_wire['reasoning']={'effort':'low'}
+            quote=self.config.prices.image_microdollars if image else math.ceil(tokens*1.25+output*4.25)
+            payload=dict(provider='meta',requested_model=model,wire=request_wire,
+                input_token_ceiling=None if image else tokens,output_token_ceiling=None if image else output)
+            row=self.ledger.reserve(self.campaign,case.id,operation,payload,quote=quote,images=int(image),attempt=attempt,sheet=sheet,parents=parents)
         if row['state']=='reserved': dispatch(self.ledger,row['id'],self.specialist)
         raw,receipt=self.ledger.artifact(row['id'])
         if not self.ledger.status(self.campaign)['stopped']:
@@ -238,6 +247,13 @@ class Runner:
         rubric=DIAGNOSIS_RUBRIC+(' Independent preservation audit: inspect each subject, legitimate deformation and event order without seeing another assessment.' if ordinal%2 else '')
         text=rubric+'\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
         rid,raw,receipt=self._call(case,'diagnose',text,[anchor,*[png(f) for f in frames]],attempt=ordinal,parents=[revision_id])
+        response=json.loads(raw)
+        if response.get('status')=='incomplete':
+            if response.get('incomplete_details',{}).get('reason')!='max_output_tokens':
+                raise ValueError('unsupported incomplete assessment; retain uncertainty')
+            original_rid=rid
+            rid,raw,receipt=self._call(case,'recheck',text,[anchor,*[png(f) for f in frames]],
+                attempt=0,parents=[revision_id,original_rid],sheet=ordinal%self.config.limits.sheets)
         body=extract_text(raw)
         if set(body)!={'coverage','findings'}:raise ValueError('unexpected teacher fields')
         p=Provenance(provider='meta',requested_model='muse-spark-1.3',observed_model=receipt['provider'].get('observed_model'),

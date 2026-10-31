@@ -128,3 +128,26 @@ def test_webp_provider_outputs_are_normalized_without_regeneration(tmp_path):
     assert any(a['mime']=='image/webp' and a['source_kind']=='generated' for a in assets)
     assert any(a['derivation'].get('operator')=='muse-source-to-png-v1' for a in assets)
     runner.run();assert len(specialist.sends)==7
+
+
+def test_incomplete_diagnosis_gets_one_recheck_without_new_artwork(tmp_path):
+    config,case=configured(tmp_path)
+    class IncompleteSpecialist(EngineeringSpecialist):
+        def execute(self,request,*,timeout):
+            if request['operation']=='diagnose' and request['attempt']==0:
+                self.sends.append(request)
+                return Response(canonical(dict(status='incomplete',incomplete_details={'reason':'max_output_tokens'},output=[])),1000,0,{'id':'test-incomplete'})
+            if request['operation']=='recheck':
+                assert request['payload']['wire']['reasoning']=={'effort':'low'}
+                assert request['payload']['wire']['max_output_tokens']==8192
+                self.sends.append(request)
+                coverage=[dict(category=c,status='uncertain',slots=list(range(6)),limitations='Synthetic uncertainty') for c in CATEGORIES]
+                body=dict(status='completed',output=[dict(type='output_text',text=json.dumps(dict(coverage=coverage,findings=[])))])
+                return Response(canonical(body),1000,0,{'id':'test-recheck'})
+            return super().execute(request,timeout=timeout)
+    specialist=IncompleteSpecialist();runner=Runner(tmp_path,config.id,specialist)
+    result=runner.run()
+    assert result['results'][case.id]['outcome']=='ambiguous',result
+    assert sum(r['operation']=='recheck' for r in specialist.sends)==1
+    assert sum(r['operation']=='generate' for r in specialist.sends)==1
+    count=len(specialist.sends);runner.run();assert len(specialist.sends)==count
