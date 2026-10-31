@@ -22,3 +22,15 @@ output/
 docs/research/
 corpus/
 local-corpus/
+
+# Experiment payloads, derived tensors and learned models remain local.
+campaigns/
+checkpoints/
+*.sqlite3
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.npz
+*.npy
+*.receipt.json
