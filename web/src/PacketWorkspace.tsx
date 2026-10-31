@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {AnnotationPlayer,Stroke} from "./AnnotationPlayer";
 import { api } from "./api";
 import type {
   EligibilityDto,
@@ -38,6 +39,7 @@ export function PacketWorkspace({
   bundles: Bundle[];
   onRefresh: () => void;
 }) {
+  const [visual,setVisual]=useState<Stroke[]>([]);
   const id = packetId(b),
     revision = revisionId(b),
     controls = useFilm();
@@ -165,7 +167,7 @@ export function PacketWorkspace({
         `${tickOfSlot(holds, useRange ? selectedFirst : index)}-${tickOfSlot(holds, useRange ? selectedLast : index) + holds[useRange ? selectedLast : index] - 1}`,
       );
       setRoi(null);
-      setNote("");
+      setNote("");setVisual([]);
       setIssueId(null);
       operation.current = "issue-" + crypto.randomUUID();
     }
@@ -372,7 +374,7 @@ export function PacketWorkspace({
         roi: roi
           ? { left: roi[0], top: roi[1], right: roi[2], bottom: roi[3] }
           : null,
-        note: note.trim(),
+        note: note.trim(),visual_annotations:visual,
         category,
       });
       setIssueId(null);
@@ -482,6 +484,7 @@ export function PacketWorkspace({
   );
   return (
     <>
+      {tab==="correction"&&<AnnotationPlayer urls={b.frames.map(f=>f.asset_url)} holds={holds} tps={timing.ticks_per_second||60} loop={Boolean((b.contract.action as {loop?:boolean}).loop)} width={width} height={height} value={visual} onChange={setVisual}/>}
       <div className={"packet-workspace" + (expanded ? " expanded-film" : "")}>
         <section className="film-window">
           <header className="pane-title viewer-title">
