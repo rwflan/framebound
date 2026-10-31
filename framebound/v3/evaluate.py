@@ -8,7 +8,7 @@ import PIL
 
 import numpy as np
 
-VERSION = 'declared-regions-v2'
+VERSION = 'declared-regions-v3-isolated'
 
 
 def digest(value):
@@ -71,6 +71,17 @@ def evaluate(spec, images, asset_manifest, presented_holds):
     result('timing', 'timing', list(range(len(images))),
            'pass' if presented_holds == spec.timing.holds else 'fail', presented_holds, spec.timing.holds,
            'Preserve exact authored frame holds; timing changes require a new task specification.')
+    from .intake import inspect, VERSION as INTAKE_VERSION
+    for i, image in enumerate(images):
+        intake=inspect(image)
+        result(f'intake-{i}', 'media', [i], 'pass' if intake['eligible'] else 'fail', intake,
+               'Isolated foreground with real alpha and clear borders',
+               '; '.join(intake['reasons']) or 'MVP raster isolation passed; semantics remain unverified.')
+        if not intake['eligible']:arrays[i]=None
+    # Stop before consistency measurements when the input is outside the MVP.
+    if any(not inspect(image)['eligible'] for image in images):
+        manifest=dict(evaluator=VERSION,intake_policy=INTAKE_VERSION,spec=spec.model_dump(mode='json',exclude_unset=True),assets=asset_manifest,presented_holds=presented_holds,results=results)
+        return results,manifest,digest(manifest)
     measurements = {}
     for r in spec.region_observations:
         roi = r.roi.model_dump()
@@ -108,7 +119,7 @@ def evaluate(spec, images, asset_manifest, presented_holds):
                ('Only this explicitly declared moving interval rejects identical drawings; intentional holds are exempt.'
                 if t.family == 'moving' else 'Declared feature-centroid displacement bound; intended motion and camera changes must be encoded in the task regions and bounds.'),
                source=t.source)
-    manifest = dict(evaluator=VERSION, evaluator_identity=dict(version=VERSION, source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    manifest = dict(evaluator=VERSION, evaluator_identity=dict(version=VERSION, source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),intake_sha256=hashlib.sha256((Path(__file__).parent/'intake.py').read_bytes()).hexdigest(),
                     dependencies=dict(python=platform.python_version(),numpy=np.__version__,Pillow=PIL.__version__)), spec=spec.model_dump(mode='json', exclude_unset=True), assets=asset_manifest,
                     presented_holds=presented_holds, results=results)
     return results, manifest, digest(manifest)

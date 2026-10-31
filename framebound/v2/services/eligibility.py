@@ -59,6 +59,10 @@ def release_eligibility_in(con, project_dir: str, revision_id: str) -> dict:
         except KeyError:
             return {"revision_id": revision_id, "eligible": False,"evaluation_id":None,
                     "reasons": [f"unknown revision {revision_id}"]}
+        from ...v3.services.studio import gate_frames
+        frame_assets=[S.get(con,'frame_instances',fid)[0]['asset_id'] for fid in rev.frame_instance_ids]
+        if not gate_frames(project_dir,frame_assets)['eligible']:
+            eligible=False;reasons.append('MVP intake failed: isolated 2D sprites with real alpha are required')
         if contract.references.get('motion_guide_revision'):
             from .approvals import approval_for_contract
             from .errors import InvalidInput

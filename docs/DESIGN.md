@@ -1,5 +1,13 @@
 # Design
 
+## MVP input boundary (2026-10-31)
+
+Framebound accepts isolated 2D animations of characters, animals, figures and objects, supplied as sprite sheets or native frames. Surroundings must be genuinely transparent. White or coloured mattes, paper, baked checkerboards, scenery, photorealistic scenes and effects-only sequences do not belong in MVP animation review. Decode and isolation checks run before consistency assessment. Unknown semantic/artistic quality remains unknown; a raster isolation pass is never creative acceptance.
+
+Preserve unsuitable originals, provenance and negative intake evidence locally, but quarantine them from active review, approval and positive learning views. A replacement is a new versioned clip with explicit timing and source-family lineage, not a rewrite of a frozen experiment. Declared color-key extraction is an auditable derivation with original bytes and receipts retained; never guess that white subject pixels are background.
+
+There is one **Interventions** workflow: inspect frame → comment and annotate → submit → new take beneath feedback → repeat or approve. Use the existing film/frame windows and queue. Follow [the fixed PostHog design principles](../web/public/designs/posthog/DESIGN.md) for every screen change. Export is a workspace utility, not a competing feedback workflow or sidebar promotional link. See [the implementation plan](ANIMATION_FEEDBACK_STUDIO_PLAN.md).
+
 > Target product direction (2026-10-30): see the [agent-led animation workflow plan](AGENT_ANIMATION_WORKFLOW_PLAN.md). It replaces mandatory phase references and routine human review as workflow assumptions, while preserving truthful evidence and approval labels. The target is not yet implemented; the historical design and current v2 notes below remain implementation context.
 
 > Status (2026-10-28): the v1 prototype design below is historical. The
@@ -106,6 +114,6 @@ See [DATASET.md](DATASET.md). Formats: COCO, Hugging Face imagefolder, preferenc
 
 ## Non-goals
 
-- Not an editor. Humans do not draw or directly manipulate frames here.
+- Not a pixel editor. Pen and highlighter marks are non-destructive feedback overlays; they never alter source art or imply edit permission.
 - Not a skeleton/rig system. No joints are inferred from raster colour.
 - No automatic art approval, anywhere, under any score.

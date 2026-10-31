@@ -19,3 +19,8 @@ The adaptation below is our design interpretation, rather than a claim about mea
 Removed: the large repeated sequence heading, breadcrumb, packet identifier in the title bar, repeated project footer, empty-correction prose, zero-correction text on every frame, duplicate selected-frame phase/timing and the procedural-media status label. Provenance and preview limitations remain in About and the README. Full check explanations remain available in the evidence pane.
 
 This is a design preview against the existing procedural fixture. It does not replace the live React desk or write to its project.
+
+
+## Live desk rules (2026-10-31)
+
+These principles govern the live React desk as well as this reference preview. Reuse its shell, queue, film window, contextual frame window, title bars and compact controls. Interventions is the single review entry point. Text feedback, frame marks, generation history and approval are contextual tools in that workflow. Never add a second review navigation item or a parallel studio layout. Put provenance, raw identifiers and machine handoffs in disclosures; keep the inspected frame and actionable controls first. Export stays in the existing workspace menu. Do not add sidebar promotional links. Transparent checkerboard is viewer chrome only: it must never be baked into accepted artwork.

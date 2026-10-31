@@ -1,6 +1,6 @@
 import base64,io
 import pytest
-from PIL import Image
+from PIL import Image,ImageDraw
 from framebound.v3.services import studio,loop
 from framebound.v2.services.authz import Actor
 from framebound.v2.services.errors import AuthorizationError,InvalidInput
@@ -17,7 +17,9 @@ def prepared(tmp_path):
 class Fake:
     def __init__(self):self.calls=0
     def execute(self,request,*,timeout):
-        self.calls+=1;out=io.BytesIO();Image.new('RGBA',(96,64),'blue').save(out,format='PNG')
+        self.calls+=1;out=io.BytesIO();im=Image.new('RGBA',(96,64));draw=ImageDraw.Draw(im)
+        for i in range(6):draw.rectangle((i%3*32+8,i//3*32+8,i%3*32+24,i//3*32+24),fill='blue')
+        im.save(out,format='PNG')
         return Response(canonical(dict(status='completed',output=[dict(type='image_generation_call',result=base64.b64encode(out.getvalue()).decode())])),10000,1,{'id':'TEST-ONLY'})
 def test_iterate_markup_approval_and_stale_duplicate(tmp_path):
     p,c=prepared(tmp_path);req=dict(id='feedback-one',version_id='base',text='Keep the prop visible',strokes=[dict(slot=1,tool='highlighter',color='#ffaa00',width=2,points=[[1,1],[3,3]])])
@@ -60,3 +62,12 @@ def test_received_result_can_resume_without_second_send(tmp_path,monkeypatch):
         row=studio.get(con,'feedback','resume');row['state']='queued';studio.put(con,'feedback',row,True)
     studio.drain(p,fake)
     assert fake.calls==1 and studio.snapshot(p,c)['feedback'][0]['state']=='completed'
+
+def test_versioned_receipt_reprocessing_does_not_send_or_erase_old_take(tmp_path):
+    p,c=prepared(tmp_path);studio.submit(p,REVIEWER,c,dict(id='alpha-fix',version_id='base',text='Fix pose'))
+    fake=Fake();studio.drain(p,fake);before=studio.snapshot(p,c)
+    studio.reprocess_received(p,'alpha-fix');studio.drain(p,fake);after=studio.snapshot(p,c)
+    assert fake.calls==1 and len(after['versions'])==len(before['versions'])+1
+    assert after['versions'][-1]['parent']==before['case']['current']
+    assert after['case']['current'].endswith('-alpha-v3')
+    assert studio.snapshot(p)['budget']['spent']==10000

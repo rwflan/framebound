@@ -30,7 +30,7 @@ from ..services.errors import InvalidInput
 from . import implementations as C
 from .raster import alpha_mask
 
-ANALYZER_VERSION = "v2-checks-2"
+ANALYZER_VERSION = "v2-checks-3-isolated"
 PROFILE = C.PROFILE
 
 
@@ -48,6 +48,7 @@ def _code_sha256() -> str:
                   here.parent / "media" / "canonical.py",
                   here.parent / "domain.py"):
         h.update(extra.read_bytes())
+    h.update((here.parent.parent / "v3" / "intake.py").read_bytes())
     return h.hexdigest()
 
 
@@ -165,6 +166,12 @@ def _frame_ok(ctx: _Ctx, slot: int) -> D.CheckResult | None:
     w, h = ctx.sizes[slot]
     reg_c = ctx.by_check.get("registration")
     cid = reg_c.id if reg_c else "registration"
+    r = C.check_registration(cid, f'slot {slot}', img_px, w, h, (ctx.W, ctx.H))
+    if (w,h)!=(ctx.W,ctx.H) or r.outcome!=D.CheckOutcome.PASS:return r
+    from ...v3.intake import inspect
+    intake=inspect(Image.frombytes('RGBA',(w,h),img_px))
+    if not intake['eligible']:
+        return D.CheckResult(constraint_id=cid,scope=f'slot {slot}',outcome=D.CheckOutcome.FAIL,reason='MVP intake: '+'; '.join(intake['reasons']))
     r = C.check_registration(cid, f"slot {slot}", img_px, w, h, (ctx.W, ctx.H))
     if (w, h) != (ctx.W, ctx.H) or r.outcome != D.CheckOutcome.PASS:
         return r
@@ -180,6 +187,8 @@ def _h_frame(ctx: _Ctx, cid: str, check: str, scope: str) -> D.CheckResult:
                 reason='nonzero legacy registration requires explicit native re-materialization')
         px = ctx.frames_px[slot]
         w, h = ctx.sizes[slot]
+        intake_failure=_frame_ok(ctx,slot)
+        if intake_failure is not None:return intake_failure
         registration=C.check_registration(cid, scope, px, w, h, (ctx.W, ctx.H))
         c=ctx.by_check.get(cid)
         bound=(c.params or {}).get('max_anchor_drift_px') if c else None
