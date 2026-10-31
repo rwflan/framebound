@@ -1,37 +1,34 @@
-"""Validate research sources, frozen split and brief coverage without calling a model."""
+"""Validate an explicit local corpus manifest without generating or publishing media."""
+import argparse
 import json
 from pathlib import Path
+import sys
+
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from framebound.v2 import storage as S
 
 
-def validate(root):
-    root = Path(root)
-    corpus = json.loads((root/'docs/research/game-art/corpus/boards.json').read_text())
-    games = {g['game']:g for g in json.loads((root/'docs/research/game-art/games.json').read_text())['games']}
-    boards = corpus['boards']; ids = {b['board_id'] for b in boards}
-    assert len(boards) == len(ids) == 8, 'eight unique boards required'
-    splits = corpus['split_freeze']
-    dev, held = set(splits['development']), set(splits['held_out'])
-    assert not dev & held and dev | held == ids, 'board families must occupy exactly one frozen split'
-    briefs = []
-    for board in boards:
-        assert len(board['briefs']) == 4
-        assert {b['category'] for b in board['briefs']} == {'locomotion','acting','interaction','effects'}
-        assert len(board['motion_studies']) >= 3
-        for ref in board['references']:
-            assert ref['url'] in {s['url'] for s in games[ref['game']]['screenshots']}, 'reference is not an actual source'
-            assert ref['conditioning_eligibility'] == 'research_only'
-        for brief in board['briefs']:
-            assert brief['generation_status'] == 'pending', 'planning manifest cannot invent a generation'
-            assert brief['holds_nonuniform'] and brief['counterexamples_to_test'] and brief['unsupported_measurement_limitations']
-            briefs.append(brief['brief_id'])
-    assert len(briefs) == len(set(briefs)) == 32
-    limits = corpus['global_policy']
-    assert limits['repair_policy']['max_model_repairs_per_base'] <= 2
-    ceiling = limits['finite_limits_corpus_pilot']
-    assert ceiling['max_total_calls'] >= 32*3 + ceiling['calibration_calls_reserved']
-    assert ceiling['max_spend_usd'] > 0
-    return {'boards':8,'base_briefs':32,'source_links':sum(len(b['references']) for b in boards),'generation_calls':0,'visual_review':'pending','motion_studies':'pending'}
+def validate(path):
+    path=Path(path).resolve();root=path.parent
+    data=json.loads(path.read_text());cases=data.get('cases',[])
+    if not cases or len(cases)>96:raise ValueError('expected 1–96 corpus cases')
+    if len({c['id'] for c in cases})!=len(cases):raise ValueError('duplicate case IDs')
+    families={};succeeded=0
+    for case in cases:
+        family=case['board_id'];split=case['split']
+        if family in families and families[family]!=split:raise ValueError('family crosses frozen splits')
+        families[family]=split
+        if case.get('status') not in {'succeeded','completed'}:continue
+        from framebound.v3.corpus import _path
+        receipt=json.loads(_path(root,case['receipt_file']).read_text())
+        raw=_path(root,case['sheet_file']).read_bytes()
+        if receipt.get('status')!='completed' or receipt.get('output_sha256')!=S.sha256_bytes(raw):raise ValueError('generation evidence differs')
+        if not str(receipt.get('model_requested','')).startswith('muse-image-'):raise ValueError('Muse Image receipt required')
+        if len(case['holds'])!=6 or any(type(h) is not int or h<=0 for h in case['holds']):raise ValueError('six positive holds required')
+        succeeded+=1
+    return dict(cases=len(cases),succeeded=succeeded,families=len(families),media_published=False)
 
 
-if __name__ == '__main__':
-    print(json.dumps(validate(Path(__file__).resolve().parents[1]), indent=2))
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('manifest')
+    print(json.dumps(validate(parser.parse_args().manifest),indent=2))

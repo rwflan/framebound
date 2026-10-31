@@ -83,7 +83,7 @@ Live specialist work additionally requires genuinely approved references, an ope
 
 ## Corpus research
 
-The [Muse animation corpus plan](docs/MUSE_ANIMATION_CORPUS_PLAN.md) now starts from established games with distinctive 2D art. Browse the [game-led reference gallery](docs/research/game-art/index.html). It covers Muse generation and parent/image-model provenance; runtime changes remain planned.
+The [local Muse corpus workflow](docs/MUSE_ANIMATION_CORPUS_PLAN.md) covers external Muse generation, typed attribution, immutable correction ancestry and portable model supervision. All corpus media, reference identities and receipts live outside the repository. Human oversight is optional; model labels retain their source and uncertainty.
 
 ## Licence
 
