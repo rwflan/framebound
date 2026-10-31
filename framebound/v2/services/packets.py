@@ -123,7 +123,7 @@ def _build_event(event: dict, actor: Actor) -> D.ReviewEvent:
             frame_range=event.get("frame_range"),
             roi=D.Roi.model_validate(event["roi"]) if event.get("roi") else None,
             note=event.get("note", ""),
-            category=event.get("category", "general"))
+            category=event.get("category", "general"),visual_annotations=event.get("visual_annotations",[]))
     except KeyError as e:
         raise InvalidInput(f"review event missing {e}")
     except Exception as e:
@@ -132,6 +132,11 @@ def _build_event(event: dict, actor: Actor) -> D.ReviewEvent:
 
 def _validate_relationships(con, project_dir: str, ev: D.ReviewEvent, raw: dict) -> None:
     rev, contract = _resolve_revision(con, ev.clip_revision_id)
+    if ev.visual_annotations:
+        from ...v3.services.studio import Stroke
+        for raw in ev.visual_annotations:
+            stroke=Stroke.model_validate(raw)
+            if stroke.slot>=len(rev.frame_instance_ids) or any(not (0<=x<contract.canvas.width and 0<=y<contract.canvas.height) for x,y in stroke.points):raise InvalidInput("Annotation exceeds native frame")
     pkt = None
     if ev.packet_id:
         pkt, _ = _check_packet_addresses(con, ev.packet_id, ev.clip_revision_id)

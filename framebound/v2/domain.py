@@ -438,6 +438,7 @@ class Roi(Strict):
 
 
 class ReviewEvent(Strict):
+    visual_annotations: list[dict] = Field(default_factory=list,max_length=100)
     schema_version: Literal["2.0"] = SCHEMA_VERSION
     id: str = Field(min_length=1, max_length=128)
     actor_type: Literal["reviewer", "orchestrator", "system"] = "reviewer"

@@ -13,6 +13,7 @@ from . import loop, tasks
 
 
 class MarkRequest(D.Strict):
+    visual_annotations: list[dict] = Field(default_factory=list,max_length=100)
     id: str = Field(min_length=1, max_length=60)
     revision_id: str = Field(min_length=1, max_length=90)
     evaluation_id: str = Field(min_length=1, max_length=128)
@@ -97,7 +98,7 @@ def augment_in(con, bundle, run=None):
             tick_range=mark['tick_range'], coordinate_space='native_px', roi=mark['roi'],
             observed=None, expected=mark['correction']['desired_outcome'],
             evidence_assets=[evaluation['evidence']['assets'][i] for i in slots],
-            desired_outcome=mark['correction']['desired_outcome'], uncertainty=None,
+            desired_outcome=mark['correction']['desired_outcome'],visual_annotations=mark.get('visual_annotations',[]), uncertainty=None,
             suggested_operation='correct_then_request_owner_resolution',
             edit_scope_authorized=mark['authorize_edit_scope'],
             permission_baseline_revision_id=run.get('edit_baseline_revision_id', mark['correction']['baseline_revision_id']),
@@ -147,6 +148,10 @@ def mark(project, actor, run_id, payload):
             if run['lifecycle'] == 'cancelled':
                 raise InvalidInput('a cancelled run cannot receive a new correction')
             spec = tasks._get(con, run['task_id']).spec
+            from .studio import Stroke
+            for raw in request.visual_annotations:
+                stroke=Stroke.model_validate(raw)
+                if stroke.slot>=len(spec.timing.holds) or any(not(0<=x<spec.canvas.width and 0<=y<spec.canvas.height) for x,y in stroke.points):raise InvalidInput('Annotation exceeds native frame')
             if request.tick_range[1] > spec.timing.total_ticks():
                 raise InvalidInput('markup range exceeds authored timing')
             if request.roi and (request.roi.right > spec.canvas.width or request.roi.bottom > spec.canvas.height):
@@ -160,7 +165,7 @@ def mark(project, actor, run_id, payload):
                 scope=f'authored ticks [{request.tick_range[0]}, {request.tick_range[1]})', status='open')
             record = dict(schema_version='3.0', id=request.id, run_id=run_id, task_id=run['task_id'],
                           request=semantic, owner=actor.id, correction=correction.model_dump(mode='json'),
-                          tick_range=list(request.tick_range), slots=slots,
+                          tick_range=list(request.tick_range), slots=slots,visual_annotations=request.visual_annotations,
                           roi=request.roi.model_dump() if request.roi else None,
                           authorize_edit_scope=request.authorize_edit_scope,
                           candidate_revision_id=None, version=1, created_at=D.utcnow(),

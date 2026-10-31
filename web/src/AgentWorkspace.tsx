@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {AnnotationPlayer,Stroke} from './AnnotationPlayer';
 import { req } from './api';
 import { Film, useFilm } from './Film';
 import { Handoff } from './Handoff';
@@ -10,6 +11,7 @@ import { firstActionable, formatMeasurement } from './agent-model';
 import type { AgentBundle, Run, Roi, Mark } from './agent-model';
 
 export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentBundle;run:Run;onChange:()=>void;onRevision:(rid:string)=>void}) {
+  const [visual,setVisual]=useState<Stroke[]>([]);
   const spec=b.task.spec, initial=useRef(firstActionable(b));
   const [slot,setSlot]=useState(initial.current), [selected,setSelected]=useState([initial.current]);
   const anchor=useRef(initial.current), controls=useFilm();
@@ -69,8 +71,8 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
       const result=await req<{feedback:{id:string}}>(`/v3/runs/${encodeURIComponent(run.id)}/${action?'decisions':'interventions'}`,{
         method:'POST',body:JSON.stringify(action?{id:operation.current,revision_id:b.revision.id,
           evaluation_id:b.evaluation.id,action,note,...(action==='approve' && preferPrevious && compare && compare.task.id===b.task.id?{comparison_revision_id:compare.revision.id,comparison_evaluation_id:compare.evaluation.id}:{})}:{id:operation.current,revision_id:b.revision.id,
-          evaluation_id:b.evaluation.id,desired_outcome:note,tick_range:[rangeStart,rangeEnd],roi,authorize_edit_scope:grant})});
-      setSaved(result.feedback.id);setNote('');setRoi(null);setGrant(false);operation.current=crypto.randomUUID();
+          evaluation_id:b.evaluation.id,desired_outcome:note,visual_annotations:visual,tick_range:[rangeStart,rangeEnd],roi,authorize_edit_scope:grant})});
+      setSaved(result.feedback.id);setVisual([]);setNote('');setRoi(null);setGrant(false);operation.current=crypto.randomUUID();
       setMessage(action?'Decision saved':'Correction saved');onChange();
     }catch(e){setError(e);}finally{setBusy(false);}
   }
@@ -79,7 +81,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
     try{
       const result=await req<{feedback:{id:string}}>(`/v3/interventions/${encodeURIComponent(mark.id)}/${reopen?'reopen':'resolve'}`,{
         method:'POST',body:JSON.stringify({expected_version:mark.version,revision_id:b.revision.id,evaluation_id:b.evaluation.id,note})});
-      setSaved(result.feedback.id);setNote('');onChange();
+      setSaved(result.feedback.id);setVisual([]);setNote('');onChange();
     }catch(e){setError(e);}finally{setBusy(false);}
   }
   function point(e:React.PointerEvent<HTMLCanvasElement>){const r=e.currentTarget.getBoundingClientRect();const p=toNative(e.clientX,e.clientY,r,spec.canvas.width,spec.canvas.height,{scaleX:r.width/spec.canvas.width,scaleY:r.height/spec.canvas.height,offsetX:0,offsetY:0,mirrored:false});return [Math.floor(p.x),Math.floor(p.y)];}
@@ -130,7 +132,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
         <small>{spec.scene?.limitation || (spec.profile==='structural-v1'?'Structural only; animation quality not verified.':'Declared regions and events only; broader anatomy and action quality remain judgment.')}</small>
         <section className="agent-finding" aria-label="Output policy"><strong>Output policy</strong>{eligibility?<><small>{eligibility.policy||'Not evaluated'} · {eligibility.eligible?'Eligible':'Withheld'}</small>{eligibility.revision_id && eligibility.revision_id!==b.revision.id && <small>Applies to current best {eligibility.revision_id}</small>}{eligibility.reasons.map((reason,index)=><small key={index}>{reason}</small>)}</>:<small>Current eligibility unavailable</small>}</section>
         <Handoff feedbackId={b.feedback.id}/></>}
-        {tab==='correction' && <form onSubmit={e=>{e.preventDefault();void save();}}><label>Desired correction<textarea aria-label="Desired correction" value={note} onChange={e=>setNote(e.target.value)} required maxLength={1000}/></label>
+        {tab==='correction' && <><AnnotationPlayer urls={b.frames.map(f=>f.asset_url)} holds={holds} tps={spec.timing.ticks_per_second} loop={spec.loop} width={spec.canvas.width} height={spec.canvas.height} value={visual} onChange={setVisual}/></>}{tab==='correction' && <form onSubmit={e=>{e.preventDefault();void save();}}><label>Desired correction<textarea aria-label="Desired correction" value={note} onChange={e=>setNote(e.target.value)} required maxLength={1000}/></label>
           <div className="agent-tick-range"><label>Start tick<input aria-label="Start tick" type="number" min={0} value={rangeStart} onChange={e=>setRangeStart(Number(e.target.value))}/></label><label>End tick (exclusive)<input aria-label="End tick" type="number" min={rangeStart+1} value={rangeEnd} onChange={e=>setRangeEnd(Number(e.target.value))}/></label></div>
           <div className="agent-mark-stage"><canvas ref={canvas} width={spec.canvas.width} height={spec.canvas.height} aria-label="Mark correction region" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);const [x,y]=point(e);drag.current={x,y};}} onPointerMove={e=>{if(!drag.current)return;const [x,y]=point(e),start=drag.current;setRoi({left:Math.min(start.x,x),top:Math.min(start.y,y),right:Math.max(start.x,x)+1,bottom:Math.max(start.y,y)+1});}} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}/>{roi && <div className="region-box" style={{left:100*roi.left/spec.canvas.width+'%',top:100*roi.top/spec.canvas.height+'%',width:100*(roi.right-roi.left)/spec.canvas.width+'%',height:100*(roi.bottom-roi.top)/spec.canvas.height+'%'}}/>}</div>
           {roi && <button type="button" onClick={()=>setRoi(null)}>Clear region</button>}

@@ -16,6 +16,7 @@ from pydantic import Field
 
 from ...v3.domain import TaskSpec, TaskRecord
 from ...v3.services.failures import FailureReport
+from ...v3.services.studio import Feedback as StudioFeedbackInput
 from ...v3.services.exports import ExportSelection
 from ...v3.services.interventions import MarkRequest, ResolveRequest, DecisionRequest
 from .. import domain as D
@@ -65,6 +66,7 @@ class AgentSubmissionBody(D.Strict):
 
 
 class IssueBody(D.Strict):
+    visual_annotations: list[dict] = Field(default_factory=list,max_length=100)
     id: str | None = Field(default=None, min_length=1, max_length=128)
     clip_revision_id: str = Field(min_length=1, max_length=128)
     packet_id: str | None = Field(default=None, min_length=1, max_length=128)
@@ -348,6 +350,46 @@ def create_app(project_dir: str) -> FastAPI:
     async def _rl(_: Request, e: _E.RateLimited):
         return JSONResponse({"code": "rate_limited", "detail": str(e)}, status_code=429)
 
+    @app.on_event('startup')
+    def studio_resume_saved():
+        from ...v3.services import studio
+        studio.start(project_dir)
+
+    @app.post('/v3/studio/{case_id}/resume')
+    def studio_resume(case_id: str, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import studio
+        from ..services.authz import require_reviewer
+        require_reviewer(actor(x_session_token,None),'mark_issue')
+        with studio.db(project_dir) as con:
+            con.execute('BEGIN IMMEDIATE')
+            for row in studio.all_rows(con,'feedback'):
+                if row['case_id']==case_id and row['state'] in {'queued','generating','failed'}:
+                    row['state']='queued';studio.put(con,'feedback',row,True)
+        studio.start(project_dir)
+        return {'resuming':True}
+
+    @app.get('/v3/studio')
+    def studio_list():
+        from ...v3.services import studio
+        return studio.snapshot(project_dir)
+
+    @app.get('/v3/studio/{case_id}')
+    def studio_case(case_id: str):
+        from ...v3.services import studio
+        return studio.snapshot(project_dir,case_id)
+
+    @app.post('/v3/studio/{case_id}/feedback')
+    def studio_feedback(case_id: str, body: StudioFeedbackInput, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import studio
+        result=studio.submit(project_dir,actor(x_session_token,None),case_id,body.model_dump(mode="json"))
+        studio.start(project_dir)
+        return result
+
+    @app.post('/v3/studio/{case_id}/approve')
+    def studio_approve(case_id: str, body: dict, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import studio
+        return studio.approve(project_dir,actor(x_session_token,None),case_id,str(body.get('version_id','')))
+
     @app.get("/api/health")
     def health():
         return {"ok": True, "schema_version": "2.0"}
@@ -576,7 +618,7 @@ def create_app(project_dir: str) -> FastAPI:
                 "frame_instance_id": body.frame_instance_id,
                 "frame_range": body.frame_range,
                 "roi": body.roi.model_dump() if body.roi else None,
-                "note": body.note, "category": body.category})
+                "note": body.note, "category": body.category,"visual_annotations":body.visual_annotations})
         except S.ConflictError as e:
             raise HTTPException(409, str(e))
         publish({"type": "issue_marked", "task_id": task.id, "revision_id": body.clip_revision_id})
