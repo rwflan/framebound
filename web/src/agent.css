@@ -57,3 +57,7 @@
 .review-queue .queue-item strong{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.review-queue .queue-item small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .agent-inspector-tabs button[aria-pressed="true"] { background: #dce8e0; border-color: #7d9485; color: #283e31; font-weight: 650; box-shadow: inset 0 1px #f7fff9, inset 0 -2px #6a8372; }
 .agent-inspector-tabs button[aria-pressed="false"] { color: #776b57; }
+
+/* Selection stays pressed; keyboard focus gets its own outer ring. */
+.agent-inspector-tabs button:focus-visible { outline: 2px solid #a15c32; outline-offset: 2px; }
+.agent-search-wrap:focus-within > kbd { color: #5f4a30; border-color: #b69b72; background: #fff4dc; }
