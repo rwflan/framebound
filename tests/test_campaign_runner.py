@@ -100,3 +100,31 @@ def test_historical_split_names_preserve_test_and_exclude_unsplit():
     assert historical_split('test')=='test'
     assert historical_split('held_out')=='test'
     assert historical_split('unsplit') is None
+
+
+def test_webp_provider_outputs_are_normalized_without_regeneration(tmp_path):
+    import hashlib
+    from framebound.v2 import storage as S
+    config,case=configured(tmp_path)
+    class WebPSpecialist(EngineeringSpecialist):
+        def execute(self,request,*,timeout):
+            response=super().execute(request,timeout=timeout)
+            if not request['images']:return response
+            body=json.loads(response.raw);item=body['output'][0]
+            with Image.open(io.BytesIO(base64.b64decode(item['result']))) as image:
+                stream=io.BytesIO();image.convert('RGB').save(stream,format='WEBP')
+            item['result']=base64.b64encode(stream.getvalue()).decode()
+            return Response(canonical(body),response.incurred,response.successful_images,response.receipt)
+    specialist=WebPSpecialist();runner=Runner(tmp_path,config.id,specialist)
+    result=runner.run()
+    assert result['results'][case.id]['outcome']=='unchanged',result
+    assert len(specialist.sends)==7
+    with runner.ledger.db() as db:anchor_id=db.execute("SELECT id FROM requests WHERE operation='anchor'").fetchone()[0]
+    raw,_=runner.ledger.artifact(anchor_id)
+    original=base64.b64decode(json.loads(raw)['output'][0]['result'])
+    assert S.blob_path(runner.project,hashlib.sha256(original).hexdigest()).read_bytes()==original
+    with S.connect(runner.project) as con:
+        assets=[json.loads(row['data']) for row in con.execute('SELECT data FROM assets')]
+    assert any(a['mime']=='image/webp' and a['source_kind']=='generated' for a in assets)
+    assert any(a['derivation'].get('operator')=='muse-source-to-png-v1' for a in assets)
+    runner.run();assert len(specialist.sends)==7
