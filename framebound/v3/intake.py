@@ -17,6 +17,13 @@ def inspect(image):
     if coverage<.0001:reasons.append('Empty or negligible foreground')
     if transparent<.05:reasons.append('Opaque background: real alpha transparency is required')
     if edges<.90:reasons.append('Background or clipped subject fills the native frame border')
+    ys,xs=np.nonzero(visible)
+    if len(xs):
+        box=a[ys.min():ys.max()+1,xs.min():xs.max()+1]
+        if box.shape[0]*box.shape[1]>.4*alpha.size and (box[:,:,3]>32).mean()>.995:
+            perimeter=np.concatenate((box[0],box[-1],box[:,0],box[:,-1]))
+            if ((perimeter[:,:3]>=235).all(axis=1)&(perimeter[:,3]>240)).mean()>.95:
+                reasons.append('Large opaque white rectangle inside alpha padding: matte versus subject is unverified')
     return dict(policy=VERSION,eligible=not reasons,reasons=reasons,transparent_fraction=transparent,foreground_fraction=coverage,clear_border_fraction=edges,
                 semantic_scope='Raster isolation only; subject identity and quality are not inferred')
 

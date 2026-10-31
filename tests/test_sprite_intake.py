@@ -63,3 +63,10 @@ def test_key_edge_unmatting_retains_non_key_interiors():
     assert result.getpixel((20,20))==(0,100,255,255)
     edge=result.getpixel((15,25))
     assert edge[0]<5 and 120<=edge[3]<=135 and recipe['edge_pixels']>0
+
+def test_white_matte_with_transparent_padding_cannot_bypass_intake():
+    im=Image.new('RGBA',(64,64));ImageDraw.Draw(im).rectangle((5,5,58,58),fill='white')
+    assert not inspect(im)['eligible']
+    # A white animal/figure silhouette remains a valid isolated raster.
+    im=Image.new('RGBA',(64,64));ImageDraw.Draw(im).ellipse((5,5,58,58),fill='white')
+    assert inspect(im)['eligible']
