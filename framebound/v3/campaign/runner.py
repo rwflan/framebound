@@ -67,6 +67,7 @@ class Runner:
             tokens=65536;output=8192
             request_wire=wire(model,text,images,max_output_tokens=None if image else output)
             if not image:request_wire['reasoning']={'effort':'low'}
+            else:request_wire['tools']=[dict(type='image_generation',size='1024x1024' if operation=='anchor' else '1536x1024',output_format='png',enable_image_search=False,enable_web_search=False)]
             quote=self.config.prices.image_microdollars if image else math.ceil(tokens*1.25+output*4.25)
             payload=dict(provider='meta',requested_model=model,wire=request_wire,
                 input_token_ceiling=None if image else tokens,output_token_ceiling=None if image else output)
