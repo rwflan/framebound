@@ -109,21 +109,84 @@ def gate_frames(project,frames):
         except (OSError,ValueError,KeyError):checks.append(inspect_sprite(None))
     return dict(eligible=bool(checks) and all(c['eligible'] for c in checks),frames=checks,principle=PRINCIPLE)
 
+def review_context(case,version,evaluation,feedback,approvals):
+    """Explain the displayed take using only evidence bound to that exact version."""
+    context=dict(version_id=version['id'],kind='unassessed',label='Not assessed · first review',
+                 title='First human review',
+                 summary='Animation consistency checks have not run on this take. Human approval is still pending.',
+                 next_step='Check motion, proportions, appearance and loop transitions. Add issues or approve the take.',
+                 evaluation_id=None,technical_status='not_run',coverage='not_assessed',findings=[],prior_issues=[])
+    if evaluation and evaluation.get('revision_id')==version['id']:
+        findings=[dict(check_id=r['id'],family=r['family'],outcome=r['outcome'],slots=r['slots'],
+                       reason=r['reason'],observed=r.get('observed'),expected=r.get('expected'),source=r['source'])
+                  for r in evaluation['results'] if r['outcome'] in {'fail','unmeasured','error'}]
+        context.update(evaluation_id=evaluation['id'],technical_status=evaluation['technical_status'],coverage=evaluation['coverage'],findings=findings)
+        if findings:
+            counts=[(sum(r['outcome']==outcome for r in findings),label) for outcome,label in [('fail','failed'),('error','errors'),('unmeasured','unmeasured')]]
+            count_label=' · '.join(f'{count} {name}' for count,name in counts if count)
+            first=findings[0];family=first['family'].replace('_',' ').capitalize()
+            slots=', '.join(str(slot+1) for slot in first['slots'][:6])
+            if len(first['slots'])>6:slots+=f" + {len(first['slots'])-6} more"
+            state={'fail':'failed','error':'could not run','unmeasured':'is unmeasured'}[first['outcome']]
+            context.update(kind='findings',label=family+' · '+count_label,title=family+' check '+state,
+                           summary=('Frames '+slots+'. ' if slots else '')+first['reason']+(f' {len(findings)-1} more findings in Evidence.' if len(findings)>1 else ''),
+                           next_step='Open the findings, inspect their frames and record the corrections needed.')
+        elif evaluation['technical_status']=='pass' and evaluation['coverage']=='complete':
+            context.update(kind='first_review',label='Checks complete · unreviewed',
+                           summary='Recorded checks found no failures on this take. Visual quality still needs human review.')
+        else:
+            context.update(kind='coverage',label='Checks incomplete',title='Assessment incomplete',
+                           summary='The recorded assessment does not establish complete passing coverage for this take.',
+                           next_step='Review the available evidence and the coverage limits before deciding.')
+    origin=next((f for f in feedback if f['id']==version.get('feedback_id')),None)
+    if origin and not origin.get('replacement'):
+        request=origin['request'];issues=list(request.get('issues',[]))
+        if request.get('text','').strip():issues.append(dict(id=origin['id'],text=request['text'],slots=sorted({s['slot'] for s in request.get('strokes',[])})))
+        context.update(prior_issues=issues,feedback_baseline=request['version_id'],annotation_slots=sorted({s['slot'] for s in request.get('strokes',[])}))
+        if not context['findings']:
+            context.update(kind='correction_review',label='Corrections · verify result',title='Verify requested corrections',
+                           summary='A new take was generated from your feedback. Confirm that the previous take’s reported issues are fixed.',
+                           next_step='Compare the requested corrections below with this take; add feedback or approve.')
+    gate=version.get('intake',{})
+    if not gate.get('eligible'):
+        context.update(kind='excluded',label='Intake failed · replacement needed',title='Outside MVP intake',
+                       summary='This take failed the input checks and cannot enter animation review.',
+                       next_step='Generate an isolated replacement. The original and its evidence remain in the audit.',
+                       intake_reasons=sorted({reason for frame in gate.get('frames',[]) for reason in frame['reasons']}))
+    elif any(a['version_id']==version['id'] for a in approvals):
+        context.update(kind='approved',label='Human approved',title='Human approval recorded',summary='A reviewer approved this exact take.',next_step='The accepted take and its history are saved in the local learning handoff.')
+    if version.get('parent') is None and case.get('reason') not in {None,'Review animation','Isolated 2D replacement · review requested'}:
+        context['requested_reason']=case['reason']
+    return context
+
 def snapshot(project,case_id=None):
     with db(project) as con:
         versions_by_id={v['id']:v for v in all_rows(con,'versions')}
-        cases=[dict(c,thumbnail_url='/api/asset/'+versions_by_id[c['current']]['frames'][0] if c.get('intake',{}).get('eligible') else None) for c in all_rows(con,'cases')]
+        raw_cases=all_rows(con,'cases');feedback=all_rows(con,'feedback');approvals=all_rows(con,'approvals')
+        visible_versions=[v for v in versions_by_id.values() if v['case_id']==case_id] if case_id else [versions_by_id[c['current']] for c in raw_cases]
+        evaluations={}
+        with S.connect(project) as assets_con:
+            if assets_con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_evaluations'").fetchone():
+                for v in visible_versions:
+                    row=assets_con.execute('SELECT data FROM agent_evaluations WHERE id=?',('evaluation:'+v['id'],)).fetchone()
+                    if row:evaluations[v['id']]=json.loads(row[0])
+        def explain(c,v):
+            return review_context(c,v,evaluations.get(v['id']),feedback,approvals)
+        cases=[dict(c,review=explain(c,versions_by_id[c['current']]),thumbnail_url='/api/asset/'+versions_by_id[c['current']]['frames'][0] if c.get('intake',{}).get('eligible') else None) for c in raw_cases]
         if case_id:
             c=get(con,'cases',case_id)
-            versions=[dict(v,intake=v.get('intake') or gate_frames(project,v['frames']),urls=['/api/asset/'+a for a in v['frames']]) for v in all_rows(con,'versions') if v['case_id']==case_id]
-            return dict(case=c,versions=versions,feedback=[f for f in all_rows(con,'feedback') if f['case_id']==case_id],approvals=[a for a in all_rows(con,'approvals') if a['case_id']==case_id])
+            versions=[]
+            for v in visible_versions:
+                shown=dict(v,intake=v.get('intake') or gate_frames(project,v['frames']),urls=['/api/asset/'+a for a in v['frames']])
+                shown['review']=explain(c,shown);versions.append(shown)
+            return dict(case=dict(c,review=explain(c,versions_by_id[c['current']])),versions=versions,feedback=[f for f in feedback if f['case_id']==case_id],approvals=[a for a in approvals if a['case_id']==case_id])
         setting=con.execute("SELECT data FROM settings WHERE id='budget'").fetchone()
         budget=json.loads(setting[0]) if setting else dict(ceiling=0)
         sends=all_rows(con,'sends');reserved=sum(s['quote'] for s in sends if s['state'] in {'reserved','wire_started','unknown'})
         spent=sum(s.get('incurred',s['quote']) for s in sends if s['state']=='received')
         titles={c['id']:c['title'] for c in cases}
         work=[dict(id=f['id'],case_id=f['case_id'],title=titles.get(f['case_id'],f['case_id']),state=f['state'],error=f.get('error'))
-              for f in all_rows(con,'feedback') if f['state']!='completed' and not f.get('superseded_by')]
+              for f in feedback if f['state']!='completed' and not f.get('superseded_by')]
         return dict(cases=cases,work=work,budget=dict(ceiling=budget['ceiling'],spent=spent,reserved=reserved))
 
 def allocate(project,microdollars):

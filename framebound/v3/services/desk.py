@@ -62,8 +62,11 @@ def revision(project, revision_id):
                                    frames=C.frames_at_output_starts(spec))
             for f in source_comparison['frames']:f['asset_url']=f"/api/asset/{f['asset_id']}"
         from ..provenance import summary
-        from .studio import gate_frames
+        from .studio import gate_frames,review_context
         intake=gate_frames(project,revision['frame_asset_ids'])
-        return dict(intake=intake,provenance=summary(revision.get('generation_metadata')),source_comparison=source_comparison,revision=revision,evaluation=evaluation,task=task,feedback=feedback,frames=frames,
+        review=review_context(dict(reason=feedback.get('reason')),dict(id=revision_id,intake=intake),evaluation,[],[])
+        if revision_id==run['current_revision_id'] and run['creative_status']=='human_approved':
+            review.update(kind='approved',label='Human approved',title='Human approval recorded',summary='A reviewer approved this exact take.')
+        return dict(review=review,intake=intake,provenance=summary(revision.get('generation_metadata')),source_comparison=source_comparison,revision=revision,evaluation=evaluation,task=task,feedback=feedback,frames=frames,
                     current_revision_id=run['current_revision_id'],best_revision_id=run['best_revision_id'])
     finally:con.close()

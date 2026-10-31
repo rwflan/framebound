@@ -8,6 +8,8 @@ Preserve unsuitable originals, provenance and negative intake evidence locally, 
 
 Feedback on several frames is bundled into one take-bound generation request, retaining separate issue text, explicit native-frame scopes and all visual marks. See [the stable projection and feedback bundle plan](PROJECTION_FEEDBACK_BUNDLES_PLAN.md).
 
+Review reasons are take-bound: the queue and film window explain why an animation is present. Newly generated takes without consistency evaluations say **Not assessed · first review**. Actual findings retain affected frames and measurements; previous feedback remains explicitly previous-take evidence.
+
 There is one **Interventions** workflow: inspect frame → comment and annotate → submit → new take beneath feedback → repeat or approve. Use the existing film/frame windows and queue. Follow [the fixed PostHog design principles](../web/public/designs/posthog/DESIGN.md) for every screen change. Export is a workspace utility, not a competing feedback workflow or sidebar promotional link. See [the implementation plan](ANIMATION_FEEDBACK_STUDIO_PLAN.md).
 
 > Target product direction (2026-10-30): see the [agent-led animation workflow plan](AGENT_ANIMATION_WORKFLOW_PLAN.md). It replaces mandatory phase references and routine human review as workflow assumptions, while preserving truthful evidence and approval labels. The target is not yet implemented; the historical design and current v2 notes below remain implementation context.

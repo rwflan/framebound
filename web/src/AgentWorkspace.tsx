@@ -1,3 +1,4 @@
+import {ReviewReason} from './ReviewReason';
 import {FilmPlayback,PlaybackControls,ProjectionHandle} from './FilmPlayback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {Stroke} from './AnnotationPlayer';
@@ -124,6 +125,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
         {b.revision.parent_revision_id && <button aria-pressed={Boolean(compare)} onClick={()=>void comparePrevious()}>Compare previous</button>}
 
       </div>
+      {b.review&&<ReviewReason context={b.review} onDetails={()=>{setTab('evidence');if(expansion.expanded)expansion.showFeedback();}}/>}
       <AnnotationTools controls={annotations}/>
       <div className={'film-stage agent-film-stage'+((compare||compareSource)?' has-comparison':'')}>
         <Film ref={controls.film} filmKey={'agent-'+b.revision.id} count={b.frames.length} sequence selected={slot}
