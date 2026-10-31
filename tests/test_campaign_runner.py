@@ -160,7 +160,7 @@ def test_inconsistent_teacher_labels_are_quarantined_without_paid_retries(tmp_pa
             response=super().execute(request,timeout=timeout)
             if request['images']:return response
             body=json.loads(response.raw);text=json.loads(body['output'][0]['text'])
-            text['coverage'][3]['status']='present'
+            text['findings'][0]['roi']=[0,0,999,999]
             body['output'][0]['text']=json.dumps(text)
             return Response(canonical(body),response.incurred,0,response.receipt)
     specialist=InvalidTeacher();runner=Runner(tmp_path,config.id,specialist);result=runner.run()
@@ -168,3 +168,22 @@ def test_inconsistent_teacher_labels_are_quarantined_without_paid_retries(tmp_pa
     assert len(specialist.sends)==3
     assert list((runner.folder/'annotations').glob('*-quarantine.json'))
     assert not result['status']['stopped']
+
+
+def test_empty_negative_scope_is_masked_without_losing_other_coverage(tmp_path):
+    config,case=configured(tmp_path)
+    class ScopedTeacher(EngineeringSpecialist):
+        def execute(self,request,*,timeout):
+            response=super().execute(request,timeout=timeout)
+            if request['images']:return response
+            body=json.loads(response.raw);text=json.loads(body['output'][0]['text'])
+            text['findings']=[];text['coverage'][1]['status']='uncertain'
+            text['coverage'][2]['slots']=[]
+            body['output'][0]['text']=json.dumps(text)
+            return Response(canonical(body),response.incurred,0,response.receipt)
+    runner=Runner(tmp_path,config.id,ScopedTeacher());result=runner.run()
+    a=result['results'][case.id]['after_assessment']
+    coverage={c['category']:c['status'] for c in a['coverage']}
+    assert coverage['identity']=='absent_within_assessed_scope'
+    assert coverage['prop']=='not_assessed'
+    assert coverage['extraction']=='not_assessed'
