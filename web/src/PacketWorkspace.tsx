@@ -1,3 +1,4 @@
+import {FilmPlayback,PlaybackControls} from './FilmPlayback';
 import {ViewerExpansion,useViewerExpansion} from './ViewerExpansion';
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {Stroke} from "./AnnotationPlayer";
@@ -243,7 +244,7 @@ export function PacketWorkspace({
       const target = e.target as HTMLElement;
       if (
         e.defaultPrevented ||
-        (target.closest("dialog,input,textarea,select")||(target.closest("button")&&!target.closest(".reel-camera")))
+        (target.closest("dialog,input,textarea,select")||(target.closest("button")&&!target.closest(".reel-camera,.film-projector")))
       )
         return;
       if (e.code === "Space") {
@@ -261,7 +262,7 @@ export function PacketWorkspace({
                   0,
                   Math.min(
                     holds.length - 1,
-                    inspectionSlot + (e.key === "ArrowRight" ? 1 : -1),
+                    (clock.playing?clock.slot:inspectionSlot) + (e.key === "ArrowRight" ? 1 : -1),
                   ),
                 ),
           e.shiftKey,
@@ -587,7 +588,7 @@ export function PacketWorkspace({
           <Err e={comparison.err} />
           <div
             className={
-              "film-stage" + (viewMode === "playback" ? " playback-mode" : "")
+              "film-stage"
             }
             data-view-mode={viewMode}
           >
@@ -782,154 +783,10 @@ export function PacketWorkspace({
                 </div>
               </div>
             </Film>
-            {viewMode === "playback" && (
-              <div
-                className={
-                  "playback-comparison" + (clock.playing ? " is-running" : "")
-                }
-                aria-label="Animation playback"
-                tabIndex={0}
-              >
-                <div className="playback-images">
-                  {[
-                    {
-                      label:
-                        compare === "baseline" && baselineReady
-                          ? "Previous"
-                          : "Reference",
-                      url: rowFrames[clock.slot],
-                      candidate: false,
-                    },
-                    {
-                      label: "Candidate",
-                      url: playingFrame.asset_url,
-                      candidate: true,
-                    },
-                  ].map((lane) => (
-                    <section
-                      className={
-                        "playback-lane" + (lane.candidate ? " candidate" : "")
-                      }
-                      key={lane.label}
-                    >
-                      <header>{lane.label}</header>
-                      <div className="playback-image">
-                        {lane.url && !media.errors.has(lane.url) ? (
-                          <img
-                            draggable={false}
-                            src={lane.url}
-                            alt={`${lane.label} animation`}
-                          />
-                        ) : (
-                          <span className="missing-reference">
-                            {lane.label} unavailable
-                          </span>
-                        )}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-                <input
-                  className="playback-scrub"
-                  aria-label="Playback tick"
-                  type="range"
-                  min="0"
-                  max={totalTicks(holds) - 1}
-                  value={clock.tick}
-                  onChange={(event) => inspectTick(Number(event.target.value))}
-                />
-              </div>
-            )}
+            {viewMode==='playback'&&<FilmPlayback lanes={[{title:compare==='baseline'&&baselineReady?'Previous':'Reference',urls:rowFrames},{title:'Candidate',urls}]} holds={holds} loop={Boolean((b.contract.action as {loop?:boolean}).loop)} clock={clock} onInspect={i=>{setViewMode('frames');focus(i);}}/>}
           </div>
-          <footer className="review-controls" aria-label="Film controls">
-            <div className="control-transport">
-              <button
-                aria-label="Previous frame"
-                disabled={clock.playing || displaySlot === 0}
-                onClick={() => focus(displaySlot - 1)}
-              >
-                <Icon name="left" />
-              </button>
-              <button
-                className="transport-play"
-                disabled={!clock.playing && !playbackReady}
-                title={
-                  !playbackReady
-                    ? media.errors.size
-                      ? "Frame media unavailable"
-                      : "Loading frame media"
-                    : undefined
-                }
-                aria-label={clock.playing ? "Pause" : "Play"}
-                onClick={() => togglePlayback()}
-              >
-                <Icon name={clock.playing ? "pause" : "play"} />
-              </button>
-              <button
-                aria-label="Next frame"
-                disabled={clock.playing || displaySlot === holds.length - 1}
-                onClick={() => focus(displaySlot + 1)}
-              >
-                <Icon name="right" />
-              </button>
-            </div>
-            <output className="control-counter">
-              {viewMode === "playback" && clock.playing
-                ? `${String(holds.length).padStart(2, "0")} frames`
-                : `${String(displaySlot + 1).padStart(2, "0")} / ${String(holds.length).padStart(2, "0")}`}
-            </output>
-            {viewMode === "playback" ? (
-              <div className="control-caption">
-                <span>
-                  {(
-                    totalTicks(holds) / (timing.ticks_per_second || 60)
-                  ).toFixed(2)}
-                  s
-                  {Boolean((b.contract.action as { loop?: boolean }).loop)
-                    ? " · Loop"
-                    : ""}
-                </span>
-              </div>
-            ) : (
-              <div className="control-caption">
-                <strong>
-                  {selected.length > 1
-                    ? `${selected.length} frames`
-                    : words(current.phase)}
-                </strong>
-                <span>
-                  {tickOfSlot(holds, selectedFirst)}–
-                  {tickOfSlot(holds, selectedLast) + holds[selectedLast] - 1}{" "}
-                  ticks
-                </span>
-              </div>
-            )}
-            <span
-              className="transport-tick"
-              style={{
-                visibility:
-                  viewMode === "playback" && clock.playing
-                    ? "hidden"
-                    : undefined,
-              }}
-            >
-              tick{" "}
-              {viewMode === "playback"
-                ? clock.tick
-                : tickOfSlot(holds, inspectionSlot)}
-            </span>
-            <select
-              aria-label="Playback speed"
-              value={clock.speed}
-              onChange={(e) => clock.setSpeed(Number(e.target.value))}
-            >
-              {[0.25, 0.5, 1, 1.5, 2, 4].map((speed) => (
-                <option key={speed} value={speed}>
-                  {speed}×
-                </option>
-              ))}
-            </select>
-          </footer>
+          <PlaybackControls clock={clock} holds={holds} tps={timing.ticks_per_second||60} loop={Boolean((b.contract.action as {loop?:boolean}).loop)} onToggle={()=>togglePlayback()} onInspect={i=>{setViewMode('frames');focus(i);}} onScrub={inspectTick} disabled={!playbackReady} filmMode={viewMode==='frames'} onFilm={returnToFilm}/>
+
         </section>
         <aside
           className={

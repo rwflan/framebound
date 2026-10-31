@@ -33,3 +33,5 @@ Keep an expand control in the film window title bar. Expanded mode reuses that w
 
 
 Utility navigation follows the same material language as review: one icon-led ⋯ popover, compact selected tabs, the existing window title bar and an exact return-to-review link. Export, Status and Reviewed guides stay in the current desk shell. Do not route them into another application layout. Use bounded lists, adjacent settings/preview panes and disclosures for detailed authority, raw evidence and capability matrices. Keep the primary generation action label `Submit & generate`; show the request price in adjacent helper text. See `docs/DESK_UTILITIES_PLAN.md` for the implemented flow.
+
+Playback keeps a moving sprocketed film rail visible beneath a stable projection in the existing window. Use the authored clock for projection, rail and scrubber; keep the right inspector pinned during play. Scrubbing pauses and selects a frame. Keep timeline and labelled slow-speed controls visible, including in expanded mode; honour reduced motion. Review starts at ½× and never changes authored timing. See `docs/FILM_PLAYBACK_PLAN.md`.

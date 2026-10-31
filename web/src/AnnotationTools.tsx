@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import type {Stroke} from './AnnotationPlayer';
 import './annotations.css';
 export type AnnotationTool='view'|'pen'|'highlighter';
-type Options={value:Stroke[];onChange?: (value:Stroke[])=>void;slot:number;onSlot:(slot:number)=>void;pause:()=>void;onDraw?:()=>void;resetKey:string;fit?:()=>void;transport?:{count:number;playing:boolean;toggle:()=>void;fit:()=>void}};
+type Options={value:Stroke[];onChange?: (value:Stroke[])=>void;slot:number;onSlot:(slot:number)=>void;pause:()=>void;onDraw?:()=>void;resetKey:string;fit?:()=>void;transport?:{count:number;slot?:number;playing:boolean;toggle:()=>void;fit:()=>void}};
 export function useAnnotations(options:Options){
  const [chosen,setChosen]=useState<AnnotationTool>('view'),[penColor,setPenColor]=useState('#d65b29'),[markerColor,setMarkerColor]=useState('#e4b52a'),[penWidth,setPenWidth]=useState(3),[markerWidth,setMarkerWidth]=useState(14);
  const live=useRef(options);live.current=options;
@@ -23,10 +23,10 @@ export function useAnnotations(options:Options){
    const tools:Record<string,AnnotationTool>={v:'view',p:'pen',h:'highlighter',escape:'view'};
    if(tools[key]){e.preventDefault();actions.current.select(tools[key]);return;}
    if(key==='f'&&(o.fit||o.transport)){e.preventDefault();(o.fit||o.transport!.fit)();return;}
-   if(!o.transport||(target.closest('button')&&!target.closest('.reel-camera')))return;
+   if(!o.transport||(target.closest('button')&&!target.closest('.reel-camera,.film-projector')))return;
    if(e.code==='Space'){e.preventDefault();o.transport.toggle();}
    if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){
-    e.preventDefault();o.pause();o.onSlot(e.key==='Home'?0:e.key==='End'?o.transport.count-1:Math.max(0,Math.min(o.transport.count-1,o.slot+(e.key==='ArrowRight'?1:-1))));
+    e.preventDefault();o.pause();o.onSlot(e.key==='Home'?0:e.key==='End'?o.transport.count-1:Math.max(0,Math.min(o.transport.count-1,(o.transport.playing?(o.transport.slot??o.slot):o.slot)+(e.key==='ArrowRight'?1:-1))));
    }
   }
   window.addEventListener('keydown',keyboard);return()=>window.removeEventListener('keydown',keyboard);

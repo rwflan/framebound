@@ -11,11 +11,12 @@ export function usePresentationClock(opts: {
   resetKey: string | number;
   autoPlay?: boolean;
   initialTick?: number;
+  initialSpeed?: number;
 }) {
   const { holds, tps, loop, resetKey } = opts;
   const [tickFloat, setTickFloat] = useState(opts.initialTick ?? 0);
   const [playing, setPlaying] = useState(opts.autoPlay ?? true);
-  const [speed, setSpeedState] = useState(1);
+  const [speed, setSpeedState] = useState(opts.initialSpeed ?? .5);
   const accRef = useRef(opts.initialTick ?? 0);
   const lastRef = useRef(0);
   const rafRef = useRef(0);
@@ -79,7 +80,7 @@ export function usePresentationClock(opts: {
     [selectTick],
   );
   const setSpeed = useCallback((sp: number) => {
-    if (!(sp > 0)) return;
+    if (!(sp > 0)||!Number.isFinite(sp)) return;
     lastRef.current = performance.now(); // continuity: no jump on speed change
     setSpeedState(sp);
   }, []);

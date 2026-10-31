@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { slotAtTick, tickOfSlot, totalTicks, toNative } from './playback.bundle.mjs';
+import { slotAtTick, tickOfSlot, totalTicks, toNative, filmPosition } from './playback.bundle.mjs';
 
 // Mirrors media/timeline.py half-open intervals: slot i covers [sum(holds[:i]), sum(holds[:i+1])).
 test('slotAtTick maps authored ticks to slots', () => {
@@ -40,4 +40,19 @@ test('toNative uses separate x/y scales and clamps', () => {
   const over = toNative(10000, 10000, rect, 64, 64,
     { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0, mirrored: false });
   assert.ok(over.x <= 64 && over.y <= 64);
+});
+
+
+test('film motion preserves uneven authored holds and wraps to an identical repeat',()=>{
+  const holds=[2,6,1];
+  assert.equal(filmPosition(holds,0,true),0);
+  assert.equal(filmPosition(holds,1,true),.5);
+  assert.equal(filmPosition(holds,2,true),1);
+  assert.equal(filmPosition(holds,5,true),1.5);
+  assert.equal(filmPosition(holds,8.5,true),2.5);
+  assert.equal(filmPosition(holds,9,true),0);
+  assert.equal(filmPosition(holds,10,true),filmPosition(holds,1,true));
+  assert.ok(filmPosition(holds,100,false)<3);
+  assert.equal(filmPosition(holds,-10,false),0);
+  assert.equal(filmPosition([],0,true),0);
 });
