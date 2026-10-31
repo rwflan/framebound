@@ -1,4 +1,4 @@
-import {ReviewReason} from './ReviewReason';
+import {ReviewTag} from './ReviewReason';
 import {FilmPlayback,PlaybackControls,ProjectionHandle} from './FilmPlayback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {Stroke} from './AnnotationPlayer';
@@ -113,11 +113,11 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
   const sourceAtSlot=b.source_comparison?.frames[slot];
   const rows:{title:string;frames:{id:string;asset_url:string;correspondence?:string}[]}[]=compareSource && projectedSource?
     [{title:'Known-good source',frames:projectedSource},{title:'Candidate',frames:b.frames}]:compare?[{title:'Previous revision',frames:compare.frames},{title:'Candidate',frames:b.frames}]:[{title:'Candidate',frames:b.frames}];
-  if(b.intake&&!b.intake.eligible)return <div className="packet-workspace agent-workspace"><section className="film-window"><header className="pane-title viewer-title"><strong>{run.animation_id}</strong><span className="title-grip"/><span className="badge">Intake rejected</span></header><div className="review-intake-empty"><strong>Outside the isolated 2D MVP</strong><p>{b.intake.principle}</p><p>{[...new Set(b.intake.frames.flatMap(f=>f.reasons))].join('; ')}</p><button onClick={()=>req(`/v3/runs/${encodeURIComponent(run.id)}/review`,{method:'POST'}).then(onChange).catch(setError)}>Prepare isolated replacement</button><Err e={error}/></div></section></div>;
+  if(b.intake&&!b.intake.eligible)return <div className="packet-workspace agent-workspace"><section className="film-window"><header className="pane-title viewer-title"><strong>{run.animation_id}</strong><span className="title-grip"/>{b.review?<ReviewTag context={b.review}/>:<span className="badge">Intake failed</span>}</header><div className="review-intake-empty"><strong>Outside the isolated 2D MVP</strong><p>{b.intake.principle}</p><p>{[...new Set(b.intake.frames.flatMap(f=>f.reasons))].join('; ')}</p><button onClick={()=>req(`/v3/runs/${encodeURIComponent(run.id)}/review`,{method:'POST'}).then(onChange).catch(setError)}>Prepare isolated replacement</button><Err e={error}/></div></section></div>;
   return <div className={"packet-workspace agent-workspace"+(expansion.expanded?" expanded-film":"")} data-revision={b.revision.id}>
     <section className="film-window">
-      <header className="pane-title viewer-title"><span className="file-icon"><Icon name="film"/></span><strong>{run.animation_id}</strong><span className="title-grip"/>
-        <span className={"badge "+b.evaluation.technical_status}>{words(b.evaluation.technical_status)}</span><span className="badge">{words(b.evaluation.coverage)} coverage</span><ViewerExpansion expanded={expansion.expanded} onToggle={expansion.toggle} onFeedback={()=>{setTab('correction');expansion.showFeedback();}}/></header>
+      <header className="pane-title viewer-title"><span className="file-icon"><Icon name="film"/></span><strong>{run.animation_id}</strong><span className="title-grip"/>{b.review&&<ReviewTag context={b.review}/>}
+        <ViewerExpansion expanded={expansion.expanded} onToggle={expansion.toggle} onFeedback={()=>{setTab('correction');expansion.showFeedback();}}/></header>
       <div className="viewer-toolbar"><span title={b.revision.id}>Revision {run.submission_ids.indexOf(b.revision.id)+1}</span>
         <span>{live?'Current revision':b.revision.id===run.current_revision_id?'Task revised · awaiting new submission':'Historical revision'}</span>
         {b.revision.id!==run.current_revision_id && run.current_revision_id && <button onClick={()=>onRevision(run.current_revision_id!)}>Open current</button>}
@@ -125,7 +125,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
         {b.revision.parent_revision_id && <button aria-pressed={Boolean(compare)} onClick={()=>void comparePrevious()}>Compare previous</button>}
 
       </div>
-      {b.review&&<ReviewReason context={b.review} onDetails={()=>{setTab('evidence');if(expansion.expanded)expansion.showFeedback();}}/>}
+
       <AnnotationTools controls={annotations}/>
       <div className={'film-stage agent-film-stage'+((compare||compareSource)?' has-comparison':'')}>
         <Film ref={controls.film} filmKey={'agent-'+b.revision.id} count={b.frames.length} sequence selected={slot}
