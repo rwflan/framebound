@@ -6,6 +6,8 @@ Framebound accepts isolated 2D animations of characters, animals, figures and ob
 
 Preserve unsuitable originals, provenance and negative intake evidence locally, but quarantine them from active review, approval and positive learning views. A replacement is a new versioned clip with explicit timing and source-family lineage, not a rewrite of a frozen experiment. Declared color-key extraction is an auditable derivation with original bytes and receipts retained; never guess that white subject pixels are background.
 
+Feedback on several frames is bundled into one take-bound generation request, retaining separate issue text, explicit native-frame scopes and all visual marks. See [the stable projection and feedback bundle plan](PROJECTION_FEEDBACK_BUNDLES_PLAN.md).
+
 There is one **Interventions** workflow: inspect frame → comment and annotate → submit → new take beneath feedback → repeat or approve. Use the existing film/frame windows and queue. Follow [the fixed PostHog design principles](../web/public/designs/posthog/DESIGN.md) for every screen change. Export is a workspace utility, not a competing feedback workflow or sidebar promotional link. See [the implementation plan](ANIMATION_FEEDBACK_STUDIO_PLAN.md).
 
 > Target product direction (2026-10-30): see the [agent-led animation workflow plan](AGENT_ANIMATION_WORKFLOW_PLAN.md). It replaces mandatory phase references and routine human review as workflow assumptions, while preserving truthful evidence and approval labels. The target is not yet implemented; the historical design and current v2 notes below remain implementation context.
