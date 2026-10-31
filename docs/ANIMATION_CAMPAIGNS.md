@@ -16,7 +16,7 @@ framebound campaign report --root /absolute/local/root --campaign animation-v1
 framebound campaign export --root /absolute/local/root --campaign animation-v1
 ```
 
-`python -m framebound.v3.campaign.credentials` opens a one-use local setup URL with a password field. It saves the key in a 0600 credential file outside the repository, suppresses request logs and makes no provider call. `run --muse` reads that file or `MODEL_API_KEY`; it also requires verified frozen prices and an explicit
+`python -m framebound.v3.campaign.credentials` creates an empty private credential file and prints its path. Open it in an editor, fill `api_key` and save. Existing credentials are preserved. The file stays outside the repository with mode 0600; setup makes no provider call. `run --muse` reads that file or `MODEL_API_KEY`; it also requires verified frozen prices and an explicit
 allocation. Planning does not fund a release. The initial API ceiling is $15 and
 Modal ceiling $10; the lifetime ledger retains prior incurred costs and unknown
 reservations. `Ledger.fund` is the explicit local allocation interface and requires
