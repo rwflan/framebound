@@ -192,7 +192,13 @@ def main(argv=None):
     oj = sub.add_parser("openapi", help="v2: regenerate the committed OpenAPI schema")
     oj.add_argument("--out", required=True, help="Write the OpenAPI JSON schema here")
 
+    from .v3.campaign.service import register_cli
+    register_cli(sub)
     args = p.parse_args(argv)
+    if args.cmd == "campaign":
+        from .v3.campaign.service import from_cli
+        _print(from_cli(args))
+        return 0
     if args.cmd == "doctor":
         from .v2.doctor import run_doctor
         _print(run_doctor())
