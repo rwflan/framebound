@@ -117,6 +117,7 @@ def export_campaign(root,campaign,*,version='1'):
             assets=[S.get(con,'assets',aid)[0] for aid in revision['frame_asset_ids']]
             p=P.parse(revision['generation_metadata'])
             closure=set(P.blob_hashes(p))
+            closure.update(a['byte_sha256'] for a in context.get('asset_ancestry',{}).values())
             conditioning=[]
             for event in p.generations:
                 for ref in event.conditioning:
