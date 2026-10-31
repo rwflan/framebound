@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {AnnotationPlayer,Stroke} from './AnnotationPlayer';
+import type {Stroke} from './AnnotationPlayer';
+import {AnnotationTools,AnnotationSurface,useAnnotations} from './AnnotationTools';
 import { req } from './api';
 import { Film, useFilm } from './Film';
 import { Handoff } from './Handoff';
@@ -46,13 +47,13 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
   },[run.id,run.version,b.revision.id]);
   useEffect(()=>{ setCompare(null); },[b.revision.id]);
   useEffect(()=>setPreferPrevious(false),[compare?.revision.id]);
-  const focus=(index:number,shift=false)=>{
+  const focus=(index:number,shift=false,reveal=true)=>{
     clock.setPlaying(false);wasPlaying.current=false;clock.selectSlot(index);setSlot(index);
     if(!shift)anchor.current=index;
     const selection=shift?Array.from({length:Math.abs(anchor.current-index)+1},(_,i)=>Math.min(anchor.current,index)+i):[index];
     setSelected(selection);setRangeStart(tickOfSlot(holds,Math.min(...selection)));
     setRangeEnd(tickOfSlot(holds,Math.max(...selection))+holds[Math.max(...selection)]);
-    controls.film.current?.reveal(index,true);
+    if(reveal)controls.film.current?.reveal(index,true);
   };
   async function comparePrevious(){
     if(compare){setCompare(null);return;}
@@ -99,6 +100,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
     image.onload=()=>{if(active){const c=canvas.current;c?.getContext('2d')?.drawImage(image,0,0);}};
     return()=>{active=false;};
   },[tab,frame.asset_url]);
+  const annotations=useAnnotations({value:visual,onChange:writable?setVisual:undefined,slot,onSlot:focus,pause:()=>clock.setPlaying(false),onDraw:()=>{setPlayback(false);setTab('correction');},resetKey:b.revision.id,transport:{count:holds.length,playing:clock.playing,toggle:()=>{setPlayback(true);clock.setPlaying(!clock.playing);},fit:()=>controls.film.current?.fit()}});
   const projectedSource=b.source_comparison?.frames.map(f=>({id:'source-'+f.output_slot,asset_url:f.asset_url,correspondence:f.correspondence}));
   const sourceAtSlot=b.source_comparison?.frames[slot];
   const rows:{title:string;frames:{id:string;asset_url:string;correspondence?:string}[]}[]=compareSource && projectedSource?
@@ -115,11 +117,12 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
         {b.revision.parent_revision_id && <button aria-pressed={Boolean(compare)} onClick={()=>void comparePrevious()}>Compare previous</button>}
         <div className="control-zoom"><button aria-label="Zoom out" onClick={()=>controls.film.current?.zoom(-1)}>−</button><output>{controls.zoom}%</output><button aria-label="Zoom in" onClick={()=>controls.film.current?.zoom(1)}>+</button><button onClick={()=>controls.film.current?.fit()}>Fit</button></div>
       </div>
+      <AnnotationTools controls={annotations}/>
       <div className={'film-stage agent-film-stage'+((compare||compareSource)?' has-comparison':'')+(playback?' agent-playback-mode':'')}>
         <Film ref={controls.film} filmKey={'agent-'+b.revision.id} count={b.frames.length} sequence selected={slot}
           onZoom={controls.setZoom} onPosition={controls.setPosition} onStep={focus}>
           <div className="reel-ruler">{b.frames.map((f,i)=><button key={f.id} aria-label={`Frame ${i+1}`} aria-pressed={selected.includes(i)} onClick={e=>focus(i,e.shiftKey)}>{String(i+1).padStart(2,'0')}<small>{tickOfSlot(holds,i)}–{tickOfSlot(holds,i)+holds[i]}</small></button>)}</div>
-          {rows.map(row=><div className="reel-stock reel-lane candidate" key={row.title}><div className="reel-shot-row">{row.frames.map((f,i)=><div className="reel-frame-unit" key={f.id}><button className={'reel-frame '+(slot===i?'is-current':'')} title={f.correspondence?`Authored-time correspondence: ${words(f.correspondence)}`:undefined} aria-label={`${row.title}, frame ${i+1}`} aria-pressed={selected.includes(i)} onClick={e=>focus(i,e.shiftKey)}><span className="frame-aperture"><img draggable={false} src={f.asset_url} alt={`${row.title} frame ${i+1}`}/></span></button></div>)}</div></div>)}
+          {rows.map(row=><div className="reel-stock reel-lane candidate" key={row.title}><div className="reel-shot-row">{row.frames.map((f,i)=><div className="reel-frame-unit" key={f.id}><button className={'reel-frame '+(slot===i?'is-current':'')} title={f.correspondence?`Authored-time correspondence: ${words(f.correspondence)}`:undefined} aria-label={`${row.title}, frame ${i+1}`} aria-pressed={selected.includes(i)} onClick={e=>focus(i,e.shiftKey)}><span className="frame-aperture"><img draggable={false} src={f.asset_url} alt={`${row.title} frame ${i+1}`}/>{row.title==='Candidate'&&<AnnotationSurface slot={i} width={spec.canvas.width} height={spec.canvas.height} value={visual} controls={annotations} onChange={writable?setVisual:undefined} onStart={()=>focus(i,false,false)}/>}</span></button></div>)}</div></div>)}
           <div className="measurement-track" aria-label="Checks and corrections"><div className="measurement-row">{b.frames.map((f,i)=>{const issues=b.feedback.targets.filter(t=>t.slots.includes(i));return <button key={f.id} onClick={()=>focus(i)} className={'agent-check-cell '+(issues.length?'has-issue':'')} aria-label={`Frame ${i+1}: ${issues.length?issues.length+' corrections':'checks pass'}`}><strong>{issues.length?issues.length+' corrections':'Pass'}</strong>{issues.slice(0,2).map(t=><small key={t.id}>{words(t.check_id)}</small>)}</button>;})}</div></div>
         </Film>
         <div className="agent-lane-tabs" aria-hidden="true">{rows.map(row=><strong key={row.title}>{row.title}</strong>)}<strong>Checks</strong></div>
@@ -141,7 +144,7 @@ export function AgentWorkspace({bundle:b,run,onChange,onRevision}:{bundle:AgentB
         <small>{spec.scene?.limitation || (spec.profile==='structural-v1'?'Structural only; animation quality not verified.':'Declared regions and events only; broader anatomy and action quality remain judgment.')}</small>
         <section className="agent-finding" aria-label="Output policy"><strong>Output policy</strong>{eligibility?<><small>{eligibility.policy||'Not evaluated'} · {eligibility.eligible?'Eligible':'Withheld'}</small>{eligibility.revision_id && eligibility.revision_id!==b.revision.id && <small>Applies to current best {eligibility.revision_id}</small>}{eligibility.reasons.map((reason,index)=><small key={index}>{reason}</small>)}</>:<small>Current eligibility unavailable</small>}</section>
         <details><summary>Agent instructions</summary><Handoff feedbackId={b.feedback.id}/></details></>}
-        {tab==='correction' && <><AnnotationPlayer urls={b.frames.map(f=>f.asset_url)} holds={holds} tps={spec.timing.ticks_per_second} loop={spec.loop} width={spec.canvas.width} height={spec.canvas.height} value={visual} onChange={setVisual}/></>}{tab==='correction' && <form onSubmit={e=>{e.preventDefault();void save();}}><label>Desired correction<textarea aria-label="Desired correction" value={note} onChange={e=>setNote(e.target.value)} required maxLength={1000}/></label>
+        {tab==='correction' && <form onSubmit={e=>{e.preventDefault();void save();}}><label>Desired correction<textarea aria-label="Desired correction" value={note} onChange={e=>setNote(e.target.value)} required maxLength={1000}/></label>
           <details><summary>Edit scope and timing</summary><div className="agent-tick-range"><label>Start tick<input aria-label="Start tick" type="number" min={0} value={rangeStart} onChange={e=>setRangeStart(Number(e.target.value))}/></label><label>End tick (exclusive)<input aria-label="End tick" type="number" min={rangeStart+1} value={rangeEnd} onChange={e=>setRangeEnd(Number(e.target.value))}/></label></div>
           <div className="agent-mark-stage"><canvas ref={canvas} width={spec.canvas.width} height={spec.canvas.height} aria-label="Mark correction region" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);const [x,y]=point(e);drag.current={x,y};}} onPointerMove={e=>{if(!drag.current)return;const [x,y]=point(e),start=drag.current;setRoi({left:Math.min(start.x,x),top:Math.min(start.y,y),right:Math.max(start.x,x)+1,bottom:Math.max(start.y,y)+1});}} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}/>{roi && <div className="region-box" style={{left:100*roi.left/spec.canvas.width+'%',top:100*roi.top/spec.canvas.height+'%',width:100*(roi.right-roi.left)/spec.canvas.width+'%',height:100*(roi.bottom-roi.top)/spec.canvas.height+'%'}}/>}</div>
           {roi && <button type="button" onClick={()=>setRoi(null)}>Clear region</button>}

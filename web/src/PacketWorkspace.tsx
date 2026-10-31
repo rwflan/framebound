@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {AnnotationPlayer,Stroke} from "./AnnotationPlayer";
+import type {Stroke} from "./AnnotationPlayer";
+import {AnnotationTools,AnnotationSurface,useAnnotations} from "./AnnotationTools";
 import { api } from "./api";
 import type {
   EligibilityDto,
@@ -172,7 +173,7 @@ export function PacketWorkspace({
       operation.current = "issue-" + crypto.randomUUID();
     }
   };
-  const focus = (i: number, shift = false) => {
+  const focus = (i: number, shift = false, reveal = true) => {
     wasPlaying.current = false;
     clock.setPlaying(false);
     clock.selectSlot(i);
@@ -186,7 +187,7 @@ export function PacketWorkspace({
           )
         : [i],
     );
-    controls.film.current?.reveal(i, true);
+    if(reveal)controls.film.current?.reveal(i, true);
   };
   const adoptSlot = (slot: number) => {
     setInspectionSlot(slot);
@@ -224,6 +225,7 @@ export function PacketWorkspace({
     setViewMode("frames");
     controls.film.current?.reveal(clock.slot, true);
   };
+  const annotations=useAnnotations({value:visual,onChange:setVisual,slot:inspectionSlot,onSlot:focus,pause:pausePlayback,onDraw:()=>{returnToFilm();setTab('correction');},resetKey:id,fit:()=>controls.film.current?.fit()});
   useEffect(() => {
     // Inspection follows deliberate pauses/one-shot completion, never a running playhead.
     if (
@@ -240,7 +242,7 @@ export function PacketWorkspace({
       const target = e.target as HTMLElement;
       if (
         e.defaultPrevented ||
-        target.closest("dialog,input,textarea,select,button")
+        (target.closest("dialog,input,textarea,select")||(target.closest("button")&&!target.closest(".reel-camera")))
       )
         return;
       if (e.code === "Space") {
@@ -484,7 +486,6 @@ export function PacketWorkspace({
   );
   return (
     <>
-      {tab==="correction"&&<AnnotationPlayer urls={b.frames.map(f=>f.asset_url)} holds={holds} tps={timing.ticks_per_second||60} loop={Boolean((b.contract.action as {loop?:boolean}).loop)} width={width} height={height} value={visual} onChange={setVisual}/>}
       <div className={"packet-workspace" + (expanded ? " expanded-film" : "")}>
         <section className="film-window">
           <header className="pane-title viewer-title">
@@ -590,6 +591,7 @@ export function PacketWorkspace({
               </div>
             )}
           </div>
+          <AnnotationTools controls={annotations}/>
           <Err e={comparison.err} />
           <div
             className={
@@ -667,6 +669,7 @@ export function PacketWorkspace({
                                 Reference unavailable
                               </span>
                             )}
+                            {Boolean(lane)&&<AnnotationSurface slot={i} width={width} height={height} value={visual} controls={annotations} onChange={setVisual} onStart={()=>focus(i,false,false)}/>}
                           </span>
                         </button>
                       </div>
