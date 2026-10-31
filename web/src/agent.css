@@ -1,4 +1,7 @@
-.agent-search { width: min(400px, 45vw); margin: 0 auto; }
+.agent-search-wrap { position: relative; width: min(400px, 45vw); margin: 0 auto; display: flex; align-items: center; }
+.agent-search { width: 100%; box-sizing: border-box; padding-left: 29px; padding-right: 58px; }
+.agent-search-wrap > svg { position: absolute; left: 9px; width: 13px; height: 13px; color: #8a7e6a; pointer-events: none; }
+.agent-search-wrap > kbd { position: absolute; right: 8px; font-size: 9px; line-height: 15px; color: #8a7e6a; pointer-events: none; }
 .agent-workspace { height: 100%; }
 .agent-film-stage .reel-camera { --lane-height: clamp(100px, calc(100cqh - 230px), 420px); }
 .agent-film-stage.has-comparison .reel-camera { --lane-height: clamp(60px, calc((100cqh - 240px) / 2), 280px); }
