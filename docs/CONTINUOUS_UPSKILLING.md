@@ -101,6 +101,25 @@ responses. It cannot silently select twenty additional cases. Completed step
 replays do not fund, call providers or re-export data. Changed step requests are
 rejected. CLI execution is required; HTTP cannot invoke a live specialist step.
 
+After a diagnosed execution-contract fix, an explicitly resumed campaign can use
+a new batch with `recovery_of` naming its blocked parent. The configuration,
+maximum size and exact original case IDs must match. Terminal cases stay intact;
+unfinished cases consume their existing paid receipts. A recovery cannot replenish
+a completed unhealthy cohort, select other cases, resolve unknown acceptance or
+release another stage. It closes a new dataset version and leaves the blocked
+report and published snapshot unchanged. Only a completed recovery that passes
+the same cohort gate creates a checked resolution link; replay of the parent then
+returns that completed recovery without funding or provider calls.
+
+Comparators receive the exact enum/schema for model-authored fields; local
+assignment and provenance fields are never requested from the model. A valid
+provider response with invalid comparison fields is preserved and quarantined.
+It produces an explicit insufficient-evidence comparison with no assessed
+categories and unknown improvement/regression. Qualified category strings are
+never normalized into valid labels. Empty scope is forbidden for any claimed
+preference or outcome. Such abstentions cannot approve repairs or create binary
+preference/editing supervision; malformed provider envelopes still stop admission.
+
 Funding is cumulative, distinct from its ceiling, and requires current account
 and rate evidence. The participant's aggregate authorization includes historical
 costs and unresolved reservations across all campaigns. No action resets spend.

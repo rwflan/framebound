@@ -29,7 +29,7 @@ from .features import extract
 from .experiment import controls, paired_report
 from .repair import blind_assignment, decide
 from .ledger import Ledger, ProviderPending, Stopped
-from .repair import Scope, Comparison, authorize, binding_in, composite, prepare_comparisons, record_comparison
+from .repair import Scope, Comparison, authorize, binding_in, composite, prepare_comparisons, record_comparison, comparison_output_schema
 from .specialists import wire, extract_image, extract_text
 
 
@@ -338,6 +338,21 @@ class Runner:
         self._save('annotations',rid+'.json',canonical(assessment))
         return assessment
 
+    def _parse_comparison(self,rid,raw,provenance,assignment):
+        body=extract_text(raw)  # Malformed provider envelopes still stop admission.
+        try:
+            if not isinstance(body,dict) or set(body)!={'preference','target_improved','material_regression','evidence','assessed_categories'}:
+                raise ValueError('unexpected comparator fields')
+            return Comparison(assignment_sha256=digest(assignment),provenance=provenance,**body)
+        except (ValueError,TypeError) as error:
+            self._save('annotations',rid+'-comparison-quarantine.json',canonical(dict(
+                raw_sha256=hashlib.sha256(raw).hexdigest(),reason=str(error),
+                policy='invalid-comparison-abstention-v1',assignment_sha256=digest(assignment),
+                inferred_preference=False,category_normalization=False)))
+            return Comparison(assignment_sha256=digest(assignment),provenance=provenance,
+                preference='insufficient_evidence',target_improved=None,material_regression=None,
+                assessed_categories=[],evidence='Comparator output failed the typed evidence contract. Original response retained; preference, improvement and regression remain unknown.')
+
     def _compare(self, case, authority):
         rows=prepare_comparisons(self.project,authority['id'],seed=self.config.seed)
         for row in rows:
@@ -350,11 +365,13 @@ class Runner:
             target=next(f for f in authority['assessment']['findings'] if f['id']==authority['finding_id'])
             text=COMPARISON_RUBRIC+'\n'+canonical(dict(request=case.request,assignment=row['assignment'],target_category=target['category'],
                 expected_behavior=target['expected'],holds=case.holds,ticks_per_second=case.ticks_per_second,windows=temporal_windows(case.holds,loop=case.loop),
-                output_fields=['preference','target_improved','material_regression','evidence','assessed_categories'],image_order='all native A frames, then all native B frames')).decode()
+                output_fields=['preference','target_improved','material_regression','evidence','assessed_categories'],
+                output_schema=comparison_output_schema(),category_values=list(CATEGORIES),
+                image_order='all native A frames, then all native B frames')).decode()
             rid,raw,receipt=self._call(case,'compare',text,images,attempt=int(row['id'][:8],16),parents=[row['id']])
             p=Provenance(provider='meta',requested_model='muse-spark-1.3',observed_model=receipt['provider'].get('observed_model'),
                 rubric_sha256=digest(COMPARISON_RUBRIC),raw_sha256=hashlib.sha256(raw).hexdigest(),execution_id=rid)
-            record_comparison(self.project,row['id'],Comparison(assignment_sha256=digest(row['assignment']),provenance=p,**extract_text(raw)))
+            record_comparison(self.project,row['id'],self._parse_comparison(rid,raw,p,row['assignment']))
         con=loop.connect(self.project)
         try:return loop.get_in(con,'agent_auto_authorities',authority['id'])['status']
         finally:con.close()
@@ -461,12 +478,13 @@ class Runner:
         text=COMPARISON_RUBRIC+'\n'+canonical(dict(request=case.request,assignment=assignment,target_category=target['category'],
             expected_behavior=target['expected'],holds=case.holds,ticks_per_second=case.ticks_per_second,
             windows=temporal_windows(case.holds,loop=case.loop),image_order='all A native frames, then all B native frames',
-            output_fields=['preference','target_improved','material_regression','evidence','assessed_categories'])).decode()
+            output_fields=['preference','target_improved','material_regression','evidence','assessed_categories'],
+            output_schema=comparison_output_schema(),category_values=list(CATEGORIES))).decode()
         key=digest([case.id,'control'])
         rid,raw,receipt=self._call(case,'compare',text,images,attempt=int(key[:8],16),parents=[original_revision,candidate_sha])
         p=Provenance(provider='meta',requested_model='muse-spark-1.3',observed_model=receipt['provider'].get('observed_model'),
             rubric_sha256=digest(COMPARISON_RUBRIC),raw_sha256=hashlib.sha256(raw).hexdigest(),execution_id=rid)
-        comparison=Comparison(assignment_sha256=digest(assignment),provenance=p,**extract_text(raw))
+        comparison=self._parse_comparison(rid,raw,p,assignment)
         outcome=decide(assignment,comparison,candidate_sha256=candidate_sha,target_category=target['category'],preservation_passed=True)
         mapping={'accepted':'improved','unchanged':'unchanged','rejected':'unchanged','ambiguous':'ambiguous'}
         con=loop.connect(self.project)

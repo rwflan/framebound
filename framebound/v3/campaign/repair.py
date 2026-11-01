@@ -8,7 +8,7 @@ from typing import Literal
 
 import numpy as np
 from PIL import Image
-from pydantic import Field, StrictInt
+from pydantic import Field, StrictInt, model_validator
 
 from ...v2 import storage as S
 from ...v2.services.errors import InvalidInput
@@ -142,8 +142,24 @@ class Comparison(Strict):
     target_improved: bool | None
     material_regression: bool | None
     evidence: str = Field(min_length=1,max_length=4000)
-    assessed_categories: list[Category] = Field(min_length=1,max_length=9)
+    assessed_categories: list[Category] = Field(max_length=9)
     provenance: Provenance
+
+    @model_validator(mode='after')
+    def unassessed_is_unknown(self):
+        if not self.assessed_categories and not (self.preference=='insufficient_evidence'
+                and self.target_improved is None and self.material_regression is None):
+            raise ValueError('empty comparison scope requires explicit abstention with unknown outcomes')
+        return self
+
+
+def comparison_output_schema():
+    schema=Comparison.model_json_schema()
+    local={'assignment_sha256','provenance'}
+    schema['properties']={k:v for k,v in schema['properties'].items() if k not in local}
+    schema['required']=[k for k in schema['required'] if k not in local]
+    schema.pop('$defs',None)
+    return schema
 
 
 def blind_assignment(case_id, first_sha256, second_sha256, *, seed, reverse=False):
@@ -220,7 +236,9 @@ def record_comparison(project, comparison_id, comparison: Comparison):
                 outcome='ambiguous' if 'ambiguous' in outcomes else 'rejected' if 'rejected' in outcomes else 'accepted' if outcomes=={'accepted'} else 'unchanged'
                 a['status']=outcome
                 con.execute('UPDATE agent_auto_authorities SET data=? WHERE id=?',(canonical(a).decode(),a['id']))
-                run['learned_coverage_status']='assessed_model_comparison'
+                run['learned_coverage_status']=('comparison_abstained' if any(
+                    r['comparison'] and not r['comparison']['assessed_categories'] for r in rows)
+                    else 'assessed_model_comparison')
                 if outcome=='accepted': run['learned_best_revision_id']=a['candidate_revision_id']
                 run['lifecycle']='completed';run['stop_reason']='Automatic model comparison finished: '+outcome+'; coverage limitations retained.'
                 loop._update(con,run)

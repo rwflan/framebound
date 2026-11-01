@@ -20,6 +20,7 @@ class Step(Strict):
     max_cases: StrictInt = Field(default=20,ge=1,le=20)
     allocation_microdollars: StrictInt = Field(ge=0,le=50000000)
     evidence: dict
+    recovery_of: str | None = Field(default=None,exclude_if=lambda value:value is None)
 
 
 def folder(root,campaign):
@@ -152,20 +153,47 @@ def step(root,campaign,request,specialist):
             if record['config_sha256']!=digest(config):raise ValueError('batch campaign configuration changed')
             if projection.exists():
                 old=json.loads(projection.read_text())
-                if old['status'] in {'completed','blocked'}:return old
+                if old['status'] in {'completed','blocked'}:
+                    resolution=batch/'recovered_by.json'
+                    if old['status']=='blocked' and resolution.is_file():
+                        child=json.loads(resolution.read_text())['batch'];Identity(id=child)
+                        child_record=json.loads((base/child/'request.json').read_text())
+                        resolved=json.loads((base/child/'result.json').read_text())
+                        if (child_record['spec'].get('recovery_of')!=spec.batch or resolved['status']!='completed'
+                                or child_record['case_ids']!=record['case_ids'] or resolved['case_ids']!=record['case_ids']
+                                or child_record['config_sha256']!=record['config_sha256']):
+                            raise ValueError('batch recovery does not bind the original fixed cohort')
+                        return resolved
+                    return old
         else:
             decision=plan(root,campaign)
             action=decision['next_action']
             if action in {'blocked','evidence_review','local_training_and_compute_review','final_evaluation_only'}:
                 return dict(status=action,plan=decision,new_modal_jobs=0)
-            if action=='release_pilot':release(root,campaign,dict(stage='pilot'))
+            if spec.recovery_of:
+                Identity(id=spec.recovery_of)
+                parent=base/spec.recovery_of
+                parent_record=json.loads((parent/'request.json').read_text())
+                parent_result=json.loads((parent/'result.json').read_text())
+                if (spec.recovery_of==spec.batch or parent_result['status']!='blocked'
+                        or parent_record['config_sha256']!=digest(config)
+                        or parent_record['case_ids']!=parent_result['case_ids']
+                        or spec.max_cases!=parent_record['spec']['max_cases']):
+                    raise ValueError('recovery requires a blocked original cohort with unchanged configuration and size')
+                if not any(not ledger.progress(campaign,cid)['result'] for cid in parent_record['case_ids']):
+                    raise Stopped('completed unhealthy cohort cannot be replenished by recovery')
+                if action!='collect_fixed_batch':raise Stopped('recovery requires received evidence and an explicitly resumed healthy execution state')
+            elif action=='release_pilot':release(root,campaign,dict(stage='pilot'))
             elif action=='release_representative_expansion':
                 previous=latest(root,campaign)
                 baseline=previous['studies']['geometry']['baseline']['path']
                 release(root,campaign,dict(stage='expansion',batch=spec.batch,size=80,mode='representative',
                     baseline_file=str(Path(baseline).relative_to(Path(root)))))
             allowed=admitted(ledger,config)
-            selected=[c.id for c in config.cases if c.id in allowed and c.split!='test' and not ledger.progress(campaign,c.id)['result']][:spec.max_cases]
+            selected=(parent_record['case_ids'] if spec.recovery_of else
+                      [c.id for c in config.cases if c.id in allowed and c.split!='test' and not ledger.progress(campaign,c.id)['result']][:spec.max_cases])
+            if any(cid not in allowed or next(c for c in config.cases if c.id==cid).split=='test' for cid in selected):
+                raise Stopped('recovery cohort contains unadmitted or final cases')
             if not selected:return dict(status='evidence_review',plan=plan(root,campaign),new_modal_jobs=0)
             # Allocate once. Restarting retrieval of accepted work never needs
             # fresh funding evidence and cannot reset existing commitments.
@@ -174,6 +202,7 @@ def step(root,campaign,request,specialist):
             frozen.write_bytes(canonical(record))
         progress=dict(schema_version='upskill-step-1.0',campaign=campaign,batch=spec.batch,status='collecting',
             case_ids=record['case_ids'],new_modal_jobs=0,model_promoted=False)
+        if spec.recovery_of:progress['recovery_of']=spec.recovery_of
         project(projection,progress);project(base/'active.json',progress)
         from .runner import Runner
         outcome=Runner(root,campaign,specialist).run(max_cases=len(record['case_ids']),case_ids=record['case_ids'])
@@ -201,4 +230,9 @@ def step(root,campaign,request,specialist):
             ledger.stop(campaign);progress['status']='blocked'
         progress['next_action']='Review support and next release; compute requires informative data and explicit measured admission.'
         project(projection,progress);project(base/'active.json',progress);project(base/'latest.json',progress)
+        if spec.recovery_of and progress['status']=='completed':
+            resolution=base/spec.recovery_of/'recovered_by.json'
+            if resolution.exists() and json.loads(resolution.read_text())['batch']!=spec.batch:
+                raise ValueError('original cohort already has a different completed recovery')
+            project(resolution,dict(batch=spec.batch,config_sha256=digest(config),case_ids_sha256=digest(record['case_ids'])))
         return json.loads(canonical(progress))

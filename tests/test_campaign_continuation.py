@@ -317,3 +317,32 @@ def test_interrupted_accepted_native_stream_uses_get_not_post(tmp_path,monkeypat
     assert ledger.request(row['id'])['state']=='provider_pending'
     dispatch(Ledger(tmp_path),row['id'],MuseResponses(key='engineering-only'))
     assert calls==['POST','GET']
+
+
+def test_recovery_keeps_blocked_snapshot_and_exact_original_cohort(tmp_path,monkeypatch):
+    config=mvp_curriculum('recovery-fixture');ledger=Ledger(tmp_path);ledger.plan(config);calls=[]
+    class RecoverableRunner:
+        def __init__(self,*a):pass
+        def run(self,*,max_cases,case_ids):
+            calls.append(list(case_ids))
+            for cid in case_ids:
+                if not ledger.progress(config.id,cid)['result']:
+                    ledger.finish_case(config.id,cid,'ambiguous',{'outcome':'ambiguous'})
+                    if len(calls)==1:ledger.stop(config.id);break
+            return dict(status=ledger.status(config.id),deferred={} if len(calls)>1 else {'fixture':'Received comparator shape failure'})
+    monkeypatch.setattr('framebound.v3.campaign.runner.Runner',RecoverableRunner)
+    monkeypatch.setattr(continuation,'close',lambda root,campaign,version:dict(studies={},dataset_version=version))
+    monkeypatch.setattr(continuation,'cohort_evidence',lambda *a:dict(passed=True))
+    request=dict(batch='original',max_cases=2,allocation_microdollars=100000,evidence=evidence())
+    old=continuation.step(tmp_path,config.id,request,object());assert old['status']=='blocked'
+    original=tmp_path/f'campaigns/{config.id}/upskill/original/result.json';before=original.read_bytes()
+    ledger.resume(config.id)
+    with pytest.raises(ValueError,match='unchanged configuration and size'):
+        continuation.step(tmp_path,config.id,dict(request,batch='bad-recovery',recovery_of='original',max_cases=3),object())
+    recovered=continuation.step(tmp_path,config.id,dict(request,batch='recovery-001',recovery_of='original'),object())
+    assert recovered['status']=='completed' and recovered['recovery_of']=='original'
+    assert calls[0]==calls[1] and original.read_bytes()==before
+    assert old['dataset_version']!=recovered['dataset_version']
+    assert continuation.step(tmp_path,config.id,request,object())==recovered and len(calls)==2
+    with pytest.raises(Stopped,match='cannot be replenished'):
+        continuation.step(tmp_path,config.id,dict(request,batch='another-recovery',recovery_of='original'),object())
