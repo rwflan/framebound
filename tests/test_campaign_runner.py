@@ -249,3 +249,41 @@ def test_portable_campaign_keeps_declared_family_ancestry(tmp_path):
     output=export_campaign(tmp_path,config.id,version='ancestry')
     rows=load(output['path'])
     assert rows and all(row['metadata']['ancestry']==['declared-source-family'] for row in rows)
+
+
+def test_invalid_comparator_scope_abstains_without_paid_retry_or_preference_label(tmp_path):
+    import pytest
+    from framebound.v3.campaign.repair import Comparison,comparison_output_schema
+    from framebound.v3.campaign.export import export_campaign
+    config,case=configured(tmp_path)
+    class InvalidComparator(EngineeringSpecialist):
+        def execute(self,request,*,timeout):
+            response=super().execute(request,timeout=timeout)
+            if request['operation']!='compare':return response
+            body=json.loads(response.raw);value=json.loads(body['output'][0]['text'])
+            value.update(preference='B',target_improved=True,material_regression=False,
+                         assessed_categories=['parts: apparent repair'])
+            body['output'][0]['text']=json.dumps(value)
+            return Response(canonical(body),response.incurred,0,response.receipt)
+    specialist=InvalidComparator();runner=Runner(tmp_path,config.id,specialist)
+    result=runner.run();assert result['results'][case.id]['outcome']=='ambiguous'
+    assert not result['status']['stopped'] and len(specialist.sends)==7
+    from framebound.v3.services import loop
+    con=loop.connect(runner.project)
+    try:rows=[json.loads(r[0]) for r in con.execute('SELECT data FROM agent_auto_comparisons')]
+    finally:con.close()
+    comparison=rows[0]['comparison']
+    assert comparison['preference']=='insufficient_evidence' and comparison['target_improved'] is None
+    assert comparison['material_regression'] is None and comparison['assessed_categories']==[]
+    assert rows[0]['outcome']=='ambiguous'
+    run_id=runner.ledger.progress(config.id,case.id)['data']['run_id']
+    assert loop.get(runner.project,run_id)['learned_coverage_status']=='comparison_abstained'
+    with pytest.raises(ValueError):Comparison(**dict(comparison,preference='tie'))
+    schema=comparison_output_schema()
+    assert 'provenance' not in schema['properties'] and 'assignment_sha256' not in schema['properties']
+    assert list((runner.folder/'annotations').glob('*-comparison-quarantine.json'))
+    runner.run();assert len(specialist.sends)==7
+    exported=export_campaign(tmp_path,config.id,version='invalid-comparison')
+    preferences=[json.loads(line) for line in (__import__('pathlib').Path(exported['path'])/'preference.jsonl').read_text().splitlines()]
+    assert preferences and all(not row['binary_training_eligible'] for row in preferences)
+    assert exported['manifest']['counts']['editing']==0
