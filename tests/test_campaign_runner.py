@@ -287,3 +287,33 @@ def test_invalid_comparator_scope_abstains_without_paid_retry_or_preference_labe
     preferences=[json.loads(line) for line in (__import__('pathlib').Path(exported['path'])/'preference.jsonl').read_text().splitlines()]
     assert preferences and all(not row['binary_training_eligible'] for row in preferences)
     assert exported['manifest']['counts']['editing']==0
+
+
+def test_changed_advice_cannot_rewrite_received_repair_provenance(tmp_path,monkeypatch):
+    import hashlib
+    from framebound.v3.campaign.curriculum import mvp_curriculum,protocol
+    from datetime import datetime,timezone
+    from framebound.v3.services import loop
+    config=mvp_curriculum('advice-replay-fixture');ledger=Ledger(tmp_path);ledger.plan(config)
+    ledger.fund(config.id,'api',2000000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),
+        source='Engineering fixture',account_access='Synthetic authority',image_microdollars=10000))
+    cid=next(c.id for c in config.cases if c.id in protocol(config)['rehearsal'])
+    specialist=EngineeringSpecialist();runner=Runner(tmp_path,config.id,specialist)
+    finish=runner.ledger.finish_case
+    monkeypatch.setattr(runner.ledger,'finish_case',lambda *a,**k:(_ for _ in ()).throw(RuntimeError('Synthetic terminal-commit interruption')))
+    assert runner.run(max_cases=1,case_ids=[cid])['status']['stopped']
+    received=[r for r in runner.ledger.status(config.id)['requests'] if r['operation']=='repair'];assert received
+    request=json.loads(runner.ledger.request(received[0]['id'])['request'])
+    expected=hashlib.sha256(request['payload']['wire']['input'][0]['content'][0]['text'].encode()).hexdigest()
+    from framebound.v3.campaign.contracts import digest
+    revision_id='revision-'+digest([config.id,cid,'repair',0])[:40]
+    before=loop.revision_get(runner.project,revision_id)['revision']
+    sent=len(specialist.sends)
+    monkeypatch.setattr('framebound.v3.campaign.advisory.query',lambda *a,**k:dict(authority='advisory_only',entries=['NEW ENGINEERING ADVICE']))
+    monkeypatch.setattr(runner.ledger,'finish_case',finish);runner.ledger.resume(config.id)
+    result=runner.run(max_cases=1,case_ids=[cid])
+    assert not result['status']['stopped'] and result['results'][cid]['outcome']=='unchanged',result.get('deferred')
+    assert len(specialist.sends)==sent
+    after=loop.revision_get(runner.project,revision_id)['revision']
+    assert after==before
+    assert after['generation_metadata']['provenance']['generations'][0]['prompt_sha256']==expected
