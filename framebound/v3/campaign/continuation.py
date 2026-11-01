@@ -129,8 +129,8 @@ def close(root,campaign,version):
             except (ImportError,RuntimeError,ValueError) as error:
                 candidate['profile_blocker']=type(error).__name__+': '+str(error)
             if candidate['training_gate']['eligible']:
-                from .learning import fit
-                candidate['local_training']=fit(shard,categories=categories,model='temporal',seed=0)
+                from .learning import experiment
+                candidate['local_training']=experiment(root,campaign,shard,categories=categories)
             result['compute_candidate']=candidate
     return result
 

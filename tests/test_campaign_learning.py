@@ -39,3 +39,25 @@ def test_masked_training_deterministic_and_validation_is_not_training():
 def test_temporal_head_retains_native_window_predictions():
     shard=data();result=fit(shard,categories=['identity'],engineering=True,model='temporal',steps=10)
     assert len(predict(result['checkpoint'],shard.rows[0])['windows'])==2
+
+
+def test_supported_experiment_persists_checkpoints_and_separates_categories(tmp_path):
+    import json
+    from pathlib import Path
+    from framebound.v3.campaign.learning import experiment
+    rows=[]
+    for n in range(316):
+        rows.append(FeatureRow(case_id=f'{n:064x}',family_id=f'{n//4:064x}',
+            split='train' if n<300 else 'validation',features=[[float(n%2)]*8],
+            targets=[n%2]+[0]*8,assessed=[True]+[False]*8))
+    shard=FeatureShard(rows=rows)
+    trained=experiment(tmp_path,'fixture',shard,categories=['identity'])
+    assert trained['card']['status']=='evaluated_candidates' and not trained['card']['promoted']
+    assert len(trained['card']['results'])==6
+    path=Path(trained['path']);before=(path/'model-card.json').read_bytes()
+    for row in trained['card']['results']:
+        saved=json.loads((path/f'{row["model"]}-{row["seed"]}.json').read_text())
+        assert saved['categories']==['identity'] and saved['engineering_only'] is False
+    unsupported=experiment(tmp_path,'fixture',shard,categories=['parts'])
+    assert unsupported['path']!=trained['path'] and unsupported['card']['status']=='insufficient_support'
+    assert (path/'model-card.json').read_bytes()==before
