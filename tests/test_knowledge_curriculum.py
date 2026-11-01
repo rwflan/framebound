@@ -365,7 +365,9 @@ def test_local_compute_comparison_uses_fastest_successful_available_device(tmp_p
     from framebound.v3.campaign import study
     shard=geometry_shard();(tmp_path/'features.json').write_bytes(canonical(shard))
     monkeypatch.setattr(torch.backends.mps,'is_available',lambda:True)
-    clock=iter((0.,10.,20.,21.));monkeypatch.setattr(study.time,'monotonic',lambda:next(clock))
+    clock=iter((0.,10.,20.,21.))
+    from types import SimpleNamespace
+    monkeypatch.setattr(study,'time',SimpleNamespace(monotonic=lambda:next(clock)))
     calls=[]
     def fake_train(shard,*,categories,device,profile_only):
         calls.append(device)
@@ -374,3 +376,113 @@ def test_local_compute_comparison_uses_fastest_successful_available_device(tmp_p
     result=study.profile(tmp_path,'engineering',dict(feature_file='features.json',categories=['temporal']))
     assert calls==['cpu','mps'] and result['report']['device']=='mps'
     assert result['report']['wall_seconds']==1. and not result['report']['promoted']
+
+
+def test_received_bad_key_is_negative_intake_and_quota_stops_fanout(tmp_path):
+    import io,base64
+    from test_campaign_runner import EngineeringSpecialist
+    from framebound.v3.campaign.runner import Runner
+    from framebound.v3.campaign.dispatch import Response
+    config=mvp_curriculum('engineering-intake-quota');ledger=Ledger(tmp_path);ledger.plan(config)
+    ledger.fund(config.id,'api',1000000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),source='Engineering',
+        account_access='Synthetic authority',image_microdollars=10000))
+    class WrongKey(EngineeringSpecialist):
+        def execute(self,request,*,timeout):
+            assert request['images'],'Bad intake must not receive paid semantic assessment'
+            self.sends.append(request)
+            image=Image.new('RGB',(64,64),'white');out=io.BytesIO();image.save(out,format='PNG')
+            return Response(canonical(dict(status='completed',output=[dict(type='image_generation_call',result=base64.b64encode(out.getvalue()).decode())])),10000,1,{'engineering':'received'})
+    specialist=WrongKey();result=Runner(tmp_path,config.id,specialist).run()
+    assert len(specialist.sends)==4 and len(result['results'])==4
+    assert result['status']['stopped'] and result['status']['cases']['rejected']==4
+    assert result['status']['budgets']['api']['incurred']==40000
+    assert result['status']['budgets']['api']['reserved']==0
+
+
+def test_new_campaign_name_cannot_move_a_known_family_into_the_test_split(tmp_path):
+    from framebound.v3.campaign.contracts import Campaign
+    ledger=Ledger(tmp_path);original=curriculum('engineering-split-original');ledger.plan(original)
+    value=original.model_dump();value['id']='engineering-split-renamed'
+    family=value['cases'][0]['family']
+    for case in value['cases']:
+        if case['family']==family:case.update(split='test',stage='final')
+    changed=Campaign.model_validate(value)
+    with pytest.raises(ValueError,match='lifetime family'):
+        ledger.plan(changed)
+
+
+def test_plan_replay_preserves_a_frozen_legacy_curriculum(tmp_path):
+    from framebound.v3.campaign.service import operate
+    config=curriculum('engineering-historical');ledger=Ledger(tmp_path);ledger.plan(config)
+    before=canonical(ledger.config(config.id))
+    operate(tmp_path,'plan',campaign=config.id)
+    assert canonical(ledger.config(config.id))==before
+
+
+def test_closed_export_cannot_drop_a_hash_lane_and_keep_claiming_validity(tmp_path):
+    from framebound.v3.campaign.export import build,validate
+    output=build(tmp_path,'engineering',[],version='empty')
+    from pathlib import Path
+    folder=Path(output['path']);manifest=json.loads((folder/'manifest.json').read_text())
+    manifest['files'].pop('detection.jsonl');(folder/'manifest.json').write_bytes(canonical(manifest))
+    with pytest.raises(ValueError,match='objective lane'):validate(folder)
+
+
+def test_private_reports_and_serialized_curricula_cannot_enter_git(tmp_path):
+    import runpy
+    from pathlib import Path
+    audit=runpy.run_path(str(Path(__file__).resolve().parents[1]/'scripts/check_private_boundary.py'))['audit']
+    for name,value in [('readiness.json',dict(schema_version='knowledge-readiness-1.0')),
+                       ('campaign.json',dict(schema_version='2.0',dataset_version='mvp-2',cases=[]))]:
+        (tmp_path/name).write_bytes(canonical(value))
+        assert audit(tmp_path,[name])==[name]
+    (tmp_path/'schema.json').write_text('{"type":"object","properties":{"cases":{"type":"array"}}}')
+    assert not audit(tmp_path,['schema.json'])
+
+
+def test_frozen_final_artifacts_detect_changed_execution_sources(tmp_path):
+    from framebound.v3.campaign.study import execution_sources,verify_frozen
+    config=mvp_curriculum('engineering-final-freeze');ledger=Ledger(tmp_path);ledger.plan(config)
+    files={};hashes={}
+    for key in ('model','policy','prompts','preprocessing'):
+        path=tmp_path/(key+'.json');path.write_text('{}');files[key]=path.name
+        hashes[key]=hashlib.sha256(path.read_bytes()).hexdigest()
+    detail=dict(execution_sources=execution_sources(),artifact_files=files,artifact_hashes=hashes,
+                knowledge_version=None,knowledge_sha256=None)
+    evidence=dict(config_sha256=digest(config),detail=detail)
+    with ledger.db() as db:
+        db.execute('INSERT INTO knowledge_releases(campaign,stage,cases,evidence,request) VALUES(?,?,?,?,?)',
+            (config.id,'final','[]',canonical(evidence).decode(),'{}'))
+    assert verify_frozen(tmp_path,config.id)==detail
+    evidence['detail']['execution_sources']['features.py']='0'*64
+    with ledger.db() as db:db.execute('UPDATE knowledge_releases SET evidence=? WHERE campaign=?',(canonical(evidence).decode(),config.id))
+    with pytest.raises(ValueError,match='execution sources changed'):verify_frozen(tmp_path,config.id)
+
+
+def test_zero_cash_limit_allows_applicable_credit_but_never_authorizes_cash():
+    from framebound.v3.campaign.compute_gate import CreditEvidence,credit_capacity
+    now=datetime.now(timezone.utc)
+    credit=CreditEvidence(verified_at=now-timedelta(minutes=1),expires_at=now+timedelta(days=1),source='Engineering account evidence',
+        restrictions='Credit only',available_microdollars=1000000,workspace_remaining_microdollars=2000000,
+        net_spend_remaining_microdollars=0,pricing_source='Engineering prices',l4_microdollars_per_second=222,
+        l40s_microdollars_per_second=542,cpu_microdollars_per_core_second=13.1,ram_microdollars_per_gib_second=2.22)
+    assert credit_capacity(credit)==1000000
+    assert credit_capacity(credit.model_copy(update={'available_microdollars':0,'net_spend_remaining_microdollars':2000000}))==0
+    assert credit_capacity(credit.model_copy(update={'workspace_remaining_microdollars':0}))==0
+
+
+def test_scoped_negative_examples_teach_counterexamples_without_inventing_defects(tmp_path):
+    from framebound.v3.campaign.export import build
+    from framebound.v3.campaign.knowledge import build as knowledge_build,retrieve
+    image=Image.new('RGBA',(32,32));ImageDraw.Draw(image).ellipse((8,7,22,23),fill='blue');image.save(tmp_path/'a.png')
+    (tmp_path/'request.json').write_text('{}')
+    example=dict(id='negative',family='family',split='train',frames=['a.png'],holds=[2],loop=False,
+        request_file='request.json',conditioning_files=[],provenance={'source':'engineering'},rights=['original'],
+        assessment=assessment(positive=False).model_dump(mode='json'))
+    build(tmp_path,'engineering',[example],version='closed')
+    result=knowledge_build(tmp_path,'engineering',version='new-library',dataset_version='closed')
+    assert result['entries']==1
+    entry=retrieve(tmp_path,'engineering',version='new-library',categories=['temporal'])['entries'][0]
+    assert entry['record_kind']=='assessed_negative' and entry['subject'] is None and entry['roi'] is None
+    assert entry['expected'] is None and entry['proposed_correction'] is None
+    assert not entry['human_acceptance'] and entry['slots']==[0]

@@ -7,10 +7,12 @@ from .contracts import canonical, digest, local_path
 from .export import load
 
 
-def build(root, campaign, *, version):
+def build(root, campaign, *, version, dataset_version=None):
     from .contracts import Identity
     Identity(id=version)
-    dataset = local_path(root, f'campaigns/{campaign}/training/{version}')
+    dataset_version=dataset_version or version
+    Identity(id=dataset_version)
+    dataset = local_path(root, f'campaigns/{campaign}/training/{dataset_version}')
     entries = []
     examples=load(dataset)
     from .leakage import exclusions
@@ -24,15 +26,26 @@ def build(root, campaign, *, version):
         if not all(inspect(f)['eligible'] for f in example['frames']):
             continue
         assessment = Assessment.model_validate(row['assessment'])
+        common=dict(sequence_id=row.get('sequence_id',row['id']),revision_id=row['id'],family=row['family'],
+            provenance=assessment.provenance.model_dump(mode='json'),assessment_sha256=digest(assessment),
+            dataset_sha256=digest(json.loads((dataset/'manifest.json').read_text())),evidence_files=row['frames'],
+            proposed_correction=None,preservation_requirements=None,actual_outcome='unlinked',experiences=[],
+            label_source='model',human_acceptance=False)
         for f in assessment.findings:
-            entry = dict(sequence_id=row.get('sequence_id',row['id']), revision_id=row['id'], family=row['family'],
-                category=f.category, subject=f.subject, part=f.part, slots=f.slots, tick_range=f.tick_range,
-                roi=f.roi, observed=f.observed, expected=f.expected, counterexamples=f.counterexamples,
-                visibility=f.visibility, severity=f.severity, provenance=assessment.provenance.model_dump(mode='json'),
-                assessment_sha256=digest(assessment), dataset_sha256=digest(json.loads((dataset/'manifest.json').read_text())),
-                evidence_files=row['frames'], proposed_correction=None, preservation_requirements=None,
-                actual_outcome='unlinked', experiences=[], label_source='model', human_acceptance=False)
-            entries.append(dict(entry,id=digest(entry)))
+            entry=dict(common,record_kind='observed_finding',category=f.category,subject=f.subject,part=f.part,
+                slots=f.slots,tick_range=f.tick_range,roi=f.roi,observed=f.observed,expected=f.expected,
+                counterexamples=f.counterexamples,visibility=f.visibility,severity=f.severity)
+            entries.append(dict(entry,experiences=[],id=digest(entry)))
+        for coverage in assessment.coverage:
+            if coverage.status!='absent_within_assessed_scope' or not coverage.slots:continue
+            ticks=[0]
+            for hold in row['holds']:ticks.append(ticks[-1]+hold)
+            entry=dict(common,record_kind='assessed_negative',category=coverage.category,subject=None,part=None,
+                slots=coverage.slots,tick_range=None,tick_ranges=[[ticks[s],ticks[s+1]] for s in sorted(coverage.slots)],roi=None,
+                observed='No defect reported within this explicitly assessed scope',expected=None,
+                counterexamples=coverage.limitations,visibility='assessed_scope',severity=None,
+                limitation='Scoped model-negative evidence; not a whole-clip quality pass or a new defect finding.')
+            entries.append(dict(entry,experiences=[],id=digest(entry)))
     # Retain successful, failed and ambiguous corrections as distinct experiences.
     for lane in ('editing','preference','failure'):
         for example in load(dataset,lane):
@@ -48,7 +61,7 @@ def build(root, campaign, *, version):
                         comparison=row['comparison'])
     # IDs bind the complete entry, including observed outcomes.
     entries=[dict(e,id=digest({k:v for k,v in e.items() if k!='id'})) for e in entries]
-    value=dict(schema_version='animation-knowledge-1.0',campaign=campaign,dataset_version=version,
+    value=dict(schema_version='animation-knowledge-2.0',campaign=campaign,dataset_version=dataset_version,
                entries=entries,authority='advisory_only',excluded_splits=['validation','test'])
     path=local_path(root,f'campaigns/{campaign}/knowledge/{version}.json')
     path.parent.mkdir(parents=True,exist_ok=True)
@@ -65,6 +78,8 @@ def retrieve(root,campaign,*,version,categories,exclude_families=(),limit=3):
     Identity(id=version)
     path=local_path(root,f'campaigns/{campaign}/knowledge/{version}.json')
     library=json.loads(path.read_text())
+    if library.get('schema_version') not in {'animation-knowledge-1.0','animation-knowledge-2.0'}:
+        raise ValueError('unsupported knowledge label semantics')
     # Revalidate closure on use so stale or edited evidence is not cited as knowledge.
     dataset=local_path(root,f"campaigns/{campaign}/training/{library['dataset_version']}")
     from .export import validate
@@ -77,5 +92,5 @@ def retrieve(root,campaign,*,version,categories,exclude_families=(),limit=3):
         if e['category'] in categories and e['family'] not in exclude_families:
             rows.append(e)
     rows.sort(key=lambda e:(e['visibility']!='supported',e['actual_outcome']!='accepted',e['id']))
-    return dict(authority='advisory_only',entries=rows[:limit],
+    return dict(schema_version='animation-knowledge-query-2.0',authority='advisory_only',entries=rows[:limit],evidence_root=str(dataset),
                 limitation='Retrieved model observations do not validate this candidate or authorize an edit.')

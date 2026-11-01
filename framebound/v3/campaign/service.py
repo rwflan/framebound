@@ -34,7 +34,10 @@ class CommandSpecialist:
 def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, request=None, specialist=None):
     ledger = Ledger(root)
     if action == 'plan':
-        frozen = parse_campaign(config) if config is not None else mvp_curriculum(campaign)
+        if config is not None:frozen=parse_campaign(config)
+        else:
+            try:frozen=ledger.config(campaign)
+            except ValueError:frozen=mvp_curriculum(campaign)
         return ledger.plan(frozen)
     if action == 'inventory':
         from .inventory import inspect
@@ -66,7 +69,7 @@ def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, req
     if action in {'knowledge-build','knowledge-query'}:
         from . import knowledge
         if not request:raise ValueError('explicit dataset version required')
-        if action=='knowledge-build':return knowledge.build(root,campaign,version=request['version'])
+        if action=='knowledge-build':return knowledge.build(root,campaign,version=request['version'],dataset_version=request.get('dataset_version'))
         return knowledge.retrieve(root,campaign,version=request['version'],categories=request['categories'],
             exclude_families=request.get('exclude_families',()),limit=request.get('limit',3))
     if action == 'audit':

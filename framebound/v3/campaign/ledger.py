@@ -62,6 +62,15 @@ class Ledger:
         result = freeze(self.root, config)
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            registry={}
+            for stored in db.execute('SELECT config FROM campaigns'):
+                previous=parse_campaign(stored[0])
+                for case in previous.cases:
+                    for family in [case.family,*case.ancestry]:registry[family]=case.split
+            for case in config.cases:
+                for family in [case.family,*case.ancestry]:
+                    if family in registry and registry[family]!=case.split:
+                        raise ValueError('lifetime family/reference ancestry crosses splits')
             old = db.execute('SELECT config FROM campaigns WHERE id=?', (config.id,)).fetchone()
             if old and old['config'].encode() != canonical(config):
                 raise ValueError('campaign config changed')
@@ -90,6 +99,7 @@ class Ledger:
         config = self.config(campaign)
         if not evidence:
             raise ValueError('verified prices and account/access evidence required before funding')
+        credit=None
         if config.schema_version=='2.0':
             from datetime import datetime,timezone,timedelta
             if not isinstance(evidence,dict):raise ValueError('v2 requires structured current price/account evidence')
@@ -99,8 +109,12 @@ class Ledger:
                 raise ValueError('funding evidence must be verified within 24 hours')
             if not evidence.get('source') or not evidence.get('account_access'):
                 raise ValueError('price source and account/access evidence required')
-            if evidence.get('image_microdollars')!=config.prices.image_microdollars:
-                raise ValueError('verified image price differs from frozen quote; create a new campaign version')
+            if subsystem=='api':
+                if evidence.get('image_microdollars')!=config.prices.image_microdollars:
+                    raise ValueError('verified image price differs from frozen quote; create a new campaign version')
+            else:
+                from .compute_gate import CreditEvidence
+                credit=CreditEvidence.model_validate(evidence['credit'])
         elif not config.prices.verified_at:
             raise ValueError('verified prices and account/access evidence required before funding')
         if microdollars > getattr(config, subsystem + '_ceiling'):
@@ -109,6 +123,9 @@ class Ledger:
             db.execute('BEGIN IMMEDIATE')
             committed=db.execute('SELECT COALESCE(SUM(COALESCE(incurred,reserved)),0) FROM requests WHERE campaign=? AND subsystem=?',(campaign,subsystem)).fetchone()[0]
             if microdollars<committed: raise ValueError('funding cannot erase existing spend/reservations')
+            if credit is not None:
+                from .compute_gate import credit_capacity
+                if microdollars-committed>credit_capacity(credit):raise ValueError('allocation exceeds verified applicable credit or workspace usage capacity')
             db.execute(f'UPDATE campaigns SET {subsystem}_funding=? WHERE id=?', (microdollars, campaign))
             self._event(db, None, 'funding', dict(campaign=campaign, subsystem=subsystem, allocation=microdollars, evidence=evidence))
 

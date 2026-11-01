@@ -37,6 +37,10 @@ def png(image):
     stream=io.BytesIO();image.convert('RGBA').save(stream,format='PNG');return stream.getvalue()
 
 
+class AcquisitionRejected(ValueError):
+    """Known received media failed explicit isolation, before any candidate."""
+
+
 class Runner:
     def __init__(self, root, campaign, specialist):
         self.ledger=Ledger(root);self.root=Path(root).resolve();self.campaign=campaign
@@ -134,9 +138,13 @@ class Runner:
         extraction=None
         if declared_key:
             from ..intake import keyed
-            image,extraction=keyed(image)
-        normalized=write_derived(self.project,asset_id,image,[original_id],dict(operator='muse-source-to-png-v1',extraction=extraction,
-            source_format=source_format,orientation='explicit EXIF transpose',resampling='none',alpha='declared-key extraction' if extraction else 'preserved; no extraction'))
+            try:image,extraction=keyed(image)
+            except ValueError as exc:raise AcquisitionRejected(str(exc)) from exc
+        normalization=dict(operator='muse-source-to-png-v1',source_format=source_format,
+            orientation='explicit EXIF transpose',resampling='none',
+            alpha='declared-key extraction' if extraction else 'preserved; no extraction')
+        if extraction:normalization['extraction']=extraction
+        normalized=write_derived(self.project,asset_id,image,[original_id],normalization)
         self._save('canonical/sources',asset_id+'.png',S.blob_path(self.project,normalized.byte_sha256).read_bytes())
         return normalized,dict(operation='decode '+source_format+' and explicitly normalize orientation/RGBA to PNG',
             input_sha256=original_sha,output_sha256=normalized.byte_sha256)
@@ -205,7 +213,8 @@ class Runner:
             extractions=[]
             if 'DECLARED EXTRACTION KEY:' in case.request:
                 from ..intake import cell
-                extracted=[cell(frame) for frame in crops]
+                try:extracted=[cell(frame) for frame in crops]
+                except ValueError as exc:raise AcquisitionRejected(str(exc)) from exc
                 crops=[im for im,recipe in extracted];extractions=[recipe for im,recipe in extracted]
             if baseline:
                 local_scope=Scope(slots=[s-start for s in scope.slots if start<=s<start+count] or [0],roi=scope.roi)
@@ -225,8 +234,10 @@ class Runner:
             finally:con.close()
             for i,frame in enumerate(crops):
                 aid='native-'+rid[:32]+f'-{i}'
-                derived=write_derived(self.project,aid,frame,[source_id,*conditioning],dict(operator='campaign-crop-resize-composite-v1',
-                    canvas=[256,256],sheet_slot=i,global_slot=start+i,extraction=extractions[i] if extractions else None,scope=scope.model_dump() if scope else None,resampling='LANCZOS'))
+                derivation=dict(operator='campaign-crop-resize-composite-v1',canvas=[256,256],sheet_slot=i,
+                    global_slot=start+i,scope=scope.model_dump() if scope else None,resampling='LANCZOS')
+                if extractions:derivation['extraction']=extractions[i]
+                derived=write_derived(self.project,aid,frame,[source_id,*conditioning],derivation)
                 frame_ids.append(aid);event['output_asset_ids'].append(aid)
                 event['transformations'].append(dict(operation='declared crop, resize and authorized compositing' if baseline else 'declared crop and resize',
                     input_sha256=source_asset.byte_sha256,output_sha256=derived.byte_sha256))
@@ -345,11 +356,28 @@ class Runner:
             gate=local_path(self.root,f'campaigns/{self.campaign}/capabilities/long-sequences.json')
             if not gate.is_file() or json.loads(gate.read_text()).get('config_sha256')!=digest(self.config):
                 raise Stopped('long-sequence provider capability gate has not been recorded for this frozen config')
-        anchor_id,anchor=self._anchor(case)
-        if not progress['data'].get('base_revision'):
-            run_id,revision=self._materialize(case,anchor)
-            self.ledger.progress(self.campaign,case.id,state='canonicalized',data=dict(run_id=run_id,base_revision=revision))
-        else:run_id=progress['data']['run_id'];revision=progress['data']['base_revision']
+        try:
+            anchor_id,anchor=self._anchor(case)
+            if not progress['data'].get('base_revision'):
+                run_id,revision=self._materialize(case,anchor)
+                self.ledger.progress(self.campaign,case.id,state='canonicalized',data=dict(run_id=run_id,base_revision=revision))
+            else:run_id=progress['data']['run_id'];revision=progress['data']['base_revision']
+        except AcquisitionRejected as exc:
+            # The provider response is known and preserved. This rejects intake,
+            # not semantics, and never dispatches another attempt for this case.
+            failure=dict(case_id=case.id,error='ValueError',detail=str(exc))
+            self._save('reports','failure-'+digest([case.id,'intake'])+'.json',canonical(failure))
+            status=self.ledger.status(self.campaign)
+            requests=[r['id'] for r in status['requests'] if r['case_id']==case.id]
+            if not requests:
+                with self.ledger.db() as db:
+                    requests=[r[0] for r in db.execute("SELECT id FROM requests WHERE operation='anchor' AND json_extract(request,'$.family')=? AND state='received'",(case.family,))]
+            from ..intake import VERSION as intake_policy
+            result=dict(outcome='rejected',reason='Unsuitable acquisition rejected before semantic assessment',
+                failure_sha256=digest(failure),request_ids=requests,
+                intake=[dict(policy=intake_policy,eligible=False,reasons=[str(exc)],semantic_scope='Explicit source isolation; no semantic assessment')])
+            self.ledger.finish_case(self.campaign,case.id,'rejected',result)
+            return result
         from ..intake import inspect,PRINCIPLE
         frame_ids=loop.revision_get(self.project,revision)['revision']['frame_asset_ids']
         intake=[inspect(im) for im in self._frames(frame_ids)]
@@ -435,6 +463,8 @@ class Runner:
         with FileLock(str(self.folder/'coordinator.lock'),timeout=0):
             from .progression import admitted
             allowed=admitted(self.ledger,self.config)
+            known={cid:self.ledger.progress(self.campaign,cid)['result'] for cid in allowed}
+            rejected_intakes=sum(any(not i['eligible'] for i in (r or {}).get('intake',[])) for r in known.values())
             for case in self.config.cases:
                 if case.id not in allowed:continue
                 if self.ledger.status(self.campaign)['stopped']:break
@@ -444,6 +474,10 @@ class Runner:
                     processed+=1
                 try:
                     results[case.id]=self.case(case)
+                    if not known.get(case.id) and any(not i['eligible'] for i in results[case.id].get('intake',[])):
+                        rejected_intakes+=1
+                        if self.config.schema_version=='2.0' and rejected_intakes>len(allowed)*.25:
+                            self.ledger.stop(self.campaign);deferred[case.id]='Acquisition intake failures exceed 25% of the admitted cohort';break
                     gate=self.folder/'capabilities/long-sequences.json'
                     if not gate.exists():
                         evidence=[]

@@ -34,6 +34,12 @@ class CreditEvidence(Strict):
         return self
 
 
+def credit_capacity(credit):
+    # Modal's net spend limit applies after credits. A zero cash allowance still
+    # permits applicable credits; this experiment never authorizes uncovered cash.
+    return min(credit.available_microdollars,credit.workspace_remaining_microdollars)
+
+
 def admit(ledger,campaign,raw,job,study):
     from .transfer import inspect_payload
     from .study import verify_baseline
@@ -53,6 +59,7 @@ def admit(ledger,campaign,raw,job,study):
     baseline=verify_baseline(root,campaign,study['baseline_file'])
     if baseline['data_sha256']!=digest(shard) or baseline['categories']!=job.categories:
         raise ValueError('baseline differs from proposed compute experiment')
+    if not baseline['informative']:raise ValueError('paid compute requires an informative evaluated local baseline')
     credit=CreditEvidence.model_validate_json(local_path(root,study['credit_file']).read_bytes())
     rates=(credit.l4_microdollars_per_second,credit.l40s_microdollars_per_second,
            credit.cpu_microdollars_per_core_second,credit.ram_microdollars_per_gib_second)
@@ -62,7 +69,7 @@ def admit(ledger,campaign,raw,job,study):
         pending=db.execute("SELECT COALESCE(SUM(reserved),0) FROM requests WHERE subsystem='modal' AND incurred IS NULL").fetchone()[0]
         since_verification=db.execute("""SELECT COALESCE(SUM(incurred),0) FROM requests WHERE subsystem='modal' AND incurred IS NOT NULL
             AND EXISTS(SELECT 1 FROM events WHERE request_id=requests.id AND kind='wire_started' AND at>=?)""",(credit.verified_at.timestamp(),)).fetchone()[0]
-    if job.quote()+pending+since_verification>min(credit.available_microdollars,credit.workspace_remaining_microdollars,credit.net_spend_remaining_microdollars):
+    if job.quote()+pending+since_verification>credit_capacity(credit):
         raise ValueError('job and outstanding reservations exceed verified account availability')
     hypothesis=json.loads(local_path(root,study['hypothesis_file']).read_text())
     if set(hypothesis)!={'question','success_measure','stop_condition'} or not all(isinstance(v,str) and v.strip() for v in hypothesis.values()):

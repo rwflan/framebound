@@ -2,6 +2,7 @@
 import hashlib
 import json
 import time
+from pathlib import Path
 
 from .assessment import CATEGORIES
 from .contracts import canonical, digest, local_path
@@ -114,13 +115,20 @@ def profile(root,campaign,request):
     return save(root,campaign,'profile',report)
 
 
+def execution_sources():
+    folder=Path(__file__).resolve().parent
+    return {name:hashlib.sha256((folder/name).read_bytes()).hexdigest() for name in
+        ('learning.py','features.py','runner.py','assessment.py','specialists.py','advisory.py','knowledge.py')}
+
+
 def final_evidence(root,campaign,request):
     from .experiment import freeze_final,promotion
     from .ledger import Ledger,Stopped
     from .report import build
     ledger=Ledger(root);config=ledger.config(campaign)
     shard=read_features(root,request['feature_file'])
-    model=json.loads(local_path(root,request['model_file']).read_text())
+    model_raw=local_path(root,request['model_file']).read_bytes()
+    model=json.loads(model_raw)
     if model.get('engineering_only',True) or model.get('extractor')!=shard.extractor:
         raise Stopped('final policy requires a supported model with matching representation')
     if model['data_sha256']!=digest(shard) or model['recipe']!=recipe(shard.extractor):
@@ -138,6 +146,7 @@ def final_evidence(root,campaign,request):
     if not decision['promoted']:raise Stopped('; '.join(decision['reasons']))
     hashes={key:hashlib.sha256(local_path(root,request[key+'_file']).read_bytes()).hexdigest()
         for key in ('model','policy','prompts','preprocessing')}
+    if hashes['model']!=hashlib.sha256(model_raw).hexdigest():raise Stopped('model changed while freezing final policy')
     frozen=freeze_final(config,detector_sha256=hashes['model'],policy_sha256=hashes['policy'],
         prompts_sha256=hashes['prompts'],preprocessing_sha256=hashes['preprocessing'],evidence=dict(promotion_passed=True))
     knowledge_version=request.get('knowledge_version')
@@ -146,7 +155,7 @@ def final_evidence(root,campaign,request):
         from .knowledge import retrieve
         retrieve(root,campaign,version=knowledge_version,categories=model['categories'])
         knowledge_sha256=hashlib.sha256(local_path(root,f'campaigns/{campaign}/knowledge/{knowledge_version}.json').read_bytes()).hexdigest()
-    return dict(frozen=frozen,calibration=calibration,comparison=comparison,decision=decision,
+    return dict(frozen=frozen,execution_sources=execution_sources(),feature_data_sha256=digest(shard),calibration=calibration,comparison=comparison,decision=decision,
         artifact_files={key:request[key+'_file'] for key in hashes},artifact_hashes=hashes,
         knowledge_version=knowledge_version,knowledge_sha256=knowledge_sha256)
 
@@ -157,7 +166,9 @@ def verify_frozen(root,campaign):
     with ledger.db() as db:
         row=db.execute("SELECT evidence FROM knowledge_releases WHERE campaign=? AND stage='final'",(campaign,)).fetchone()
     if not row:raise ValueError('final evaluation is not released')
-    detail=json.loads(row[0])['detail']
+    release=json.loads(row[0]);detail=release['detail']
+    if release['config_sha256']!=digest(ledger.config(campaign)):raise ValueError('frozen final task configuration changed')
+    if detail.get('execution_sources')!=execution_sources():raise ValueError('frozen final execution sources changed')
     for key,relative in detail['artifact_files'].items():
         if hashlib.sha256(local_path(root,relative).read_bytes()).hexdigest()!=detail['artifact_hashes'][key]:
             raise ValueError('frozen final policy artifact changed')

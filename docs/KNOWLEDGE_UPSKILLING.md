@@ -58,8 +58,11 @@ color in the subject, and require generous margins. Native alpha is preserved;
 otherwise the existing declared-key extractor creates alpha. Source sheets,
 provider bytes, extraction recipes and raw crops remain intact. This is an
 extraction derivation, not a semantic pass. Historical white backgrounds are never
-silently erased. An extraction or malformed-sheet failure stops the batch before
-repeating the failing paid shape.
+silently erased. Known received sources that fail the declared key/isolation contract become
+negative acquisition records before semantic assessment. They never trigger
+another paid attempt. More than 25% intake failures stop the admitted cohort.
+Malformed provider schemas or wrong canvas/sheet dimensions stop the batch
+immediately before repeating the failing request shape.
 
 ## 3. Allocate and collect in bounded stages
 
@@ -80,7 +83,9 @@ current values):
 }
 ```
 
-Evidence expires after 24 hours for new allocations. A changed image price
+For a Modal allocation, use `subsystem: "modal"` and put the current structured
+credit evidence described below in `evidence.credit`; unrelated image prices are
+not required for compute funding. Evidence expires after 24 hours for new allocations. A changed image price
 requires a new frozen configuration rather than rewriting old quotes. Allocation
 cannot erase incurred cost or reservations. The initial API ceiling is $15 and
 Modal ceiling is $10; lifetime ceilings and previous bookings remain in effect.
@@ -143,17 +148,23 @@ negative. Weak weights are fixed at 0.5; corroborated weights are 1.0. Teacher
 confidence is not a calibrated loss weight. Repair variants share an opaque
 sequence ID and cannot inflate independent support counts.
 
-Final-test rows are excluded by default. Explicit `include_test: true` creates a
+The ledger also refuses to move a known family or reference ancestry into another
+split by creating a differently named campaign. Final-test rows are excluded by default. Explicit `include_test: true` creates a
 final-evaluation shard; local development studies and remote jobs reject it.
 
-`knowledge-build --request VERSION.json` derives entries only from eligible,
+`knowledge-build` takes a library `version` and optional closed `dataset_version`
+so a new knowledge policy can consume an existing immutable export. It derives
+entries only from eligible,
 split-safe training examples. Each retains observed/expected behavior,
 subject/part/frame/time/ROI scope, counterexamples, provenance, evidence hashes and
-linked correction experiences, including unsuccessful outcomes.
+linked correction experiences, including unsuccessful outcomes. Explicit assessed
+negatives become separate scoped counterexample records in knowledge schema v2,
+with unknown subject/ROI
+left unknown; clean examples never become invented defects or whole-clip passes.
 
 `knowledge-query` takes `version`, `categories`, optional `exclude_families` and
 `limit` (1–10). It revalidates the evidence closure on use and returns advisory
-entries; it does not create findings or authorize repairs. No validation or test
+entries and their local evidence root; it does not create findings or authorize repairs. No validation or test
 example enters the library.
 
 `advisory-set` selects a `knowledge_version` and/or `model_file`. A model selection
@@ -202,6 +213,7 @@ reasons without reserving funds or contacting Modal. Its request includes
 `feature_file`, pinned `image_digest`, `categories`, `purpose` (`profile`, `train`
 or `reproduce`), optional bounded resource allowances, and `study` paths.
 
+Every paid profile or training job requires an informative evaluated baseline.
 `study` names `local_profile_file`, `baseline_file`, `credit_file` and
 `hypothesis_file`. The hypothesis JSON has exactly `question`, `success_measure`
 and `stop_condition`, each with substantive text. Credit evidence contains:
@@ -216,7 +228,10 @@ and `stop_condition`, each with substantive text. Credit evidence contains:
 Account evidence must be refreshed within 24 hours. It is an explicit operator
 account declaration, not an authenticated provider balance attestation. Verified
 rates must match the versioned quote implementation. Outstanding reservations are
-included when checking available credit and limits.
+included when checking available credit and gross workspace limits. A zero net
+spend allowance permits jobs fully covered by applicable credit, as Modal defines
+net spend after credits. These experiments never authorize uncovered cash charges;
+a workspace net-spend cap of zero provides the external cash guard as well.
 
 `modal` takes `case_id` (an admitted accounting association), `feature_file`, the
 frozen `job` returned by planning and the same `study`. A training job additionally
@@ -260,7 +275,9 @@ Missing control arms remain visible and prevent promotion.
 `policy_file`, `prompts_file`, `preprocessing_file`, optional `previous_model_file`
 and `knowledge_version`. It independently recomputes model eligibility,
 calibration and saved repair-control evidence, then hashes the exact artifacts.
-All 160 final specifications remain frozen. Advice cannot be changed after final
+All 160 final specifications remain frozen. The actual generation/assessment,
+extractor, learner and advisory source files are also pinned; changing execution
+code blocks the frozen evaluation even when copied policy documents are unchanged. Advice cannot be changed after final
 release, and altered artifact bytes block final execution.
 
 `final-report` takes a final-evaluation `feature_file`. All 160 allocated outcomes

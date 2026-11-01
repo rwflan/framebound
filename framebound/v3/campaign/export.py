@@ -84,12 +84,23 @@ def validate(path):
     """Verify bytes, path closure, decode and preserve label masks on reload."""
     path=Path(path).resolve();manifest=json.loads((path/'manifest.json').read_text())
     if manifest.get('schema_version') not in {'animation-training-1.0','animation-training-2.0'}:raise ValueError('unsupported campaign label semantics')
-    families={}
+    lanes={'detection','editing','preference','sequence','failure'}
+    if manifest['schema_version']=='animation-training-2.0':lanes.add('acquisition')
+    if set(manifest['files'])!={lane+'.jsonl' for lane in lanes} or set(manifest['counts'])!=lanes:
+        raise ValueError('dataset manifest omits or invents an objective lane')
+    if manifest['categories']!=list(CATEGORIES):raise ValueError('unsupported dataset taxonomy')
+    families={};pixel_splits={}
     for filename,sha in manifest['files'].items():
         file=(path/filename).resolve()
         if not file.is_relative_to(path) or hashlib.sha256(file.read_bytes()).hexdigest()!=sha: raise ValueError('dataset hash mismatch')
-        for line in file.read_text().splitlines():
+        lines=file.read_text().splitlines()
+        count=manifest['counts'][filename.removesuffix('.jsonl')]
+        if type(count) is not int or count!=len(lines):raise ValueError('dataset manifest count differs from actual records')
+        identifiers=set()
+        for line in lines:
             row=json.loads(line)
+            if row['id'] in identifiers:raise ValueError('duplicate dataset record')
+            identifiers.add(row['id'])
             if row.get('human_acceptance') is not False or row.get('label_source')!=('execution' if filename=='acquisition.jsonl' else 'model'):
                 raise ValueError('campaign exports preserve model label semantics, never human acceptance')
             if filename=='acquisition.jsonl' and (row['frames'] or row['holds'] or row.get('training_eligible') is not False or row.get('kind')!='initial_acquisition_failure'):
@@ -100,14 +111,24 @@ def validate(path):
                 assessment=Assessment.model_validate(row['assessment']) if row.get('assessment') else None
                 expected=assessment.targets() if assessment else {c:dict(target=0,mask=False,slots=[],source='unknown') for c in CATEGORIES}
                 if row['labels']!=expected:raise ValueError('dataset labels differ from their actual assessment source')
-            if row['family'] in families and families[row['family']]!=row['split']: raise ValueError('dataset family leakage')
-            families[row['family']]=row['split']
+            for identity in [row['family'],*row.get('ancestry',[])]:
+                if identity in families and families[identity]!=row['split']:raise ValueError('dataset family leakage')
+                families[identity]=row['split']
+            for artifact in [*row['frames'],*row['conditioning']]:
+                if artifact['sha256'] in pixel_splits and pixel_splits[artifact['sha256']]!=row['split']:
+                    raise ValueError('dataset pixel/shared-input leakage')
+                pixel_splits[artifact['sha256']]=row['split']
             for artifact in [*row['frames'],*row['conditioning'],row['request'],*row.get('baseline_frames',[]),*row.get('provenance_artifacts',[])]:
                 file=(path/artifact['file']).resolve()
                 if not file.is_relative_to(path) or hashlib.sha256(file.read_bytes()).hexdigest()!=artifact['sha256']: raise ValueError('dataset closure mismatch')
             from PIL import Image
+            canvas=None
             for frame in row['frames']:
-                with Image.open(path/frame['file']) as image: image.verify()
+                with Image.open(path/frame['file']) as image:
+                    if canvas is not None and image.size!=canvas:raise ValueError('dataset native canvases differ')
+                    canvas=image.size;image.verify()
+            if filename=='detection.jsonl' and assessment:
+                assessment.validate_evidence(assessment.binding,row['holds'],canvas)
     return dict(ok=True,counts=manifest['counts'])
 
 
@@ -188,7 +209,7 @@ def export_campaign(root,campaign,*,version='1'):
             artifacts=[]
             for row in requests:
                 if row['state']=='received':
-                    _,receipt=ledger.artifact(row['id']);artifacts.append(str((folder/'originals'/receipt['sha256']).relative_to(root)))
+                    _,receipt=ledger.artifact(row['id']);artifacts.append(str(local_path(root,f"campaigns/{row['campaign']}/originals/{receipt['sha256']}").relative_to(root)))
             failures.append(dict(id=case.id,family=case.family,split=case.split,result=result,
                 request_file=str(request_path.relative_to(root)),provenance_files=artifacts))
         if not examples and not failures:return dict(status='no_generated_examples',exported=0)
