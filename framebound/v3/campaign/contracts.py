@@ -123,6 +123,16 @@ def digest(value) -> str:
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
+def parse_campaign(value) -> Campaign:
+    """Keep historical contracts byte-compatible; v2 has its own schema."""
+    if isinstance(value, (str, bytes)):
+        value = json.loads(value)
+    if value.get('schema_version') == '2.0':
+        from .curriculum import MVPCampaign
+        return MVPCampaign.model_validate(value)
+    return Campaign.model_validate(value)
+
+
 def curriculum(campaign_id='animation-v1') -> Campaign:
     cases = []
     actions = ['locomotion', 'acting', 'interaction', 'effects']

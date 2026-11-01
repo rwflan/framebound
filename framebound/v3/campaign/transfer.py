@@ -25,8 +25,8 @@ class FeatureRow(Strict):
 
     @model_validator(mode='after')
     def numeric_only(self):
-        if any(len(frame)!=8 or any(abs(v)>1000000 for v in frame) for frame in self.features):
-            raise ValueError('only the frozen eight derived measurements per native frame are allowed')
+        if any(len(frame) not in (8,20) or any(abs(v)>1000000 for v in frame) for frame in self.features):
+            raise ValueError('only frozen derived measurements per native frame are allowed')
         if any(t not in (0,1) for t in self.targets):
             raise ValueError('binary scoped labels required')
         if any(t and not m for t,m in zip(self.targets,self.assessed)):
@@ -34,20 +34,42 @@ class FeatureRow(Strict):
         return self
 
 
+class FeatureRowV2(FeatureRow):
+    sequence_id: str = Field(pattern=r'^[0-9a-f]{64}$')
+    category_weights: list[float] = Field(min_length=9,max_length=9)
+
+    @model_validator(mode='after')
+    def scoped_weights(self):
+        if any(w not in (.5, 1.) for w in self.category_weights):
+            raise ValueError('fixed weak or corroborated category weights required')
+        return self
+
+
 class FeatureShard(Strict):
-    schema_version: Literal['feature-only-1.0'] = 'feature-only-1.0'
-    extractor: Literal['native-numeric-v1'] = 'native-numeric-v1'
-    rows: list[FeatureRow] = Field(min_length=1,max_length=10000)
+    schema_version: Literal['feature-only-1.0','feature-only-2.0'] = 'feature-only-1.0'
+    extractor: Literal['native-numeric-v1','native-geometry-v2'] = 'native-numeric-v1'
+    rows: list[FeatureRowV2 | FeatureRow] = Field(min_length=1,max_length=10000)
 
     @model_validator(mode='after')
     def no_leakage(self):
         if len({r.case_id for r in self.rows}) != len(self.rows):
             raise ValueError('duplicate sequences')
         families = {}
+        sequences = {}
+        geometry = self.extractor == 'native-geometry-v2'
+        scoped=self.schema_version == 'feature-only-2.0'
+        if geometry and not scoped:
+            raise ValueError('extractor requires its exact versioned wire schema')
         for r in self.rows:
+            if any(len(f) != (20 if geometry else 8) for f in r.features) or isinstance(r,FeatureRowV2) != scoped:
+                raise ValueError('feature dimensions/row schema differ from the frozen extractor')
             if r.family_id in families and families[r.family_id] != r.split:
                 raise ValueError('family leakage across splits')
             families[r.family_id] = r.split
+            sequence = getattr(r,'sequence_id',r.case_id)
+            if sequence in sequences and sequences[sequence] != (r.family_id,r.split):
+                raise ValueError('sequence ancestry crosses families or splits')
+            sequences[sequence] = (r.family_id,r.split)
         return self
 
 
@@ -65,7 +87,7 @@ def preupload(shard: FeatureShard):
     inspect_payload(raw)
     return raw,dict(schema_version='feature-transfer-manifest-1.0',sha256=hashlib.sha256(raw).hexdigest(),
         bytes=len(raw),file_type='application/json',fields=list(FeatureShard.model_fields),
-        row_fields=list(FeatureRow.model_fields),rows=len(shard.rows),contains_pixels=False,
+        row_fields=list(type(shard.rows[0]).model_fields),rows=len(shard.rows),contains_pixels=False,
         limitation='Derived numeric features are information-bearing, private and not anonymous.')
 
 

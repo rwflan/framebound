@@ -89,4 +89,4 @@ The [local Muse corpus workflow](docs/MUSE_ANIMATION_CORPUS_PLAN.md) covers exte
 
 Code: MIT. Procedural demo art is original. Downloaded research references retain their recorded source licences and credits; they are not demo art or Muse-generated benchmark outputs. Publisher screenshots are research references, not an automatic generation or training grant.
 
-For staged generation, scoped model assessment, automatic correction and feature-only learning experiments, see [Local animation campaigns](docs/ANIMATION_CAMPAIGNS.md).
+For staged generation, scoped model assessment, automatic correction and feature-only learning experiments, see [Local animation campaigns](docs/ANIMATION_CAMPAIGNS.md). The [evidence-led learning workflow](docs/KNOWLEDGE_UPSKILLING.md) adds an MVP curriculum, private inventory, advisory experience library, geometry baselines and measured Modal admission gates.

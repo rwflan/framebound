@@ -20,16 +20,37 @@ RECIPE = dict(version='masked-feature-head-v1',learning_rate=0.05,steps=200,seed
     implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),unknown_loss='masked',features='native-numeric-v1',checkpoint_seconds=600)
 
 
+def recipe(extractor):
+    if extractor not in ('native-numeric-v1','native-geometry-v2'):
+        raise ValueError('unsupported feature extractor')
+    return RECIPE if extractor == 'native-numeric-v1' else dict(RECIPE,version='masked-geometry-head-v2',features=extractor)
+
+
+def category_weight(row, index):
+    return row.category_weights[index] if hasattr(row,'category_weights') else row.weight
+
+
+def sequence_id(row):
+    return getattr(row,'sequence_id',row.case_id)
+
+
 def eligibility(shard: FeatureShard, categories):
+    if len(set(categories)) != len(categories) or any(c not in CATEGORIES for c in categories):
+        raise ValueError('unique supported categories required')
     rows=[r for r in shard.rows if r.split=='train']
-    support={c:sum(r.weight>=0.9 and r.assessed[CATEGORIES.index(c)] and r.targets[CATEGORIES.index(c)]==1 for r in rows) for c in categories}
+    support={c:len({sequence_id(r) for r in rows if category_weight(r,CATEGORIES.index(c))>=.9
+        and r.assessed[CATEGORIES.index(c)] and r.targets[CATEGORIES.index(c)]==1}) for c in categories}
+    negatives={c:len({sequence_id(r) for r in rows if r.assessed[CATEGORIES.index(c)] and not r.targets[CATEGORIES.index(c)]}) for c in categories}
+    sequences=len({sequence_id(r) for r in rows})
     reasons=[]
-    if len(rows)<300: reasons.append('requires 300 distinct training sequences')
+    if sequences<300: reasons.append('requires 300 distinct training sequences')
     if len({r.family_id for r in rows})<75: reasons.append('requires 75 training families')
     for c,count in support.items():
         if count<30: reasons.append(f'{c}: requires 30 explicitly labeled positive sequences')
+        if negatives[c]<30: reasons.append(f'{c}: requires 30 assessed negative sequences')
     if not categories: reasons.append('no advertised learned categories')
-    return dict(eligible=not reasons,sequences=len(rows),families=len({r.family_id for r in rows}),positive_support=support,reasons=reasons)
+    return dict(eligible=not reasons,sequences=sequences,families=len({r.family_id for r in rows}),
+        positive_support=support,negative_support=negatives,reasons=reasons)
 
 
 def _design(features, model):
@@ -66,7 +87,7 @@ def fit(shard: FeatureShard, *, categories, model='linear', seed=0, steps=200, e
     masks=np.asarray([r.assessed for r in rows],dtype=float)
     included=np.asarray([c in categories for c in CATEGORIES],dtype=float)
     masks*=included
-    weights=np.asarray([r.weight for r in rows])[:,None]
+    weights=np.asarray([[category_weight(r,i) for i in range(9)] for r in rows])
     rng=np.random.default_rng(seed)
     w=rng.normal(0,0.01,(xs[0].shape[1],9));b=np.zeros(9)
     start=time.monotonic();last_checkpoint=start
@@ -88,13 +109,27 @@ def fit(shard: FeatureShard, *, categories, model='linear', seed=0, steps=200, e
             checkpoint(dict(step=step,weights=w.tolist(),bias=b.tolist(),seed=seed))
             last_checkpoint=time.monotonic()
     artifact=dict(schema_version='feature-detector-1.0',model=model,weights=w.tolist(),bias=b.tolist(),mean=mean.tolist(),scale=scale.tolist(),
-        categories=categories,seed=seed,steps=steps,recipe=RECIPE,data_sha256=digest(shard),engineering_only=engineering,
-        loss=loss,unsupported=['spatial ROI','severity','anatomy semantics without evaluated labels'])
+        categories=categories,seed=seed,steps=steps,recipe=recipe(shard.extractor),extractor=shard.extractor,data_sha256=digest(shard),engineering_only=engineering,
+        loss=loss,numpy_version=np.__version__,unsupported=['spatial ROI','severity','anatomy semantics without evaluated labels'])
     if checkpoint: checkpoint(dict(step=steps,artifact=artifact))
     return dict(status='trained',gate=gate,checkpoint=artifact)
 
 
 def predict(artifact, row):
+    if artifact.get('schema_version')=='temporal-convolution-1.0':
+        import torch
+        width=len(artifact['mean'])
+        if len(row.features[0])!=width:raise ValueError('prediction extractor differs from trained representation')
+        model=torch.nn.Sequential(torch.nn.Conv1d(width,32,3,padding=1),torch.nn.GELU(),torch.nn.Conv1d(32,9,1))
+        model.load_state_dict({k:torch.tensor(v) for k,v in artifact['weights'].items()});model.eval()
+        with torch.no_grad():
+            x=(np.asarray(row.features)-np.asarray(artifact['mean']))/np.asarray(artifact['scale'])
+            windows=torch.sigmoid(model(torch.tensor(x,dtype=torch.float32).T[None])).squeeze(0).T.numpy()
+        scores=windows.max(axis=0)
+        return dict(scores={c:float(scores[i]) if c in artifact['categories'] else None for i,c in enumerate(CATEGORIES)},
+            windows=windows.tolist(),roi=None,calibration='uncalibrated score; use held-out selective thresholds')
+    if len(row.features[0]) != len(artifact['mean']) // (4 if artifact['model']=='temporal' else 1):
+        raise ValueError('prediction extractor differs from trained representation')
     x=_design(row.features,artifact['model'])
     x=(x-np.asarray(artifact['mean']))/np.asarray(artifact['scale'])
     windows=_sigmoid(x@np.asarray(artifact['weights'])+np.asarray(artifact['bias']))
@@ -115,7 +150,7 @@ def family_precision_interval(scored,index,threshold):
     for row,score in scored:
         group=groups.setdefault(row.family_id,[0,0])
         if score>=threshold:group[0]+=row.targets[index];group[1]+=1
-    if len(groups)<2:return None
+    if sum(v[1]>0 for v in groups.values())<30:return None
     values=np.asarray(list(groups.values()),dtype=float)
     rng=np.random.default_rng(0)
     sampled=values[rng.integers(0,len(values),(1000,len(values)))].sum(axis=1)
@@ -126,6 +161,8 @@ def family_precision_interval(scored,index,threshold):
 
 def calibrate(artifact,shard: FeatureShard):
     rows=[r for r in shard.rows if r.split=='validation']
+    # One sequence contributes once to validation even when multiple repairs exist.
+    rows=list({sequence_id(r):r for r in sorted(rows,key=lambda r:r.case_id,reverse=True)}.values())
     metrics={}
     for c in artifact['categories']:
         i=CATEGORIES.index(c);assessed=[r for r in rows if r.assessed[i]]
@@ -135,13 +172,14 @@ def calibrate(artifact,shard: FeatureShard):
             positives=[r for r,s in scored if s>=threshold]
             tp=sum(r.targets[i] for r in positives);n=len(positives)
             negatives=[r for r in assessed if r.challenge and not r.targets[i]]
-            fp=sum(predict(artifact,r)['scores'][c]>=threshold for r in negatives)
+            fp=sum(score>=threshold for r,score in scored if r.challenge and not r.targets[i])
             interval=family_precision_interval(scored,i,threshold)
             curves.append(dict(threshold=threshold,precision=tp/n if n else None,precision_interval=interval,positive_support=n,
                 recall=tp/sum(r.targets[i] for r in assessed) if any(r.targets[i] for r in assessed) else None,
                 coverage=n/len(rows) if rows else 0,assessed_support=len(assessed),abstained=len(rows)-len(assessed),
+                positive_families=len({r.family_id for r in positives}),challenge_families=len({r.family_id for r in negatives}),
                 challenge_support=len(negatives),challenge_fpr=fp/len(negatives) if negatives else None))
-        eligible=[v for v in curves if v['positive_support']>=30 and v['precision_interval'] is not None and v['precision']>=0.9 and v['challenge_support']>=100 and v['challenge_fpr']<=0.05]
+        eligible=[v for v in curves if v['positive_support']>=30 and v['precision_interval'] is not None and v['precision_interval'][0]>=0.9 and v['challenge_support']>=100 and v['challenge_fpr']<=0.05]
         selected=max(eligible,key=lambda v:v['coverage']) if eligible else None
         metrics[c]=dict(selected=selected,curves=curves,status='eligible_for_comparison' if selected else 'insufficient_support_or_quality')
     return dict(split='validation_only',categories=metrics,promoted=False,
@@ -166,16 +204,19 @@ def fit_ranker(pairs, *, seed=0, steps=200):
         promoted=False,limitation='Validation calibration, untouched family evaluation and repair-control gates required')
 
 
-def train_temporal_torch(shard, *, categories, seed=0, steps=200, checkpoint=None, device=None):
+def train_temporal_torch(shard, *, categories, seed=0, steps=200, checkpoint=None, device=None, profile_only=False):
     """Optional trainable temporal convolution with masked sequence supervision."""
     gate=eligibility(shard,categories)
-    if not gate['eligible']: return dict(status='insufficient_support',gate=gate,checkpoint=None)
+    if not gate['eligible'] and not profile_only: return dict(status='insufficient_support',gate=gate,checkpoint=None)
+    if type(steps) is not int or not 1<=steps<=10000: raise ValueError('bounded positive training steps required')
     import torch
     torch.manual_seed(seed)
     torch.use_deterministic_algorithms(True)
     rows=[r for r in shard.rows if r.split=='train']
     device=device or ('cuda' if torch.cuda.is_available() else 'cpu')
-    frames=torch.zeros((len(rows),24,8),dtype=torch.float32,device=device)
+    if not rows: raise ValueError('profile/training requires training rows')
+    width=len(rows[0].features[0])
+    frames=torch.zeros((len(rows),24,width),dtype=torch.float32,device=device)
     valid=torch.zeros((len(rows),24),dtype=torch.bool,device=device)
     for n,row in enumerate(rows):
         frames[n,:len(row.features)]=torch.tensor(row.features,device=device)
@@ -186,8 +227,8 @@ def train_temporal_torch(shard, *, categories, seed=0, steps=200, checkpoint=Non
     targets=torch.tensor([r.targets for r in rows],dtype=torch.float32,device=device)
     assessed=torch.tensor([r.assessed for r in rows],dtype=torch.float32,device=device)
     assessed*=torch.tensor([c in categories for c in CATEGORIES],device=device)
-    assessed*=torch.tensor([r.weight for r in rows],device=device)[:,None]
-    model=torch.nn.Sequential(torch.nn.Conv1d(8,32,3,padding=1),torch.nn.GELU(),torch.nn.Conv1d(32,9,1)).to(device)
+    assessed*=torch.tensor([[category_weight(r,i) for i in range(9)] for r in rows],device=device)
+    model=torch.nn.Sequential(torch.nn.Conv1d(width,32,3,padding=1),torch.nn.GELU(),torch.nn.Conv1d(32,9,1)).to(device)
     optimizer=torch.optim.AdamW(model.parameters(),lr=0.001)
     started=time.monotonic();saved=started
     for step in range(steps):
@@ -203,7 +244,7 @@ def train_temporal_torch(shard, *, categories, seed=0, steps=200, checkpoint=Non
             saved=time.monotonic()
     artifact=dict(schema_version='temporal-convolution-1.0',weights={k:v.detach().cpu().tolist() for k,v in model.state_dict().items()},
         mean=mean.cpu().tolist(),scale=scale.cpu().tolist(),categories=categories,seed=seed,steps=step+1,
-        data_sha256=digest(shard),torch_version=torch.__version__,device=device,loss=float(loss.item()),seconds=time.monotonic()-started,
+        data_sha256=digest(shard),recipe=recipe(shard.extractor),recipe_sha256=digest(recipe(shard.extractor)),extractor=shard.extractor,engineering_only=profile_only,torch_version=torch.__version__,device=device,loss=float(loss.item()),seconds=time.monotonic()-started,
         unsupported=['ROI without patch labels','anatomical correctness without evaluation'])
     if checkpoint: checkpoint(dict(step=step+1,artifact=artifact))
     return dict(status='trained',gate=gate,checkpoint=artifact)
@@ -211,8 +252,9 @@ def train_temporal_torch(shard, *, categories, seed=0, steps=200, checkpoint=Non
 
 def experiment(root, campaign, shard: FeatureShard, *, categories):
     from .contracts import local_path
+    shard=shard.model_copy(update={'rows':[r for r in shard.rows if r.split!='test']})
     gate=eligibility(shard,categories)
-    folder=local_path(root,f'campaigns/{campaign}/checkpoints/{digest([digest(shard),digest(RECIPE)])}')
+    folder=local_path(root,f'campaigns/{campaign}/checkpoints/{digest([digest(shard),digest(recipe(shard.extractor))])}')
     folder.mkdir(parents=True,exist_ok=True)
     results=[]
     if gate['eligible']:
@@ -224,8 +266,8 @@ def experiment(root, campaign, shard: FeatureShard, *, categories):
                 (folder/filename).write_bytes(raw)
                 results.append(dict(model=model,seed=seed,sha256=hashlib.sha256(raw).hexdigest(),calibration=calibration))
     card=dict(schema_version='animation-model-card-1.0',status='evaluated_candidates' if results else 'insufficient_support',
-        gate=gate,recipe=RECIPE,data_sha256=digest(shard),results=results,promoted=False,
-        limitations=['Eight local numeric measurements have a limited semantic ceiling.',
+        gate=gate,recipe=recipe(shard.extractor),data_sha256=digest(shard),results=results,promoted=False,
+        limitations=['Derived geometry/appearance measurements do not establish anatomy or action semantics.',
             'No human-ground-truth accuracy claim.', 'Repair-controls and unseen-family evaluation required before promotion.'])
     (folder/'model-card.json').write_bytes(canonical(card))
     return dict(path=str(folder),card=card)

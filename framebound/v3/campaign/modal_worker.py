@@ -7,7 +7,7 @@ no mount, secret, corpus volume, provider client or generation entrypoint.
 from pathlib import Path
 
 from .contracts import digest
-from .learning import RECIPE
+from .learning import recipe
 from .remote import Job
 
 SOURCE_FILES=('__init__.py','contracts.py','assessment.py','transfer.py','remote.py','learning.py')
@@ -15,7 +15,7 @@ SOURCE_FILES=('__init__.py','contracts.py','assessment.py','transfer.py','remote
 
 def build(job: Job):
     import modal
-    if job.recipe_sha256!=digest(RECIPE): raise ValueError('unpinned training recipe')
+    if job.recipe_sha256 not in {digest(recipe(e)) for e in ('native-numeric-v1','native-geometry-v2')}: raise ValueError('unpinned training recipe')
     source=Path(__file__).resolve().parent
     image=modal.Image.from_registry('python:3.11-slim@'+job.image_digest).pip_install('numpy==2.4.0','pydantic==2.12.5','torch==2.9.0')
     # Parent package files are empty: no implicit source or local-directory copy.
@@ -29,27 +29,17 @@ def build(job: Job):
         timeout=job.seconds,startup_timeout=job.startup_seconds or 120,retries=0,min_containers=0,max_containers=1,
         env={'CUBLAS_WORKSPACE_CONFIG':':4096:8'},include_source=False,block_network=True,restrict_modal_access=True,single_use_containers=True)
     def worker(payload: bytes, job_data: dict):
-        from framebound.v3.campaign.learning import fit,train_temporal_torch,RECIPE
+        from framebound.v3.campaign.learning import fit,train_temporal_torch,recipe
         from framebound.v3.campaign.contracts import digest
         from framebound.v3.campaign.remote import Job,execute_pure
         def execute(shard,job,key):
-            if job.recipe_sha256!=digest(RECIPE): raise ValueError('recipe hash mismatch')
-            # Labels with sufficient support remain experimental until calibration.
-            from framebound.v3.campaign.assessment import CATEGORIES
-            from framebound.v3.campaign.learning import eligibility
+            if job.recipe_sha256!=digest(recipe(shard.extractor)):raise ValueError('recipe hash mismatch')
+            result=train_temporal_torch(shard,categories=job.categories,device='cuda',profile_only=job.purpose=='profile')
             if job.purpose=='profile':
-                import time,torch
-                started=time.monotonic()
-                values=torch.tensor([r.features[0] for r in shard.rows],dtype=torch.float32,device='cuda')
-                head=torch.nn.Linear(8,9,device='cuda')
-                for _ in range(100):head(values)
-                torch.cuda.synchronize()
-                return dict(status='profile_only',cases=len(shard.rows),elapsed_seconds=time.monotonic()-started,
-                    peak_vram_bytes=torch.cuda.max_memory_allocated(),promoted=False)
-            categories=[c for c in CATEGORIES if eligibility(shard,[c])['eligible']]
-            if not categories:raise ValueError('no supported learned categories')
-            return dict(linear=fit(shard,categories=categories),
-                        temporal=train_temporal_torch(shard,categories=categories),promoted=False)
+                import torch
+                return dict(status='profile_only',cases=len(shard.rows),steps=result['checkpoint']['steps'],
+                    training_seconds=result['checkpoint']['seconds'],peak_vram_bytes=torch.cuda.max_memory_allocated(),promoted=False)
+            return dict(temporal=result,promoted=False)
         return execute_pure(payload,Job.model_validate(job_data),execute)
     return app,worker
 

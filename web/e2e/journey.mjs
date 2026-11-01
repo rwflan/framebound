@@ -102,6 +102,7 @@ async function stopApi(proc, signal = 'SIGKILL') {
 async function main() {
   let apiProc = null;
   let browser = null;
+  let page = null;
   try {
     step = 'setup-project';
     const info = JSON.parse(runPy(['web/e2e/setup.py', PROJ]));
@@ -117,15 +118,15 @@ async function main() {
     step = 'launch-browser';
     browser = await chromium.launch();
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-    const page = await ctx.newPage();
+    page = await ctx.newPage();
     page.on('pageerror', (e) => { out.pageerror = String(e).slice(0, 300); });
 
     step='approve-references-in-browser';
     await page.goto(BASE+'/#/references',{waitUntil:'networkidle'});
     for (const character of info.characters) {
-      const proposal=page.locator('article').filter({has:page.getByRole('heading',{name:new RegExp(character)})});
-      await proposal.getByRole('button',{name:'Approve these references'}).click();
-      await proposal.getByRole('button',{name:'References approved'}).waitFor();
+      await page.getByRole('navigation',{name:'Reference guides'}).getByRole('button').filter({hasText:character}).click();
+      await page.getByRole('button',{name:'Approve references',exact:true}).click();
+      await page.getByRole('button',{name:'References approved',exact:true}).waitFor();
     }
     const reviewCookie = (await ctx.cookies(BASE + '/api')).find(c => c.name === 'fb_desk_review');
     assert(reviewCookie?.httpOnly && reviewCookie.sameSite === 'Strict', 'browser did not receive its automatic review cookie');
@@ -157,17 +158,18 @@ async function main() {
     const firstBundle=(await api('/api/packet/pkt-diff')).json;
     const flagged=firstBundle.evaluation.results.filter(c=>['fail','error','unmeasured'].includes(c.outcome)&&/^slot \d+$/.test(c.scope)).map(c=>Number(c.scope.slice(5)));
     const firstFlag=flagged.length?Math.min(...flagged):0;
-    assert(await page.locator('.candidate .reel-frame[aria-pressed=true]').getAttribute('aria-label')===`Candidate, frame ${firstFlag+1}`, 'initial selection is not the first errant frame');
-    await page.waitForFunction(()=>{
-      const frame=document.querySelector('.candidate .reel-frame.is-current .frame-aperture')?.getBoundingClientRect(), camera=document.querySelector('.reel-camera')?.getBoundingClientRect();
-      return frame&&camera&&Math.abs((frame.left+frame.right-camera.left-camera.right)/2)<2;
-    });
+    assert(await page.getByRole('button',{name:`Inspect candidate playback frame ${firstFlag+1}`,exact:true}).getAttribute('class').then(c=>c.includes('is-playhead')), 'initial selection is not the first errant frame');
+    await page.waitForFunction((slot)=>{
+      const reel=document.querySelector('.projector-reel:last-child');
+      const frame=reel?.querySelector(`.projector-cell[data-slot="${slot}"]:not([aria-hidden="true"])`)?.getBoundingClientRect(),camera=reel?.getBoundingClientRect();
+      return frame&&camera&&frame.width>0&&Math.abs((frame.left+frame.right-camera.left-camera.right)/2)<2;
+    },firstFlag);
 
     step = 'responsive-control-layout';
     for (const viewport of [{width:1280,height:900},{width:1218,height:1180},{width:940,height:1218},{width:768,height:1024},{width:390,height:844},{width:360,height:720}]) {
       await page.setViewportSize(viewport);
       await page.waitForFunction(() => {
-        const dock=document.querySelector('.review-controls');
+        const dock=document.querySelector('.film-transport');
         if (!dock) return false;
         const box=dock.getBoundingClientRect();
         const rects=[...dock.querySelectorAll('button,input')].map(el=>el.getBoundingClientRect()).filter(r=>r.width&&r.height);
@@ -177,8 +179,8 @@ async function main() {
     await page.setViewportSize({width:1280,height:900});
 
     step = 'film-camera-and-inline-evidence';
-    assert(await page.locator('.reel-lane').count() === 2, 'comparison lanes missing');
-    const stock = await page.locator('.reel-lane').first().evaluate(el => {
+    assert(await page.locator('.projector-reel').count() === 2, 'comparison lanes missing');
+    const stock = await page.locator('.projector-moving-stock').first().evaluate(el => {
       const s=getComputedStyle(el);
       return {mask:s.maskImage,composite:s.maskComposite,padding:parseFloat(s.paddingTop),color:s.backgroundColor,image:s.backgroundImage};
     });
@@ -191,7 +193,7 @@ async function main() {
     assert(await page.locator('.measurement-cell').count() === 8, 'per-frame measurement sheet missing');
     assert(await page.locator('.reel-stock .frame-measure').count() === 0, 'measurements must be outside the film stock');
     await page.getByRole('button', {name:'Zoom in',exact:true}).click();
-    await page.getByRole('button', {name:'Zoom 125%. Reset to 100%.',exact:true}).waitFor();
+    await page.getByRole('group',{name:'Image zoom'}).getByText('150%',{exact:true}).waitFor();
     const viewed = (await api('/api/packet/pkt-diff')).json;
     await page.getByRole('button', {name:'Request correction',exact:true}).click();
     await page.getByRole('dialog').getByLabel('Note', {exact:true}).fill('Unsaved review draft');
@@ -201,21 +203,17 @@ async function main() {
     const draftDialogs = await page.locator('dialog').evaluateAll(nodes => nodes.map(node => ({open:node.open, textarea:node.querySelector('textarea')?.value, title:node.querySelector('h2')?.textContent})));
     assert(draftDialogs.some(d => d.open && d.textarea === 'Unsaved review draft'), 'automatic update discarded review draft: ' + JSON.stringify(draftDialogs));
     await page.getByRole('dialog').getByRole('button',{name:'Close review',exact:true}).click();
-    assert(await page.locator('.zoom-value').textContent() === '125%', 'automatic update reset camera zoom');
+    assert(await page.getByRole('group',{name:'Image zoom'}).locator('output').textContent() === '150%', 'automatic update reset camera zoom');
 
-    await page.getByRole('button', {name:'Fit',exact:true}).click();
-    await page.waitForFunction(() => {
-      const camera = document.querySelector('.reel-camera'), track = document.querySelector('.reel-track');
-      return track && camera && track.getBoundingClientRect().width <= camera.clientWidth - 47;
-    });
-    await page.locator('.zoom-value').click();
-    await page.getByRole('button', {name:'Zoom 100%. Reset to 100%.',exact:true}).waitFor();
+    await page.getByRole('group',{name:'Image zoom'}).getByRole('button', {name:'Fit',exact:true}).click();
+    await page.getByRole('group',{name:'Image zoom'}).getByText('100%',{exact:true}).waitFor();
+    assert(await page.locator('.projector-art').first().evaluate(el=>el.style.transform.includes('scale(1)')),'fit did not reset image transform');
 
     step = 'assert-frame-media';
     await page.getByRole('button', { name: 'Open frame preview', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Play', exact: true }).click();
     await page.keyboard.press('Home'); // Home also pauses via the desk shortcut
-    const frameImg = page.locator('#frame-img');
+    const frameImg = page.locator('.projector-screen img[alt="Candidate playback"]');
     await frameImg.waitFor({ timeout: 15000 });
     const natural = await frameImg.evaluate((el) => ({ w: el.naturalWidth, h: el.naturalHeight, src: el.currentSrc }));
     assert(natural.w === 64 && natural.h === 64, `frame media is not the 64x64 asset: ${JSON.stringify(natural)}`);
@@ -431,6 +429,9 @@ report['decoded_batch_shape']=list(batch['chosen'][0][0].shape);print(json.dumps
 
     assert(!out.pageerror,`browser error: ${out.pageerror}`);
     step = 'done';
+  } catch(error) {
+    if(page){await page.screenshot({path:path.join(SHOTS,'failure.png')}).catch(()=>{});fs.writeFileSync(path.join(SHOTS,'failure.html'),await page.content().catch(()=>''));}
+    throw error;
   } finally {
     if (browser) await browser.close().catch(() => {});
     if (apiProc) await stopApi(apiProc).catch(() => {});
