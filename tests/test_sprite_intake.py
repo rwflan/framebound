@@ -57,6 +57,37 @@ def test_declared_rules_do_not_remove_nonuniform_scenery_or_wrong_key():
     im=Image.new('RGBA',(64,64),'#ff00ff');d=ImageDraw.Draw(im)
     d.rectangle((20,20,40,40),fill='blue');d.line((0,0,63,0),fill='white');d.rectangle((4,0,20,0),fill='green')
     with pytest.raises(ValueError):cell(im,declared_white_rules=True)
+
+
+def test_scaled_white_rule_antialiasing_keeps_subject_and_requires_white_seed():
+    sheet=Image.new('RGBA',(1920,1280),'#ff00ff');draw=ImageDraw.Draw(sheet)
+    draw.rectangle((0,0,1919,1279),outline='white',width=6)
+    for x in (640,1280):draw.rectangle((x-3,0,x+2,1279),fill='white')
+    draw.rectangle((0,637,1919,642),fill='white')
+    for slot in range(6):
+        x=slot%3*640;y=slot//3*640
+        draw.ellipse((x+200,y+200,x+440,y+440),fill='white')
+    original=sheet.tobytes()
+    for slot in range(6):
+        x=slot%3*640;y=slot//3*640
+        frame=sheet.crop((x,y,x+640,y+640)).resize((256,256),Image.Resampling.LANCZOS)
+        with pytest.raises(ValueError):cell(frame)
+        result,recipe=cell(frame,declared_white_rules=True)
+        assert inspect(result)['eligible'] and result.getpixel((128,128))==(255,255,255,255)
+        assert recipe['uniform_sheet_rules_removed'] and 'observed-white' in recipe['white_rule_edge_recipe']
+    assert sheet.tobytes()==original
+    pink=Image.new('RGBA',(64,64),'#ff00ff');d=ImageDraw.Draw(pink)
+    d.ellipse((20,20,40,40),fill='blue');d.rectangle((0,0,63,2),fill=(255,180,255,255))
+    with pytest.raises(ValueError):cell(pink,declared_white_rules=True)
+    # A nominally straight raster rule can vary by one pixel after resampling;
+    # every edge position still needs observed white within the bounded band.
+    varied=Image.new('RGBA',(64,64),'#ff00ff');d=ImageDraw.Draw(varied)
+    d.ellipse((20,20,40,40),fill='white')
+    for x in range(64):
+        varied.putpixel((x,0),(255,255,255,255) if x%2 else (248,180,247,255))
+        varied.putpixel((x,1),(248,180,247,255) if x%2 else (255,255,255,255))
+    result,recipe=cell(varied,declared_white_rules=True)
+    assert inspect(result)['eligible'] and result.getpixel((30,30))==(255,255,255,255)
     im=Image.new('RGBA',(64,64),'#b000b0');ImageDraw.Draw(im).ellipse((20,20,40,40),fill='white')
     with pytest.raises(ValueError):cell(im,declared_white_rules=True)
 
