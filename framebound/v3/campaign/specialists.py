@@ -10,7 +10,7 @@ import urllib.request
 import urllib.error
 
 from .contracts import canonical
-from .dispatch import Response, ProviderRejected
+from .dispatch import Response, ProviderRejected, ProviderObservationError
 from .ledger import ProviderPending
 
 
@@ -74,7 +74,9 @@ class MuseResponses:
         if not request['payload']['wire'].get('background'):
             raise ValueError('explicit frozen background request required')
         raw=self._post(request,timeout=timeout)
-        body=json.loads(raw);validate_acceptance(request,body)
+        try:body=json.loads(raw);validate_acceptance(request,body)
+        except (ValueError,TypeError) as error:
+            raise ProviderObservationError('Unverified provider acknowledgement retained',raw) from error
         # Commit identity before any polling. A restart may GET this ID, never
         # repeat creation. Failure before this acknowledgement remains unknown.
         on_acceptance(body)
@@ -90,8 +92,11 @@ class MuseResponses:
             with urllib.request.urlopen(req,timeout=max(1,min(30,deadline-time.monotonic()))) as response:
                 raw=response.read(64*1024**2+1)
             if len(raw)>64*1024**2:raise ValueError('provider response size ceiling')
-            body=json.loads(raw);validate_acceptance(request,body)
-            if body['id']!=acceptance['id']:raise ValueError('retrieved response identity differs')
+            try:
+                body=json.loads(raw);validate_acceptance(request,body)
+                if body['id']!=acceptance['id']:raise ValueError('retrieved response identity differs')
+            except (ValueError,TypeError) as error:
+                raise ProviderObservationError('Unverified retrieved response retained',raw) from error
             if body['status'] not in {'queued','in_progress'}:return self._result(request,raw)
             time.sleep(min(2,max(0,deadline-time.monotonic())))
         raise ProviderPending('Accepted response is still pending; retrieve later')

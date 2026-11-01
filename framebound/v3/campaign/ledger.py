@@ -375,8 +375,18 @@ class Ledger:
     def unknown(self, rid, reason):
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
-            db.execute("UPDATE requests SET state='unknown_provider_outcome',outcome=? WHERE id=? AND state='wire_started'", (reason,rid))
+            db.execute("UPDATE requests SET state='unknown_provider_outcome',outcome=? WHERE id=? AND state IN ('wire_started','provider_pending')", (reason,rid))
             self._event(db,rid,'unknown',dict(reason=reason))
+
+    def observe(self,rid,raw):
+        """Preserve unverified provider bytes without manufacturing a receipt."""
+        row=self.request(rid)
+        sha=hashlib.sha256(raw).hexdigest()
+        path=local_path(self.root,f"campaigns/{row['campaign']}/originals/observed-{sha}")
+        path.parent.mkdir(parents=True,exist_ok=True)
+        if path.exists() and path.read_bytes()!=raw:raise ValueError('provider observation differs')
+        if not path.exists():path.write_bytes(raw)
+        with self.db() as db:self._event(db,rid,'provider_observed',dict(sha256=sha,bytes=len(raw),verified=False))
 
     def cancel_reserved(self, rid, reason):
         with self.db() as db:

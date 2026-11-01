@@ -25,6 +25,12 @@ class ProviderRejected(Exception):
         super().__init__('Provider rejected the request before inference')
 
 
+class ProviderObservationError(ValueError):
+    def __init__(self,message,raw):
+        self.raw=raw
+        super().__init__(message)
+
+
 class Specialist(Protocol):
     def execute(self, request: dict, *, timeout: int) -> Response: ...
 
@@ -66,6 +72,10 @@ def dispatch(ledger: Ledger, request_id: str, specialist: Specialist):
             response=rejection.response
             return ledger.receive(request_id,response.raw,incurred=response.incurred,
                 successful_images=response.successful_images,provider_receipt=response.receipt)
+        except ProviderObservationError as error:
+            ledger.observe(request_id,error.raw)
+            ledger.unknown(request_id,'Unverified provider response preserved; reconcile before continuation')
+            raise
         except BaseException as error:
             known=ledger.request(request_id)['acceptance']
             if known and isinstance(error,(ProviderPending,OSError,TimeoutError)):

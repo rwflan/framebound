@@ -101,6 +101,8 @@ def test_mismatched_acknowledgement_never_becomes_a_receipt(tmp_path,monkeypatch
     saved=ledger.request(row['id'])
     assert saved['state']=='unknown_provider_outcome' and not saved['acceptance'] and not saved['receipt']
     assert saved['reserved']==10000
+    observations=list((tmp_path/'campaigns'/config.id/'originals').glob('observed-*'))
+    assert len(observations)==1 and observations[0].read_bytes()==canonical(body(**changes))
 
 
 def test_new_recipe_is_disjoint_and_old_v2_bytes_are_preserved():
