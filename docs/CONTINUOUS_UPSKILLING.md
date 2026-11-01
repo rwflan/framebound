@@ -85,6 +85,17 @@ authored tick bounds and require nonempty observed-scope limitations. Neither
 receipt replay nor intake/semantic validation changes. An earlier failed cohort
 stays failed; a new recipe must independently pass rehearsal and the full pilot.
 
+After a diagnosed sheet-rule failure, a new independent study may opt into
+`source_policy: declared-sheet-rules-v3`. Its frozen brief explicitly reserves
+uniform white outer cell-edge rules as technical separators, at most eight pixels
+after cell scaling, immediately followed by the declared magenta key. Only this
+policy permits their recorded removal. Nonuniform edges, wider mattes, wrong keys
+and interior boxes still fail; alpha/isolation thresholds are unchanged. Originals
+and transformations remain preserved. Anchor canvases have no separators. Teacher
+briefs explicitly tie every finding slot to overlapping authored ticks and list
+all required finding fields. Old rejected sources and quarantined answers are not
+reprocessed into passing outcomes; the new families start a separate rehearsal.
+
 ## 3. Execute fixed, restartable batches
 
 `campaign upskill-plan` reports the next admissible action without funding or

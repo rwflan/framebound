@@ -39,6 +39,27 @@ def test_only_uniform_sheet_rules_can_be_removed():
     d.rectangle((0,0,63,20),fill='white')
     with pytest.raises(ValueError):cell(im)
 
+
+def test_white_rules_require_explicit_source_contract_and_preserve_art():
+    im=Image.new('RGBA',(64,64),'#ff00ff');d=ImageDraw.Draw(im)
+    d.ellipse((20,20,40,40),fill='white');d.rectangle((0,0,63,63),outline='white',width=3)
+    with pytest.raises(ValueError):cell(im)
+    result,recipe=cell(im,declared_white_rules=True)
+    assert inspect(result)['eligible'] and result.getpixel((30,30))==(255,255,255,255)
+    assert result.getpixel((30,0))[3]==0 and recipe['white_sheet_rules_explicitly_declared']
+    assert im.getpixel((30,0))==(255,255,255,255) # original remains untouched
+    d.rectangle((0,0,63,8),fill='white') # nine-pixel matte is outside the contract
+    with pytest.raises(ValueError):cell(im,declared_white_rules=True)
+    with pytest.raises(ValueError):cell(Image.new('RGBA',(64,64),'white'),declared_white_rules=True)
+
+
+def test_declared_rules_do_not_remove_nonuniform_scenery_or_wrong_key():
+    im=Image.new('RGBA',(64,64),'#ff00ff');d=ImageDraw.Draw(im)
+    d.rectangle((20,20,40,40),fill='blue');d.line((0,0,63,0),fill='white');d.rectangle((4,0,20,0),fill='green')
+    with pytest.raises(ValueError):cell(im,declared_white_rules=True)
+    im=Image.new('RGBA',(64,64),'#b000b0');ImageDraw.Draw(im).ellipse((20,20,40,40),fill='white')
+    with pytest.raises(ValueError):cell(im,declared_white_rules=True)
+
 def test_input_gate_precedes_quality_and_blocks_historical_approval(tmp_path):
     p,spec,frames=setup(tmp_path)
     im=Image.new('RGBA',(8,8),'white');path=tmp_path/'bad.png';im.save(path);import_asset(p,str(path),'opaque',source_kind='generated')

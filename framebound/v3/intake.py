@@ -80,10 +80,10 @@ def keyed(image, key=(255,0,255)):
     return result,dict(operator='declared-border-key-v1',key=list(key),max_channel_distance=70,removed_pixels=int(mask.sum()),enclosed_key_pixels=enclosed,edge_unmatting='nearest clean subject sample within 4px; two-pixel boundary band',edge_pixels=corrected,residual_boundary_key_pixels=residual,policy=VERSION)
 
 
-def cell(image):
+def cell(image, *, declared_white_rules=False):
     """Remove at most eight uniform sheet-rule pixels at an outer cell edge.
 
-    Only a full, near-black straight rule is removable. Subject pixels and
+    Only a full, near-black straight rule (or explicitly declared white rule) is removable. Subject pixels and
     nonuniform scenery are never inferred as a rule. Alpha is still validated.
     """
     if inspect(image)['eligible']:return keyed(image)
@@ -100,9 +100,13 @@ def cell(image):
                 depth_to_key=depth;break
             # A complete straight dark/key-hued rule, allowing codec noise.
             reserved_hue=(rgb[:,1]<30)&(np.abs(rgb[:,0]-rgb[:,2])<25)
-            if reserved_hue.mean()<.98:break
+            # Earlier edge passes replace shared rule corners with the key.
+            white_or_key=(rgb>=235).all(axis=1)|(np.max(np.abs(rgb-np.array([255,0,255])),axis=1)<=70)
+            declared_white=declared_white_rules and white_or_key.mean()>=.98
+            if reserved_hue.mean()<.98 and not declared_white:break
         if depth_to_key is not None:
             for depth in range(depth_to_key):line_at(depth)[:]=[255,0,255,255];removed.append([edge,depth])
     result,recipe=keyed(Image.fromarray(a))
     recipe['uniform_sheet_rules_removed']=removed
+    if declared_white_rules:recipe['white_sheet_rules_explicitly_declared']=True
     return result,recipe

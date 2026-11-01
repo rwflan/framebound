@@ -29,7 +29,7 @@ class MVPCampaign(Campaign):
         default='synchronous-v1', exclude_if=lambda value: value == 'synchronous-v1')
     assessment_policy: Literal['legacy-v1', 'independent-coverage-v2'] = Field(
         default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
-    source_policy: Literal['legacy-v1', 'single-anchor-keyed-v2'] = Field(
+    source_policy: Literal['legacy-v1', 'single-anchor-keyed-v2', 'declared-sheet-rules-v3'] = Field(
         default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
 
     @model_validator(mode='after')
@@ -112,11 +112,12 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
     New family designs, transport and assessment recipe are frozen together.
     Historical v1/v2 defaults retain identical serialized bytes.
     """
-    if source_policy not in {'legacy-v1','single-anchor-keyed-v2'}:
+    if source_policy not in {'legacy-v1','single-anchor-keyed-v2','declared-sheet-rules-v3'}:
         raise ValueError('unknown frozen source policy')
     base=mvp_curriculum(campaign_id).model_dump(mode='json')
     namespace='u4-'+digest(['independent-upskilling-v4',campaign_id])[:10]
     if source_policy!='legacy-v1':namespace='u5-'+digest(['single-anchor-keyed-v2',campaign_id])[:10]
+    if source_policy=='declared-sheet-rules-v3':namespace='u6-'+digest([source_policy,campaign_id])[:10]
     designs={
         'character':('gardener','astronaut','chef','sailor','mountaineer','mechanic','courier','musician'),
         'animal':('otter','fox','badger','heron','tortoise','rabbit','gecko','puffin'),
@@ -141,7 +142,7 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
             'No floor, shadow, paper, scenery, checkerboard, simulated transparency, second actor, caption, border, grid rule or gutter. '
             'Neighboring cell backgrounds merge seamlessly. Local extraction creates the final alpha. '
             'Preserve the original identity, authored timing, fixed camera and topology across ordered poses.')
-        if source_policy=='single-anchor-keyed-v2':
+        if source_policy in {'single-anchor-keyed-v2','declared-sheet-rules-v3'}:
             case['request']=(f'Original isolated 2D {case["subject"]}: one {silhouette} {design}, '
                 f'distinctive {palette} palette. '
                 'SOURCE CONTRACT single-anchor-keyed-v2. DECLARED EXTRACTION KEY: opaque pure RGB(255,0,255) #FF00FF. '
@@ -153,6 +154,15 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
                 f'ANIMATION EXERCISE: {case["exercise"]} Complexity C{case["level"]}. '
                 f'Legitimate counterexample: {case["legitimate_counterexample"]} '
                 'Preserve identity, fixed camera, topology and authored timing across ordered poses.')
+        if source_policy=='declared-sheet-rules-v3':
+            case['request']=case['request'].replace('SOURCE CONTRACT single-anchor-keyed-v2.',
+                'SOURCE CONTRACT declared-sheet-rules-v3.').replace(
+                'No floor, shadow, paper, scenery, checkerboard, caption, border, grid or gutter.',
+                'No floor, shadow, paper, scenery, checkerboard or caption. '
+                'DECLARED TECHNICAL SHEET RULE: optional uniform pure white straight cell-edge rules, '
+                'at most 8 pixels wide after scaling a cell to 256x256; pure magenta must immediately follow each rule. '
+                'Rules are technical separators, never artwork. No white subject pixels may touch a cell edge. '
+                'Do not draw interior boxes, textured separators or a white matte.')
     base.update(transport='stream-images-v1',assessment_policy='independent-coverage-v2',api_ceiling=50000000)
     if source_policy!='legacy-v1':base['source_policy']=source_policy
     return MVPCampaign.model_validate(base)
