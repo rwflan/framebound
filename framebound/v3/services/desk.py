@@ -3,6 +3,7 @@ import json
 
 from ...v2 import storage as S
 from . import loop, tasks
+from .attention import run_needs_intervention
 
 
 def snapshot(project):
@@ -18,11 +19,16 @@ def snapshot(project):
             run['task']=specs[run['task_id']]
             run['interventions']=[m for m in marks if m['run_id']==run['id']]
             open_marks=[m for m in run['interventions'] if m['correction']['status'] not in {'resolved','cancelled'}]
-            run['needs_intervention']=run['lifecycle']!='cancelled' and (bool(open_marks) or run['lifecycle'] in {'blocked','awaiting_input','awaiting_decision'})
+            evaluated=con.execute('SELECT data FROM agent_evaluations WHERE id=?',('evaluation:'+str(run.get('current_revision_id')),)).fetchone()
+            run['needs_intervention']=run_needs_intervention(run,json.loads(evaluated[0]) if evaluated else None,open_marks)
         # One timeline includes local reviewer feedback, generated takes and approvals.
         from pathlib import Path
         if (Path(project)/'studio.sqlite3').exists():
             from . import studio
+            reviewed=studio.snapshot(project)
+            by_case={c['id']:c for c in reviewed['cases']}
+            for run in runs:
+                if run['id'] in by_case:run['needs_intervention']=by_case[run['id']]['needs_intervention']
             with studio.db(project) as review_con:
                 versions={v['id']:v for v in studio.all_rows(review_con,'versions')}
                 by_run={r['id']:r for r in runs}

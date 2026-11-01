@@ -55,3 +55,32 @@ def test_cancelled_run_leaves_unresolved_work_in_history_without_actionable_queu
     assert not data['runs'][0]['needs_intervention']
     assert data['runs'][0]['interventions'][0]['correction']['status']=='open'
     assert data['events'][-1]['event']=='cancelled'
+
+
+def test_routine_explicit_review_policy_does_not_create_an_intervention(tmp_path):
+    project,spec,good=setup(tmp_path)
+    tasks.create(project,dict(spec,id='explicit-task',animation_id='explicit-animation',intervention='explicit_review'))
+    loop.start(project,'explicit-task','explicit-run')
+    loop.submit(project,'explicit-run','explicit-good',good)
+    run=next(r for r in desk.snapshot(project)['runs'] if r['id']=='explicit-run')
+    assert run['lifecycle']=='awaiting_decision'
+    assert run['creative_status']=='unreviewed' and not run['needs_intervention']
+
+
+def test_detected_failures_still_need_intervention_without_a_manual_mark(tmp_path):
+    project,_,_=setup(tmp_path)
+    bad=import_frames(tmp_path,'failed',{'kind':'flicker'})
+    loop.submit(project,'run','failed',bad)
+    run=desk.snapshot(project)['runs'][0]
+    assert not run['interventions'] and run['needs_intervention']
+
+
+def test_only_blocking_missing_measurements_require_attention():
+    from framebound.v3.services.attention import evaluation_needs_intervention
+    clean=dict(technical_status='pass',coverage='complete',results=[])
+    assert not evaluation_needs_intervention(None)
+    assert not evaluation_needs_intervention(clean)
+    assert not evaluation_needs_intervention(dict(clean,results=[dict(outcome='unmeasured',required=False)]))
+    assert evaluation_needs_intervention(dict(clean,results=[dict(outcome='unmeasured',required=True)]))
+    assert evaluation_needs_intervention(dict(clean,coverage='partial'))
+    assert evaluation_needs_intervention(dict(clean,technical_status='error'))

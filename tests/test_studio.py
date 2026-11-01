@@ -199,3 +199,49 @@ def test_review_reason_retains_exclusion_instead_of_calling_it_an_animation_defe
     context=studio.review_context({},v,None,[],[])
     assert context['kind']=='excluded' and context['intake_reasons']==['background_present']
     assert context['technical_status']=='not_run' and context['findings']==[]
+
+
+def test_replacement_without_findings_is_browsable_without_an_intervention(tmp_path):
+    from framebound.v2.services.assets import import_asset
+    from framebound.v3.services import desk
+    p,_,_=setup(tmp_path)
+    matte=tmp_path/'matte.png';Image.new('RGBA',(8,8),'white').save(matte)
+    import_asset(p,str(matte),'matte',source_kind='procedural')
+    loop.submit(p,'run','excluded',['matte']*3)
+    c=studio.seed(p,'excluded');studio.allocate(p,100000)
+    assert studio.snapshot(p,c)['case']['needs_intervention']
+    assert desk.snapshot(p)['runs'][0]['needs_intervention']
+    studio.replace(p,REVIEWER,c,dict(id='new-isolated',version_id='excluded',category='character',description='A walking blue sprite'))
+    studio.drain(p,Fake())
+    view=studio.snapshot(p,c)
+    assert view['case']['status']=='review' and view['case']['review']['kind']=='unassessed'
+    assert not view['case']['needs_intervention']
+    assert not studio.snapshot(p)['cases'][0]['needs_intervention']
+    run=desk.snapshot(p)['runs'][0]
+    assert not run['needs_intervention']
+    assert run['current_revision_id']=='excluded'  # Frozen source history is intact.
+    assert desk.revision(p,'excluded')['evaluation']['technical_status']=='fail'
+    assert view['versions'][0]['review']['needs_intervention']
+    assert view['case']['current']!=view['versions'][0]['id']
+    studio.submit(p,REVIEWER,c,dict(id='human-issue',version_id=view['case']['current'],text='Correct the boots'))
+    assert studio.snapshot(p,c)['case']['needs_intervention']
+    assert desk.snapshot(p)['runs'][0]['needs_intervention']
+    studio.drain(p,Fake())
+    view=studio.snapshot(p,c)
+    assert view['case']['review']['kind']=='correction_review' and view['case']['needs_intervention']
+    studio.approve(p,REVIEWER,c,view['case']['current'])
+    assert not studio.snapshot(p,c)['case']['needs_intervention']
+    assert not desk.snapshot(p)['runs'][0]['needs_intervention']
+
+
+def test_unknown_feedback_acceptance_stays_actionable_and_reserved(tmp_path):
+    p,c=prepared(tmp_path)
+    assert not studio.snapshot(p,c)['case']['needs_intervention']
+    studio.submit(p,REVIEWER,c,dict(id='attention-unknown',version_id='base',text='Correct the hand'))
+    class Timeout:
+        def execute(self,*a,**kw):raise TimeoutError('lost response')
+    studio.drain(p,Timeout())
+    assert studio.snapshot(p,c)['case']['needs_intervention']
+    before=studio.snapshot(p)['budget'];fake=Fake();studio.drain(p,fake)
+    assert not fake.calls and studio.snapshot(p)['budget']==before
+    assert before['reserved']==10000
