@@ -90,6 +90,22 @@ requires a new frozen configuration rather than rewriting old quotes. Allocation
 cannot erase incurred cost or reservations. The initial API ceiling is $15 and
 Modal ceiling is $10; lifetime ceilings and previous bookings remain in effect.
 
+An operator can explicitly amend an API budget without changing the frozen
+curriculum, receipts or experiment configuration. `api-budget --request BUDGET.json`
+takes `microdollars` and `evidence` containing nonempty `source`, `reason`, and a
+timezone-aware `authorized_at`. This records an append-only authorization and
+does not allocate funds or send requests. The latest authorization caps aggregate
+API spend and outstanding reservations across **all campaigns in the private
+ledger**, including historical spend. Only the named campaign receives a release
+ceiling amendment; other campaigns retain their own ceilings, bounded by the
+aggregate cap. It cannot be set below already committed spend or exceed the $125
+hard limit. The cap is checked atomically at reservation, including against older
+larger allocations. `status.api_budget` reports the effective ceilings and remaining
+aggregate capacity. Separate `fund` with current account/rate evidence is still
+required. The amendment records user authorization; it is not a provider balance
+attestation. A $50 authorization uses `microdollars: 50000000`; preserve the actual
+operator authorization evidence privately rather than committing it.
+
 `run --muse --request BATCH.json` uses `{"max_cases": 1}` for one rehearsal case,
 or a bounded batch of 1–80 unfinished admitted cases. Without a batch request it
 visits the current admitted cohort. Completed cases replay without another send.
