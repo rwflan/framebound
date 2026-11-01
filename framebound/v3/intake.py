@@ -90,6 +90,15 @@ def cell(image, *, declared_white_rules=False):
     a=np.array(image.convert('RGBA'));removed=[]
     original_key=np.max(np.abs(a[:,:,:3].astype(int)-np.array([255,0,255])),axis=2)<=70
     if original_key.mean()<.1:raise ValueError('No substantial declared magenta surround; candidate withheld')
+    # A shared separator may be split by the crop: one edge contains only its
+    # antialiased half. Require an actual near-white rule in this same cell's
+    # bounded outer band, then use that evidence for its declared edge system.
+    observed_cell_rule=False
+    if declared_white_rules:
+        for band in (a[:8],a[-8:],a[:,:8].transpose(1,0,2),a[:,-8:].transpose(1,0,2)):
+            trim=min(8,band.shape[1]//4)
+            if trim and any((line[trim:-trim,:3]>=235).all(axis=1).mean()>=.98 for line in band):
+                observed_cell_rule=True
     for edge in ('top','bottom','left','right'):
         def line_at(depth):
             return a[depth] if edge=='top' else a[-1-depth] if edge=='bottom' else a[:,depth] if edge=='left' else a[:,-1-depth]
@@ -100,11 +109,13 @@ def cell(image, *, declared_white_rules=False):
             trim=min(8,len(rgb)//4)
             white_line=(rgb>=235).all(axis=1)
             white_seen=white_line if white_seen is None else white_seen|white_line
-            has_white_rule=bool(trim>0 and white_seen[trim:-trim].mean()>=.98)
+            has_white_rule=observed_cell_rule or bool(trim>0 and white_seen[trim:-trim].mean()>=.98)
             # Resampling a declared white rule against magenta creates a narrow
             # pink transition. Require observed white first, then accept only
             # that white/key color segment inside the existing eight-pixel band.
-            white_key_segment=(rgb[:,0]>=235)&(rgb[:,2]>=235)&(np.abs(rgb[:,0]-rgb[:,2])<=25)
+            # Use the existing declared-key channel tolerance for the key end
+            # of the segment; an accepted key need not decode as exact255.
+            white_key_segment=(rgb[:,0]>=185)&(rgb[:,2]>=185)&(np.abs(rgb[:,0]-rgb[:,2])<=70)
             # Orthogonal declared edge rules can cover the row's corners.
             # Only the bounded edge band is excluded from this inward-key test.
             declared_inward_key=(declared_white_rules and trim>0

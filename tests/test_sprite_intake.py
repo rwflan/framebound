@@ -88,6 +88,11 @@ def test_scaled_white_rule_antialiasing_keeps_subject_and_requires_white_seed():
         varied.putpixel((x,1),(248,180,247,255) if x%2 else (255,255,255,255))
     result,recipe=cell(varied,declared_white_rules=True)
     assert inspect(result)['eligible'] and result.getpixel((30,30))==(255,255,255,255)
+    split=Image.new('RGBA',(64,64),(240,0,216,255));d=ImageDraw.Draw(split)
+    d.ellipse((20,20,40,40),fill='white');d.rectangle((0,0,63,2),fill='white')
+    d.rectangle((0,63,63,63),fill=(228,77,225,255))
+    result,recipe=cell(split,declared_white_rules=True)
+    assert inspect(result)['eligible'] and result.getpixel((30,30))==(255,255,255,255)
     im=Image.new('RGBA',(64,64),'#b000b0');ImageDraw.Draw(im).ellipse((20,20,40,40),fill='white')
     with pytest.raises(ValueError):cell(im,declared_white_rules=True)
 
