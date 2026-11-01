@@ -19,6 +19,7 @@ from ...v2.services.provenance import write_derived
 from ..campaign.contracts import canonical,digest
 from ..campaign.specialists import MuseResponses,wire,extract_image
 from . import desk
+from .attention import evaluation_needs_intervention
 from ..intake import inspect as inspect_sprite, cell, PRINCIPLE
 
 class Stroke(Strict):
@@ -118,7 +119,7 @@ def review_context(case,version,evaluation,feedback,approvals):
                  evaluation_id=None,technical_status='not_run',coverage='not_assessed',findings=[],prior_issues=[])
     if evaluation and evaluation.get('revision_id')==version['id']:
         findings=[dict(check_id=r['id'],family=r['family'],outcome=r['outcome'],slots=r['slots'],
-                       reason=r['reason'],observed=r.get('observed'),expected=r.get('expected'),source=r['source'])
+                       reason=r['reason'],observed=r.get('observed'),expected=r.get('expected'),source=r['source'],required=r.get('required',True))
                   for r in evaluation['results'] if r['outcome'] in {'fail','unmeasured','error'}]
         context.update(evaluation_id=evaluation['id'],technical_status=evaluation['technical_status'],coverage=evaluation['coverage'],findings=findings)
         if findings:
@@ -157,6 +158,13 @@ def review_context(case,version,evaluation,feedback,approvals):
         context.update(kind='approved',label='Human approved',title='Human approval recorded',summary='A reviewer approved this exact take.',next_step='The accepted take and its history are saved in the local learning handoff.')
     if version.get('parent') is None and case.get('reason') not in {None,'Review animation','Isolated 2D replacement · review requested'}:
         context['requested_reason']=case['reason']
+    bound_evaluation=evaluation if evaluation and evaluation.get('revision_id')==version['id'] else None
+    pending=[f for f in feedback if f['case_id']==version.get('case_id') and not f.get('superseded_by')
+             and f['state'] in {'queued','generating','unknown','failed'}]
+    context['needs_intervention']=context['kind']!='approved' and (
+        context['kind']=='excluded' or evaluation_needs_intervention(bound_evaluation)
+        or bool(origin and not origin.get('replacement'))
+        or (case.get('current')==version['id'] and any(not f.get('replacement') or f['state'] in {'unknown','failed'} for f in pending)))
     return context
 
 def snapshot(project,case_id=None):
@@ -172,14 +180,18 @@ def snapshot(project,case_id=None):
                     if row:evaluations[v['id']]=json.loads(row[0])
         def explain(c,v):
             return review_context(c,v,evaluations.get(v['id']),feedback,approvals)
-        cases=[dict(c,review=explain(c,versions_by_id[c['current']]),thumbnail_url='/api/asset/'+versions_by_id[c['current']]['frames'][0] if c.get('intake',{}).get('eligible') else None) for c in raw_cases]
+        cases=[]
+        for c in raw_cases:
+            v=versions_by_id[c['current']];context=explain(c,v)
+            cases.append(dict(c,needs_intervention=context['needs_intervention'],review=context,
+                              thumbnail_url='/api/asset/'+v['frames'][0] if v.get('intake',{}).get('eligible') else None))
         if case_id:
             c=get(con,'cases',case_id)
             versions=[]
             for v in visible_versions:
                 shown=dict(v,intake=v.get('intake') or gate_frames(project,v['frames']),urls=['/api/asset/'+a for a in v['frames']])
                 shown['review']=explain(c,shown);versions.append(shown)
-            return dict(case=dict(c,review=explain(c,versions_by_id[c['current']])),versions=versions,feedback=[f for f in feedback if f['case_id']==case_id],approvals=[a for a in approvals if a['case_id']==case_id])
+            return dict(case=next(row for row in cases if row['id']==case_id),versions=versions,feedback=[f for f in feedback if f['case_id']==case_id],approvals=[a for a in approvals if a['case_id']==case_id])
         setting=con.execute("SELECT data FROM settings WHERE id='budget'").fetchone()
         budget=json.loads(setting[0]) if setting else dict(ceiling=0)
         sends=all_rows(con,'sends');reserved=sum(s['quote'] for s in sends if s['state'] in {'reserved','wire_started','unknown'})
