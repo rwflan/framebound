@@ -74,6 +74,17 @@ permission. A second execution is not human truth.
 Historical v1 and v2 configurations retain byte-identical serialized defaults;
 the new transport and assessment policies are explicit opt-ins.
 
+`plan-upskill` also accepts a request with `source_policy: single-anchor-keyed-v2`
+for a new independent study after diagnosed acquisition failures. This opt-in
+freezes disjoint families and separates the one-pose neutral anchor brief from
+the animation exercise. Every sheet brief specifies a central 256-square drawing
+region in each 512-square cell. Generation conditioning previews explicitly
+composite retained alpha onto the declared magenta key, recording that derivation;
+semantic teachers still receive original alpha frames. Teacher briefs supply the
+authored tick bounds and require nonempty observed-scope limitations. Neither
+receipt replay nor intake/semantic validation changes. An earlier failed cohort
+stays failed; a new recipe must independently pass rehearsal and the full pilot.
+
 ## 3. Execute fixed, restartable batches
 
 `campaign upskill-plan` reports the next admissible action without funding or

@@ -80,12 +80,19 @@ class Runner:
                 for original in images:
                     with Image.open(io.BytesIO(original)) as source:
                         preview=source.convert('RGBA');source_size=preview.size
+                        keyed_preview=getattr(self.config,'source_policy','legacy-v1')=='single-anchor-keyed-v2'
+                        if keyed_preview:
+                            backdrop=Image.new('RGBA',preview.size,(255,0,255,255))
+                            preview=Image.alpha_composite(backdrop,preview)
                         preview.thumbnail((256,256),Image.Resampling.LANCZOS)
                         rendered=png(preview)
                     previews.append(rendered)
                     derivations.append(dict(operator='conditioning-preview-256-v1',source_sha256=hashlib.sha256(original).hexdigest(),
                         source_size=source_size,output_sha256=hashlib.sha256(rendered).hexdigest(),output_size=preview.size,
                         resampling='LANCZOS; aspect ratio preserved; original retained'))
+                    if keyed_preview:
+                        derivations[-1]['alpha_backdrop']={'rgba':[255,0,255,255],
+                            'operator':'explicit-conditioning-key-backdrop-v1','purpose':'generation reference only; original alpha and bytes retained'}
                 request_wire=wire(model,text,previews)
                 request_wire.update(tools=payload['wire']['tools'],background=True,store=True,
                     metadata=dict(framebound_binding=digest([self.campaign,case.id,operation,attempt,sheet])))
@@ -129,9 +136,13 @@ class Runner:
             path.parent.mkdir(parents=True,exist_ok=True)
             path.write_bytes(canonical(dict(request_id=existing['id'],sha256=hashlib.sha256(image).hexdigest())))
             return existing['id'],image
-        rid,raw,receipt=self._call(case,'anchor',
-            'Create one original isolated design anchor for the declared entity graph; do not invent an actor for an effect-only graph. No existing character or source reference. '+case.request+' Style treatment: '+self.config.treatments[case.treatment]+' Graph: '+canonical(case.complexity).decode(),
-            image=True)
+        text='Create one original isolated design anchor for the declared entity graph; do not invent an actor for an effect-only graph. No existing character or source reference. '+case.request
+        if getattr(self.config,'source_policy','legacy-v1')=='single-anchor-keyed-v2':
+            text=('Draw exactly ONE original subject in ONE neutral pose, centered in ONE square canvas. '
+                'This is a single design reference: no animation, pose sequence, turnaround, contact sheet or duplicate subject. '
+                +case.request.split('ANIMATION EXERCISE:')[0])
+        text+=' Style treatment: '+self.config.treatments[case.treatment]+' Graph: '+canonical(case.complexity).decode()
+        rid,raw,receipt=self._call(case,'anchor',text,image=True)
         image=extract_image(raw)
         with Image.open(io.BytesIO(image)) as check: check.verify()
         path.parent.mkdir(parents=True,exist_ok=True)
@@ -209,6 +220,8 @@ class Runner:
             instruction+='\nReturn a row-major 3-by-2 sheet of six distinct square poses. Preserve original anchor identity; the last input boundary pose fixes continuity.'
             if self.config.schema_version=='2.0':
                 instruction+='\nLAYOUT: exactly THREE COLUMNS and TWO ROWS of equal square cells. Top row: poses 0,1,2. Bottom row: poses 3,4,5. No gutters, grid rules or labels. Keep the complete subject and generous magenta margins inside every cell.'
+            if getattr(self.config,'source_policy','legacy-v1')=='single-anchor-keyed-v2':
+                instruction+='\nAt 1536x1024, each cell is 512x512. Subject and prop must fit within local x=128..383, y=128..383 in EACH cell. All pixels outside those central bounds must be pure #FF00FF. The reference backdrop is the exact technical key, never a style sample. Draw one ordered pose per cell, six total.'
             if authority:
                 instruction+='\n'+authority['instruction']
                 if self.config.schema_version=='2.0':
@@ -302,6 +315,10 @@ class Runner:
         rubric=DIAGNOSIS_RUBRIC+(' Independent preservation audit: inspect each subject, legitimate deformation and event order without seeing another assessment.' if ordinal%2 else '')
         if getattr(self.config,'assessment_policy','legacy-v1')=='independent-coverage-v2':
             rubric+='\nUse the stable subject label primary actor for the sole original actor, and held prop for its prop. Inspect all nine categories; prioritize temporal and artifacts when applicable. Independently assess every supplied native frame. Negative coverage must list every actually assessed slot; abstain on unobserved scope. Do not invent a defect to balance classes. Do not invent an ROI or part when evidence only supports a whole actor or canvas observation. Preserve actual affected slots and tick ranges for positive findings; legitimate holds and smears remain counterexamples.'
+        if getattr(self.config,'source_policy','legacy-v1')=='single-anchor-keyed-v2':
+            context['tick_bounds']=dict(start=0,end_exclusive=sum(case.holds),
+                slots=[dict(slot=i,start=sum(case.holds[:i]),end_exclusive=sum(case.holds[:i+1])) for i in range(len(case.holds))])
+            rubric+='\nEvery coverage entry requires a nonempty limitations string describing actual observed scope. Tick ranges are authored ticks, not frame numbers or milliseconds: 0 <= start < end <= '+str(sum(case.holds))+'. Loop windows may wrap slots, but never extend a finding tick_range beyond this bound. If unsupported, abstain; do not clamp invented ranges.'
         text=rubric+'\nFor any assessed category, list actual native slots (0 to '+str(len(frames)-1)+'). No props or no extraction means not_assessed, not an empty-scope negative label. Include a visibility field in every finding.\nCoverage present means a DEFECT exists in that category, never that an entity or property exists. Every present category MUST have a corresponding localized finding. Explicitly include visibility=supported only when the pose and observations support a defect. Opaque backdrops do not establish extraction defects unless extraction was actually performed.\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
         rid,raw,receipt=self._call(case,'diagnose',text,[anchor,*[png(f) for f in frames]],attempt=ordinal,parents=[revision_id])
         response=json.loads(raw)

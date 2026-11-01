@@ -120,6 +120,19 @@ def test_new_recipe_is_disjoint_and_old_v2_bytes_are_preserved():
     assert canonical(parse_campaign(canonical(new)))==canonical(new)
 
 
+def test_single_anchor_recipe_is_frozen_disjoint_and_opt_in():
+    old=upskill_curriculum('same-study')
+    new=upskill_curriculum('same-study',source_policy='single-anchor-keyed-v2')
+    assert 'source_policy' not in old.model_dump(mode='json')
+    assert new.source_policy=='single-anchor-keyed-v2'
+    assert not {c.family for c in old.cases}&{c.family for c in new.cases}
+    assert len(protocol(new)['rehearsal'])==12
+    assert canonical(parse_campaign(canonical(new)))==canonical(new)
+    assert all('ANIMATION EXERCISE:' in c.request and 'outer QUARTER' in c.request for c in new.cases)
+    with pytest.raises(ValueError,match='unknown frozen source policy'):
+        upskill_curriculum('bad',source_policy='unguarded')
+
+
 def test_fixed_batch_resume_does_not_add_unattempted_cases(tmp_path,monkeypatch):
     config=mvp_curriculum('workflow-fixture');ledger=Ledger(tmp_path);ledger.plan(config)
     calls=[];pending_id=[]

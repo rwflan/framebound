@@ -29,6 +29,8 @@ class MVPCampaign(Campaign):
         default='synchronous-v1', exclude_if=lambda value: value == 'synchronous-v1')
     assessment_policy: Literal['legacy-v1', 'independent-coverage-v2'] = Field(
         default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
+    source_policy: Literal['legacy-v1', 'single-anchor-keyed-v2'] = Field(
+        default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
 
     @model_validator(mode='after')
     def protocol(self):
@@ -104,14 +106,17 @@ def protocol(config):
                 knowledge_mode='advisory; no automatic repair or acceptance authority')
 
 
-def upskill_curriculum(campaign_id):
+def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
     """Independent breadth/depth study, never a replacement for unknown attempts.
 
     New family designs, transport and assessment recipe are frozen together.
     Historical v1/v2 defaults retain identical serialized bytes.
     """
+    if source_policy not in {'legacy-v1','single-anchor-keyed-v2'}:
+        raise ValueError('unknown frozen source policy')
     base=mvp_curriculum(campaign_id).model_dump(mode='json')
     namespace='u4-'+digest(['independent-upskilling-v4',campaign_id])[:10]
+    if source_policy!='legacy-v1':namespace='u5-'+digest(['single-anchor-keyed-v2',campaign_id])[:10]
     designs={
         'character':('gardener','astronaut','chef','sailor','mountaineer','mechanic','courier','musician'),
         'animal':('otter','fox','badger','heron','tortoise','rabbit','gecko','puffin'),
@@ -136,5 +141,18 @@ def upskill_curriculum(campaign_id):
             'No floor, shadow, paper, scenery, checkerboard, simulated transparency, second actor, caption, border, grid rule or gutter. '
             'Neighboring cell backgrounds merge seamlessly. Local extraction creates the final alpha. '
             'Preserve the original identity, authored timing, fixed camera and topology across ordered poses.')
+        if source_policy=='single-anchor-keyed-v2':
+            case['request']=(f'Original isolated 2D {case["subject"]}: one {silhouette} {design}, '
+                f'distinctive {palette} palette. '
+                'SOURCE CONTRACT single-anchor-keyed-v2. DECLARED EXTRACTION KEY: opaque pure RGB(255,0,255) #FF00FF. '
+                'Background color is technical and independent of style: never darken, shade, texture or recolor it. '
+                'No key color in the subject. No floor, shadow, paper, scenery, checkerboard, caption, border, grid or gutter. '
+                'Keep every limb, accessory and held prop inside the central HALF of its own square cell; '
+                'the outer QUARTER on EACH of its four edges is uninterrupted pure magenta. '
+                'Local declared-key extraction creates real alpha; never simulate transparency. '
+                f'ANIMATION EXERCISE: {case["exercise"]} Complexity C{case["level"]}. '
+                f'Legitimate counterexample: {case["legitimate_counterexample"]} '
+                'Preserve identity, fixed camera, topology and authored timing across ordered poses.')
     base.update(transport='stream-images-v1',assessment_policy='independent-coverage-v2',api_ceiling=50000000)
+    if source_policy!='legacy-v1':base['source_policy']=source_policy
     return MVPCampaign.model_validate(base)

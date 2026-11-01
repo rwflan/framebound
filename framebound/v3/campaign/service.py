@@ -35,7 +35,7 @@ def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, req
     ledger = Ledger(root)
     if action == 'plan-upskill':
         from .curriculum import upskill_curriculum
-        return ledger.plan(upskill_curriculum(campaign))
+        return ledger.plan(upskill_curriculum(campaign,**(request or {})))
     if action in {'upskill-plan','upskill-step'}:
         from . import continuation
         if action=='upskill-plan':return continuation.plan(root,campaign)
