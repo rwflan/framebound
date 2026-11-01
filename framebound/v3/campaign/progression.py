@@ -34,7 +34,7 @@ def cohort_evidence(ledger,config,ids):
             intake_failed+=int(any(not i['eligible'] for i in result['intake']))
         rows.append(dict(case_id=cid,terminal=bool(result),result_sha256=digest(result)))
     status=ledger.status(config.id)
-    unknown=[r['id'] for r in status['requests'] if r['state'] in {'wire_started','unknown_provider_outcome'}]
+    unknown=[r['id'] for r in status['requests'] if r['state'] in {'wire_started','provider_pending','unknown_provider_outcome'}]
     received=[r for r in status['requests'] if r['case_id'] in ids and r['state']=='received']
     errors=[]
     for r in received:
@@ -111,7 +111,7 @@ def release(root,campaign,request):
             raise Stopped('concurrent expansion already released a selected case')
         # Recheck provider stops atomically with the new release.
         if db.execute('SELECT stopped FROM campaigns WHERE id=?',(campaign,)).fetchone()[0]:raise Stopped('campaign stopped')
-        if db.execute("SELECT 1 FROM requests WHERE campaign=? AND state IN ('wire_started','unknown_provider_outcome')",(campaign,)).fetchone():
+        if db.execute("SELECT 1 FROM requests WHERE campaign=? AND state IN ('wire_started','provider_pending','unknown_provider_outcome')",(campaign,)).fetchone():
             raise Stopped('provider outcomes need reconciliation')
         db.execute('INSERT INTO knowledge_releases(campaign,stage,cases,evidence,request) VALUES(?,?,?,?,?)',
             (campaign,stage_key,canonical(selected).decode(),canonical(value).decode(),canonical(request).decode()))

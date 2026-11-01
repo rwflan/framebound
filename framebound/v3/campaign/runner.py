@@ -28,7 +28,7 @@ from .dispatch import dispatch
 from .features import extract
 from .experiment import controls, paired_report
 from .repair import blind_assignment, decide
-from .ledger import Ledger, Stopped
+from .ledger import Ledger, ProviderPending, Stopped
 from .repair import Scope, Comparison, authorize, binding_in, composite, prepare_comparisons, record_comparison
 from .specialists import wire, extract_image, extract_text
 
@@ -75,8 +75,28 @@ class Runner:
             quote=self.config.prices.image_microdollars if image else math.ceil(tokens*1.25+output*4.25)
             payload=dict(provider='meta',requested_model=model,wire=request_wire,
                 input_token_ceiling=None if image else tokens,output_token_ceiling=None if image else output)
+            if image and getattr(self.config,'transport','synchronous-v1')=='background-images-v1':
+                previews=[];derivations=[]
+                for original in images:
+                    with Image.open(io.BytesIO(original)) as source:
+                        preview=source.convert('RGBA');source_size=preview.size
+                        preview.thumbnail((256,256),Image.Resampling.LANCZOS)
+                        rendered=png(preview)
+                    previews.append(rendered)
+                    derivations.append(dict(operator='conditioning-preview-256-v1',source_sha256=hashlib.sha256(original).hexdigest(),
+                        source_size=source_size,output_sha256=hashlib.sha256(rendered).hexdigest(),output_size=preview.size,
+                        resampling='LANCZOS; aspect ratio preserved; original retained'))
+                request_wire=wire(model,text,previews)
+                request_wire.update(tools=payload['wire']['tools'],background=True,store=True,
+                    metadata=dict(framebound_binding=digest([self.campaign,case.id,operation,attempt,sheet])))
+                payload.update(wire=request_wire,conditioning_derivations=derivations)
+                if len(canonical(request_wire))>1048576:
+                    raise ValueError('background conditioning exceeds 1 MiB; no request reserved or sent')
+            if hasattr(self.specialist,'preflight'):
+                self.specialist.preflight(dict(payload=payload))
             row=self.ledger.reserve(self.campaign,case.id,operation,payload,quote=quote,images=int(image),attempt=attempt,sheet=sheet,parents=parents)
-        if row['state']=='reserved': dispatch(self.ledger,row['id'],self.specialist)
+        if row['state'] in {'reserved','provider_pending'} or (row['state']=='wire_started' and row.get('acceptance')):
+            dispatch(self.ledger,row['id'],self.specialist)
         raw,receipt=self.ledger.artifact(row['id'])
         if not self.ledger.status(self.campaign)['stopped']:
             return row['id'],raw,receipt
@@ -274,6 +294,8 @@ class Runner:
         context=dict(request=case.request,binding=binding.model_dump(),subject_registry={'scene_canvas':'The whole native canvas; use subject_id=scene_canvas only for composition/canvas artifacts. For actor/part/prop identity, leave subject_id null and name the exact subject; never alias different entities.'},holds=case.holds,ticks_per_second=case.ticks_per_second,
             image_order='identity anchor, then ordered native frames',windows=temporal_windows(case.holds,loop=case.loop),measurement_proposals=features['proposals'],schema=Assessment.model_json_schema())
         rubric=DIAGNOSIS_RUBRIC+(' Independent preservation audit: inspect each subject, legitimate deformation and event order without seeing another assessment.' if ordinal%2 else '')
+        if getattr(self.config,'assessment_policy','legacy-v1')=='independent-coverage-v2':
+            rubric+='\nUse the stable subject label primary actor for the sole original actor, and held prop for its prop. Inspect all nine categories; prioritize temporal and artifacts when applicable. Independently assess every supplied native frame. Negative coverage must list every actually assessed slot; abstain on unobserved scope. Do not invent a defect to balance classes. Do not invent an ROI or part when evidence only supports a whole actor or canvas observation. Preserve actual affected slots and tick ranges for positive findings; legitimate holds and smears remain counterexamples.'
         text=rubric+'\nFor any assessed category, list actual native slots (0 to '+str(len(frames)-1)+'). No props or no extraction means not_assessed, not an empty-scope negative label. Include a visibility field in every finding.\nCoverage present means a DEFECT exists in that category, never that an entity or property exists. Every present category MUST have a corresponding localized finding. Explicitly include visibility=supported only when the pose and observations support a defect. Opaque backdrops do not establish extraction defects unless extraction was actually performed.\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
         rid,raw,receipt=self._call(case,'diagnose',text,[anchor,*[png(f) for f in frames]],attempt=ordinal,parents=[revision_id])
         response=json.loads(raw)
@@ -391,7 +413,8 @@ class Runner:
         for attempt in range(self.config.limits.repairs):
             targets=[f for f in a.findings if f.severity in {'material','critical'} and f.visibility=='supported']
             if not targets:
-                if attempt==0 and int(digest(case.id)[:8],16)%5==0:self._assess(case,run_id,revision,ordinal=1)
+                if attempt==0 and (getattr(self.config,'assessment_policy','legacy-v1')=='independent-coverage-v2'
+                        or int(digest(case.id)[:8],16)%5==0):self._assess(case,run_id,revision,ordinal=1)
                 if attempt==0:outcome='unchanged' if all(c.status=='absent_within_assessed_scope' for c in a.coverage) else 'ambiguous'
                 break
             independent=self._assess(case,run_id,revision,ordinal=attempt*2+1)
@@ -455,7 +478,7 @@ class Runner:
         self._save('comparisons',key+'.json',canonical(dict(rows=rows,assignment=assignment,comparison=comparison.model_dump(mode='json'))))
         return dict(rows=rows,comparison_id=key)
 
-    def run(self,*,max_cases=None):
+    def run(self,*,max_cases=None,case_ids=None):
         if max_cases is not None and (type(max_cases) is not int or not 1<=max_cases<=80):
             raise ValueError('bounded batch size must be 1..80')
         results={};deferred={};processed=0
@@ -463,10 +486,15 @@ class Runner:
         with FileLock(str(self.folder/'coordinator.lock'),timeout=0):
             from .progression import admitted
             allowed=admitted(self.ledger,self.config)
+            if case_ids is not None:
+                if (not isinstance(case_ids,list) or not 1<=len(case_ids)<=80 or len(set(case_ids))!=len(case_ids)
+                        or any(cid not in allowed for cid in case_ids)):
+                    raise ValueError('unique admitted case IDs required for a frozen batch')
+            selected=set(case_ids) if case_ids is not None else allowed
             known={cid:self.ledger.progress(self.campaign,cid)['result'] for cid in allowed}
             rejected_intakes=sum(any(not i['eligible'] for i in (r or {}).get('intake',[])) for r in known.values())
             for case in self.config.cases:
-                if case.id not in allowed:continue
+                if case.id not in selected:continue
                 if self.ledger.status(self.campaign)['stopped']:break
                 if max_cases is not None:
                     if self.ledger.progress(self.campaign,case.id)['result']:continue
@@ -490,6 +518,8 @@ class Runner:
                             if len(evidence)==2:
                                 enable_long_sequences(self.root,self.campaign,evidence)
                                 break
+                except ProviderPending as exc:
+                    deferred[case.id]=str(exc);break
                 except Stopped as exc:deferred[case.id]=str(exc)
                 except Exception as exc:
                     # One malformed schema/shape stops the batch before the same

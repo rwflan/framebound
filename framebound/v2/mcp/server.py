@@ -11,7 +11,7 @@ def build_server(project_dir: str) -> MCPServer:
     @server.tool(name='campaign_control', description='Local campaign plan/resume/status/stop/report/reserve; no implicit provider dispatch or funding')
     def campaign_control(root: str, action: str, campaign: str = 'animation-v1', config: dict | None = None, request: dict | None = None) -> dict:
         from ...v3.campaign.service import operate
-        if action in {'run','outbox','modal'}:raise ValueError('Use CLI for locally pinned specialist execution')
+        if action in {'run','outbox','modal','upskill-step'}:raise ValueError('Use CLI for locally pinned specialist execution')
         return operate(root, action, campaign=campaign, config=config, request=request)
 
     @server.tool(name='agent_handoff_export', description='Package a saved handoff and hashed native assets for an external agent without project access')

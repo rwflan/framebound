@@ -6,7 +6,7 @@ import subprocess
 from .contracts import canonical, local_path, parse_campaign
 from .curriculum import mvp_curriculum
 from .dispatch import Response, dispatch
-from .ledger import Ledger, Stopped
+from .ledger import Ledger, ProviderPending, Stopped
 
 
 class CommandSpecialist:
@@ -33,6 +33,17 @@ class CommandSpecialist:
 
 def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, request=None, specialist=None):
     ledger = Ledger(root)
+    if action == 'plan-upskill':
+        from .curriculum import upskill_curriculum
+        return ledger.plan(upskill_curriculum(campaign))
+    if action in {'upskill-plan','upskill-step'}:
+        from . import continuation
+        if action=='upskill-plan':return continuation.plan(root,campaign)
+        if not request:raise ValueError('explicit fixed batch and allocation request required')
+        return continuation.step(root,campaign,request,specialist)
+    if action == 'isolate-unknown':
+        if not request:raise ValueError('explicit unknown request and isolation evidence required')
+        return ledger.isolate_unknown(campaign,request['request_id'],request['evidence'])
     if action == 'plan':
         if config is not None:frozen=parse_campaign(config)
         else:
@@ -110,7 +121,7 @@ def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, req
         if specialist is None:
             raise ValueError('an explicitly configured specialist is required')
         from .runner import Runner
-        return Runner(root,campaign,specialist).run(max_cases=(request or {}).get('max_cases'))
+        return Runner(root,campaign,specialist).run(max_cases=(request or {}).get('max_cases'),case_ids=(request or {}).get('case_ids'))
     if action == 'outbox':
         if specialist is None:
             raise ValueError('an explicitly configured specialist is required; no generation is inferred')
@@ -121,9 +132,11 @@ def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, req
         # Single coordinator, bounded serial admission. Parallel adapters can claim
         # the same outbox safely; initial configured concurrency is an upper bound.
         for row in ledger.status(campaign)['requests']:
-            if row['state'] == 'reserved':
+            if row['state'] in {'reserved','provider_pending'}:
                 try:
                     completed.append(dispatch(ledger,row['id'],specialist))
+                except ProviderPending:
+                    return dict(completed=completed,pending=row['id'],status=ledger.status(campaign))
                 except Exception as exc:
                     ledger.stop(campaign)
                     return dict(completed=completed, stopped=True, reason=type(exc).__name__,
@@ -146,7 +159,7 @@ def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, req
 
 def register_cli(sub):
     parser = sub.add_parser('campaign', help='v3 local animation campaign controller')
-    parser.add_argument('action',choices=['plan','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal','audit','inventory','readiness','release','fund','api-budget','baseline','profile','ablation','knowledge-build','knowledge-query','final-report','advisory-set','compute-plan','quarantine'])
+    parser.add_argument('action',choices=['plan','plan-upskill','upskill-plan','upskill-step','isolate-unknown','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal','audit','inventory','readiness','release','fund','api-budget','baseline','profile','ablation','knowledge-build','knowledge-query','final-report','advisory-set','compute-plan','quarantine'])
     parser.add_argument('--root',required=True)
     parser.add_argument('--campaign',default='animation-mvp-v2-keyed')
     parser.add_argument('--config',help='Frozen config JSON file for plan')

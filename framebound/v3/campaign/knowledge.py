@@ -17,8 +17,11 @@ def build(root, campaign, *, version, dataset_version=None):
     examples=load(dataset)
     from .leakage import exclusions
     excluded=exclusions(examples,dataset)
+    from .ledger import Ledger
+    isolated=Ledger(root).isolated_families()
     for example in examples:
         row = example['metadata']
+        if isolated.intersection([row['family'],*row.get('ancestry',[])]):continue
         if row['id'] in excluded:continue
         if row['split'] != 'train' or not row.get('assessment') or any(r!='original' for r in row.get('rights',['unknown'])):
             continue
@@ -86,7 +89,10 @@ def retrieve(root,campaign,*,version,categories,exclude_families=(),limit=3):
     validate(dataset)
     manifest_sha=digest(json.loads((dataset/'manifest.json').read_text()))
     rows=[]
+    from .ledger import Ledger
+    isolated=Ledger(root).isolated_families()
     for e in library['entries']:
+        if e['family'] in isolated:continue
         if e['id']!=digest({k:v for k,v in e.items() if k!='id'}) or e['dataset_sha256']!=manifest_sha:
             raise ValueError('knowledge evidence identity mismatch')
         if e['category'] in categories and e['family'] not in exclude_families:

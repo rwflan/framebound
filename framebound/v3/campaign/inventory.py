@@ -96,7 +96,7 @@ def inspect(root, campaign=None):
             finding_categories=dict(defects), model_label_sources=dict(label_sources), intake=dict(intake),
             assessment_errors=assessment_errors, receipt_errors=receipt_errors, exports=exports,
             budgets=status['budgets'], stopped=status['stopped'],
-            unknown_requests=sum(r['state'] in {'wire_started', 'unknown_provider_outcome'} for r in status['requests']),
+            unknown_requests=sum(r['state'] in {'wire_started', 'provider_pending', 'unknown_provider_outcome'} for r in status['requests']),
             evidence_sha256=digest(sorted(evidence_hashes)),
             limitations=['Historical model labels are not independently authenticated ground truth.',
                          'Undeclared subject, rights and quality coverage remain unknown.',
