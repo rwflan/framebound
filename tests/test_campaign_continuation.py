@@ -18,11 +18,12 @@ def evidence():
                 account_access='Synthetic account authority',image_microdollars=10000)
 
 
-def background(tmp_path):
+def background(tmp_path,transport='background'):
     config=curriculum('engineering').model_copy(update={'prices':Prices(verified_at='fixture')})
     ledger=Ledger(tmp_path);ledger.plan(config);ledger.fund(config.id,'api',100000,evidence='Engineering fixture')
     case=next(c for c in config.cases if c.stage=='pilot')
     wire=dict(model='muse-image-1.0',background=True,store=True,metadata={'framebound_binding':'a'*64},input='Synthetic image request')
+    if transport=='stream':wire.pop('background');wire['stream']=True
     row=ledger.reserve(config.id,case.id,'generate',dict(wire=wire),quote=10000,images=1)
     return ledger,config,row
 
@@ -110,7 +111,7 @@ def test_new_recipe_is_disjoint_and_old_v2_bytes_are_preserved():
     assert 'transport' not in original and 'assessment_policy' not in original
     assert canonical(parse_campaign(original))==canonical(original)
     new=upskill_curriculum('independent-study')
-    assert new.transport=='background-images-v1' and new.assessment_policy=='independent-coverage-v2'
+    assert new.transport=='stream-images-v1' and new.assessment_policy=='independent-coverage-v2'
     assert not {c.family for c in new.cases}&{c.family for c in mvp_curriculum().cases}
     assert len(protocol(new)['rehearsal'])==12
     for family in {c.family for c in new.cases}:
@@ -215,6 +216,10 @@ def test_complete_step_closes_real_pipeline_and_replay_sends_nothing(tmp_path):
             original=self.execute(request,timeout=timeout);raw=json.loads(original.raw)
             raw.update(ack,status='completed')
             return Response(canonical(raw),original.incurred,original.successful_images,dict(original.receipt,response_id=rid))
+        def execute_stream(self,request,*,timeout,on_acceptance,on_observation):
+            result=self.execute_with_acceptance(request,timeout=timeout,on_acceptance=on_acceptance)
+            on_observation(result.raw)
+            return result
     config=upskill_curriculum('pipeline-fixture');ledger=Ledger(tmp_path);ledger.plan(config)
     specialist=BackgroundEngineering()
     request=dict(batch='pipeline-001',max_cases=2,allocation_microdollars=2000000,evidence=evidence())
@@ -276,3 +281,39 @@ def test_actual_validation_rejection_is_received_without_inventing_acceptance(tm
     assert json.loads(saved['receipt'])['provider']['not_accepted'] is True
     dispatch(ledger,row['id'],MuseResponses(key='engineering-only'))
     assert calls==['POST']
+
+
+def test_native_image_stream_saves_identity_before_terminal_and_keeps_transcript(tmp_path,monkeypatch):
+    import hashlib
+    ledger,config,row=background(tmp_path,transport='stream');calls=[]
+    ack=body('in_progress',background=False);done=body('completed',background=False)
+    first=b'data: '+canonical(dict(type='response.created',response=ack))+b'\n\n'
+    terminal=b'data: '+canonical(dict(type='response.completed',response=done))+b'\n\n'
+    class Stream(io.BytesIO):
+        def readline(self,*a):
+            if self.tell()>=len(first):assert ledger.request(row['id'])['acceptance']
+            return super().readline(*a)
+    def urlopen(req,timeout):calls.append(req.get_method());return Stream(first+terminal)
+    monkeypatch.setattr('urllib.request.urlopen',urlopen)
+    dispatch(ledger,row['id'],MuseResponses(key='engineering-only'))
+    receipt=json.loads(ledger.request(row['id'])['receipt'])
+    assert receipt['provider']['transport']=='responses-sse-v1'
+    sha=hashlib.sha256(first+terminal).hexdigest()
+    assert receipt['provider']['transcript_sha256']==sha
+    assert (tmp_path/'campaigns'/config.id/'originals'/('observed-'+sha)).read_bytes()==first+terminal
+    dispatch(ledger,row['id'],MuseResponses(key='engineering-only'))
+    assert calls==['POST']
+
+
+def test_interrupted_accepted_native_stream_uses_get_not_post(tmp_path,monkeypatch):
+    ledger,config,row=background(tmp_path,transport='stream');calls=[]
+    ack=body('in_progress',background=False)
+    first=b'data: '+canonical(dict(type='response.created',response=ack))+b'\n\n'
+    def urlopen(req,timeout):
+        calls.append(req.get_method())
+        return io.BytesIO(first if req.get_method()=='POST' else canonical(body('completed',background=False)))
+    monkeypatch.setattr('urllib.request.urlopen',urlopen)
+    with pytest.raises(ProviderPending):dispatch(ledger,row['id'],MuseResponses(key='engineering-only'))
+    assert ledger.request(row['id'])['state']=='provider_pending'
+    dispatch(Ledger(tmp_path),row['id'],MuseResponses(key='engineering-only'))
+    assert calls==['POST','GET']
