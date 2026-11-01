@@ -133,6 +133,15 @@ def test_single_anchor_recipe_is_frozen_disjoint_and_opt_in():
         upskill_curriculum('bad',source_policy='unguarded')
 
 
+def test_declared_rule_recipe_freezes_new_families_without_changing_v5():
+    old=upskill_curriculum('same-study',source_policy='single-anchor-keyed-v2')
+    new=upskill_curriculum('same-study',source_policy='declared-sheet-rules-v3')
+    assert not {c.family for c in new.cases}&{c.family for c in old.cases}
+    assert all('DECLARED TECHNICAL SHEET RULE:' in c.request for c in new.cases)
+    assert canonical(parse_campaign(canonical(new)))==canonical(new)
+    assert 'DECLARED TECHNICAL SHEET RULE:' not in old.cases[0].request
+
+
 def test_candidate_failures_share_source_acquisition_allowance():
     from types import SimpleNamespace
     from framebound.v3.campaign.progression import cohort_evidence
