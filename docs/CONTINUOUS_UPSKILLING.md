@@ -100,6 +100,8 @@ reuses the same cohort, consumes received results, and retrieves accepted pendin
 responses. It cannot silently select twenty additional cases. Completed step
 replays do not fund, call providers or re-export data. Changed step requests are
 rejected. CLI execution is required; HTTP cannot invoke a live specialist step.
+Generation provenance hashes the actual frozen paid brief, so changing the
+selected advisory library cannot rewrite a received repair's submission binding.
 
 After a diagnosed execution-contract fix, an explicitly resumed campaign can use
 a new batch with `recovery_of` naming its blocked parent. The configuration,

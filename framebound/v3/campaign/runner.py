@@ -218,6 +218,10 @@ class Runner:
                     instruction+='\nAdvisory experiences and scores (preserve the existing authorized scope): '+canonical(advice).decode()
             rid,response,receipt=self._call(case,operation,instruction,refs,attempt=attempt,sheet=sheet,image=True,
                 parents=[authority['baseline_revision_id']] if authority else [])
+            # A received request is replayed even when advisory knowledge has
+            # changed. Provenance must describe its actual frozen paid brief.
+            frozen_request=json.loads(self.ledger.request(rid)['request'])
+            actual_instruction=frozen_request['payload']['wire']['input'][0]['content'][0]['text']
             raw=extract_image(response);sha=S.store_blob(self.project,raw)
             source_id='sheet-'+rid[:32]
             source_asset,normalization=self._import_muse_media(raw,source_id)
@@ -245,7 +249,7 @@ class Runner:
             event=dict(id='generation-'+rid[:40],provider='meta',requested_model='muse-image-1.0',
                 observed_model=receipt['provider'].get('observed_model'),observed_version=receipt['provider'].get('observed_version'),
                 evidence_source='external_assertion',outcome='succeeded',response_id=receipt['provider'].get('response_id'),
-                request_id=rid,edit_parent_event_id=(loop.revision_get(self.project,authority['baseline_revision_id'])['revision']['generation_metadata']['provenance']['generations'][-1]['id'] if authority else None),prompt_sha256=hashlib.sha256(instruction.encode()).hexdigest(),conditioning=[],
+                request_id=rid,edit_parent_event_id=(loop.revision_get(self.project,authority['baseline_revision_id'])['revision']['generation_metadata']['provenance']['generations'][-1]['id'] if authority else None),prompt_sha256=hashlib.sha256(actual_instruction.encode()).hexdigest(),conditioning=[],
                 original_output_sha256=[sha],receipt_sha256=[receipt_sha,anchor_receipt_sha],output_asset_ids=[],transformations=[normalization])
             con=S.connect(self.project)
             try:
