@@ -123,9 +123,9 @@ async function main() {
     step='approve-references-in-browser';
     await page.goto(BASE+'/#/references',{waitUntil:'networkidle'});
     for (const character of info.characters) {
-      const proposal=page.locator('article').filter({has:page.getByRole('heading',{name:new RegExp(character)})});
-      await proposal.getByRole('button',{name:'Approve these references'}).click();
-      await proposal.getByRole('button',{name:'References approved'}).waitFor();
+      await page.getByRole('navigation',{name:'Reference guides'}).getByRole('button').filter({hasText:character}).click();
+      await page.getByRole('button',{name:'Approve references',exact:true}).click();
+      await page.getByRole('button',{name:'References approved',exact:true}).waitFor();
     }
     const reviewCookie = (await ctx.cookies(BASE + '/api')).find(c => c.name === 'fb_desk_review');
     assert(reviewCookie?.httpOnly && reviewCookie.sameSite === 'Strict', 'browser did not receive its automatic review cookie');
