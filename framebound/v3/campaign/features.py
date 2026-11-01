@@ -104,8 +104,11 @@ def collect(root,campaign,*,version='1',extractor=VERSION,include_test=False,dat
     examples=load(result['path'])
     from .leakage import exclusions
     excluded=exclusions(examples,Path(result['path']))
+    from .ledger import Ledger
+    isolated=Ledger(root).isolated_families()
     for example in examples:
         metadata=example['metadata']
+        if isolated.intersection([metadata['family'],*metadata.get('ancestry',[])]):continue
         if metadata['id'] in excluded:continue
         if metadata['split']=='test' and not include_test:continue
         if not metadata.get('rights') or any(r!='original' for r in metadata['rights']):continue

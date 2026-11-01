@@ -25,6 +25,10 @@ class MVPCampaign(Campaign):
     schema_version: Literal['2.0'] = '2.0'
     dataset_version: Literal['mvp-2'] = 'mvp-2'
     cases: list[MVPCase] = Field(min_length=1, max_length=800)
+    transport: Literal['synchronous-v1', 'background-images-v1'] = Field(
+        default='synchronous-v1', exclude_if=lambda value: value == 'synchronous-v1')
+    assessment_policy: Literal['legacy-v1', 'independent-coverage-v2'] = Field(
+        default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
 
     @model_validator(mode='after')
     def protocol(self):
@@ -98,3 +102,39 @@ def protocol(config):
                 final=[c.id for c in config.cases if c.split == 'test'],
                 initial_categories=['temporal', 'artifacts'],
                 knowledge_mode='advisory; no automatic repair or acceptance authority')
+
+
+def upskill_curriculum(campaign_id):
+    """Independent breadth/depth study, never a replacement for unknown attempts.
+
+    New family designs, transport and assessment recipe are frozen together.
+    Historical v1/v2 defaults retain identical serialized bytes.
+    """
+    base=mvp_curriculum(campaign_id).model_dump(mode='json')
+    namespace='u3-'+digest(['independent-upskilling-v3',campaign_id])[:10]
+    designs={
+        'character':('gardener','astronaut','chef','sailor','mountaineer','mechanic','courier','musician'),
+        'animal':('otter','fox','badger','heron','tortoise','rabbit','gecko','puffin'),
+        'figure':('wooden mannequin','jointed tin figure','origami figure','clay figure','cloth doll','beaded figure','carved puppet','wire figure'),
+        'object':('wind-up lantern','toy teapot','folding umbrella','walking toolbox','jointed desk lamp','rolling watering can','toy accordion','hinged telescope')}
+    colors=('teal','ochre','navy','cream','olive','rust','cobalt','scarlet','forest green','gold','slate','copper')
+    for case in base['cases']:
+        original_family=case['family'];n=int(digest([namespace,original_family])[:12],16)
+        case['family']=original_family.replace('mvp2',namespace)
+        case['id']=case['id'].replace('mvp2',namespace)
+        design=designs[case['subject']][n%8]
+        palette=colors[(n//8)%12]+' and '+colors[((n//96)%11+(n//8)%12+1)%12]
+        silhouette=('rounded','angular','compact','elongated')[(n//1056)%4]
+        case['request']=(f'Animate one original isolated 2D {case["subject"]}: a {silhouette} {design}, '
+            f'with a distinctive {palette} palette. {case["exercise"]} Complexity C{case["level"]}. '
+            f'Legitimate counterexample: {case["legitimate_counterexample"]} '
+            'SOURCE CONTRACT upskill-v3: render an OPAQUE source on one perfectly uniform background. '
+            'DECLARED EXTRACTION KEY: pure RGB(255,0,255), hex #FF00FF, including enclosed gaps. '
+            'Keep the key independent of the drawing style; no pink, dark purple, texture or gradients in the background. '
+            'No magenta in the subject. Fit the entire subject and held prop inside the central 60 percent of EVERY square pose cell, '
+            'leaving at least 20 percent empty key on all four edges. No clipped limbs, antennae, tails or accessories. '
+            'No floor, shadow, paper, scenery, checkerboard, simulated transparency, second actor, caption, border, grid rule or gutter. '
+            'Neighboring cell backgrounds merge seamlessly. Local extraction creates the final alpha. '
+            'Preserve the original identity, authored timing, fixed camera and topology across ordered poses.')
+    base.update(transport='background-images-v1',assessment_policy='independent-coverage-v2',api_ceiling=50000000)
+    return MVPCampaign.model_validate(base)

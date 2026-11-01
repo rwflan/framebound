@@ -46,7 +46,7 @@ def build(root,campaign):
     requests=status['requests']
     generation_requests=[r for r in requests if r['operation']=='generate']
     generated={r['case_id'] for r in generation_requests if r['receipt'] and json.loads(r['receipt'])['successful_images']>0}
-    unknown={r['case_id'] for r in requests if r['state'] in {'wire_started','unknown_provider_outcome'}}
+    unknown={r['case_id'] for r in requests if r['state'] in {'wire_started','provider_pending','unknown_provider_outcome'}}
     return dict(schema_version='animation-campaign-report-1.0',campaign=campaign,config_sha256=digest(config),phase=stage,
         denominators=dict(requested=len(released),generated=len(generated),canonicalized=sum(bool(ledger.progress(campaign,c.id)['data'].get('base_revision')) for c in released),
             assessed=sum(bool((ledger.progress(campaign,c.id)['result'] or {}).get('after_assessment') or (ledger.progress(campaign,c.id)['result'] or {}).get('assessment')) for c in released),

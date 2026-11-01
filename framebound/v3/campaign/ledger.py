@@ -21,6 +21,10 @@ class Stopped(ValueError):
     pass
 
 
+class ProviderPending(Stopped):
+    """Acceptance is durable; only a read of this response may continue it."""
+
+
 class Ledger:
     def __init__(self, root):
         self.root = Path(root).resolve()
@@ -43,9 +47,12 @@ class Ledger:
                 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, request_id TEXT, kind TEXT, at REAL, data TEXT);
                 CREATE TABLE IF NOT EXISTS api_budget_authorizations(id INTEGER PRIMARY KEY, campaign TEXT NOT NULL,
                     ceiling INTEGER NOT NULL, evidence TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS unknown_isolations(request_id TEXT PRIMARY KEY, evidence TEXT NOT NULL);
             ''')
             if 'progress' not in {r[1] for r in db.execute('PRAGMA table_info(cases)')}:
                 db.execute("ALTER TABLE cases ADD COLUMN progress TEXT NOT NULL DEFAULT '{}'")
+            if 'acceptance' not in {r[1] for r in db.execute('PRAGMA table_info(requests)')}:
+                db.execute('ALTER TABLE requests ADD COLUMN acceptance TEXT')
 
     @contextmanager
     def db(self):
@@ -172,6 +179,29 @@ class Ledger:
     def _event(self, db, request_id, kind, data):
         db.execute('INSERT INTO events(request_id,kind,at,data) VALUES(?,?,?,?)', (request_id, kind, time.time(), canonical(data).decode()))
 
+    def isolate_unknown(self, campaign, rid, evidence):
+        """Permanent research exclusion, never a receipt, cancellation or refund."""
+        if not isinstance(evidence,dict) or not all(isinstance(evidence.get(k),str) and evidence[k].strip()
+                                                  for k in ('source','reason')):
+            raise ValueError('explicit isolation source and reason required')
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT * FROM requests WHERE id=? AND campaign=?',(rid,campaign)).fetchone()
+            if not row or row['state']!='unknown_provider_outcome' or row['acceptance']:
+                raise ValueError('only an unresolved request without recoverable acceptance may be isolated')
+            raw=canonical(evidence).decode()
+            old=db.execute('SELECT evidence FROM unknown_isolations WHERE request_id=?',(rid,)).fetchone()
+            if old and old[0]!=raw:raise ValueError('unknown isolation evidence is immutable')
+            if not old:
+                db.execute('INSERT INTO unknown_isolations(request_id,evidence) VALUES(?,?)',(rid,raw))
+                self._event(db,rid,'unknown_isolated',evidence)
+            return dict(request_id=rid,state=row['state'],reserved=row['reserved'],incurred=row['incurred'],
+                research_excluded=True,retry_permitted=False,provider_outcome_resolved=False)
+
+    def isolated_families(self):
+        with self.db() as db:
+            return {r[0] for r in db.execute('SELECT c.family FROM unknown_isolations i JOIN requests r ON r.id=i.request_id JOIN cases c ON c.campaign=r.campaign AND c.id=r.case_id')}
+
     def reserve(self, campaign, case_id, operation, payload, *, quote, images=0, subsystem='api', attempt=0, parents=(), sheet=0):
         if type(quote) is not int or quote < 0 or type(images) is not int or images < 0 or subsystem not in {'api','modal'}:
             raise ValueError('nonnegative integer resource quote required')
@@ -212,7 +242,9 @@ class Ledger:
                 return dict(old)
             campaign_row = db.execute('SELECT * FROM campaigns WHERE id=?', (campaign,)).fetchone()
             case = db.execute('SELECT * FROM cases WHERE campaign=? AND id=?', (campaign,case_id)).fetchone()
-            unknown = db.execute("SELECT 1 FROM requests r JOIN cases c ON c.campaign=r.campaign AND c.id=r.case_id WHERE c.family=? AND r.state IN ('wire_started','unknown_provider_outcome')", (spec.family,)).fetchone()
+            families=[spec.family,*spec.ancestry]
+            placeholders=','.join('?' for _ in families)
+            unknown = db.execute(f"SELECT 1 FROM requests r JOIN cases c ON c.campaign=r.campaign AND c.id=r.case_id WHERE c.family IN ({placeholders}) AND r.state IN ('wire_started','provider_pending','unknown_provider_outcome')", families).fetchone()
             if case_id not in admitted(self,config,db):
                 raise Stopped('case is not in this release')
             if subsystem=='modal':
@@ -279,7 +311,7 @@ class Ledger:
             config = parse_campaign(db.execute('SELECT config FROM campaigns WHERE id=?',(row['campaign'],)).fetchone()[0])
             lane = "images>0" if row['images'] else "images=0 AND subsystem='api'" if row['subsystem']=='api' else "subsystem='modal'"
             limit = config.limits.generation_workers if row['images'] else config.limits.assessment_workers if row['subsystem']=='api' else config.limits.modal_workers
-            if db.execute(f"SELECT COUNT(*) FROM requests WHERE state IN ('wire_started','unknown_provider_outcome') AND {lane}").fetchone()[0]>=limit:
+            if db.execute(f"SELECT COUNT(*) FROM requests WHERE state IN ('wire_started','provider_pending','unknown_provider_outcome') AND {lane}").fetchone()[0]>=limit:
                 raise Stopped('configured concurrency ceiling')
             db.execute("UPDATE requests SET state='wire_started', permit=NULL WHERE id=?", (rid,))
             self._event(db,rid,'wire_started',{})
@@ -292,7 +324,7 @@ class Ledger:
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
             row = db.execute('SELECT * FROM requests WHERE id=?',(rid,)).fetchone()
-            if not row or row['state'] not in {'wire_started','unknown_provider_outcome','received'}:
+            if not row or row['state'] not in {'wire_started','provider_pending','unknown_provider_outcome','received'}:
                 raise Stopped('request has no possibly accepted send')
             receipt = dict(sha256=sha, incurred=incurred, successful_images=successful_images, provider=provider_receipt)
             if row['receipt']:
@@ -316,11 +348,45 @@ class Ledger:
             self._event(db,rid,'received',receipt)
         return receipt
 
+    def record_acceptance(self, rid, body):
+        from .specialists import validate_acceptance
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT * FROM requests WHERE id=?',(rid,)).fetchone()
+            if not row or row['state'] not in {'wire_started','provider_pending','unknown_provider_outcome'}:
+                raise Stopped('acceptance requires an existing possibly sent request')
+            validate_acceptance(json.loads(row['request']),body)
+            raw=canonical(body).decode()
+            if row['acceptance'] and row['acceptance'] != raw:
+                raise ValueError('initial provider acceptance is immutable')
+            if not row['acceptance']:
+                db.execute('UPDATE requests SET acceptance=? WHERE id=?',(raw,rid))
+                self._event(db,rid,'provider_accepted',dict(response_id=body['id'],acceptance_sha256=digest(body)))
+
+    def pending(self, rid, reason):
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT state,acceptance FROM requests WHERE id=?',(rid,)).fetchone()
+            if not row or not row['acceptance'] or row['state'] not in {'wire_started','provider_pending','unknown_provider_outcome'}:
+                raise Stopped('a pending read requires durable provider acceptance')
+            db.execute("UPDATE requests SET state='provider_pending',outcome=? WHERE id=?",(reason,rid))
+            self._event(db,rid,'provider_pending',dict(reason=reason))
+
     def unknown(self, rid, reason):
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
-            db.execute("UPDATE requests SET state='unknown_provider_outcome',outcome=? WHERE id=? AND state='wire_started'", (reason,rid))
+            db.execute("UPDATE requests SET state='unknown_provider_outcome',outcome=? WHERE id=? AND state IN ('wire_started','provider_pending')", (reason,rid))
             self._event(db,rid,'unknown',dict(reason=reason))
+
+    def observe(self,rid,raw):
+        """Preserve unverified provider bytes without manufacturing a receipt."""
+        row=self.request(rid)
+        sha=hashlib.sha256(raw).hexdigest()
+        path=local_path(self.root,f"campaigns/{row['campaign']}/originals/observed-{sha}")
+        path.parent.mkdir(parents=True,exist_ok=True)
+        if path.exists() and path.read_bytes()!=raw:raise ValueError('provider observation differs')
+        if not path.exists():path.write_bytes(raw)
+        with self.db() as db:self._event(db,rid,'provider_observed',dict(sha256=sha,bytes=len(raw),verified=False))
 
     def cancel_reserved(self, rid, reason):
         with self.db() as db:
@@ -339,7 +405,7 @@ class Ledger:
         # In-flight records and reservations remain intact. Never infer nonacceptance.
         with self.db() as db:
             db.execute('UPDATE campaigns SET stopped=0 WHERE id=?',(campaign,))
-            db.execute("UPDATE requests SET state='unknown_provider_outcome' WHERE campaign=? AND state='wire_started' AND lease_until<?",(campaign,time.time()))
+            db.execute("UPDATE requests SET state=CASE WHEN acceptance IS NULL THEN 'unknown_provider_outcome' ELSE 'provider_pending' END WHERE campaign=? AND state='wire_started' AND lease_until<?",(campaign,time.time()))
         return self.status(campaign)
 
     def finish_case(self, campaign, case_id, state, evidence):
@@ -347,7 +413,7 @@ class Ledger:
             raise ValueError('terminal result requires evidence')
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
-            pending = db.execute("SELECT 1 FROM requests WHERE campaign=? AND case_id=? AND state IN ('reserved','wire_started','unknown_provider_outcome')", (campaign,case_id)).fetchone()
+            pending = db.execute("SELECT 1 FROM requests WHERE campaign=? AND case_id=? AND state IN ('reserved','wire_started','provider_pending','unknown_provider_outcome')", (campaign,case_id)).fetchone()
             if pending:
                 raise Stopped('pending requests must retain their reservation and blocked status')
             row = db.execute('SELECT state,result FROM cases WHERE campaign=? AND id=?',(campaign,case_id)).fetchone()
@@ -373,12 +439,14 @@ class Ledger:
         config = self.config(campaign)
         with self.db() as db:
             states = {r[0]:r[1] for r in db.execute('SELECT state,COUNT(*) FROM cases WHERE campaign=? GROUP BY state',(campaign,))}
-            requests = [dict(r) for r in db.execute('SELECT id,case_id,operation,state,reserved,incurred,receipt FROM requests WHERE campaign=?',(campaign,))]
+            requests = [dict(r) for r in db.execute("SELECT id,case_id,operation,state,reserved,incurred,receipt,json_extract(acceptance,'$.id') AS provider_response_id FROM requests WHERE campaign=?",(campaign,))]
             budgets = {s:dict(incurred=sum(r['incurred'] or 0 for r in db.execute('SELECT incurred FROM requests WHERE campaign=? AND subsystem=?',(campaign,s))),
                 reserved=db.execute('SELECT COALESCE(SUM(reserved),0) FROM requests WHERE campaign=? AND subsystem=? AND incurred IS NULL',(campaign,s)).fetchone()[0]) for s in ('api','modal')}
             stopped = bool(db.execute('SELECT stopped FROM campaigns WHERE id=?',(campaign,)).fetchone()[0])
             api_budget = self._api_budget(db, config)
-        return dict(campaign=campaign, stopped=stopped, cases=states, budgets=budgets, requests=requests, api_budget=api_budget)
+            isolated=[r[0] for r in db.execute('SELECT i.request_id FROM unknown_isolations i JOIN requests r ON r.id=i.request_id WHERE r.campaign=?',(campaign,))]
+        return dict(campaign=campaign, stopped=stopped, cases=states, budgets=budgets, requests=requests, api_budget=api_budget,
+            isolated_unknown_requests=isolated)
 
     def progress(self, campaign, case_id, *, state=None, data=None):
         with self.db() as db:

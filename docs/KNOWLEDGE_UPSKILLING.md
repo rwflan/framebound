@@ -1,5 +1,8 @@
 # Evidence-led animation learning
 
+For durable provider acceptance, independent new-family curricula and fixed,
+resumable learning batches, see [Continuous upskilling](CONTINUOUS_UPSKILLING.md).
+
 Framebound now provides a versioned curriculum, a private evidence inventory,
 scoped supervision, an advisory experience library, richer geometry features,
 local baseline/ablation studies, and measured admission to feature-only Modal
