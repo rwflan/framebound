@@ -138,6 +138,16 @@ and rate evidence. The participant's aggregate authorization includes historical
 costs and unresolved reservations across all campaigns. No action resets spend.
 Release, funding and actual request reservation each retain their own checks.
 
+A received repair or blind-rerun source that fails strict isolation is retained
+as a candidate acquisition failure, without submitting or assessing that candidate.
+The valid baseline and its scoped labels remain intact; the failed repair stays
+ambiguous and its authority closes without approval. There is no replacement
+generation or comparator. Allocated control arms retain provider failure or
+explicitly missing outcomes rather than fabricated preferences. Source and
+candidate failures together must remain within the same 25% cohort acquisition
+allowance. Receipt/shape/schema errors still stop admission, and a blocked batch
+requires explicit diagnosis and exact-cohort recovery before continuation.
+
 Each completed batch closes an immutable dataset, generates matched numeric and
 geometry features, saves baseline support reports and verifies a train-only
 advisory library. The library is selected only for already authorized correction
