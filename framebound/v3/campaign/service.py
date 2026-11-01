@@ -57,6 +57,9 @@ def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, req
         if not request:raise ValueError('explicit allocation and account evidence required')
         ledger.fund(campaign,request['subsystem'],request['microdollars'],evidence=request['evidence'])
         return ledger.status(campaign)
+    if action == 'api-budget':
+        if not request:raise ValueError('explicit API ceiling and operator authorization required')
+        return ledger.authorize_api_budget(campaign,request['microdollars'],evidence=request['evidence'])
     if action in {'baseline','profile','ablation','final-report','compute-plan'}:
         from . import study
         if not request:raise ValueError('explicit local study request required')
@@ -143,7 +146,7 @@ def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, req
 
 def register_cli(sub):
     parser = sub.add_parser('campaign', help='v3 local animation campaign controller')
-    parser.add_argument('action',choices=['plan','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal','audit','inventory','readiness','release','fund','baseline','profile','ablation','knowledge-build','knowledge-query','final-report','advisory-set','compute-plan','quarantine'])
+    parser.add_argument('action',choices=['plan','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal','audit','inventory','readiness','release','fund','api-budget','baseline','profile','ablation','knowledge-build','knowledge-query','final-report','advisory-set','compute-plan','quarantine'])
     parser.add_argument('--root',required=True)
     parser.add_argument('--campaign',default='animation-mvp-v2-keyed')
     parser.add_argument('--config',help='Frozen config JSON file for plan')

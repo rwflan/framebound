@@ -41,6 +41,8 @@ class Ledger:
                     reserved INTEGER NOT NULL, incurred INTEGER, images INTEGER NOT NULL,
                     state TEXT NOT NULL, permit TEXT, lease_until REAL, receipt TEXT, outcome TEXT);
                 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, request_id TEXT, kind TEXT, at REAL, data TEXT);
+                CREATE TABLE IF NOT EXISTS api_budget_authorizations(id INTEGER PRIMARY KEY, campaign TEXT NOT NULL,
+                    ceiling INTEGER NOT NULL, evidence TEXT NOT NULL);
             ''')
             if 'progress' not in {r[1] for r in db.execute('PRAGMA table_info(cases)')}:
                 db.execute("ALTER TABLE cases ADD COLUMN progress TEXT NOT NULL DEFAULT '{}'")
@@ -117,10 +119,11 @@ class Ledger:
                 credit=CreditEvidence.model_validate(evidence['credit'])
         elif not config.prices.verified_at:
             raise ValueError('verified prices and account/access evidence required before funding')
-        if microdollars > getattr(config, subsystem + '_ceiling'):
-            raise ValueError('allocation exceeds frozen release ceiling')
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            ceiling = self._api_budget(db, config)['campaign_ceiling'] if subsystem == 'api' else config.modal_ceiling
+            if microdollars > ceiling:
+                raise ValueError('allocation exceeds frozen release ceiling or explicit budget authorization')
             committed=db.execute('SELECT COALESCE(SUM(COALESCE(incurred,reserved)),0) FROM requests WHERE campaign=? AND subsystem=?',(campaign,subsystem)).fetchone()[0]
             if microdollars<committed: raise ValueError('funding cannot erase existing spend/reservations')
             if credit is not None:
@@ -128,6 +131,43 @@ class Ledger:
                 if microdollars-committed>credit_capacity(credit):raise ValueError('allocation exceeds verified applicable credit or workspace usage capacity')
             db.execute(f'UPDATE campaigns SET {subsystem}_funding=? WHERE id=?', (microdollars, campaign))
             self._event(db, None, 'funding', dict(campaign=campaign, subsystem=subsystem, allocation=microdollars, evidence=evidence))
+
+    def _api_budget(self, db, config):
+        latest = db.execute('SELECT ceiling FROM api_budget_authorizations ORDER BY id DESC LIMIT 1').fetchone()
+        amendment = db.execute('SELECT ceiling FROM api_budget_authorizations WHERE campaign=? ORDER BY id DESC LIMIT 1', (config.id,)).fetchone()
+        lifetime_ceiling = latest['ceiling'] if latest else 125000000
+        campaign_ceiling = min(lifetime_ceiling, amendment['ceiling'] if amendment else config.api_ceiling)
+        committed = db.execute("SELECT COALESCE(SUM(COALESCE(incurred,reserved)),0) FROM requests WHERE subsystem='api'").fetchone()[0]
+        return dict(campaign_ceiling=campaign_ceiling, lifetime_ceiling=lifetime_ceiling,
+                    lifetime_committed=committed, lifetime_remaining=lifetime_ceiling-committed)
+
+    def authorize_api_budget(self, campaign, ceiling, *, evidence):
+        """Append an explicit operator amendment; never mutate frozen science or reset spend.
+
+        The latest authorization caps aggregate API spend across every campaign in
+        this private ledger. Only its named campaign receives a ceiling amendment.
+        Allocation and live pricing evidence remain separate requirements.
+        """
+        from datetime import datetime, timezone
+        if type(ceiling) is not int or not 0 <= ceiling <= 125000000:
+            raise ValueError('API ceiling must be integer microdollars within the lifetime hard limit')
+        if not isinstance(evidence, dict) or any(not isinstance(evidence.get(k), str) or not evidence[k].strip()
+                                               for k in ('source', 'reason', 'authorized_at')):
+            raise ValueError('explicit operator authorization source, reason and timestamp required')
+        authorized = datetime.fromisoformat(evidence['authorized_at'])
+        if authorized.tzinfo is None or authorized > datetime.now(timezone.utc):
+            raise ValueError('authorization timestamp must be timezone-aware and not in the future')
+        config = self.config(campaign)
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            previous = self._api_budget(db, config)
+            if ceiling < previous['lifetime_committed']:
+                raise ValueError('API ceiling cannot erase existing spend or reservations')
+            db.execute('INSERT INTO api_budget_authorizations(campaign,ceiling,evidence) VALUES(?,?,?)',
+                       (campaign, ceiling, canonical(evidence).decode()))
+            self._event(db, None, 'api_budget_authorized', dict(campaign=campaign, ceiling=ceiling,
+                previous=previous, evidence=evidence))
+            return self._api_budget(db, config)
 
     def _event(self, db, request_id, kind, data):
         db.execute('INSERT INTO events(request_id,kind,at,data) VALUES(?,?,?,?)', (request_id, kind, time.time(), canonical(data).decode()))
@@ -199,7 +239,10 @@ class Ledger:
             lifetime = db.execute('SELECT COALESCE(SUM(COALESCE(incurred,reserved)),0) FROM requests WHERE subsystem=?', (subsystem,)).fetchone()[0]
             if total + quote > campaign_row[subsystem+'_funding']:
                 raise Stopped('unfunded or release budget exhausted')
-            if lifetime + quote > (125000000 if subsystem == 'api' else 100000000):
+            api_budget = self._api_budget(db, config) if subsystem == 'api' else None
+            if api_budget and total + quote > api_budget['campaign_ceiling']:
+                raise Stopped('authorized API campaign ceiling exhausted')
+            if lifetime + quote > (api_budget['lifetime_ceiling'] if api_budget else 100000000):
                 raise Stopped('lifetime spending ceiling, including unresolved reservations')
             successful = db.execute("SELECT COALESCE(SUM(CASE WHEN receipt IS NOT NULL THEN json_extract(receipt,'$.successful_images') ELSE images END),0) FROM requests WHERE state!='cancelled'").fetchone()[0]
             attempts = db.execute("SELECT COALESCE(SUM(images),0) FROM requests WHERE state!='cancelled'").fetchone()[0]
@@ -327,14 +370,15 @@ class Ledger:
             raise Stopped('disk quota/free-space guard; originals are preserved')
 
     def status(self, campaign):
-        self.config(campaign)
+        config = self.config(campaign)
         with self.db() as db:
             states = {r[0]:r[1] for r in db.execute('SELECT state,COUNT(*) FROM cases WHERE campaign=? GROUP BY state',(campaign,))}
             requests = [dict(r) for r in db.execute('SELECT id,case_id,operation,state,reserved,incurred,receipt FROM requests WHERE campaign=?',(campaign,))]
             budgets = {s:dict(incurred=sum(r['incurred'] or 0 for r in db.execute('SELECT incurred FROM requests WHERE campaign=? AND subsystem=?',(campaign,s))),
                 reserved=db.execute('SELECT COALESCE(SUM(reserved),0) FROM requests WHERE campaign=? AND subsystem=? AND incurred IS NULL',(campaign,s)).fetchone()[0]) for s in ('api','modal')}
             stopped = bool(db.execute('SELECT stopped FROM campaigns WHERE id=?',(campaign,)).fetchone()[0])
-        return dict(campaign=campaign, stopped=stopped, cases=states, budgets=budgets, requests=requests)
+            api_budget = self._api_budget(db, config)
+        return dict(campaign=campaign, stopped=stopped, cases=states, budgets=budgets, requests=requests, api_budget=api_budget)
 
     def progress(self, campaign, case_id, *, state=None, data=None):
         with self.db() as db:
