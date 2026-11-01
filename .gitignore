@@ -34,3 +34,6 @@ checkpoints/
 *.npz
 *.npy
 *.receipt.json
+
+# Editable installation metadata
+*.egg-info/

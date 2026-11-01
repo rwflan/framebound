@@ -1,5 +1,9 @@
 # Local animation campaigns
 
+For the current versioned MVP curriculum, audit, knowledge library, representation
+studies and measured Modal gates, see [Evidence-led animation learning](KNOWLEDGE_UPSKILLING.md).
+The v1 commands below retain their historical contracts and cohorts.
+
 The v3 campaign package implements a local experiment controller around bounded
 Muse specialists. It never starts paid work on import, planning, replay or report.
 It keeps experiment media, prompts, receipts, labels, models and reports outside
@@ -84,8 +88,10 @@ editing targets. Ties and ambiguity remain nonbinary comparisons. The validator
 checks hashes, closure, image decode and family splits. These are local portable
 training datasets, not evidence that hosted Muse weights were fine-tuned.
 
-Modal accepts only the canonical `FeatureShard` byte format: eight derived numeric
-measurements per native frame, scoped targets/masks, weights and opaque IDs. Exact
+Modal accepts only the canonical `FeatureShard` byte formats: the historical eight
+measurements or twenty versioned geometry measurements per native frame, scoped
+targets/masks, fixed weights and opaque IDs. Current admission also requires a
+frozen hypothesis, account evidence, a local baseline and an actual workload profile. Exact
 transferred bytes are validated; arbitrary metadata, prompts, images, masks and
 archives have no wire field. Final-test features are rejected from training jobs.
 Derived features remain private information. `remote.Job` freezes the base image

@@ -3,7 +3,8 @@ import json
 from pathlib import Path
 import subprocess
 
-from .contracts import Campaign, canonical, curriculum, local_path
+from .contracts import canonical, local_path, parse_campaign
+from .curriculum import mvp_curriculum
 from .dispatch import Response, dispatch
 from .ledger import Ledger, Stopped
 
@@ -30,11 +31,44 @@ class CommandSpecialist:
         return Response(base64.b64decode(body['raw_base64'],validate=True),body['incurred'],body['successful_images'],body['receipt'])
 
 
-def operate(root, action, *, campaign='animation-v1', config=None, request=None, specialist=None):
+def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, request=None, specialist=None):
     ledger = Ledger(root)
     if action == 'plan':
-        frozen = Campaign.model_validate(config) if config is not None else curriculum(campaign)
+        frozen = parse_campaign(config) if config is not None else mvp_curriculum(campaign)
         return ledger.plan(frozen)
+    if action == 'inventory':
+        from .inventory import inspect
+        return inspect(root,(request or {}).get('campaign'))
+    if action == 'readiness':
+        from .progression import readiness
+        return readiness(root,campaign)
+    if action == 'quarantine':
+        from .progression import quarantine
+        if not request:raise ValueError('saved acquisition failure report required')
+        return quarantine(root,campaign,request)
+    if action == 'release':
+        from .progression import release
+        if not request:raise ValueError('explicit stage and evidence request required')
+        return release(root,campaign,request)
+    if action == 'fund':
+        if not request:raise ValueError('explicit allocation and account evidence required')
+        ledger.fund(campaign,request['subsystem'],request['microdollars'],evidence=request['evidence'])
+        return ledger.status(campaign)
+    if action in {'baseline','profile','ablation','final-report','compute-plan'}:
+        from . import study
+        if not request:raise ValueError('explicit local study request required')
+        function={'final-report':study.final_report,'compute-plan':study.compute_plan}.get(action) or getattr(study,action)
+        return function(root,campaign,request)
+    if action == 'advisory-set':
+        from .advisory import select
+        if not request:raise ValueError('explicit advisory selection required')
+        return select(root,campaign,request)
+    if action in {'knowledge-build','knowledge-query'}:
+        from . import knowledge
+        if not request:raise ValueError('explicit dataset version required')
+        if action=='knowledge-build':return knowledge.build(root,campaign,version=request['version'])
+        return knowledge.retrieve(root,campaign,version=request['version'],categories=request['categories'],
+            exclude_families=request.get('exclude_families',()),limit=request.get('limit',3))
     if action == 'audit':
         from .corroboration import replay
         return replay(root,campaign)
@@ -49,10 +83,13 @@ def operate(root, action, *, campaign='animation-v1', config=None, request=None,
         from .modal_worker import ModalTransport
         if not request:raise ValueError('explicit feature file, quoted job and case required')
         raw=local_path(root,request['feature_file']).read_bytes()
-        return submit(ledger,campaign,request['case_id'],raw,Job.model_validate(request['job']),ModalTransport())
+        return submit(ledger,campaign,request['case_id'],raw,Job.model_validate(request['job']),ModalTransport(),study=request.get('study'))
     if action == 'features':
         from .features import collect
-        return collect(root,campaign,version=(request or {}).get('version','1'))
+        return collect(root,campaign,version=(request or {}).get('version','1'),
+            extractor=(request or {}).get('extractor','native-geometry-v2' if ledger.config(campaign).schema_version=='2.0' else 'native-numeric-v1'),
+            include_test=(request or {}).get('include_test',False),dataset_version=(request or {}).get('dataset_version'),
+            scoped=ledger.config(campaign).schema_version=='2.0')
     if action == 'train':
         from .transfer import inspect_payload
         from .learning import experiment
@@ -67,7 +104,7 @@ def operate(root, action, *, campaign='animation-v1', config=None, request=None,
         if specialist is None:
             raise ValueError('an explicitly configured specialist is required')
         from .runner import Runner
-        return Runner(root,campaign,specialist).run()
+        return Runner(root,campaign,specialist).run(max_cases=(request or {}).get('max_cases'))
     if action == 'outbox':
         if specialist is None:
             raise ValueError('an explicitly configured specialist is required; no generation is inferred')
@@ -103,11 +140,11 @@ def operate(root, action, *, campaign='animation-v1', config=None, request=None,
 
 def register_cli(sub):
     parser = sub.add_parser('campaign', help='v3 local animation campaign controller')
-    parser.add_argument('action',choices=['plan','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal','audit'])
+    parser.add_argument('action',choices=['plan','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal','audit','inventory','readiness','release','fund','baseline','profile','ablation','knowledge-build','knowledge-query','final-report','advisory-set','compute-plan','quarantine'])
     parser.add_argument('--root',required=True)
-    parser.add_argument('--campaign',default='animation-v1')
+    parser.add_argument('--campaign',default='animation-mvp-v2-keyed')
     parser.add_argument('--config',help='Frozen config JSON file for plan')
-    parser.add_argument('--request',help='Executable request JSON file for reserve')
+    parser.add_argument('--request',help='Local JSON request for the selected operation')
     parser.add_argument('--snapshot',help='Validated historical snapshot for assessment-only replay')
     parser.add_argument('--muse',action='store_true',help='Use bounded Muse Responses with MODEL_API_KEY')
     parser.add_argument('--specialist',help='JSON array of pinned external specialist argv')
@@ -117,7 +154,7 @@ def from_cli(args):
     if args.action=='replay':
         from .replay import replay
         if not args.snapshot: raise ValueError('--snapshot is required')
-        return replay(args.root,args.snapshot)
+        return replay(args.root,args.snapshot,name=args.campaign)
     from .specialists import MuseResponses
     return operate(args.root,args.action,campaign=args.campaign,
         config=json.loads(Path(args.config).read_text()) if args.config else None,

@@ -23,7 +23,7 @@ def audit(root, files, private_hashes=()):
             if path.suffix=='.json':
                 try:
                     value=json.loads(path.read_text())
-                    private |= isinstance(value,dict) and value.get('schema_version') in {'animation-model-card-1.0','feature-detector-1.0','temporal-convolution-1.0','feature-only-1.0','animation-training-1.0','historical-assessment-replay-1.0'}
+                    private |= isinstance(value,dict) and value.get('schema_version') in {'animation-model-card-1.0','feature-detector-1.0','temporal-convolution-1.0','feature-only-1.0','animation-training-1.0','animation-training-2.0','historical-assessment-replay-1.0','feature-only-2.0','animation-knowledge-1.0','knowledge-inventory-1.0','local-baseline-1.0','local-workload-profile-1.0','representation-ablation-1.0','knowledge-release-1.0','animation-advisory-1.0','frozen-final-report-1.0','mvp-protocol-2.0','compute-plan-1.0'}
                 except (ValueError,UnicodeError):pass
             private |= hashlib.sha256(path.read_bytes()).hexdigest() in private_hashes
         if unsafe or private:

@@ -14,7 +14,7 @@ import shutil
 import sqlite3
 import time
 
-from .contracts import Campaign, canonical, digest, freeze, local_path
+from .contracts import Campaign, canonical, digest, freeze, local_path, parse_campaign
 
 
 class Stopped(ValueError):
@@ -30,6 +30,8 @@ class Ledger:
         with self.db() as db:
             db.executescript('''
                 PRAGMA journal_mode=WAL;
+                CREATE TABLE IF NOT EXISTS knowledge_releases(campaign TEXT, stage TEXT, cases TEXT NOT NULL,
+                    evidence TEXT NOT NULL, request TEXT NOT NULL, PRIMARY KEY(campaign,stage));
                 CREATE TABLE IF NOT EXISTS campaigns(id TEXT PRIMARY KEY, config TEXT NOT NULL, stopped INTEGER NOT NULL DEFAULT 0,
                     api_funding INTEGER NOT NULL DEFAULT 0, modal_funding INTEGER NOT NULL DEFAULT 0);
                 CREATE TABLE IF NOT EXISTS cases(campaign TEXT, id TEXT, family TEXT, state TEXT NOT NULL DEFAULT 'planned',
@@ -79,14 +81,27 @@ class Ledger:
             row = db.execute('SELECT config FROM campaigns WHERE id=?', (campaign,)).fetchone()
         if not row:
             raise ValueError('unknown campaign')
-        return Campaign.model_validate_json(row['config'])
+        return parse_campaign(row['config'])
 
     def fund(self, campaign, subsystem, microdollars, *, evidence):
         """Explicit allocation, never an implicit side effect of plan/run/resume."""
         if subsystem not in {'api', 'modal'} or type(microdollars) is not int or microdollars < 0:
             raise ValueError('invalid funding')
         config = self.config(campaign)
-        if not evidence or not config.prices.verified_at:
+        if not evidence:
+            raise ValueError('verified prices and account/access evidence required before funding')
+        if config.schema_version=='2.0':
+            from datetime import datetime,timezone,timedelta
+            if not isinstance(evidence,dict):raise ValueError('v2 requires structured current price/account evidence')
+            verified=datetime.fromisoformat(evidence['verified_at'])
+            now=datetime.now(timezone.utc)
+            if verified.tzinfo is None or not now-timedelta(hours=24)<=verified<=now:
+                raise ValueError('funding evidence must be verified within 24 hours')
+            if not evidence.get('source') or not evidence.get('account_access'):
+                raise ValueError('price source and account/access evidence required')
+            if evidence.get('image_microdollars')!=config.prices.image_microdollars:
+                raise ValueError('verified image price differs from frozen quote; create a new campaign version')
+        elif not config.prices.verified_at:
             raise ValueError('verified prices and account/access evidence required before funding')
         if microdollars > getattr(config, subsystem + '_ceiling'):
             raise ValueError('allocation exceeds frozen release ceiling')
@@ -109,7 +124,8 @@ class Ledger:
         spec = next((c for c in config.cases if c.id == case_id), None)
         if spec is None:
             raise ValueError('unknown case')
-        if spec.stage != config.phase:
+        from .progression import admitted
+        if case_id not in admitted(self,config):
             raise Stopped('case is not in this release; final-test cases remain sealed')
         if type(attempt) is not int or type(sheet) is not int or not 0 <= sheet < config.limits.sheets:
             raise ValueError('bounded integer attempt and sheet required')
@@ -140,11 +156,27 @@ class Ledger:
             campaign_row = db.execute('SELECT * FROM campaigns WHERE id=?', (campaign,)).fetchone()
             case = db.execute('SELECT * FROM cases WHERE campaign=? AND id=?', (campaign,case_id)).fetchone()
             unknown = db.execute("SELECT 1 FROM requests r JOIN cases c ON c.campaign=r.campaign AND c.id=r.case_id WHERE c.family=? AND r.state IN ('wire_started','unknown_provider_outcome')", (spec.family,)).fetchone()
+            if case_id not in admitted(self,config,db):
+                raise Stopped('case is not in this release')
+            if subsystem=='modal':
+                from .remote import Job
+                job=Job.model_validate(payload['job'])
+                seconds=job.seconds+job.startup_seconds+job.replay_seconds
+                booked=0
+                stage_cost=0
+                for prior in db.execute("SELECT request,incurred,reserved FROM requests WHERE subsystem='modal' AND state!='cancelled'"):
+                    prior_job=Job.model_validate(json.loads(prior[0])['payload']['job'])
+                    booked+=prior_job.seconds+prior_job.startup_seconds+prior_job.replay_seconds
+                    if prior_job.purpose==job.purpose:stage_cost+=prior['incurred'] if prior['incurred'] is not None else prior['reserved']
+                if stage_cost+quote>{'profile':1000000,'train':3000000,'reproduce':2000000}[job.purpose]:
+                    raise Stopped('Modal experiment-stage allocation exhausted; reserve remains unallocated')
+                if booked+seconds>config.limits.modal_seconds:
+                    raise Stopped('lifetime Modal wall allowance exhausted, including unresolved reservations')
             if operation=='anchor' and db.execute("SELECT 1 FROM requests r JOIN cases c ON c.campaign=r.campaign AND c.id=r.case_id WHERE c.family=? AND r.operation='anchor' AND r.state!='cancelled'",(spec.family,)).fetchone():
                 raise Stopped('identity anchor already has a frozen lifetime request; reuse or reconcile it')
             if campaign_row['stopped'] or unknown or case['active_seconds'] >= config.limits.active_seconds:
                 raise Stopped('stopped, unknown family outcome or active processing ceiling')
-            if case['state'] in {'accepted','unchanged','rejected','ambiguous','exhausted'}:
+            if subsystem!='modal' and case['state'] in {'accepted','unchanged','rejected','ambiguous','exhausted'}:
                 raise Stopped('case already has a durable terminal result')
             total = db.execute('SELECT COALESCE(SUM(COALESCE(incurred,reserved)),0) FROM requests WHERE campaign=? AND subsystem=?', (campaign,subsystem)).fetchone()[0]
             lifetime = db.execute('SELECT COALESCE(SUM(COALESCE(incurred,reserved)),0) FROM requests WHERE subsystem=?', (subsystem,)).fetchone()[0]
@@ -158,7 +190,8 @@ class Ledger:
                 raise Stopped('lifetime image/dispatch ceiling')
             db.execute('INSERT INTO requests(id,campaign,case_id,operation,binding,request,subsystem,reserved,images,state) VALUES(?,?,?,?,?,?,?,?,?,?)',
                 (rid,campaign,case_id,operation,binding,canonical(request).decode(),subsystem,quote,images,'reserved'))
-            db.execute("UPDATE cases SET state='budget_reserved' WHERE campaign=? AND id=?", (campaign,case_id))
+            if subsystem!='modal':
+                db.execute("UPDATE cases SET state='budget_reserved' WHERE campaign=? AND id=?", (campaign,case_id))
             self._event(db,rid,'reserved',request)
             return dict(db.execute('SELECT * FROM requests WHERE id=?', (rid,)).fetchone())
 
@@ -183,7 +216,7 @@ class Ledger:
                 raise Stopped('send permit already consumed, expired or invalid')
             if db.execute('SELECT stopped FROM campaigns WHERE id=?',(row['campaign'],)).fetchone()[0]:
                 raise Stopped('campaign stopped')
-            config = Campaign.model_validate_json(db.execute('SELECT config FROM campaigns WHERE id=?',(row['campaign'],)).fetchone()[0])
+            config = parse_campaign(db.execute('SELECT config FROM campaigns WHERE id=?',(row['campaign'],)).fetchone()[0])
             lane = "images>0" if row['images'] else "images=0 AND subsystem='api'" if row['subsystem']=='api' else "subsystem='modal'"
             limit = config.limits.generation_workers if row['images'] else config.limits.assessment_workers if row['subsystem']=='api' else config.limits.modal_workers
             if db.execute(f"SELECT COUNT(*) FROM requests WHERE state IN ('wire_started','unknown_provider_outcome') AND {lane}").fetchone()[0]>=limit:
