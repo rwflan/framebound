@@ -21,7 +21,7 @@ def admitted(ledger, config, db=None):
 
 
 def cohort_evidence(ledger,config,ids):
-    rows=[];assessed=0;intake_failed=0
+    rows=[];assessed=0;intake_failed=0;candidate_failed=0;acquisition_failed=0
     for cid in ids:
         p=ledger.progress(config.id,cid)
         result=p['result']
@@ -30,8 +30,10 @@ def cohort_evidence(ledger,config,ids):
             parsed=Assessment.model_validate(a)
             if any(c.status in {'present','absent_within_assessed_scope'} and c.slots for c in parsed.coverage):
                 assessed+=1
-        if (result or {}).get('intake'):
-            intake_failed+=int(any(not i['eligible'] for i in result['intake']))
+        initial_failure=any(not i['eligible'] for i in (result or {}).get('intake',[]))
+        candidate_failure=bool((result or {}).get('candidate_acquisition_failures'))
+        intake_failed+=int(initial_failure);candidate_failed+=int(candidate_failure)
+        acquisition_failed+=int(initial_failure or candidate_failure)
         rows.append(dict(case_id=cid,terminal=bool(result),result_sha256=digest(result)))
     status=ledger.status(config.id)
     unknown=[r['id'] for r in status['requests'] if r['state'] in {'wire_started','provider_pending','unknown_provider_outcome'}]
@@ -44,11 +46,13 @@ def cohort_evidence(ledger,config,ids):
     if any(not r['terminal'] for r in rows):reasons.append('cohort has unfinished cases')
     if assessed < math.ceil(len(ids)*.75):reasons.append('fewer than 75% of allocated cases have usable scoped assessments')
     if intake_failed > len(ids)*.25:reasons.append('more than 25% of allocated cases failed intake')
+    elif acquisition_failed > len(ids)*.25:reasons.append('more than 25% of allocated cases failed source or candidate acquisition')
     if unknown:reasons.append('provider outcomes need reconciliation')
     if errors:reasons.append('receipt closure is missing or changed')
     if not received:reasons.append('cohort has no actual provider receipts')
     return dict(passed=not reasons,reasons=reasons,allocated=len(ids),scoped_assessed=assessed,
-                intake_failed=intake_failed,results=rows,request_ids=[r['id'] for r in received],receipt_errors=errors)
+                intake_failed=intake_failed,candidate_acquisition_failed=candidate_failed,
+                acquisition_failed=acquisition_failed,results=rows,request_ids=[r['id'] for r in received],receipt_errors=errors)
 
 
 def release(root,campaign,request):

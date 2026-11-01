@@ -133,6 +133,21 @@ def test_single_anchor_recipe_is_frozen_disjoint_and_opt_in():
         upskill_curriculum('bad',source_policy='unguarded')
 
 
+def test_candidate_failures_share_source_acquisition_allowance():
+    from types import SimpleNamespace
+    from framebound.v3.campaign.progression import cohort_evidence
+    results={'a':dict(intake=[dict(eligible=False)]),
+        'b':dict(candidate_acquisition_failures=[dict(operation='repair'),dict(operation='blind_rerun')]),
+        'c':dict(outcome='ambiguous'),'d':dict(outcome='ambiguous')}
+    ledger=SimpleNamespace(progress=lambda campaign,cid:dict(result=results[cid]),
+        status=lambda campaign:dict(requests=[dict(id='received-fixture',case_id='a',state='received')]),
+        artifact=lambda rid:None)
+    report=cohort_evidence(ledger,SimpleNamespace(id='fixture'),list(results))
+    assert not report['passed'] and report['intake_failed']==1
+    assert report['candidate_acquisition_failed']==1 and report['acquisition_failed']==2
+    assert 'more than 25% of allocated cases failed source or candidate acquisition' in report['reasons']
+
+
 def test_fixed_batch_resume_does_not_add_unattempted_cases(tmp_path,monkeypatch):
     config=mvp_curriculum('workflow-fixture');ledger=Ledger(tmp_path);ledger.plan(config)
     calls=[];pending_id=[]

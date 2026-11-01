@@ -397,6 +397,34 @@ class Runner:
         try:return loop.get_in(con,'agent_auto_authorities',authority['id'])['status']
         finally:con.close()
 
+    def _candidate_acquisition_failure(self,case,operation,attempt,error,authority=None):
+        """Close known unsuitable output without approving it or repeating it."""
+        requests=[r for r in self.ledger.status(self.campaign)['requests']
+            if r['case_id']==case.id and r['operation']==operation
+            and json.loads(self.ledger.request(r['id'])['request'])['attempt']==attempt]
+        if not requests or any(r['state']!='received' for r in requests):
+            raise Stopped('candidate acquisition failure requires received receipts')
+        failure=dict(operation=operation,attempt=attempt,reason=str(error),
+            request_ids=[r['id'] for r in requests],candidate_submitted=False,
+            semantic_assessment=False,retry_permitted=False)
+        self._save('reports','candidate-acquisition-'+digest([case.id,operation,attempt])+'.json',canonical(failure))
+        if authority:
+            con=loop.connect(self.project)
+            try:
+                with S.atomic(con):
+                    con.execute('BEGIN IMMEDIATE')
+                    saved=loop.get_in(con,'agent_auto_authorities',authority['id'])
+                    if saved['candidate_revision_id'] is not None:
+                        raise ValueError('submitted candidate cannot be relabeled as acquisition failure')
+                    saved['status']='acquisition_rejected'
+                    con.execute('UPDATE agent_auto_authorities SET data=? WHERE id=?',(canonical(saved).decode(),saved['id']))
+                    run=loop.get_in(con,'agent_runs',saved['run_id'])
+                    run['learned_coverage_status']='repair_acquisition_rejected'
+                    run['lifecycle']='completed';run['stop_reason']='Received repair failed isolation before candidate submission; baseline retained, no model approval.'
+                    loop._update(con,run)
+            finally:con.close()
+        return failure
+
     def case(self,case):
         self._case_started=time.monotonic()
         self._case_initial_active=self.ledger.progress(self.campaign,case.id)['active_seconds']
@@ -449,7 +477,7 @@ class Runner:
             return result
         a=self._assess(case,run_id,revision,ordinal=0)
         original_revision=revision
-        outcome='ambiguous';authority=None;after=a;corroboration=None
+        outcome='ambiguous';authority=None;after=a;corroboration=None;candidate_failures=[]
         for attempt in range(self.config.limits.repairs):
             targets=[f for f in a.findings if f.severity in {'material','critical'} and f.visibility=='supported']
             if not targets:
@@ -473,7 +501,10 @@ class Runner:
             try:authority=previous[0] if previous else authorize(self.project,run_id,a,independent,target.id)
             except InvalidInput as exc:
                 outcome='ambiguous';break
-            _,candidate=self._materialize(case,anchor,operation='repair',attempt=attempt,authority=authority)
+            try:_,candidate=self._materialize(case,anchor,operation='repair',attempt=attempt,authority=authority)
+            except AcquisitionRejected as exc:
+                candidate_failures.append(self._candidate_acquisition_failure(case,'repair',attempt,exc,authority))
+                after=a;outcome='ambiguous';break
             after=self._assess(case,run_id,candidate,ordinal=attempt*2+2)
             outcome=self._compare(case,authority)
             if outcome!='accepted':break
@@ -482,13 +513,32 @@ class Runner:
             authority_id=authority['id'] if authority else None,corroboration=corroboration)
         allocation=controls(self.config)
         if authority and case.id in {r['case_id'] for r in allocation['cases']}:
-            result['control']=self._control(case,anchor,original_revision,authority,outcome)
+            if candidate_failures:
+                result['control']=dict(rows=[dict(case_id=case.id,family=case.family,arm=arm,outcome=state)
+                    for arm,state in [('guided_edit','provider_failure'),('blind_rerun','missing')]],
+                    reason='Guided acquisition rejected; no further control dispatched for this failed attempt.')
+            else:
+                result['control']=self._control(case,anchor,original_revision,authority,outcome)
+                if result['control'].get('acquisition_failure'):
+                    candidate_failures.append(result['control']['acquisition_failure'])
+        if candidate_failures:result['candidate_acquisition_failures']=candidate_failures
         self.ledger.finish_case(self.campaign,case.id,outcome,result)
         return result
 
     def _control(self,case,anchor,original_revision,authority,guided_outcome):
         """One original-request rerun, selected before observing repair success."""
-        ids,_=self._materialize(case,anchor,operation='blind_rerun')
+        try:ids,_=self._materialize(case,anchor,operation='blind_rerun')
+        except AcquisitionRejected as exc:
+            failure=self._candidate_acquisition_failure(case,'blind_rerun',0,exc)
+            mapping={'accepted':'improved','unchanged':'unchanged','rejected':'unchanged','ambiguous':'ambiguous'}
+            con=loop.connect(self.project)
+            try:
+                comparisons=[json.loads(r['data']) for r in con.execute('SELECT data FROM agent_auto_comparisons')
+                    if json.loads(r['data'])['authority_id']==authority['id']]
+            finally:con.close()
+            regressed=any((r.get('comparison') or {}).get('material_regression') for r in comparisons)
+            return dict(rows=[dict(case_id=case.id,family=case.family,arm='guided_edit',outcome='regressed' if regressed else mapping[guided_outcome]),
+                dict(case_id=case.id,family=case.family,arm='blind_rerun',outcome='provider_failure')],acquisition_failure=failure)
         original=loop.revision_get(self.project,original_revision)['revision']
         candidate_sha=digest(ids)
         assignment=blind_assignment(case.id,digest(original),candidate_sha,seed=self.config.seed)
@@ -533,7 +583,9 @@ class Runner:
                     raise ValueError('unique admitted case IDs required for a frozen batch')
             selected=set(case_ids) if case_ids is not None else allowed
             known={cid:self.ledger.progress(self.campaign,cid)['result'] for cid in allowed}
-            rejected_intakes=sum(any(not i['eligible'] for i in (r or {}).get('intake',[])) for r in known.values())
+            def acquisition_failed(result):
+                return bool(result and (result.get('candidate_acquisition_failures') or any(not i['eligible'] for i in result.get('intake',[]))))
+            rejected_intakes=sum(acquisition_failed(r) for r in known.values())
             for case in self.config.cases:
                 if case.id not in selected:continue
                 if self.ledger.status(self.campaign)['stopped']:break
@@ -543,7 +595,7 @@ class Runner:
                     processed+=1
                 try:
                     results[case.id]=self.case(case)
-                    if not known.get(case.id) and any(not i['eligible'] for i in results[case.id].get('intake',[])):
+                    if not known.get(case.id) and acquisition_failed(results[case.id]):
                         rejected_intakes+=1
                         if self.config.schema_version=='2.0' and rejected_intakes>len(allowed)*.25:
                             self.ledger.stop(self.campaign);deferred[case.id]='Acquisition intake failures exceed 25% of the admitted cohort';break

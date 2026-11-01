@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import pytest
 
 from PIL import Image,ImageDraw
 
@@ -77,6 +78,43 @@ def configured(tmp_path):
     config=config.model_copy(update={'cases':[case],'prices':Prices(verified_at='engineering',source='test-only')})
     ledger=Ledger(tmp_path);ledger.plan(config);ledger.fund(config.id,'api',1000000,evidence='synthetic engineering authority')
     return config,case
+
+
+@pytest.mark.parametrize('failed_operation',['repair','blind_rerun'])
+def test_rejected_candidate_retains_receipts_baseline_and_allocated_arms(tmp_path,monkeypatch,failed_operation):
+    from framebound.v3.services import loop
+    config,case=configured(tmp_path)
+    case=case.model_copy(update={'request':case.request+' DECLARED EXTRACTION KEY: pure magenta.'})
+    config=config.model_copy(update={'cases':[case]})
+    other=tmp_path/'isolated';ledger=Ledger(other);ledger.plan(config)
+    ledger.fund(config.id,'api',2000000,evidence='synthetic engineering authority')
+    monkeypatch.setattr('framebound.v3.campaign.runner.controls',lambda config:dict(cases=[dict(case_id=case.id)]))
+    class UnsuitableCandidate(EngineeringSpecialist):
+        def execute(self,request,*,timeout):
+            response=super().execute(request,timeout=timeout)
+            if request['operation']!=failed_operation:return response
+            stream=io.BytesIO();Image.new('RGB',(96,64),'white').save(stream,format='PNG')
+            body=dict(status='completed',output=[dict(type='image_generation_call',result=base64.b64encode(stream.getvalue()).decode())])
+            return Response(canonical(body),response.incurred,1,response.receipt)
+    specialist=UnsuitableCandidate();runner=Runner(other,config.id,specialist);result=runner.run()
+    actual=result['results'][case.id]
+    assert not result['status']['stopped'] and actual['after_assessment']['coverage']
+    failure=actual['candidate_acquisition_failures'][0]
+    assert failure['operation']==failed_operation and failure['retry_permitted'] is False
+    assert failure['candidate_submitted'] is False
+    assert all(ledger.request(rid)['state']=='received' for rid in failure['request_ids'])
+    assert actual['outcome']==('ambiguous' if failed_operation=='repair' else 'unchanged')
+    assert [r['outcome'] for r in actual['control']['rows']]==(
+        ['provider_failure','missing'] if failed_operation=='repair' else ['unchanged','provider_failure'])
+    if failed_operation=='repair':
+        assert len(specialist.sends)==5 # no post-assessment, comparison or new control
+        con=loop.connect(runner.project)
+        try:
+            authority=json.loads(con.execute('SELECT data FROM agent_auto_authorities').fetchone()[0])
+            assert authority['status']=='acquisition_rejected' and authority['candidate_revision_id'] is None
+            assert con.execute('SELECT COUNT(*) FROM agent_clip_revisions').fetchone()[0]==1
+        finally:con.close()
+    sent=len(specialist.sends);runner.run();assert len(specialist.sends)==sent
 
 
 def test_unattended_repair_retains_tie_and_replay_sends_nothing(tmp_path):
