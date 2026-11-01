@@ -30,20 +30,28 @@ It cannot replace the unknown specimen, reuse its anchor or ancestry, move its
 split, reset costs or claim that the blocked pilot passed. Existing lifetime
 concurrency and budget reservations still apply across campaigns.
 
-New campaigns can opt into `background-images-v1`. They freeze `background: true`,
-`store: true`, a deterministic binding tag and bounded conditioning previews in
-image requests. Original references are retained; previews preserve aspect ratio,
-use LANCZOS and have a longest edge of 256 pixels. Each preview records input and
-output hashes, sizes and its recipe inside the frozen request.
+New independent curricula use `stream-images-v1`: one native Meta image POST with
+`stream: true`, `store: true`, a deterministic binding tag and bounded conditioning
+previews. Original references are retained; previews preserve aspect ratio, use
+LANCZOS and have a longest edge of 256 pixels. Every preview records its input and
+output hashes, sizes and recipe in the frozen request.
 
-Meta background creation has a 1 MiB body limit. Oversized bodies fail locally
-before reservation or a paid send. After one POST, the response ID, model and
-binding metadata must match and are durably committed before polling. Restarts
-only GET the accepted response; a request lock prevents simultaneous creation or
-retrieval coordinators. Terminal receipts must match that identity. A creation
-failure before an ID is captured remains unknown and is never retried. Stored
-responses and their pending reservations block stage release until resolved.
-This does not recover IDs from historical synchronous requests.
+The `response.created` event commits provider identity before the terminal image
+arrives. A creation event can omit model or metadata; the ID remains bound to its
+own original POST. Terminal model and response identity are validated, and any
+returned binding metadata must match. Complete streams and interrupted prefixes
+are retained as observations; canonical terminal response extraction is recorded
+as a derivation. A restart only GETs the accepted ID, never repeats creation.
+Missing acknowledgement remains unknown and is never retried. Pending responses
+and reservations still block stage release. No historical ID is reconstructed.
+
+The separate `background-images-v1` opt-in is retained for compatible provider
+routes, with its 1 MiB body limit and strict queued acknowledgement. The live Meta
+image background route rejected the documented image tool during pre-inference
+validation, so it is not the default continuation transport. That actual rejection
+was preserved with zero output cost. Native Responses streaming subsequently
+produced a real image, retained its ID/transcript and passed read-only retrieval.
+Provider capability checks are engineering evidence, not semantic training data.
 
 ## 2. Freeze a new breadth and depth curriculum
 

@@ -25,7 +25,7 @@ class MVPCampaign(Campaign):
     schema_version: Literal['2.0'] = '2.0'
     dataset_version: Literal['mvp-2'] = 'mvp-2'
     cases: list[MVPCase] = Field(min_length=1, max_length=800)
-    transport: Literal['synchronous-v1', 'background-images-v1'] = Field(
+    transport: Literal['synchronous-v1', 'background-images-v1', 'stream-images-v1'] = Field(
         default='synchronous-v1', exclude_if=lambda value: value == 'synchronous-v1')
     assessment_policy: Literal['legacy-v1', 'independent-coverage-v2'] = Field(
         default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
@@ -111,7 +111,7 @@ def upskill_curriculum(campaign_id):
     Historical v1/v2 defaults retain identical serialized bytes.
     """
     base=mvp_curriculum(campaign_id).model_dump(mode='json')
-    namespace='u3-'+digest(['independent-upskilling-v3',campaign_id])[:10]
+    namespace='u4-'+digest(['independent-upskilling-v4',campaign_id])[:10]
     designs={
         'character':('gardener','astronaut','chef','sailor','mountaineer','mechanic','courier','musician'),
         'animal':('otter','fox','badger','heron','tortoise','rabbit','gecko','puffin'),
@@ -136,5 +136,5 @@ def upskill_curriculum(campaign_id):
             'No floor, shadow, paper, scenery, checkerboard, simulated transparency, second actor, caption, border, grid rule or gutter. '
             'Neighboring cell backgrounds merge seamlessly. Local extraction creates the final alpha. '
             'Preserve the original identity, authored timing, fixed camera and topology across ordered poses.')
-    base.update(transport='background-images-v1',assessment_policy='independent-coverage-v2',api_ceiling=50000000)
+    base.update(transport='stream-images-v1',assessment_policy='independent-coverage-v2',api_ceiling=50000000)
     return MVPCampaign.model_validate(base)

@@ -14,12 +14,14 @@ from .dispatch import Response, ProviderRejected, ProviderObservationError
 from .ledger import ProviderPending
 
 
-def validate_acceptance(request, body):
+def validate_acceptance(request, body, *, initial=False):
     wire=request['payload']['wire']
-    if (wire.get('background') is not True or not isinstance(body,dict)
+    streaming=wire.get('stream') is True
+    if (not (wire.get('background') is True or streaming) or not isinstance(body,dict)
             or not re.fullmatch(r'resp_[A-Za-z0-9_-]{1,128}',body.get('id',''))
-            or body.get('model')!=wire['model'] or body.get('background') is not True
-            or body.get('metadata')!=wire.get('metadata')
+            or (body.get('model')!=wire['model'] and not (streaming and initial and body.get('model') is None))
+            or (not streaming and body.get('background') is not True)
+            or (body.get('metadata')!=wire.get('metadata') and not (streaming and body.get('metadata') is None))
             or body.get('status') not in {'queued','in_progress','completed','failed','cancelled','incomplete'}):
         raise ValueError('provider acceptance does not match the frozen background request')
 
@@ -36,14 +38,15 @@ class MuseResponses:
             raise ValueError('only explicitly priced Muse models are supported')
         if wire.get('background') and (wire.get('stream') or len(canonical(wire))>1048576):
             raise ValueError('background body must fit 1 MiB without streaming; no paid send performed')
+        if len(canonical(wire))>50*1024**2:raise ValueError('provider request body exceeds bounded inline-media limit')
 
     def execute(self, request, *, timeout):
         self.preflight(request)
-        if request['payload']['wire'].get('background'):
+        if request['payload']['wire'].get('background') or request['payload']['wire'].get('stream'):
             raise ValueError('background creation requires a durable acceptance callback')
         return self._result(request,self._post(request,timeout=timeout))
 
-    def _post(self, request, *, timeout):
+    def _open_post(self, request, *, timeout):
         payload=request['payload']
         wire=payload['wire']
         if wire['model'] not in {'muse-image-1.0','muse-spark-1.3'}:
@@ -53,8 +56,7 @@ class MuseResponses:
         # urllib has no automatic paid POST retries. Any possible acceptance with
         # a missing result is left unknown by the outer durable dispatch service.
         try:
-            with urllib.request.urlopen(req,timeout=timeout) as response:
-                raw=response.read(64*1024**2+1)
+            return urllib.request.urlopen(req,timeout=timeout)
         except urllib.error.HTTPError as error:
             raw=error.read(65537)
             try:body=json.loads(raw)
@@ -66,8 +68,53 @@ class MuseResponses:
                 raise ProviderRejected(Response(raw,0,0,dict(http_status=error.code,not_accepted=True,
                     requested_model=wire['model'],error=detail,cost_basis='Documented pre-inference validation rejection; no output'))) from error
             raise
-        if len(raw)>64*1024**2: raise ValueError('provider response size ceiling')
+    def _post(self, request, *, timeout):
+        with self._open_post(request,timeout=timeout) as response:raw=response.read(64*1024**2+1)
+        if len(raw)>64*1024**2:raise ValueError('provider response size ceiling')
         return raw
+
+    def execute_stream(self,request,*,timeout,on_acceptance,on_observation):
+        self.preflight(request)
+        if not request['payload']['wire'].get('stream'):raise ValueError('frozen streaming request required')
+        transcript=bytearray();data=[];accepted=None;final=None
+        def event():
+            nonlocal accepted,final
+            if not data:return
+            raw=b'\n'.join(data);data.clear()
+            if raw==b'[DONE]':return
+            item=json.loads(raw);kind=item.get('type');body=item.get('response')
+            if kind=='response.created':
+                validate_acceptance(request,body,initial=True)
+                on_observation(bytes(transcript));on_acceptance(body);accepted=body
+            elif kind in {'response.completed','response.failed','response.incomplete','response.cancelled'}:
+                validate_acceptance(request,body)
+                if accepted and accepted['id']!=body['id']:raise ValueError('stream response identity changed')
+                if not accepted:on_acceptance(body);accepted=body
+                final=body
+        try:
+            with self._open_post(request,timeout=timeout) as response:
+                while True:
+                    line=response.readline(64*1024**2+1)
+                    if not line:break
+                    transcript.extend(line)
+                    if len(transcript)>64*1024**2:raise ValueError('stream byte ceiling')
+                    if not line.strip():event()
+                    elif line.startswith(b'data:'):data.append(line[5:].strip())
+                    if final is not None:break
+                if data:event()
+            on_observation(bytes(transcript))
+            if final is None:raise ProviderPending('Accepted stream ended before terminal response') if accepted else ValueError('Stream has no acceptance event')
+            result=self._result(request,canonical(final))
+            result.receipt.update(transport='responses-sse-v1',transcript_sha256=hashlib.sha256(transcript).hexdigest(),
+                normalization='Canonical response extracted from retained terminal SSE event')
+            return result
+        except ProviderPending:
+            raise
+        except (ValueError,TypeError) as error:
+            raise ProviderObservationError('Unverified stream retained',bytes(transcript)) from error
+        except BaseException:
+            if transcript:on_observation(bytes(transcript))
+            raise
 
     def execute_with_acceptance(self, request, *, timeout, on_acceptance):
         self.preflight(request)
@@ -84,7 +131,7 @@ class MuseResponses:
         return self.retrieve(request,body,timeout=timeout)
 
     def retrieve(self, request, acceptance, *, timeout):
-        validate_acceptance(request,acceptance)
+        validate_acceptance(request,acceptance,initial=True)
         deadline=time.monotonic()+timeout
         while time.monotonic()<deadline:
             req=urllib.request.Request('https://api.meta.ai/v1/responses/'+acceptance['id'],

@@ -50,12 +50,18 @@ def dispatch(ledger: Ledger, request_id: str, specialist: Specialist):
             if hasattr(specialist,'preflight'):specialist.preflight(request)
             if request.get('payload',{}).get('wire',{}).get('background') and not hasattr(specialist,'execute_with_acceptance'):
                 raise ValueError('specialist lacks durable background acceptance support; no send performed')
+            if request.get('payload',{}).get('wire',{}).get('stream') and not hasattr(specialist,'execute_stream'):
+                raise ValueError('specialist lacks durable streaming support; no send performed')
             permit=ledger.claim(request_id)
             request=ledger.start_wire(request_id,permit)
         start=time.monotonic()
         try:
             if acceptance:
                 response=specialist.retrieve(request,acceptance,timeout=timeout)
+            elif request.get('payload',{}).get('wire',{}).get('stream'):
+                response=specialist.execute_stream(request,timeout=timeout,
+                    on_acceptance=lambda body:ledger.record_acceptance(request_id,body),
+                    on_observation=lambda raw:ledger.observe(request_id,raw))
             elif request.get('payload',{}).get('wire',{}).get('background'):
                 if not hasattr(specialist,'execute_with_acceptance'):
                     raise ValueError('specialist lacks durable background acceptance support')

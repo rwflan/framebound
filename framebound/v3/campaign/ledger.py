@@ -355,7 +355,7 @@ class Ledger:
             row=db.execute('SELECT * FROM requests WHERE id=?',(rid,)).fetchone()
             if not row or row['state'] not in {'wire_started','provider_pending','unknown_provider_outcome'}:
                 raise Stopped('acceptance requires an existing possibly sent request')
-            validate_acceptance(json.loads(row['request']),body)
+            validate_acceptance(json.loads(row['request']),body,initial=True)
             raw=canonical(body).decode()
             if row['acceptance'] and row['acceptance'] != raw:
                 raise ValueError('initial provider acceptance is immutable')
