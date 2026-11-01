@@ -96,12 +96,18 @@ def cell(image, *, declared_white_rules=False):
         depth_to_key=None
         for depth in range(min(9,min(a.shape[:2])//4)):
             rgb=line_at(depth)[:,:3].astype(int)
-            if (np.max(np.abs(rgb-np.array([255,0,255])),axis=1)<=70).mean()>=.95:
+            key_line=np.max(np.abs(rgb-np.array([255,0,255])),axis=1)<=70
+            white_or_key=(rgb>=235).all(axis=1)|key_line
+            trim=min(8,len(rgb)//4)
+            # Orthogonal declared edge rules can cover the row's corners.
+            # Only the bounded edge band is excluded from this inward-key test.
+            declared_inward_key=(declared_white_rules and trim>0 and key_line[trim:-trim].mean()>=.95
+                and white_or_key.mean()>=.98)
+            if key_line.mean()>=.95 or declared_inward_key:
                 depth_to_key=depth;break
             # A complete straight dark/key-hued rule, allowing codec noise.
             reserved_hue=(rgb[:,1]<30)&(np.abs(rgb[:,0]-rgb[:,2])<25)
             # Earlier edge passes replace shared rule corners with the key.
-            white_or_key=(rgb>=235).all(axis=1)|(np.max(np.abs(rgb-np.array([255,0,255])),axis=1)<=70)
             declared_white=declared_white_rules and white_or_key.mean()>=.98
             if reserved_hue.mean()<.98 and not declared_white:break
         if depth_to_key is not None:
