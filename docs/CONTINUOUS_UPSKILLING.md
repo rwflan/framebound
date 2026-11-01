@@ -194,6 +194,12 @@ Local fitting does not select or promote a model. Validation calibration and
 matched repair-versus-blind-rerun evidence remain required for promotion and final
 release.
 
+Batch closure automatically runs the supported local training experiment when
+its category and data gates pass. It saves both model recipes across the frozen
+seeds, checkpoints, validation calibration and a model card; no operator handoff
+is required to start local training. Category sets have separate checkpoint
+directories. Models remain unpromoted pending the existing release evidence.
+
 The result's `compute_candidate` supplies the category-specific baseline, feature
 file, training support and local profile. Use the existing `compute-plan` with
 these exact artifacts, current applicable credit/pricing evidence, a substantive

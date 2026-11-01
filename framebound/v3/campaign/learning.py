@@ -254,7 +254,7 @@ def experiment(root, campaign, shard: FeatureShard, *, categories):
     from .contracts import local_path
     shard=shard.model_copy(update={'rows':[r for r in shard.rows if r.split!='test']})
     gate=eligibility(shard,categories)
-    folder=local_path(root,f'campaigns/{campaign}/checkpoints/{digest([digest(shard),digest(recipe(shard.extractor))])}')
+    folder=local_path(root,f'campaigns/{campaign}/checkpoints/{digest([digest(shard),digest(recipe(shard.extractor)),categories])}')
     folder.mkdir(parents=True,exist_ok=True)
     results=[]
     if gate['eligible']:
