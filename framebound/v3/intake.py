@@ -93,26 +93,36 @@ def cell(image, *, declared_white_rules=False):
     for edge in ('top','bottom','left','right'):
         def line_at(depth):
             return a[depth] if edge=='top' else a[-1-depth] if edge=='bottom' else a[:,depth] if edge=='left' else a[:,-1-depth]
-        depth_to_key=None
+        depth_to_key=None;white_seen=None;needs_white=False
         for depth in range(min(9,min(a.shape[:2])//4)):
             rgb=line_at(depth)[:,:3].astype(int)
             key_line=np.max(np.abs(rgb-np.array([255,0,255])),axis=1)<=70
-            white_or_key=(rgb>=235).all(axis=1)|key_line
             trim=min(8,len(rgb)//4)
+            white_line=(rgb>=235).all(axis=1)
+            white_seen=white_line if white_seen is None else white_seen|white_line
+            has_white_rule=bool(trim>0 and white_seen[trim:-trim].mean()>=.98)
+            # Resampling a declared white rule against magenta creates a narrow
+            # pink transition. Require observed white first, then accept only
+            # that white/key color segment inside the existing eight-pixel band.
+            white_key_segment=(rgb[:,0]>=235)&(rgb[:,2]>=235)&(np.abs(rgb[:,0]-rgb[:,2])<=25)
             # Orthogonal declared edge rules can cover the row's corners.
             # Only the bounded edge band is excluded from this inward-key test.
-            declared_inward_key=(declared_white_rules and trim>0 and key_line[trim:-trim].mean()>=.95
-                and white_or_key.mean()>=.98)
-            if key_line.mean()>=.95 or declared_inward_key:
+            declared_inward_key=(declared_white_rules and trim>0
+                and key_line[trim:-trim].mean()>=.95 and white_key_segment.mean()>=.98)
+            if (key_line.mean()>=.95 or declared_inward_key) and (not needs_white or has_white_rule):
                 depth_to_key=depth;break
             # A complete straight dark/key-hued rule, allowing codec noise.
             reserved_hue=(rgb[:,1]<30)&(np.abs(rgb[:,0]-rgb[:,2])<25)
             # Earlier edge passes replace shared rule corners with the key.
-            declared_white=declared_white_rules and white_or_key.mean()>=.98
-            if reserved_hue.mean()<.98 and not declared_white:break
+            declared_white=declared_white_rules and white_key_segment.mean()>=.98
+            if reserved_hue.mean()<.98:
+                if not declared_white:break
+                needs_white=True
         if depth_to_key is not None:
             for depth in range(depth_to_key):line_at(depth)[:]=[255,0,255,255];removed.append([edge,depth])
     result,recipe=keyed(Image.fromarray(a))
     recipe['uniform_sheet_rules_removed']=removed
-    if declared_white_rules:recipe['white_sheet_rules_explicitly_declared']=True
+    if declared_white_rules:
+        recipe['white_sheet_rules_explicitly_declared']=True
+        recipe['white_rule_edge_recipe']='observed-white-then-key-segment-v2; existing 8px maximum'
     return result,recipe

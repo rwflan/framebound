@@ -96,6 +96,12 @@ briefs explicitly tie every finding slot to overlapping authored ticks and list
 all required finding fields. Old rejected sources and quarantined answers are not
 reprocessed into passing outcomes; the new families start a separate rehearsal.
 
+The declared-rule decoder requires an observed near-white rule before accepting
+its narrow white-to-magenta resampling transition. The existing eight-pixel band,
+inward-key proof and alpha gate still apply. Pink-only borders, wrong keys and
+wide mattes remain unsuitable. Record the edge recipe in the derivation; never
+silently reinterpret prior closed rejections after a decoder correction.
+
 ## 3. Execute fixed, restartable batches
 
 `campaign upskill-plan` reports the next admissible action without funding or
