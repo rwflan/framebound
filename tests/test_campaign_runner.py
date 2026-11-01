@@ -236,3 +236,16 @@ def test_opaque_generation_is_rejected_before_any_paid_semantic_assessment(tmp_p
     specialist=Opaque();result=Runner(tmp_path,config.id,specialist).run()
     assert result['results'][case.id]['outcome']=='rejected'
     assert [r['operation'] for r in specialist.sends]==['anchor','generate']
+
+
+def test_portable_campaign_keeps_declared_family_ancestry(tmp_path):
+    from framebound.v3.campaign.export import export_campaign,load
+    config=curriculum('engineering-ancestry')
+    case=next(c for c in config.cases if c.stage=='pilot' and len(c.holds)==6)
+    case=case.model_copy(update={'ancestry':['declared-source-family']})
+    config=config.model_copy(update={'cases':[case],'prices':Prices(verified_at='engineering',source='synthetic')})
+    ledger=Ledger(tmp_path);ledger.plan(config);ledger.fund(config.id,'api',1000000,evidence='Engineering authority')
+    Runner(tmp_path,config.id,EngineeringSpecialist()).run()
+    output=export_campaign(tmp_path,config.id,version='ancestry')
+    rows=load(output['path'])
+    assert rows and all(row['metadata']['ancestry']==['declared-source-family'] for row in rows)

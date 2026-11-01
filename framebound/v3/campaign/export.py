@@ -188,7 +188,8 @@ def export_campaign(root,campaign,*,version='1'):
             if pair and pair['comparison']['preference'] in {'A','B'}:
                 chosen=pair['assignment'][pair['comparison']['preference']]
                 preference='candidate' if chosen==pair['candidate_sha256'] else 'baseline'
-            examples.append(dict(id=revision['id'],sequence_id=context['case_id'],family=context['family'],split=context['split'],frames=[relative_blob(a['byte_sha256']) for a in assets],
+            examples.append(dict(id=revision['id'],sequence_id=context['case_id'],family=context['family'],
+                ancestry=next(c.ancestry for c in config.cases if c.id==context['case_id']),split=context['split'],frames=[relative_blob(a['byte_sha256']) for a in assets],
                 holds=spec.timing.holds,loop=spec.loop,request_file=str(request_path.relative_to(root)),conditioning_files=conditioning,
                 provenance=revision['generation_metadata'],provenance_files=[relative_blob(h) for h in sorted(closure)]+raw_files,assessment=assessment,corroborating_assessments=corroborating,
                 rights=[a['rights'] for a in assets],baseline_revision_id=baseline['id'] if baseline else None,
