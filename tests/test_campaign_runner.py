@@ -38,6 +38,39 @@ class EngineeringSpecialist:
         return Response(canonical(body),request['quote'],int(request['images']>0),dict(response_id='TEST-ONLY-'+str(len(self.sends)),observed_model=request['payload']['requested_model']))
 
 
+def test_single_anchor_wire_preserves_key_and_separates_animation(tmp_path):
+    from datetime import datetime,timezone
+    from framebound.v3.campaign.curriculum import upskill_curriculum,protocol
+    config=upskill_curriculum('single-anchor-fixture',source_policy='single-anchor-keyed-v2')
+    ledger=Ledger(tmp_path);ledger.plan(config)
+    ledger.fund(config.id,'api',2000000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),
+        source='synthetic engineering rate evidence',account_access='test fixture',image_microdollars=10000))
+    cid=protocol(config)['rehearsal'][0]
+    class StreamingFixture(EngineeringSpecialist):
+        def execute_stream(self,request,*,timeout,on_acceptance,on_observation):
+            return self.execute(request,timeout=timeout)
+    specialist=StreamingFixture();runner=Runner(tmp_path,config.id,specialist)
+    result=runner.run(max_cases=1,case_ids=[cid])
+    assert not result['status']['stopped'],result.get('deferred')
+    anchor=next(q for q in specialist.sends if q['operation']=='anchor')
+    anchor_text=anchor['payload']['wire']['input'][0]['content'][0]['text']
+    assert 'exactly ONE' in anchor_text and 'ANIMATION EXERCISE:' not in anchor_text
+    generated=next(q for q in specialist.sends if q['operation']=='generate')
+    content=generated['payload']['wire']['input'][0]['content']
+    assert 'x=128..383' in content[0]['text'] and 'ANIMATION EXERCISE:' in content[0]['text']
+    image_item=next(c for c in content if c['type']=='input_image')
+    with Image.open(io.BytesIO(base64.b64decode(image_item['image_url'].split(',',1)[1]))) as im:
+        assert im.convert('RGBA').getpixel((0,0))==(255,0,255,255)
+    derivation=generated['payload']['conditioning_derivations'][0]
+    assert derivation['alpha_backdrop']['operator']=='explicit-conditioning-key-backdrop-v1'
+    assert derivation['source_sha256']!=derivation['output_sha256']
+    diagnose=next(q for q in specialist.sends if q['operation']=='diagnose')
+    teacher_text=diagnose['payload']['wire']['input'][0]['content'][0]['text']
+    assert 'end_exclusive' in teacher_text and 'nonempty limitations' in teacher_text
+    sent=len(specialist.sends);runner.run(max_cases=1,case_ids=[cid])
+    assert len(specialist.sends)==sent
+
+
 def configured(tmp_path):
     config=curriculum('engineering')
     case=next(c for c in config.cases if c.stage=='pilot' and len(c.holds)==6)
