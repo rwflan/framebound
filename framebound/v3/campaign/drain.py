@@ -22,8 +22,9 @@ def run(root,campaign,*,parent_batch,version,specialist,max_cases=20):
     if not report.get('deferred') or any(v not in {'URLError','TimeoutError','ConnectionResetError','Stopped'} for v in report['deferred'].values()):
         raise ValueError('parent requires a diagnosed transport interruption')
     with ledger.db() as db:
-        unresolved=list(db.execute("SELECT r.case_id,r.state,i.request_id isolated FROM requests r LEFT JOIN unknown_isolations i ON i.request_id=r.id WHERE r.campaign=? AND r.state IN ('wire_started','provider_pending','unknown_provider_outcome')",(campaign,)))
-    if (not unresolved or any(r['state']!='unknown_provider_outcome' or not r['isolated']
+        unresolved=list(db.execute("SELECT r.case_id,r.state,r.acceptance,i.request_id isolated FROM requests r LEFT JOIN unknown_isolations i ON i.request_id=r.id WHERE r.campaign=? AND r.state IN ('wire_started','provider_pending','unknown_provider_outcome')",(campaign,)))
+    if (not any(r['isolated'] for r in unresolved) or any(
+            (not r['isolated'] and not (r['state'] in {'provider_pending','wire_started'} and r['acceptance']))
             or r['case_id'] not in request['case_ids'] for r in unresolved)):
         raise ValueError('only permanently isolated unknown members of this exact interrupted cohort may be skipped')
     out=local_path(root,f'campaigns/{campaign}/drains/{version}')
@@ -43,5 +44,10 @@ def run(root,campaign,*,parent_batch,version,specialist,max_cases=20):
         evidence=cohort_evidence(ledger,config,request['case_ids'])
         result.update(parent_batch=parent_batch,stage_release_permitted=False,original_cohort_evidence=evidence,
                       unknowns_preserved=True,parent_artifacts_unchanged=True)
+        if any(r['state']=='provider_pending' or (r['state']=='wire_started' and r.get('provider_response_id'))
+                for r in result['status']['requests']):
+            result['waiting_for_response']=True
+            temporary=out/'pending.tmp';temporary.write_bytes(canonical(result));temporary.replace(out/'pending.json')
+            return result
         result_file.write_bytes(canonical(result))
         return result

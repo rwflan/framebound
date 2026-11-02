@@ -746,8 +746,9 @@ class Runner:
             if isolated_continuation:
                 if case_ids is None:raise ValueError('isolated continuation requires the exact frozen cohort')
                 with self.ledger.db() as db:
-                    unknowns=list(db.execute("SELECT r.id,r.case_id,i.request_id isolated FROM requests r LEFT JOIN unknown_isolations i ON i.request_id=r.id WHERE r.campaign=? AND r.state IN ('wire_started','provider_pending','unknown_provider_outcome')",(self.campaign,)))
-                if not unknowns or any(not r['isolated'] for r in unknowns):
+                    unknowns=list(db.execute("SELECT r.id,r.case_id,r.state,r.acceptance,i.request_id isolated FROM requests r LEFT JOIN unknown_isolations i ON i.request_id=r.id WHERE r.campaign=? AND r.state IN ('wire_started','provider_pending','unknown_provider_outcome')",(self.campaign,)))
+                if not any(r['isolated'] for r in unknowns) or any(
+                        not r['isolated'] and not (r['state'] in {'provider_pending','wire_started'} and r['acceptance']) for r in unknowns):
                     raise ValueError('every unresolved request must already be permanently isolated')
                 blocked_families=self.ledger.isolated_families()
                 with self.ledger.db() as db:
