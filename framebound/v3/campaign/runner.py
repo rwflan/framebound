@@ -734,7 +734,7 @@ class Runner:
                             if candidate.id not in allowed or len(candidate.holds)!=6:continue
                             result=self.ledger.progress(self.campaign,candidate.id)['result']
                             assessment=(result or {}).get('after_assessment') or (result or {}).get('assessment')
-                            if assessment and any(c['status'] in {'present','absent_within_assessed_scope'} and c['slots'] for c in assessment['coverage']):
+                            if (result or {}).get('outcome') in {'accepted','unchanged','ambiguous'} and assessment and any(c['status'] in {'present','absent_within_assessed_scope'} and c['slots'] for c in assessment['coverage']):
                                 evidence.append(candidate.id)
                             if len(evidence)==2:
                                 enable_long_sequences(self.root,self.campaign,evidence)

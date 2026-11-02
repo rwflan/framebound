@@ -435,3 +435,24 @@ def test_other_admitted_failures_do_not_consume_selected_cohort_allowance(tmp_pa
     monkeypatch.setattr(runner,'case',lambda case:(calls.append(case.id) or dict(outcome='ambiguous')))
     result=runner.run(max_cases=1,case_ids=selected)
     assert len(calls)==1 and not result['status']['stopped'] and not result['status']['requests']
+
+
+def test_capability_selection_skips_semantically_rejected_terminal_case(tmp_path,monkeypatch):
+    config=curriculum('capability-selection')
+    cases=[c for c in config.cases if c.stage=='pilot' and len(c.holds)==6][:3]
+    config=config.model_copy(update={'cases':cases,'prices':Prices(verified_at='engineering',source='synthetic')})
+    ledger=Ledger(tmp_path);ledger.plan(config)
+    assessment=dict(coverage=[dict(category='parts',status='absent_within_assessed_scope',slots=[0],limitations='synthetic')])
+    for case,outcome in zip(cases,['ambiguous','rejected','unchanged']):
+        ledger.finish_case(config.id,case.id,outcome,dict(outcome=outcome,assessment=assessment))
+    from framebound.v3.campaign.runner import enable_long_sequences
+    with pytest.raises(ValueError,match='completed assessed evidence'):
+        enable_long_sequences(tmp_path,config.id,[cases[1].id,cases[0].id])
+    runner=Runner(tmp_path,config.id,EngineeringSpecialist());enabled=[]
+    monkeypatch.setattr(runner,'case',lambda c:ledger.progress(config.id,c.id)['result'])
+    monkeypatch.setattr('framebound.v3.campaign.runner.enable_long_sequences',lambda root,campaign,ids:enabled.append(list(ids)))
+    result=runner.run(case_ids=[c.id for c in cases])
+    assert not result['status']['stopped'] and not result['deferred']
+    assert enabled and all(ids==[cases[0].id,cases[2].id] for ids in enabled)
+    assert ledger.progress(config.id,cases[1].id)['result']['outcome']=='rejected'
+    assert not result['status']['requests']
