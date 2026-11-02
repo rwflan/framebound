@@ -185,6 +185,17 @@ generation concurrency, request timeouts, family quarantine and scientific
 configuration remain unchanged. These operations are CLI-only and never an
 implicit consequence of planning or querying status.
 
+After every unaffected member of that interrupted batch has closed, an explicit
+`continue-admitted` request may collect up to20 remaining cases from the SAME
+already-released pilot. It binds `parent_version`, a new immutable `version`,
+the original pilot release and the unchanged configuration. The previous cohort
+must still meet its original scoped-coverage, source and receipt thresholds;
+only permanently isolated unknown members may remain incomplete. The new fixed
+case list is frozen before dispatch, selected from unfinished admitted pilot
+cases without replacing the old unknown specimen. No expansion or final cases
+are admitted and no old report, denominator or outcome is rewritten. Full pilot
+release remains blocked until the original full-cohort requirements are met.
+
 A received repair or blind-rerun source that fails strict isolation is retained
 as a candidate acquisition failure, without submitting or assessing that candidate.
 The valid baseline and its scoped labels remain intact; the failed repair stays
