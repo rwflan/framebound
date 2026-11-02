@@ -39,7 +39,7 @@ class EngineeringSpecialist:
         return Response(canonical(body),request['quote'],int(request['images']>0),dict(response_id='TEST-ONLY-'+str(len(self.sends)),observed_model=request['payload']['requested_model']))
 
 
-@pytest.mark.parametrize('source_policy',['single-anchor-keyed-v2','declared-sheet-rules-v3'])
+@pytest.mark.parametrize('source_policy',['single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4'])
 def test_single_anchor_wire_preserves_key_and_separates_animation(tmp_path,source_policy):
     from datetime import datetime,timezone
     from framebound.v3.campaign.curriculum import upskill_curriculum,protocol
@@ -66,6 +66,9 @@ def test_single_anchor_wire_preserves_key_and_separates_animation(tmp_path,sourc
     derivation=generated['payload']['conditioning_derivations'][0]
     assert derivation['alpha_backdrop']['operator']=='explicit-conditioning-key-backdrop-v1'
     assert derivation['source_sha256']!=derivation['output_sha256']
+    if source_policy=='native-layout-key-v4':
+        assert generated['payload']['conditioning_derivations'][1]['source_size']==[1536,1024]
+        assert 'Single anchor only; no placement sheet' in anchor_text
     diagnose=next(q for q in specialist.sends if q['operation']=='diagnose')
     teacher_text=diagnose['payload']['wire']['input'][0]['content'][0]['text']
     assert 'end_exclusive' in teacher_text and 'nonempty limitations' in teacher_text

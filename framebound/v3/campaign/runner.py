@@ -80,7 +80,7 @@ class Runner:
                 for original in images:
                     with Image.open(io.BytesIO(original)) as source:
                         preview=source.convert('RGBA');source_size=preview.size
-                        keyed_preview=getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3'}
+                        keyed_preview=getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4'}
                         if keyed_preview:
                             backdrop=Image.new('RGBA',preview.size,(255,0,255,255))
                             preview=Image.alpha_composite(backdrop,preview)
@@ -137,13 +137,16 @@ class Runner:
             path.write_bytes(canonical(dict(request_id=existing['id'],sha256=hashlib.sha256(image).hexdigest())))
             return existing['id'],image
         text='Create one original isolated design anchor for the declared entity graph; do not invent an actor for an effect-only graph. No existing character or source reference. '+case.request
-        if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3'}:
+        if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4'}:
             text=('Draw exactly ONE original subject in ONE neutral pose, centered in ONE square canvas. '
                 'This is a single design reference: no animation, pose sequence, turnaround, contact sheet or duplicate subject. '
                 +case.request.split('ANIMATION EXERCISE:')[0])
-            if self.config.source_policy=='declared-sheet-rules-v3':
+            if self.config.source_policy in {'declared-sheet-rules-v3','native-layout-key-v4'}:
                 text+=' The single anchor canvas has NO separator, rule or border; the technical sheet-rule declaration applies only to later animation sheets.'
         text+=' Style treatment: '+self.config.treatments[case.treatment]+' Graph: '+canonical(case.complexity).decode()
+        if getattr(self.config,'source_policy','legacy-v1')=='native-layout-key-v4':
+            text=text.replace('Follow the supplied placement template: subject size and cell centers are fixed; change poses without zooming, adding borders or changing the background.',
+                'Single anchor only; no placement sheet is requested for this image.')
         rid,raw,receipt=self._call(case,'anchor',text,image=True)
         image=extract_image(raw)
         with Image.open(io.BytesIO(image)) as check: check.verify()
@@ -211,6 +214,19 @@ class Runner:
         for sheet in range(math.ceil(len(case.holds)/6)):
             start=sheet*6;count=min(6,len(case.holds)-start)
             refs=[anchor];conditioning=[spec['inputs'][0]['asset_id']]
+            if getattr(self.config,'source_policy','legacy-v1')=='native-layout-key-v4':
+                identity=self._frames([spec['inputs'][0]['asset_id']])[0]
+                bounds=identity.getbbox()
+                if not bounds:raise AcquisitionRejected('Empty identity cannot form a placement template')
+                subject=identity.crop(bounds);subject.thumbnail((256,256),Image.Resampling.LANCZOS)
+                template=Image.new('RGBA',(1536,1024),(255,0,255,255))
+                for pos in range(6):
+                    template.alpha_composite(subject,(pos%3*512+(512-subject.width)//2,pos//3*512+(512-subject.height)//2))
+                template_id=spec['inputs'][0]['asset_id']+'-layout'
+                write_derived(self.project,template_id,template,[spec['inputs'][0]['asset_id']],dict(
+                    operator='identity-placement-template-v1',purpose='Conditioning placement only; repeated reference poses are not generated or labeled sequence data',
+                    canvas=[1536,1024],cell=[512,512],subject_max=[256,256],source_bbox=list(bounds),resampling='LANCZOS'))
+                refs.append(png(template));conditioning.append(template_id)
             if boundary is not None:
                 refs.append(png(boundary));conditioning.append(frame_ids[-1])
             if baseline:
@@ -220,11 +236,13 @@ class Runner:
             instruction=case.request+'\nStyle treatment: '+self.config.treatments[case.treatment]+' Detail: '+case.detail+'\n'+canonical(dict(holds=case.holds,loop=case.loop,complexity=case.complexity.model_dump(),sheet=sheet,
                 native_slots=list(range(start,start+count)))).decode()
             instruction+='\nReturn a row-major 3-by-2 sheet of six distinct square poses. Preserve original anchor identity; the last input boundary pose fixes continuity.'
+            if getattr(self.config,'source_policy','legacy-v1')=='native-layout-key-v4':
+                instruction+='\nThe second input is a placement template, not animation evidence. Keep its cell centers, subject scale and uninterrupted magenta surround. Replace every repeated reference with the appropriate distinct ordered pose. Visible separators are unnecessary; do not zoom or add a matte.'
             if self.config.schema_version=='2.0':
                 instruction+='\nLAYOUT: exactly THREE COLUMNS and TWO ROWS of equal square cells. Top row: poses 0,1,2. Bottom row: poses 3,4,5. No gutters, grid rules or labels. Keep the complete subject and generous magenta margins inside every cell.'
-            if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3'}:
+            if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4'}:
                 instruction+='\nAt 1536x1024, each cell is 512x512. Subject and prop must fit within local x=128..383, y=128..383 in EACH cell. All pixels outside those central bounds must be pure #FF00FF. The reference backdrop is the exact technical key, never a style sample. Draw one ordered pose per cell, six total.'
-            if getattr(self.config,'source_policy','legacy-v1')=='declared-sheet-rules-v3':
+            if getattr(self.config,'source_policy','legacy-v1') in {'declared-sheet-rules-v3','native-layout-key-v4'}:
                 instruction=instruction.replace('No gutters, grid rules or labels.',
                     'Only the explicitly declared uniform white technical cell-edge rules are allowed; no labels or interior boxes.').replace(
                     'All pixels outside those central bounds must be pure #FF00FF.',
@@ -254,14 +272,19 @@ class Runner:
                 if source.width*source.height>16777216 or source.width%3 or source.height%2 or source.width//3!=source.height//2:
                     raise ValueError('wrong-size sheet; stop before repeating this request shape')
                 w=source.width//3;h=source.height//2
-                crops=[source.crop((i%3*w,i//3*h,i%3*w+w,i//3*h+h)).convert('RGBA').resize((256,256),Image.Resampling.LANCZOS) for i in range(count)]
+                native_crops=[source.crop((i%3*w,i//3*h,i%3*w+w,i//3*h+h)).convert('RGBA') for i in range(count)]
+                crops=[im.resize((256,256),Image.Resampling.LANCZOS) for im in native_crops]
             raw_crops=crops
             extractions=[]
             if 'DECLARED EXTRACTION KEY:' in case.request:
                 from ..intake import cell
-                try:extracted=[cell(frame,declared_white_rules=getattr(self.config,'source_policy','legacy-v1')=='declared-sheet-rules-v3') for frame in crops]
+                native_first=getattr(self.config,'source_policy','legacy-v1')=='native-layout-key-v4'
+                try:extracted=[cell(frame,declared_white_rules=getattr(self.config,'source_policy','legacy-v1') in {'declared-sheet-rules-v3','native-layout-key-v4'},
+                    rule_pixels=max(1,8*w//256) if native_first else 8) for frame in (native_crops if native_first else crops)]
                 except ValueError as exc:raise AcquisitionRejected(str(exc)) from exc
-                crops=[im for im,recipe in extracted];extractions=[recipe for im,recipe in extracted]
+                crops=[im.resize((256,256),Image.Resampling.LANCZOS) if native_first else im for im,recipe in extracted];extractions=[recipe for im,recipe in extracted]
+                if native_first:
+                    for recipe in extractions:recipe.update(operation_order='native crop/key extraction before resize',native_cell=[w,h],canonical_cell=[256,256],canonical_rule_limit=8)
             if baseline:
                 local_scope=Scope(slots=[s-start for s in scope.slots if start<=s<start+count] or [0],roi=scope.roi)
                 if any(start<=s<start+count for s in scope.slots): crops=composite(baseline[start:start+count],crops,local_scope)
@@ -322,11 +345,11 @@ class Runner:
         rubric=DIAGNOSIS_RUBRIC+(' Independent preservation audit: inspect each subject, legitimate deformation and event order without seeing another assessment.' if ordinal%2 else '')
         if getattr(self.config,'assessment_policy','legacy-v1')=='independent-coverage-v2':
             rubric+='\nUse the stable subject label primary actor for the sole original actor, and held prop for its prop. Inspect all nine categories; prioritize temporal and artifacts when applicable. Independently assess every supplied native frame. Negative coverage must list every actually assessed slot; abstain on unobserved scope. Do not invent a defect to balance classes. Do not invent an ROI or part when evidence only supports a whole actor or canvas observation. Preserve actual affected slots and tick ranges for positive findings; legitimate holds and smears remain counterexamples.'
-        if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3'}:
+        if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4'}:
             context['tick_bounds']=dict(start=0,end_exclusive=sum(case.holds),
                 slots=[dict(slot=i,start=sum(case.holds[:i]),end_exclusive=sum(case.holds[:i+1])) for i in range(len(case.holds))])
             rubric+='\nEvery coverage entry requires a nonempty limitations string describing actual observed scope. Tick ranges are authored ticks, not frame numbers or milliseconds: 0 <= start < end <= '+str(sum(case.holds))+'. Loop windows may wrap slots, but never extend a finding tick_range beyond this bound. If unsupported, abstain; do not clamp invented ranges.'
-        if getattr(self.config,'source_policy','legacy-v1')=='declared-sheet-rules-v3':
+        if getattr(self.config,'source_policy','legacy-v1') in {'declared-sheet-rules-v3','native-layout-key-v4'}:
             rubric+='\nFor EACH finding, every reported slot interval in tick_bounds must overlap its tick_range. Use the actual tick interval of the listed slots, never the slot number as a tick. For a loop-boundary finding spanning the last and first slots, its range envelope may be [0, end_exclusive]; list only the actually affected native slots. Required finding fields: id, category, slots, tick_range, subject, severity (minor/material/critical), observed, expected, counterexamples, visibility. If any field or timing cannot be supported, omit that finding and mark its category not_assessed; never invent or repair evidence.'
         text=rubric+'\nFor any assessed category, list actual native slots (0 to '+str(len(frames)-1)+'). No props or no extraction means not_assessed, not an empty-scope negative label. Include a visibility field in every finding.\nCoverage present means a DEFECT exists in that category, never that an entity or property exists. Every present category MUST have a corresponding localized finding. Explicitly include visibility=supported only when the pose and observations support a defect. Opaque backdrops do not establish extraction defects unless extraction was actually performed.\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
         rid,raw,receipt=self._call(case,'diagnose',text,[anchor,*[png(f) for f in frames]],attempt=ordinal,parents=[revision_id])

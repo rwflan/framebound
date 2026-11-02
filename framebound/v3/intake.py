@@ -80,12 +80,14 @@ def keyed(image, key=(255,0,255)):
     return result,dict(operator='declared-border-key-v1',key=list(key),max_channel_distance=70,removed_pixels=int(mask.sum()),enclosed_key_pixels=enclosed,edge_unmatting='nearest clean subject sample within 4px; two-pixel boundary band',edge_pixels=corrected,residual_boundary_key_pixels=residual,policy=VERSION)
 
 
-def cell(image, *, declared_white_rules=False):
+def cell(image, *, declared_white_rules=False, rule_pixels=8):
     """Remove at most eight uniform sheet-rule pixels at an outer cell edge.
 
     Only a full, near-black straight rule (or explicitly declared white rule) is removable. Subject pixels and
     nonuniform scenery are never inferred as a rule. Alpha is still validated.
     """
+    if type(rule_pixels) is not int or not 1<=rule_pixels<=min(64,max(8,8*min(image.size)//256)):
+        raise ValueError('bounded native rule width required')
     if inspect(image)['eligible']:return keyed(image)
     a=np.array(image.convert('RGBA'));removed=[]
     original_key=np.max(np.abs(a[:,:,:3].astype(int)-np.array([255,0,255])),axis=2)<=70
@@ -95,18 +97,18 @@ def cell(image, *, declared_white_rules=False):
     # bounded outer band, then use that evidence for its declared edge system.
     observed_cell_rule=False
     if declared_white_rules:
-        for band in (a[:8],a[-8:],a[:,:8].transpose(1,0,2),a[:,-8:].transpose(1,0,2)):
-            trim=min(8,band.shape[1]//4)
+        for band in (a[:rule_pixels],a[-rule_pixels:],a[:,:rule_pixels].transpose(1,0,2),a[:,-rule_pixels:].transpose(1,0,2)):
+            trim=min(rule_pixels,band.shape[1]//4)
             if trim and any((line[trim:-trim,:3]>=235).all(axis=1).mean()>=.98 for line in band):
                 observed_cell_rule=True
     for edge in ('top','bottom','left','right'):
         def line_at(depth):
             return a[depth] if edge=='top' else a[-1-depth] if edge=='bottom' else a[:,depth] if edge=='left' else a[:,-1-depth]
         depth_to_key=None;white_seen=None;needs_white=False
-        for depth in range(min(9,min(a.shape[:2])//4)):
+        for depth in range(min(rule_pixels+1,min(a.shape[:2])//4)):
             rgb=line_at(depth)[:,:3].astype(int)
             key_line=np.max(np.abs(rgb-np.array([255,0,255])),axis=1)<=70
-            trim=min(8,len(rgb)//4)
+            trim=min(rule_pixels,len(rgb)//4)
             white_line=(rgb>=235).all(axis=1)
             white_seen=white_line if white_seen is None else white_seen|white_line
             has_white_rule=observed_cell_rule or bool(trim>0 and white_seen[trim:-trim].mean()>=.98)
@@ -135,5 +137,6 @@ def cell(image, *, declared_white_rules=False):
     recipe['uniform_sheet_rules_removed']=removed
     if declared_white_rules:
         recipe['white_sheet_rules_explicitly_declared']=True
+        if rule_pixels!=8:recipe['native_rule_pixel_limit']=rule_pixels
         recipe['white_rule_edge_recipe']='observed-white-then-key-segment-v2; existing 8px maximum'
     return result,recipe
