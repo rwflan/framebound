@@ -9,7 +9,9 @@ export type View =
         | "export"
         | "activity"
         | "status"
-        | "references";
+        | "references"
+        | "training"
+        | "settings";
     }
   | { name: "packet"; id: string }
   | { name: "compare"; base: string; other: string }
@@ -26,7 +28,7 @@ export function parseHash(): View {
   if (path === "issues")
     return { name: "issues", revision: q.get("revision") || undefined };
   if (
-    ["corrections", "export", "activity", "status", "references"].includes(path)
+    ["corrections", "export", "activity", "status", "references", "training", "settings"].includes(path)
   )
     return { name: path as "export" };
   return { name: "inbox" };
@@ -150,9 +152,11 @@ export function Icon({
     | "history"
     | "search"
     | "expand"
-    | "film";
+    | "film"
+    | "settings";
 }) {
   const paths = {
+    settings: "M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6",
     left: "m14 6-6 6 6 6",
     right: "m10 6 6 6-6 6",
     play: "m8 5 11 7-11 7Z",

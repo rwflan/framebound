@@ -2,8 +2,10 @@ import {useEffect,useRef} from 'react';
 import type {ReactNode} from 'react';
 import {Icon} from './shared';
 import './utilities.css';
-export type Utility='export'|'status'|'reviewed-guides';
-const utilities:{id:Utility;title:string;description:string;icon:'folder'|'history'|'frame'}[]=[
+export type Utility='export'|'status'|'reviewed-guides'|'training'|'settings';
+const utilities:{id:Utility;title:string;description:string;icon:'folder'|'history'|'frame'|'film'|'settings'}[]=[
+ {id:'training',title:'Train a model',description:'Build a model with your own evidence',icon:'film'},
+ {id:'settings',title:'Settings',description:'Meta and Modal connections',icon:'settings'},
  {id:'export',title:'Export',description:'Preview and save a local snapshot',icon:'folder'},
  {id:'status',title:'Status',description:'Current work and framework evidence',icon:'history'},
  {id:'reviewed-guides',title:'Reviewed guides',description:'Reference images and edit authority',icon:'frame'},

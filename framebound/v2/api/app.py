@@ -124,6 +124,78 @@ def create_app(project_dir: str) -> FastAPI:
     app.state.project_dir = project_dir
 
 
+    def training_call(function,*args):
+        from pydantic import ValidationError
+        try:return function(*args)
+        except ValidationError:
+            raise InvalidInput('Check the training fields; credentials and settings must match the requested format') from None
+        except ValueError as error:
+            raise InvalidInput(str(error)) from None
+
+    @app.on_event('startup')
+    def training_resume_saved():
+        from ...v3.services import training
+        training.resume_saved(project_dir)
+
+    @app.get('/v3/settings/providers')
+    def training_providers():
+        from ...v3.services import training
+        return training_call(training.providers,project_dir)
+
+    @app.put('/v3/settings/providers')
+    def training_configure(body: dict, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import training
+        return training_call(training.configure,project_dir,actor(x_session_token,None),body)
+
+    @app.get('/v3/training')
+    def training_list():
+        from ...v3.services import training
+        return training_call(training.listing,project_dir)
+
+    @app.post('/v3/training')
+    def training_create(body: dict, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import training
+        return training_call(training.create,project_dir,actor(x_session_token,None),body)
+
+    @app.get('/v3/training/worker-image')
+    def training_worker_image():
+        from ...v3.services import training
+        return training_call(training.worker_image)
+
+    @app.get('/v3/training/{identifier}')
+    def training_status(identifier: str):
+        from ...v3.services import training
+        return training_call(training.snapshot,project_dir,identifier)
+
+    @app.post('/v3/training/{identifier}/start')
+    @app.post('/v3/training/{identifier}/resume')
+    def training_start(identifier: str, body: dict, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import training
+        return training_call(training.start,project_dir,actor(x_session_token,None),identifier,body)
+
+    @app.post('/v3/training/{identifier}/pause')
+    def training_pause(identifier: str, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import training
+        return training_call(training.pause,project_dir,actor(x_session_token,None),identifier)
+
+
+    @app.post('/v3/training/{identifier}/review')
+    def training_review(identifier: str, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import training
+        from ..services.authz import require_reviewer
+        require_reviewer(actor(x_session_token,None),'review_training_support')
+        return training_call(training.review_support,project_dir,identifier)
+
+    @app.post('/v3/training/{identifier}/compute')
+    def training_compute(identifier: str, body: dict, x_session_token: str | None = Header(default=None)):
+        from ...v3.services import training
+        return training_call(training.configure_compute,project_dir,actor(x_session_token,None),identifier,body)
+
+    @app.get('/v3/training/{identifier}/model')
+    def training_model(identifier: str):
+        from ...v3.services import training
+        return Response(training_call(training.model_artifact,project_dir,identifier),media_type='application/zip',headers={'Content-Disposition':'attachment; filename="framebound-model.zip"'})
+
     @app.post('/v3/campaigns/{campaign_id}/{action}')
     def campaign_control(campaign_id: str, action: str, body: dict):
         from ...v3.campaign.service import operate

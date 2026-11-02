@@ -184,6 +184,7 @@ def get(project_dir: str, task_id: str) -> dict:
 
 def compile_inputs(project_dir: str, task_id: str) -> dict:
     record = get(project_dir, task_id)
+    from ..guidance import compile_guidance
     con = S.connect(project_dir)
     assets = []
     try:
@@ -216,7 +217,8 @@ def compile_inputs(project_dir: str, task_id: str) -> dict:
                 source_assets.append(dict(id=aid,byte_sha256=asset['byte_sha256'],pixel_sha256=asset.get('pixel_sha256'),
                                           blob_path=str(blob.relative_to(Path(project_dir))),http_path=f'/api/asset/{aid}'))
         finally:con.close()
-    return {'source_assets':source_assets,'schema_version': '3.0', 'task_id': task_id,
+    return {'generation_guidance':compile_guidance(record['spec']),
+            'source_assets':source_assets,'schema_version': '3.0', 'task_id': task_id,
             'spec_sha256': record['spec_sha256'], 'assets': assets, 'intent': record['spec']['intent'],
             'spec': record['spec'], 'requirements': record['requirements'],
             'execution': 'external_agent', 'provider_execution_authorized': False,

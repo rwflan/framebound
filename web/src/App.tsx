@@ -1,4 +1,5 @@
 import {UtilitiesMenu,UtilityWindow} from './DeskUtilities';
+import {TrainingJourney,ProviderSettings} from './TrainingJourney';
 import {KeyboardGuide} from './KeyboardGuide';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
@@ -577,6 +578,8 @@ function LegacyApp() {
                 {view.name === "export" && <UtilityWindow view="export"><ExportView /></UtilityWindow>}
                 {view.name === "references" && <UtilityWindow view="reviewed-guides"><ReferencesView /></UtilityWindow>}
                 {view.name === "status" && <UtilityWindow view="status"><StatusView /></UtilityWindow>}
+                {view.name === "training" && <UtilityWindow view="training"><TrainingJourney/></UtilityWindow>}
+                {view.name === "settings" && <UtilityWindow view="settings"><ProviderSettings/></UtilityWindow>}
               </div>
             )}
           </main>

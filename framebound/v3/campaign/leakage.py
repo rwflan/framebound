@@ -104,6 +104,10 @@ def exclusions(examples,dataset,*,evidence=None):
     that different drawings are the same input. Historical one-stage behavior
     remains available as legacy_exclusions for reproducing retained reports.
     """
+    # Closed exports share content-addressed conditioning and original pixels
+    # across revisions. Reusing an identical ordered pair result changes no
+    # decision or metric and avoids repeating expensive full-resolution proof.
+    compare = lru_cache(maxsize=8192)(confirm_near_duplicate)
     parent={e['metadata']['id']:e['metadata']['id'] for e in examples}
     def find(value):
         while parent[value]!=value:
@@ -126,7 +130,7 @@ def exclusions(examples,dataset,*,evidence=None):
                 if (value^other).bit_count()>4:continue
                 for other_rid,other_path in seen[other]:
                     if find(rid)==find(other_rid):continue
-                    result=confirm_near_duplicate(path,other_path)
+                    result=compare(path,other_path)
                     if evidence is not None:evidence.append(dict(left=rid,right=other_rid,hash_hamming=(value^other).bit_count(),**result))
                     if result['confirmed']:union(rid,other_rid)
             seen[value].append((rid,path))
