@@ -18,3 +18,14 @@
 
 .review-tag{display:inline-flex;align-items:center;max-width:100%;box-sizing:border-box;padding:2px 5px;border:1px solid #c5bdab;border-radius:3px;background:#e9e5da;color:#746b59;font-size:9px;font-weight:500;line-height:1.35;vertical-align:middle;white-space:normal;text-align:left;letter-spacing:0}.queue-item .review-tag{margin-top:5px}.review-tag.review{background:#eee1bf;border-color:#cebd91;color:#796135}.review-tag.verify{background:#dfe9e6;border-color:#aebfb6;color:#48695b}.review-tag.incomplete{background:#eee0c9;border-color:#d1b998;color:#896536}.review-tag.blocked{background:#f0ded2;border-color:#d3ae97;color:#924d32}.review-tag.working{background:#e1e7ed;border-color:#b6c1ce;color:#526a81}.review-tag.approved{background:#dce8d8;border-color:#b0c4a5;color:#4e6c43}.viewer-title>.review-tag{flex-shrink:0;max-width:220px}.review-reason-evidence>summary{margin-bottom:8px}.review-reason-evidence:not([open]){padding-bottom:0;border-bottom:0;margin-bottom:14px}
 .review-queue:has(>.animation-review-queue){background:#eae6db;border-top:1px solid #cfc7b5;box-shadow:inset 0 1px #fbf8ef80}.animation-review-queue>.queue-heading{background:#eae6db}.animation-review-queue .queue-item:hover{background:#e2ddcf}
+/* Intake uses the film window's paper and keeps detailed evidence on demand. */
+.review-intake-empty{padding:24px;align-items:center;text-align:left}
+.intake-decision{width:min(100%,440px);padding:18px 20px;border:1px solid #c8bda8;background:#f4eddf;box-shadow:3px 3px #e0d6c4}
+.intake-decision-mark{display:inline-grid;place-items:center;width:19px;height:19px;margin-right:8px;border:1px solid #bd9c7b;background:#f1dfc8;color:#8c563d;font-size:11px;font-weight:700}
+.intake-decision>strong{font-size:13px;color:#50432f}
+.intake-decision>p{margin:10px 0 15px;font-size:11px;line-height:1.5;color:#786a52}
+.intake-decision>button{font-size:11px}
+.intake-decision details{border-top:1px solid #d4c7ae;margin-top:16px;padding-top:10px;color:#75664d;font-size:11px}
+.intake-decision summary{cursor:pointer;font-weight:600}
+.intake-decision details p{font-size:11px;line-height:1.5}
+.intake-decision ul{padding-left:18px;line-height:1.5}
