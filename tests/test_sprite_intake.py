@@ -88,6 +88,17 @@ def test_scaled_white_rule_antialiasing_keeps_subject_and_requires_white_seed():
         varied.putpixel((x,1),(248,180,247,255) if x%2 else (255,255,255,255))
     result,recipe=cell(varied,declared_white_rules=True)
     assert inspect(result)['eligible'] and result.getpixel((30,30))==(255,255,255,255)
+
+
+def test_native_rule_budget_preserves_canonical_eight_pixel_limit():
+    im=Image.new('RGBA',(640,640),'#ff00ff');d=ImageDraw.Draw(im)
+    d.ellipse((180,180,460,460),fill='blue');d.rectangle((0,0,639,17),fill='white')
+    result,recipe=cell(im,declared_white_rules=True,rule_pixels=8*640//256)
+    assert inspect(result.resize((256,256),Image.Resampling.LANCZOS))['eligible']
+    assert recipe['native_rule_pixel_limit']==20
+    d.rectangle((0,0,639,20),fill='white')
+    with pytest.raises(ValueError):cell(im,declared_white_rules=True,rule_pixels=20)
+    with pytest.raises(ValueError):cell(im,rule_pixels=65)
     split=Image.new('RGBA',(64,64),(240,0,216,255));d=ImageDraw.Draw(split)
     d.ellipse((20,20,40,40),fill='white');d.rectangle((0,0,63,2),fill='white')
     d.rectangle((0,63,63,63),fill=(228,77,225,255))

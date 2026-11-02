@@ -102,6 +102,15 @@ inward-key proof and alpha gate still apply. Pink-only borders, wrong keys and
 wide mattes remain unsuitable. Record the edge recipe in the derivation; never
 silently reinterpret prior closed rejections after a decoder correction.
 
+`native-layout-key-v4` is a separate opt-in acquisition experiment. It derives
+an explicitly recorded six-cell placement template from the family's isolated
+identity anchor; the repeated reference poses guide size/position and never enter
+sequence labels or training examples. Native cell extraction precedes resizing,
+so downsampling cannot destroy separator evidence. The native rule allowance is
+scaled to the same eight canonical pixels, and the resulting256-square alpha
+frames still pass the unchanged isolation gate. Earlier policies retain their
+processing order and frozen outputs. Source failures remain failures.
+
 ## 3. Execute fixed, restartable batches
 
 `campaign upskill-plan` reports the next admissible action without funding or
