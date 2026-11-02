@@ -164,6 +164,27 @@ and rate evidence. The participant's aggregate authorization includes historical
 costs and unresolved reservations across all campaigns. No action resets spend.
 Release, funding and actual request reservation each retain their own checks.
 
+### Continue unaffected work after an isolated transport interruption
+
+`campaign drain-isolated --muse --request FILE` finishes only unaffected members
+of an existing frozen cohort. The request names `parent_batch`, an immutable new
+`version`, and at most20 `max_cases`. It requires the parent's actual interrupted
+report, matching configuration and exact case list, permanent isolation of every
+unknown request, and no active accepted response. It cannot replenish a failed
+source cohort, retry the unknown family, select replacement cases or release a
+stage. The original cohort remains incomplete and its original denominator and
+75%/25% gates remain unchanged. The parent report stays immutable; the campaign
+returns to stopped after the bounded continuation, including on exceptions.
+
+If two unknown assessment jobs occupy the default two slots, an explicit local
+`recovery-capacity` amendment can admit one additional assessment slot, expiring
+within24hours. It requires current account/provider-capacity evidence and keeps
+ALL unknown jobs counted: two uncertain jobs plus one active job equals the
+three-slot bound. It does not cancel or declare any old job finished. Budget,
+generation concurrency, request timeouts, family quarantine and scientific
+configuration remain unchanged. These operations are CLI-only and never an
+implicit consequence of planning or querying status.
+
 A received repair or blind-rerun source that fails strict isolation is retained
 as a candidate acquisition failure, without submitting or assessing that candidate.
 The valid baseline and its scoped labels remain intact; the failed repair stays
