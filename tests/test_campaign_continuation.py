@@ -383,3 +383,36 @@ def test_recovery_keeps_blocked_snapshot_and_exact_original_cohort(tmp_path,monk
     assert continuation.step(tmp_path,config.id,request,object())==recovered and len(calls)==2
     with pytest.raises(Stopped,match='cannot be replenished'):
         continuation.step(tmp_path,config.id,dict(request,batch='another-recovery',recovery_of='original'),object())
+
+
+@pytest.mark.parametrize('recovered',[False,True])
+def test_closed_step_replay_during_other_active_batch_is_read_only(tmp_path,recovered):
+    from framebound.v3.campaign.contracts import digest
+    config=upskill_curriculum('closed-history-fixture');ledger=Ledger(tmp_path);ledger.plan(config)
+    request=dict(batch='earlier',max_cases=2,allocation_microdollars=2000000,evidence=evidence())
+    spec=continuation.Step.model_validate(request);base=continuation.folder(tmp_path,config.id);old=base/'earlier';old.mkdir()
+    ids=protocol(config)['rehearsal'][:2]
+    record=dict(spec=spec.model_dump(mode='json'),case_ids=ids,config_sha256=digest(config))
+    (old/'request.json').write_bytes(canonical(record))
+    result=dict(status='completed',case_ids=ids,marker='immutable engineering snapshot')
+    if recovered:
+        (old/'result.json').write_bytes(canonical(dict(status='blocked')))
+        child=base/'earlier-recovery';child.mkdir()
+        (child/'request.json').write_bytes(canonical(dict(record,spec=dict(record['spec'],batch='earlier-recovery',recovery_of='earlier'))))
+        (child/'result.json').write_bytes(canonical(result))
+        (old/'recovered_by.json').write_bytes(canonical(dict(batch='earlier-recovery')))
+    else:(old/'result.json').write_bytes(canonical(result))
+    active=canonical(dict(status='collecting',batch='unfinished',case_ids=['original-unfinished-case']))
+    (base/'active.json').write_bytes(active)
+    class NoPaid:
+        def execute(self,*a,**k):pytest.fail('Closed replay cannot send')
+    before={p:p.read_bytes() for p in base.rglob('*.json')}
+    assert continuation.step(tmp_path,config.id,request,NoPaid())==result
+    assert all(p.read_bytes()==content for p,content in before.items())
+    assert not ledger.status(config.id)['requests']
+    with ledger.db() as db:assert db.execute('select api_funding from campaigns where id=?',(config.id,)).fetchone()[0]==0
+    with pytest.raises(Stopped,match='unfinished fixed batch'):
+        continuation.step(tmp_path,config.id,dict(request,batch='new-cohort'),NoPaid())
+    with pytest.raises(ValueError,match='immutable'):
+        continuation.step(tmp_path,config.id,dict(request,max_cases=3),NoPaid())
+    assert (base/'active.json').read_bytes()==active

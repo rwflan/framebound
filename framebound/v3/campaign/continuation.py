@@ -143,10 +143,6 @@ def step(root,campaign,request,specialist):
     with FileLock(str(base/'coordinator.lock'),timeout=0):
         frozen=batch/'request.json';projection=batch/'result.json'
         active=base/'active.json'
-        if active.is_file():
-            active_batch=json.loads(active.read_text())
-            if active_batch['status'] in {'collecting','closing','waiting_for_response','funding_required'} and active_batch['batch']!=spec.batch:
-                raise Stopped('an unfinished fixed batch must be resumed before selecting another cohort')
         if frozen.exists():
             record=json.loads(frozen.read_text())
             if record['spec']!=spec.model_dump(mode='json'):raise ValueError('batch request is immutable')
@@ -165,7 +161,14 @@ def step(root,campaign,request,specialist):
                             raise ValueError('batch recovery does not bind the original fixed cohort')
                         return resolved
                     return old
-        else:
+        # Reading an immutable completed snapshot (or its checked completed
+        # recovery) does not select a cohort or mutate the active step. A
+        # restarted supervisor can replay history before resuming saved work.
+        if active.is_file():
+            active_batch=json.loads(active.read_text())
+            if active_batch['status'] in {'collecting','closing','waiting_for_response','funding_required'} and active_batch['batch']!=spec.batch:
+                raise Stopped('an unfinished fixed batch must be resumed before selecting another cohort')
+        if not frozen.exists():
             decision=plan(root,campaign)
             action=decision['next_action']
             if action in {'blocked','evidence_review','local_training_and_compute_review','final_evaluation_only'}:
