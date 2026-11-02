@@ -68,6 +68,7 @@ class Limits(Strict):
 class Prices(Strict):
     verified_at: str | None = None
     image_microdollars: StrictInt = Field(default=10000, ge=0)
+    segmentation_microdollars: StrictInt | None = Field(default=None,ge=0,exclude_if=lambda v:v is None)
     # Planning rates are never enough to authorize a live request.
     source: str = 'planning-only; verify before funding'
 

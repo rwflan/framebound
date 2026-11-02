@@ -257,3 +257,26 @@ stays quiet. All private experiment plans and reports remain outside Git.
 
 Primary provider references: [Meta background responses and retrieval](https://dev.meta.ai/docs/protocols/responses),
 [Meta standard pricing](https://dev.meta.ai/docs/pricing-rate-limits).
+
+## Explicit segmented-source acquisition
+
+The opt-in `sam-isolation-v5` source policy declares flat technical backing and
+model-derived alpha before any semantic assessment. It uses disjoint frozen
+families, one neutral anchor and a placement template. One stored native streamed
+`sam-3.1` still-image request segments each received anchor or six-cell sheet.
+Install the `campaign-acquisition` extra for the official parser pinned by commit;
+SAM's compressed protocol is not generic base85 or a packed bitmap. The parser
+normalizes inclusive boxes to half-open bounds, and any box-local mask scaling is
+recorded explicitly before image resizing.
+
+Each request is separately quoted using `segmentation_microdollars` and requires
+matching current funding evidence. Its original response, acceptance identity,
+mask hashes and source binding are retained. Replays consume the same receipt;
+pending acceptance resumes by GET, and unknown acceptance is never retried.
+Missing/duplicate masks, wrong dimensions, cross-cell/clipped subjects and scenic
+surroundings fail acquisition. At least 98% of unselected pixels in every cell
+must match the declared white or magenta technical backing, with at least 25%
+surroundings. This predeclared policy does not rehabilitate earlier failed media.
+The original strict alpha intake, scoped semantic assessment, corroboration,
+75% usable scope and 25% acquisition-failure gates still apply. A model mask is
+structural evidence, never artistic acceptance or automatic training readiness.
