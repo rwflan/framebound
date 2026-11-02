@@ -41,6 +41,11 @@ def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, req
         from .drain import run
         return run(root,campaign,parent_batch=request['parent_batch'],version=request['version'],
                    specialist=specialist,max_cases=request.get('max_cases',20))
+    if action=='continue-admitted':
+        if not request or specialist is None:raise ValueError('explicit previous closure and live specialist required')
+        from .drain import continue_admitted
+        return continue_admitted(root,campaign,parent_version=request['parent_version'],version=request['version'],
+                   specialist=specialist,max_cases=request.get('max_cases',20))
     if action == 'plan-upskill':
         from .curriculum import upskill_curriculum
         return ledger.plan(upskill_curriculum(campaign,**(request or {})))
@@ -167,7 +172,7 @@ def operate(root, action, *, campaign='animation-mvp-v2-keyed', config=None, req
 
 def register_cli(sub):
     parser = sub.add_parser('campaign', help='v3 local animation campaign controller')
-    parser.add_argument('action',choices=['plan','plan-upskill','upskill-plan','upskill-step','isolate-unknown','drain-isolated','recovery-capacity','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal','audit','inventory','readiness','release','fund','api-budget','baseline','profile','ablation','knowledge-build','knowledge-query','final-report','advisory-set','compute-plan','quarantine'])
+    parser.add_argument('action',choices=['plan','plan-upskill','upskill-plan','upskill-step','isolate-unknown','drain-isolated','continue-admitted','recovery-capacity','run','resume','status','stop','report','reserve','outbox','replay','export','train','features','modal','audit','inventory','readiness','release','fund','api-budget','baseline','profile','ablation','knowledge-build','knowledge-query','final-report','advisory-set','compute-plan','quarantine'])
     parser.add_argument('--root',required=True)
     parser.add_argument('--campaign',default='animation-mvp-v2-keyed')
     parser.add_argument('--config',help='Frozen config JSON file for plan')
