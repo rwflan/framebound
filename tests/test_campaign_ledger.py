@@ -91,3 +91,41 @@ def test_control_plane_uses_indexes_without_scanning_inline_wire_blobs(tmp_path)
         assert all('COVERING INDEX' in r[3] for r in resources)
     # Schema installation is repeatable and does not rewrite any outbox row.
     Ledger(tmp_path)
+
+
+def test_exact_disk_scan_excludes_symlinks_and_keeps_quota(tmp_path):
+    from types import SimpleNamespace
+    from framebound.v3.campaign.ledger import Ledger,Stopped
+    root=tmp_path/'data';root.mkdir();(root/'a').write_bytes(b'a');(root/'nested').mkdir();(root/'nested'/'b').write_bytes(b'bb')
+    external=tmp_path/'external';external.write_bytes(b'x'*1000);(root/'link').symlink_to(external);(root/'directory-link').symlink_to(root/'nested',target_is_directory=True)
+    ledger=Ledger.__new__(Ledger);ledger.root=root
+    ledger._disk(SimpleNamespace(limits=SimpleNamespace(disk_bytes=4)))
+    with pytest.raises(Stopped,match='disk quota'):ledger._disk(SimpleNamespace(limits=SimpleNamespace(disk_bytes=3)))
+
+
+def test_local_denial_audit_releases_only_phantom_slot_not_unknown_or_money(tmp_path):
+    import json
+    from framebound.v3.campaign.contracts import curriculum,Prices
+    from framebound.v3.campaign.ledger import Ledger,Stopped
+    ledger=Ledger(tmp_path);requests=[]
+    for i in range(3):
+        config=curriculum('local-proof-'+str(i));case=config.cases[0].model_copy(update={'family':'proof-family-'+str(i)})
+        config=config.model_copy(update={'cases':[case],'prices':Prices(verified_at='engineering',source='fixture')})
+        ledger.plan(config);ledger.fund(config.id,'api',1000,evidence='engineering')
+        row=ledger.reserve(config.id,case.id,'diagnose',{},quote=100);requests.append((config,case,row))
+        if i<2:
+            token=ledger.claim(row['id']);ledger.start_wire(row['id'],token);ledger.unknown(row['id'],'unacknowledged')
+    config,case,row=requests[0]
+    ledger.isolate_unknown(config.id,row['id'],dict(source='engineering',reason='no retry'))
+    (tmp_path/'report.json').write_text(json.dumps(dict(campaign=config.id,case_ids=[case.id],deferred={case.id:'Supervisor admission window ended before paid send'})))
+    (tmp_path/'adapter.py').write_text("class WindowedMuse(MuseResponses):\n def preflight(self,request):\n  super().preflight(request)\n  raise Stopped('Supervisor admission window ended before paid send')\n")
+    c3,_,q3=requests[2];token=ledger.claim(q3['id'])
+    with pytest.raises(Stopped,match='concurrency'):ledger.start_wire(q3['id'],token)
+    before=ledger.status(config.id)['api_budget']['lifetime_committed']
+    ledger.record_local_admission_denial(config.id,row['id'],batch_report='report.json',adapter_source='adapter.py')
+    assert ledger.request(row['id'])['state']=='unknown_provider_outcome'
+    assert ledger.request(row['id'])['reserved']==100
+    assert ledger.status(config.id)['api_budget']['lifetime_committed']==before
+    ledger.start_wire(q3['id'],token)
+    assert ledger.request(q3['id'])['state']=='wire_started'
+    with pytest.raises(Stopped):ledger.claim(row['id'])
