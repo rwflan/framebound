@@ -47,6 +47,7 @@ def test_white_rules_require_explicit_source_contract_and_preserve_art():
     result,recipe=cell(im,declared_white_rules=True)
     assert inspect(result)['eligible'] and result.getpixel((30,30))==(255,255,255,255)
     assert result.getpixel((30,0))[3]==0 and recipe['white_sheet_rules_explicitly_declared']
+    assert 'native_rule_pixel_limit' not in recipe # historical default derivation stays byte-compatible
     assert im.getpixel((30,0))==(255,255,255,255) # original remains untouched
     d.rectangle((0,0,63,8),fill='white') # nine-pixel matte is outside the contract
     with pytest.raises(ValueError):cell(im,declared_white_rules=True)

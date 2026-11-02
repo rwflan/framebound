@@ -86,7 +86,8 @@ def cell(image, *, declared_white_rules=False, rule_pixels=8):
     Only a full, near-black straight rule (or explicitly declared white rule) is removable. Subject pixels and
     nonuniform scenery are never inferred as a rule. Alpha is still validated.
     """
-    if type(rule_pixels) is not int or not 1<=rule_pixels<=64:raise ValueError('bounded native rule width required')
+    if type(rule_pixels) is not int or not 1<=rule_pixels<=min(64,max(8,8*min(image.size)//256)):
+        raise ValueError('bounded native rule width required')
     if inspect(image)['eligible']:return keyed(image)
     a=np.array(image.convert('RGBA'));removed=[]
     original_key=np.max(np.abs(a[:,:,:3].astype(int)-np.array([255,0,255])),axis=2)<=70
@@ -136,6 +137,6 @@ def cell(image, *, declared_white_rules=False, rule_pixels=8):
     recipe['uniform_sheet_rules_removed']=removed
     if declared_white_rules:
         recipe['white_sheet_rules_explicitly_declared']=True
-        recipe['native_rule_pixel_limit']=rule_pixels
+        if rule_pixels!=8:recipe['native_rule_pixel_limit']=rule_pixels
         recipe['white_rule_edge_recipe']='observed-white-then-key-segment-v2; existing 8px maximum'
     return result,recipe
