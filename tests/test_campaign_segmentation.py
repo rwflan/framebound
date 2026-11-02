@@ -208,3 +208,84 @@ def test_spatial_negative_clicks_require_actual_technical_corner_pixels():
     pytest.importorskip('meta_sam_parser')
     from framebound.v3.campaign.segmentation import spatial_prompt
     with pytest.raises(ValueError,match='negative corner'):spatial_prompt(pixels('green'))
+
+
+def test_native_cell_lanes_are_bounded_unique_and_do_not_change_legacy_bindings(tmp_path):
+    from framebound.v3.campaign.curriculum import protocol
+    from framebound.v3.campaign.contracts import digest
+    config=upskill_curriculum('native-lanes',source_policy='sam-native-cell-v7')
+    case=next(c for c in config.cases if c.id==protocol(config)['rehearsal'][0])
+    ledger=Ledger(tmp_path);ledger.plan(config)
+    ledger.fund(config.id,'api',30000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),source='engineering',account_access='fixture',image_microdollars=10000,segmentation_microdollars=2500))
+    payload=dict(requested_model='sam-3.1',wire={'model':'sam-3.1'})
+    original=ledger.reserve(config.id,case.id,'segment_generate',payload,quote=2500)
+    assert 'cell' not in json.loads(original['request'])
+    assert original['binding']==digest([config.id,case.id,'segment_generate',0,0])
+    lanes=[ledger.reserve(config.id,case.id,'segment_generate',payload,quote=2500,cell=i) for i in range(6)]
+    assert len({x['binding'] for x in lanes}|{original['binding']})==7
+    assert ledger.reserve(config.id,case.id,'segment_generate',payload,quote=2500,cell=0)['id']==lanes[0]['id']
+    with pytest.raises(Stopped):ledger.reserve(config.id,case.id,'segment_generate',dict(payload,changed=True),quote=2500,cell=0)
+    for cell in [-1,6,True]:
+        with pytest.raises(ValueError,match='cell lane'):ledger.reserve(config.id,case.id,'segment_generate',payload,quote=2500,cell=cell)
+    with pytest.raises(ValueError,match='cell lane'):ledger.reserve(config.id,case.id,'generate',payload,quote=10000,images=1,cell=0)
+
+
+def test_raw_ink_clipping_cannot_be_hidden_by_an_interior_mask():
+    pytest.importorskip('meta_sam_parser')
+    from PIL import ImageDraw
+    from framebound.v3.campaign.segmentation import spatial_prompt,raw_clip_check
+    image=Image.new('RGB',(320,320),'white');draw=ImageDraw.Draw(image)
+    draw.rectangle((100,100,220,220),fill='navy')
+    def encoded():
+        out=io.BytesIO();image.save(out,format='PNG');return out.getvalue()
+    raw=encoded();_,proposal=spatial_prompt(raw)
+    assert raw_clip_check(raw,proposal)['margin']==6
+    draw.rectangle((0,150,110,155),fill='navy');raw=encoded();_,proposal=spatial_prompt(raw)
+    with pytest.raises(ValueError,match='clips native cell'):raw_clip_check(raw,proposal)
+
+
+def test_native_cells_preflight_all_before_send_and_reassemble_original_rgb(tmp_path,monkeypatch):
+    pytest.importorskip('meta_sam_parser')
+    from PIL import ImageDraw
+    config=upskill_curriculum('native-preflight',source_policy='sam-native-cell-v7')
+    ledger=Ledger(tmp_path);ledger.plan(config);runner=Runner(tmp_path,config.id,object());case=config.cases[0]
+    sheet=Image.new('RGB',(960,640),'white');draw=ImageDraw.Draw(sheet)
+    for i in range(6):draw.rectangle((i%3*320+100,i//3*320+100,i%3*320+220,i//3*320+220),fill='navy')
+    def encoded():
+        out=io.BytesIO();sheet.save(out,format='PNG');return out.getvalue()
+    calls=[]
+    def segment(case,raw,parent,operation,**kwargs):
+        calls.append(kwargs['cell']);im=Image.open(io.BytesIO(raw)).convert('RGBA');im.putalpha(255)
+        return im,dict(request_id='request-'+str(kwargs['cell']))
+    monkeypatch.setattr(runner,'_segment',segment)
+    raw=encoded();image,recipe=runner._segment_cells(case,raw,'original','generate')
+    assert image.convert('RGB').tobytes()==sheet.tobytes() and calls==list(range(6))
+    assert recipe['request_ids']==['request-'+str(i) for i in range(6)]
+    calls.clear();draw.rectangle((640,470,750,475),fill='navy')
+    with pytest.raises(AcquisitionRejected,match='clips native cell'):runner._segment_cells(case,encoded(),'new','generate')
+    assert not calls
+
+
+def test_native_received_cell_replay_never_reposts_or_consumes_other_cell(tmp_path):
+    pytest.importorskip('meta_sam_parser')
+    from framebound.v3.campaign.curriculum import protocol
+    from PIL import ImageDraw
+    config=upskill_curriculum('native-replay',source_policy='sam-native-cell-v7')
+    case=next(c for c in config.cases if c.id==protocol(config)['rehearsal'][0])
+    ledger=Ledger(tmp_path);ledger.plan(config)
+    ledger.fund(config.id,'api',30000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),source='engineering',account_access='fixture',image_microdollars=10000,segmentation_microdollars=2500))
+    class SamFixture:
+        sends=[]
+        def execute_stream(self,request,**kwargs):
+            self.sends.append(request)
+            return Response(response(),2500,0,dict(response_id='engineering-'+str(len(self.sends)),observed_model='sam-3.1'))
+    fixture=SamFixture();runner=Runner(tmp_path,config.id,fixture)
+    im=Image.new('RGB',(320,334),'white');ImageDraw.Draw(im).rectangle((211,228,270,254),fill='navy')
+    out=io.BytesIO();im.save(out,format='PNG');source=out.getvalue()
+    first=runner._segment(case,source,'original','generate',cell=0)[1]
+    second=runner._segment(case,source,'original','generate',cell=1)[1]
+    assert first['request_id']!=second['request_id'] and len(fixture.sends)==2
+    assert runner._segment(case,source,'original','generate',cell=0)[1]==first
+    assert len(fixture.sends)==2
+    with pytest.raises(AcquisitionRejected,match='source differs'):runner._segment(case,pixels('green'),'original','generate',cell=0)
+    assert len(fixture.sends)==2
