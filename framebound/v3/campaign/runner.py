@@ -222,6 +222,8 @@ class Runner:
                 +case.request.split('ANIMATION EXERCISE:')[0])
             if self.config.source_policy in {'declared-sheet-rules-v3','native-layout-key-v4'}:
                 text+=' The single anchor canvas has NO separator, rule or border; the technical sheet-rule declaration applies only to later animation sheets.'
+        if getattr(self.config,'source_policy','legacy-v1')=='sam-sheet-v8':
+            text=text.replace('Generate a complete six-pose sheet, never separate pose requests. One batched six-object SAM request extracts the whole sheet.', 'Single neutral identity anchor only. The later animation sheet contract does not apply to this anchor; no repeated subject, grid or sequence.')
         text+=' Style treatment: '+self.config.treatments[case.treatment]+' Graph: '+canonical(case.complexity).decode()
         if getattr(self.config,'source_policy','legacy-v1') in {'sam-isolation-v5','sam-spatial-v6','sam-native-cell-v7','sam-sheet-v8'}:
             text=text.replace('Follow the supplied placement template; keep subject scale and cell centers.','Single neutral anchor only; no placement sheet is requested for this image.')
