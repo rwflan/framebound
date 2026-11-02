@@ -307,3 +307,25 @@ remain absolute. Historical one-stage reports remain reproducible with
 New feature source manifests record the quarantine policy and source hash; new
 knowledge versions record the policy. A corrected learning projection must use
 new version names over its original frozen dataset, never new labels or media.
+
+## Native-cell acquisition contract
+
+The opt-in `sam-native-cell-v7` freezes one still-image segmentation lane per
+native sheet cell before any outcome is observed. Each of the six inputs is a
+lossless crop of the original source, with its own bounded cell binding, cost,
+receipt and source hash. An accepted response resumes by retrieval; a received
+failed mask cannot switch methods or purchase a replacement. These six inputs
+remain one source sequence, never six training examples.
+
+All original cells first pass an observed-ink connected-component edge check,
+so masking cannot hide a limb clipped by the source cell. Each mask retains the
+existing native margin, technical-background and surroundings requirements.
+Alpha is reassembled at native size before normal frame resizing and intake.
+Generation receives recorded full-layout references at a maximum 512 pixels,
+without competing enlarged single-subject references. Identity, baseline and
+continuity originals remain retained; repeated reference poses are conditioning
+only. Older source policies retain their original request bindings and previews.
+
+Fixed-cohort acquisition stopping uses the selected cohort as its denominator,
+including persisted failures before any next dispatch. The full pilot gate,
+independent semantic support and training/promotion gates remain unchanged.

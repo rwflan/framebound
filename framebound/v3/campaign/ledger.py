@@ -211,12 +211,16 @@ class Ledger:
         with self.db() as db:
             return {r[0] for r in db.execute('SELECT c.family FROM unknown_isolations i JOIN requests r ON r.id=i.request_id JOIN cases c ON c.campaign=r.campaign AND c.id=r.case_id')}
 
-    def reserve(self, campaign, case_id, operation, payload, *, quote, images=0, subsystem='api', attempt=0, parents=(), sheet=0):
+    def reserve(self, campaign, case_id, operation, payload, *, quote, images=0, subsystem='api', attempt=0, parents=(), sheet=0, cell=None):
         if type(quote) is not int or quote < 0 or type(images) is not int or images < 0 or subsystem not in {'api','modal'}:
             raise ValueError('nonnegative integer resource quote required')
         if operation not in {'anchor','generate','diagnose','recheck','repair','blind_rerun','compare','train','evaluate','segment_anchor','segment_generate','segment_repair','segment_blind_rerun'}:
             raise ValueError('unsupported operation')
+        if cell is not None and (type(cell) is not int or not 0<=cell<6 or not operation.startswith('segment_')):
+            raise ValueError('cell lane requires segmentation and integer 0..5')
         config = self.config(campaign)
+        if cell is not None and getattr(config,'source_policy','legacy-v1')!='sam-native-cell-v7':
+            raise ValueError('cell lane requires the frozen native-cell source policy')
         spec = next((c for c in config.cases if c.id == case_id), None)
         if spec is None:
             raise ValueError('unknown case')
@@ -244,9 +248,10 @@ class Ledger:
         request = dict(campaign=campaign, family=spec.family, case_id=case_id, operation=operation, attempt=attempt,
                        parents=list(parents), sheet=sheet, payload=payload, quote=quote, images=images, subsystem=subsystem,
                        config_sha256=digest(config))
+        if cell is not None:request['cell']=cell
         rid = digest(request)
         # A changed prompt or model cannot create a new send for the same attempt.
-        binding = digest([campaign, case_id, operation, attempt, sheet])
+        binding = digest([campaign, case_id, operation, attempt, sheet] + ([] if cell is None else ['cell',cell]))
         self._disk(config)
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')

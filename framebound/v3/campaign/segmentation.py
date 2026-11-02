@@ -131,3 +131,33 @@ def isolate(raw, response, *, columns=1, rows=1):
         mask_mapping='official decoded box-local binary raster; NEAREST to half-open native bounds before any image resize',
         masks=records,technical_background_fraction=proofs,minimum=.98,
         meaning='Model-derived structural isolation only; independent alpha intake and semantic assessment still required')
+
+
+def raw_clip_check(raw, recipe):
+    """Reject source-connected ink at an edge before any paid mask can hide it."""
+    from collections import deque
+    with Image.open(io.BytesIO(raw)) as source:
+        if source.width*source.height>16777216:
+            raise ValueError('raw clipping source bound')
+        rgb=np.asarray(ImageOps.exif_transpose(source).convert('RGB')).astype(np.int16)
+    technical=(rgb.min(axis=2)>=235)|((rgb[:,:,0]>=185)&(rgb[:,:,1]<=70)&(rgb[:,:,2]>=185))
+    ink=~technical
+    height,width=ink.shape
+    seen=np.zeros((height,width),dtype=bool)
+    queue=deque()
+    for x,y in recipe['boxes'][0]['positive_ink']:
+        if not seen[y,x]:
+            seen[y,x]=True
+            queue.append((y,x))
+    while queue:
+        y,x=queue.popleft()
+        for ny,nx in ((y-1,x),(y+1,x),(y,x-1),(y,x+1)):
+            if 0<=ny<height and 0<=nx<width and ink[ny,nx] and not seen[ny,nx]:
+                seen[ny,nx]=True
+                queue.append((ny,nx))
+    ys,xs=np.nonzero(seen)
+    margin=max(1,min(width,height)//50)
+    if not len(xs) or xs.min()<margin or ys.min()<margin or xs.max()>=width-margin or ys.max()>=height-margin:
+        raise ValueError('observed raw ink component clips native cell; no mask can hide it')
+    return dict(operator='observed-ink-raw-cell-clip-v1',
+                bounds=[int(xs.min()),int(ys.min()),int(xs.max())+1,int(ys.max())+1],margin=margin)
