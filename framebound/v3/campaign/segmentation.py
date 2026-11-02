@@ -13,6 +13,14 @@ import numpy as np
 from PIL import Image, ImageOps
 
 
+def concept_for(case):
+    """Use the concrete frozen design noun, never a new teacher answer."""
+    match=re.match(r'Original isolated 2D (?:character|animal|figure|object): one (?:rounded|angular|compact|elongated) (.+?), distinctive ',case.request)
+    if not match or not 0<len(match[1])<=160:
+        raise ValueError('segmented source requires a concrete frozen design noun')
+    return match[1]
+
+
 def isolate(raw, response, *, columns=1, rows=1):
     from meta_sam_parser import CompletedOutcome, image_segmentation_format, decode_mask_to_raster
     with Image.open(io.BytesIO(raw)) as source:
@@ -26,6 +34,7 @@ def isolate(raw, response, *, columns=1, rows=1):
     if body.get('status')!='completed':raise ValueError('segmentation response not completed')
     text=''.join(p.get('text','') for item in body.get('output',[]) for p in item.get('content',[]) if p.get('type')=='output_text')
     if len(text)>16*1024**2:raise ValueError('segmentation text bound')
+    if not text.strip():raise ValueError('completed segmentation returned no matches')
     dimensions=re.findall(r'<\|box;[^|]*?;w=(\d+);h=(\d+)[^|]*\|>',text)
     if not dimensions or any((int(w),int(h))!=(width,height) for w,h in dimensions):
         raise ValueError('segmentation source dimensions do not match original')
