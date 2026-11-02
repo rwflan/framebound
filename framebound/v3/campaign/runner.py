@@ -221,7 +221,8 @@ class Runner:
         self._save('canonical/sources',asset_id+'.png',S.blob_path(self.project,normalized.byte_sha256).read_bytes())
         provenance=dict(operation='decode '+source_format+' and explicitly normalize orientation/RGBA to PNG',
             input_sha256=original_sha,output_sha256=normalized.byte_sha256)
-        if segmentation is not None:provenance['segmentation']=extraction
+        if segmentation is not None:
+            provenance['operation']+='; SAM3.1 isolation request '+extraction['request_id']+'; recipe SHA256 '+digest(extraction)+'; native mask mapping retained in asset derivation'
         return normalized,provenance
 
     def _spec(self, case, anchor):
