@@ -161,3 +161,75 @@ def raw_clip_check(raw, recipe):
         raise ValueError('observed raw ink component clips native cell; no mask can hide it')
     return dict(operator='observed-ink-raw-cell-clip-v1',
                 bounds=[int(xs.min()),int(ys.min()),int(xs.max())+1,int(ys.max())+1],margin=margin)
+
+
+def whitespace_reflow(raw):
+    """Cut on observed technical whitespace, then pad six common-size cells.
+
+    No foreground is resized, erased or invented. Nominal pose centers share
+    one camera/scale convention; the original source and every crop stay bound.
+    """
+    with Image.open(io.BytesIO(raw)) as original:
+        if original.width*original.height>16777216:raise ValueError('whitespace source bound')
+        image=ImageOps.exif_transpose(original).convert('RGB')
+    width,height=image.size
+    if width%3 or height%2 or width//3!=height//2:raise ValueError('six square nominal poses required')
+    rgb=np.asarray(image).astype(np.int16)
+    technical=(rgb.min(axis=2)>=235)|((rgb[:,:,0]>=185)&(rgb[:,:,1]<=70)&(rgb[:,:,2]>=185))
+    def boundary(clear,nominal,radius):
+        lo=max(1,nominal-radius);hi=min(len(clear)-1,nominal+radius)
+        runs=[];start=None
+        for i in range(lo,hi):
+            if clear[i] and start is None:start=i
+            if start is not None and (not clear[i] or i==hi-1):
+                end=i if not clear[i] else i+1;runs.append((start,end));start=None
+        if not runs:raise ValueError('no real whitespace separating poses')
+        left,right=max(runs,key=lambda r:(r[1]-r[0],-abs((r[0]+r[1])/2-nominal)))
+        if right-left<4:raise ValueError('insufficient whitespace between poses')
+        return (left+right)//2
+    split=boundary(technical.all(axis=1),height//2,height//6)
+    cells=[];centers=[];clips=[]
+    for row,(top,bottom) in enumerate(((0,split),(split,height))):
+        clear=technical[top:bottom].all(axis=0)
+        first=boundary(clear,width//3,width//8);second=boundary(clear,2*width//3,width//8)
+        if first>=second:raise ValueError('ambiguous whitespace pose order')
+        for col,(left,right) in enumerate(((0,first),(first,second),(second,width))):
+            bounds=[left,top,right,bottom];crop=image.crop(bounds);buf=io.BytesIO();crop.save(buf,format='PNG')
+            _,proposal=spatial_prompt(buf.getvalue());clip=raw_clip_check(buf.getvalue(),proposal)
+            cells.append(bounds);centers.append((col*(width//3)+width//6,row*(height//2)+height//4));clips.append(clip)
+    # Common square size preserves one scale across all six poses. Original
+    # nominal centers stay aligned; only known technical backing is padded.
+    radius=3*(width//3)//4 # frozen 1.5 nominal-cell view, identical across sheets
+    side=2*radius
+    if 6*side*side>16777216:raise ValueError('reflowed source bound')
+    output=Image.new('RGB',(3*side,2*side),'white');records=[]
+    for slot,(bounds,(cx,cy),clip) in enumerate(zip(cells,centers,clips)):
+        original_bounds=list(bounds);left,top,right,bottom=bounds
+        bounds=[max(left,cx-radius),max(top,cy-radius),min(right,cx+radius),min(bottom,cy+radius)]
+        def ink_count(box):
+            l,t,r,b=box;return int((~technical[t:b,l:r]).sum())
+        if ink_count(bounds)!=ink_count(original_bounds):raise ValueError('pose exceeds frozen common camera extent; no foreground can be trimmed')
+        buf=io.BytesIO();image.crop(bounds).save(buf,format='PNG');_,proposal=spatial_prompt(buf.getvalue());render_clip=raw_clip_check(buf.getvalue(),proposal)
+        left,top,right,bottom=bounds;offset=(radius+left-cx,radius+top-cy)
+        output.paste(image.crop(bounds),(slot%3*side+offset[0],slot//3*side+offset[1]))
+        records.append(dict(slot=slot,source_bounds=bounds,original_whitespace_bounds=original_bounds,nominal_center=[cx,cy],cell_offset=list(offset),raw_clip=clip,render_clip=render_clip,trim='technical backing only, foreground count unchanged'))
+    buf=io.BytesIO();output.save(buf,format='PNG');rendered=buf.getvalue()
+    return rendered,dict(operator='observed-whitespace-reflow-v2',source_sha256=hashlib.sha256(raw).hexdigest(),output_sha256=hashlib.sha256(rendered).hexdigest(),source_size=[width,height],output_size=list(output.size),cell_size=side,cells=records,resampling='NONE; foreground RGB pixels retained; only observed technical backing may be trimmed',padding='explicit pure white technical backing only; no foreground synthesis')
+
+
+def validate_reflow_masks(image,recipe):
+    """Validate unpadded source areas so added backing cannot dilute gates."""
+    side=recipe['cell_size'];proofs=[]
+    for record in recipe['cells']:
+        slot=record['slot'];left,top,right,bottom=record['source_bounds'];width,height=right-left,bottom-top
+        ox,oy=record['cell_offset'];tile=image.crop((slot%3*side,slot//3*side,(slot%3+1)*side,(slot//3+1)*side))
+        native=tile.crop((ox,oy,ox+width,oy+height));alpha=np.asarray(native.getchannel('A'))>0
+        if int((np.asarray(tile.getchannel('A'))>0).sum())!=int(alpha.sum()):raise ValueError('mask selected synthetic technical padding')
+        bounds=native.getchannel('A').getbbox();margin=max(1,min(width,height)//50)
+        if not bounds or bounds[0]<margin or bounds[1]<margin or bounds[2]>width-margin or bounds[3]>height-margin:raise ValueError('mask clips original whitespace cell margin')
+        rgb=np.asarray(native)[:,:,:3].astype(np.int16);technical=(rgb.min(axis=2)>=235)|((rgb[:,:,0]>=185)&(rgb[:,:,1]<=70)&(rgb[:,:,2]>=185));outside=~alpha
+        if outside.mean()<.25:raise ValueError('original whitespace cell has insufficient surroundings')
+        fraction=float(technical[outside].mean())
+        if fraction<.98:raise ValueError('nontechnical background outside mask in original whitespace cell')
+        proofs.append(dict(slot=slot,technical_background_fraction=fraction,surroundings_fraction=float(outside.mean()),native_margin=margin,basis='original unpadded source crop, never synthetic padding'))
+    return proofs

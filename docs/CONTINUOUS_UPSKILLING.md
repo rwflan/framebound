@@ -366,3 +366,17 @@ its unknown state, full reserved spend, stopped study or permanent family
 exclusion, and never authorizes a resend. Real unknown provider jobs still occupy
 concurrency. This narrowly separates a proven local guard from an actual network
 acceptance ambiguity.
+
+`sam-whitespace-sheet-v9` uses a separately frozen extraction geometry for full
+pose screens. It cuts only on observed technical-whitespace bands between rows
+and between subjects within each row. Each original crop still passes the raw
+2% margin check. All foreground RGB pixels are retained without resizing; only observed technical backing may be trimmed. Common
+square cells are padded with explicitly recorded technical white, aligning the
+original nominal centers and using a frozen1.5 nominal-cell view across every sheet in the sequence. One
+whole-sheet SAM call then extracts the subjects. Mask margins,98% technical
+surroundings and25% empty area are rechecked on the ORIGINAL UNPADDED crops, and
+selecting synthetic padding fails. Padding cannot dilute a failed source gate.
+Clipped canvas edges, overlaps, ambiguous/absent gutters and extra/scenic content
+still reject. No earlier fixed-grid failure is reprocessed as an accepted result.
+The neutral anchor brief uses only the frozen identity design and an independent
+single-pose contract, never the shared animation/extraction instructions.
