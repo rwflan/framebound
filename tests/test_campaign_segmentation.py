@@ -289,3 +289,25 @@ def test_native_received_cell_replay_never_reposts_or_consumes_other_cell(tmp_pa
     assert len(fixture.sends)==2
     with pytest.raises(AcquisitionRejected,match='source differs'):runner._segment(case,pixels('green'),'original','generate',cell=0)
     assert len(fixture.sends)==2
+
+
+def test_whole_sheet_contract_preflights_then_masks_once(tmp_path,monkeypatch):
+    pytest.importorskip('meta_sam_parser')
+    from PIL import ImageDraw
+    config=upskill_curriculum('sheet-mask-fixture',source_policy='sam-sheet-v8',transport='stream-all-v2')
+    ledger=Ledger(tmp_path);ledger.plan(config);runner=Runner(tmp_path,config.id,object());case=config.cases[0]
+    sheet=Image.new('RGB',(960,640),'white');draw=ImageDraw.Draw(sheet)
+    for i in range(6):draw.rectangle((i%3*320+100,i//3*320+100,i%3*320+220,i//3*320+220),fill='navy')
+    def encoded():
+        out=io.BytesIO();sheet.save(out,format='PNG');return out.getvalue()
+    calls=[]
+    def segment(case,raw,parent,operation,**kwargs):
+        calls.append((raw,kwargs));return Image.open(io.BytesIO(raw)).convert('RGBA'),dict(request_id='single-whole-sheet-request')
+    monkeypatch.setattr(runner,'_segment',segment)
+    source=encoded();image,recipe=runner._segment_sheet(case,source,'original','generate')
+    assert len(calls)==1 and calls[0][0]==source and calls[0][1]['columns']==3 and calls[0][1]['rows']==2
+    assert recipe['request_id']=='single-whole-sheet-request' and len(recipe['raw_cell_clipping'])==6
+    assert image.convert('RGB').tobytes()==sheet.tobytes()
+    calls.clear();draw.rectangle((640,470,750,475),fill='navy')
+    with pytest.raises(AcquisitionRejected,match='clips native cell'):runner._segment_sheet(case,encoded(),'new','generate')
+    assert not calls

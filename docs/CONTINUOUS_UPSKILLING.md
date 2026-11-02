@@ -337,3 +337,32 @@ disconnect. Received answers keep the same typed scope/corroboration rules. Olde
 transport defaults and all saved requests remain unchanged. A connection lost
 before acknowledgement can still be unknown: preserve its full reservation and
 exclude its family/ancestry rather than send another POST.
+
+Admission-window checks use the dispatch `admit` hook, before claiming a send
+permit or recording a wire transition. Pure adapter validation may run again
+inside execution. An expired admission leaves the frozen outbox reserved and
+unsent; it must not be reported as an unknown provider outcome. A permit whose
+wire transition failed can be released only while its state remains reserved,
+with the matching token and an audit event. Sent/pending/unknown outcomes cannot
+be reset this way.
+
+Quota scans still count every regular private file and enforce the same disk
+limit and free-space guard; directory entries avoid repeated filesystem stats.
+Stop checks use a single campaign flag read, and status summaries use a covering
+index containing the response ID rather than inline request/acceptance media.
+
+`sam-sheet-v8` keeps full six-pose image generation and submits ONE spatial
+six-object SAM request per whole screen. Every native cell passes the same raw
+clipping preflight before that send; masks retain original per-cell background,
+margin, alpha and scene-exclusion checks. Frame cutting and sequence assembly
+are deterministic local derivations with retained originals. There is no paid
+per-pose dispatch or fallback after a failed answer. Older frozen policies stay
+unchanged; this opt-in must independently qualify under existing release gates.
+
+A documented local preflight deadline denial can have its phantom worker slot
+excluded through an explicit audit of the saved batch, pure adapter guard and
+immediate event sequence without any provider observation. This does not change
+its unknown state, full reserved spend, stopped study or permanent family
+exclusion, and never authorizes a resend. Real unknown provider jobs still occupy
+concurrency. This narrowly separates a proven local guard from an actual network
+acceptance ambiguity.

@@ -47,6 +47,7 @@ class Ledger:
                 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, request_id TEXT, kind TEXT, at REAL, data TEXT);
                 CREATE TABLE IF NOT EXISTS api_budget_authorizations(id INTEGER PRIMARY KEY, campaign TEXT NOT NULL,
                     ceiling INTEGER NOT NULL, evidence TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS local_admission_denials(request_id TEXT PRIMARY KEY, evidence TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS unknown_isolations(request_id TEXT PRIMARY KEY, evidence TEXT NOT NULL);
                 -- Wire payloads contain large inline images. Cover control-plane
                 -- queries so budget/replay checks never scan their overflow pages.
@@ -60,6 +61,8 @@ class Ledger:
                 db.execute("ALTER TABLE cases ADD COLUMN progress TEXT NOT NULL DEFAULT '{}'")
             if 'acceptance' not in {r[1] for r in db.execute('PRAGMA table_info(requests)')}:
                 db.execute('ALTER TABLE requests ADD COLUMN acceptance TEXT')
+            # Store only the extracted response ID, never inline acceptance media.
+            db.execute("CREATE INDEX IF NOT EXISTS requests_status_summary ON requests(campaign,id,case_id,operation,state,reserved,incurred,receipt,json_extract(acceptance,'$.id'))")
 
     @contextmanager
     def db(self):
@@ -207,6 +210,44 @@ class Ledger:
             return dict(request_id=rid,state=row['state'],reserved=row['reserved'],incurred=row['incurred'],
                 research_excluded=True,retry_permitted=False,provider_outcome_resolved=False)
 
+    def record_local_admission_denial(self,campaign,rid,*,batch_report,adapter_source):
+        """Audit a saved local preflight denial; NEVER retry or alter its outcome/cost.
+
+        Only the phantom active-worker slot is excluded. Unknown state, full
+        reservation, campaign stop and permanent family exclusion remain intact.
+        """
+        import ast
+        report_path=local_path(self.root,batch_report)
+        adapter_path=local_path(self.root,adapter_source)
+        report=json.loads(report_path.read_bytes());source=adapter_path.read_text()
+        detail='Supervisor admission window ended before paid send'
+        tree=ast.parse(source)
+        adapters=[n for n in ast.walk(tree) if isinstance(n,ast.ClassDef) and len(n.bases)==1 and isinstance(n.bases[0],ast.Name) and n.bases[0].id=='MuseResponses']
+        guards=[node for adapter in adapters for node in adapter.body if isinstance(node,ast.FunctionDef) and node.name=='preflight']
+        if not any(any(isinstance(n,ast.Raise) and isinstance(n.exc,ast.Call) and isinstance(n.exc.func,ast.Name) and n.exc.func.id=='Stopped' and n.exc.args and isinstance(n.exc.args[0],ast.Constant) and n.exc.args[0].value==detail for n in ast.walk(g)) for g in guards):
+            raise ValueError('saved adapter must contain the matching local preflight denial')
+        allowed={'super','super().preflight','time.monotonic','datetime.now','Stopped'}
+        matching=[g for g in guards if any(isinstance(n,ast.Constant) and n.value==detail for n in ast.walk(g))]
+        if any(ast.unparse(n.func) not in allowed for g in matching for n in ast.walk(g) if isinstance(n,ast.Call)):
+            raise ValueError('local denial preflight must contain only pure validation and clock calls')
+        evidence=dict(kind='saved_local_preflight_denial',batch_report=batch_report,report_sha256=hashlib.sha256(report_path.read_bytes()).hexdigest(),adapter_source=adapter_source,adapter_sha256=hashlib.sha256(source.encode()).hexdigest(),detail=detail,meaning='Excludes only proven local denial from active-provider concurrency; unknown outcome, spend reservation and research exclusion retained; no resend authorized')
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT * FROM requests WHERE id=? AND campaign=?',(rid,campaign)).fetchone()
+            if not row or row['state']!='unknown_provider_outcome' or row['acceptance'] or row['incurred'] is not None:
+                raise ValueError('only unacknowledged unknown with full reservation can receive local-denial evidence')
+            if not db.execute('SELECT 1 FROM unknown_isolations WHERE request_id=?',(rid,)).fetchone():raise ValueError('permanent family research exclusion required')
+            if report.get('campaign')!=campaign or report.get('deferred',{}).get(row['case_id'])!=detail or row['case_id'] not in report.get('case_ids',[]):raise ValueError('saved batch must bind exact request and local denial')
+            events=list(db.execute("SELECT kind,at FROM events WHERE request_id=? AND kind NOT IN ('reserved','unknown_isolated')",(rid,)))
+            if [e['kind'] for e in events]!=['wire_started','unknown'] or events[1]['at']-events[0]['at']>1:
+                raise ValueError('only immediate preflight denial without any provider observation qualifies')
+            raw=canonical(evidence).decode();old=db.execute('SELECT evidence FROM local_admission_denials WHERE request_id=?',(rid,)).fetchone()
+            if old and old[0]!=raw:raise ValueError('local denial evidence immutable')
+            if not old:
+                db.execute('INSERT INTO local_admission_denials VALUES(?,?)',(rid,raw))
+                self._event(db,None,'local_admission_denial_audited',dict(request_id=rid,**evidence))
+            return evidence
+
     def isolated_families(self):
         with self.db() as db:
             return {r[0] for r in db.execute('SELECT c.family FROM unknown_isolations i JOIN requests r ON r.id=i.request_id JOIN cases c ON c.campaign=r.campaign AND c.id=r.case_id')}
@@ -320,6 +361,16 @@ class Ledger:
             db.execute('UPDATE requests SET permit=?,lease_until=? WHERE id=?', (permit,time.time()+180,rid))
             return permit
 
+    def release_claim(self,rid,permit):
+        """Release only a still-unsent permit; never reset a wire or outcome."""
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT state,permit FROM requests WHERE id=?',(rid,)).fetchone()
+            if not row or row['state']!='reserved' or row['permit']!=permit:
+                raise Stopped('only the matching unsent claim may be released')
+            db.execute('UPDATE requests SET permit=NULL,lease_until=NULL WHERE id=?',(rid,))
+            self._event(db,rid,'claim_released',dict(reason='wire transition did not occur'))
+
     def start_wire(self, rid, permit):
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -331,7 +382,7 @@ class Ledger:
             config = parse_campaign(db.execute('SELECT config FROM campaigns WHERE id=?',(row['campaign'],)).fetchone()[0])
             lane = "images>0" if row['images'] else "images=0 AND subsystem='api'" if row['subsystem']=='api' else "subsystem='modal'"
             limit = config.limits.generation_workers if row['images'] else config.limits.assessment_workers if row['subsystem']=='api' else config.limits.modal_workers
-            if db.execute(f"SELECT COUNT(*) FROM requests WHERE state IN ('wire_started','provider_pending','unknown_provider_outcome') AND {lane}").fetchone()[0]>=limit:
+            if db.execute(f"SELECT COUNT(*) FROM requests WHERE (state IN ('wire_started','provider_pending') OR (state='unknown_provider_outcome' AND NOT EXISTS (SELECT 1 FROM local_admission_denials d WHERE d.request_id=requests.id))) AND {lane}").fetchone()[0]>=limit:
                 raise Stopped('configured concurrency ceiling')
             db.execute("UPDATE requests SET state='wire_started', permit=NULL WHERE id=?", (rid,))
             self._event(db,rid,'wire_started',{})
@@ -451,9 +502,24 @@ class Ledger:
             db.execute('UPDATE cases SET active_seconds=active_seconds+? WHERE campaign=? AND id=?',(seconds,campaign,case_id))
 
     def _disk(self, config):
-        used = sum(p.stat().st_size for p in self.root.rglob('*') if p.is_file() and not p.is_symlink())
+        # DirEntry caches file type; avoid three pathlib stat calls per file.
+        import os
+        used=0;folders=[str(self.root)]
+        while folders:
+            with os.scandir(folders.pop()) as entries:
+                for entry in entries:
+                    if entry.is_dir(follow_symlinks=False):folders.append(entry.path)
+                    elif entry.is_file(follow_symlinks=False):
+                        used+=entry.stat(follow_symlinks=False).st_size
+                        if used>=config.limits.disk_bytes:raise Stopped('disk quota/free-space guard; originals are preserved')
         if used >= config.limits.disk_bytes or shutil.disk_usage(self.root).free < 1024**3:
             raise Stopped('disk quota/free-space guard; originals are preserved')
+
+    def is_stopped(self,campaign):
+        with self.db() as db:
+            row=db.execute('SELECT stopped FROM campaigns WHERE id=?',(campaign,)).fetchone()
+            if row is None:raise ValueError('unknown campaign')
+            return bool(row[0])
 
     def status(self, campaign):
         config = self.config(campaign)

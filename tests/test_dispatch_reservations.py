@@ -113,3 +113,34 @@ def test_wire_model_is_frozen_and_explicit_retry_setting_conflicts(tmp_path,monk
     assert models==['model-original']
     assert J.submit_generation(p,brief,[],'frozen').artifacts[0]['id']==ids[1]
     with pytest.raises(S.ConflictError):J.submit_generation(p,brief,[],'frozen',provider_settings={'model':'changed'})
+
+
+def test_admission_expiry_precedes_claim_and_never_creates_unknown(tmp_path):
+    from framebound.v3.campaign.contracts import curriculum,Prices
+    from framebound.v3.campaign.ledger import Ledger,Stopped
+    from framebound.v3.campaign.dispatch import dispatch
+    config=curriculum('admission-clock-fixture');case=config.cases[0]
+    config=config.model_copy(update={'cases':[case],'prices':Prices(verified_at='engineering',source='fixture')})
+    ledger=Ledger(tmp_path);ledger.plan(config);ledger.fund(config.id,'api',10000,evidence='engineering')
+    row=ledger.reserve(config.id,case.id,'diagnose',dict(wire={'model':'muse-spark-1.3'}),quote=100)
+    class Expired:
+        def preflight(self,request):pass
+        def admit(self,request):raise Stopped('admission window expired before claim')
+        def execute(self,*a,**k):raise AssertionError('No POST permitted')
+    with pytest.raises(Stopped,match='admission window'):dispatch(ledger,row['id'],Expired())
+    after=ledger.request(row['id']);assert after['state']=='reserved' and after['permit'] is None
+    with ledger.db() as db:assert not db.execute("SELECT 1 FROM events WHERE request_id=? AND kind IN ('wire_started','unknown')",(row['id'],)).fetchone()
+
+
+def test_releasing_unsent_claim_preserves_reservation_and_cannot_reset_wire(tmp_path):
+    from framebound.v3.campaign.contracts import curriculum,Prices
+    from framebound.v3.campaign.ledger import Ledger,Stopped
+    config=curriculum('unsent-permit-fixture');case=config.cases[0]
+    config=config.model_copy(update={'cases':[case],'prices':Prices(verified_at='engineering',source='fixture')})
+    ledger=Ledger(tmp_path);ledger.plan(config);ledger.fund(config.id,'api',1000,evidence='engineering')
+    row=ledger.reserve(config.id,case.id,'diagnose',{},quote=100);permit=ledger.claim(row['id'])
+    with pytest.raises(Stopped):ledger.release_claim(row['id'],'wrong')
+    ledger.release_claim(row['id'],permit);assert ledger.request(row['id'])['reserved']==100
+    second=ledger.claim(row['id']);ledger.start_wire(row['id'],second)
+    with pytest.raises(Stopped):ledger.release_claim(row['id'],second)
+    assert ledger.request(row['id'])['state']=='wire_started'

@@ -52,8 +52,14 @@ def dispatch(ledger: Ledger, request_id: str, specialist: Specialist):
                 raise ValueError('specialist lacks durable background acceptance support; no send performed')
             if request.get('payload',{}).get('wire',{}).get('stream') and not hasattr(specialist,'execute_stream'):
                 raise ValueError('specialist lacks durable streaming support; no send performed')
+            # Time/window admission belongs before the durable wire transition.
+            # Adapter preflight stays pure and may run again inside execute.
+            if hasattr(specialist,'admit'):specialist.admit(request)
             permit=ledger.claim(request_id)
-            request=ledger.start_wire(request_id,permit)
+            try:request=ledger.start_wire(request_id,permit)
+            except BaseException:
+                ledger.release_claim(request_id,permit)
+                raise
         start=time.monotonic()
         try:
             if acceptance:
