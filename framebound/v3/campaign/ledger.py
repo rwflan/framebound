@@ -49,6 +49,7 @@ class Ledger:
                     ceiling INTEGER NOT NULL, evidence TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS local_admission_denials(request_id TEXT PRIMARY KEY, evidence TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS unknown_isolations(request_id TEXT PRIMARY KEY, evidence TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS resource_authorizations(campaign TEXT PRIMARY KEY, assessment_workers INTEGER NOT NULL, expires REAL NOT NULL, evidence TEXT NOT NULL);
                 -- Wire payloads contain large inline images. Cover control-plane
                 -- queries so budget/replay checks never scan their overflow pages.
                 CREATE INDEX IF NOT EXISTS requests_campaign_attempt ON requests(campaign,case_id,operation,state);
@@ -209,6 +210,30 @@ class Ledger:
                 self._event(db,rid,'unknown_isolated',evidence)
             return dict(request_id=rid,state=row['state'],reserved=row['reserved'],incurred=row['incurred'],
                 research_excluded=True,retry_permitted=False,provider_outcome_resolved=False)
+
+    def authorize_recovery_capacity(self,campaign,*,expires_at,evidence):
+        """One extra assessment slot; ALL real unknowns still occupy capacity.
+
+        This operational amendment changes neither the frozen scientific config
+        nor money, request states or release gates. It cannot enable parallel
+        recovery workers: the campaign coordinator lock still owns execution.
+        """
+        from datetime import datetime,timezone
+        expiry=datetime.fromisoformat(expires_at)
+        now=datetime.now(timezone.utc)
+        if expiry.tzinfo is None or not 0 < (expiry-now).total_seconds() <= 86400:
+            raise ValueError('recovery capacity needs a future expiry within24hours')
+        if not isinstance(evidence,dict) or any(not isinstance(evidence.get(k),str) or not evidence[k].strip()
+                for k in ('source','account_access','reason')):
+            raise ValueError('current provider capacity/account evidence required')
+        self.config(campaign)
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('INSERT OR REPLACE INTO resource_authorizations VALUES(?,?,?,?)',
+                (campaign,3,expiry.timestamp(),canonical(evidence).decode()))
+            self._event(db,None,'recovery_capacity_authorized',dict(campaign=campaign,assessment_workers=3,
+                expires_at=expires_at,evidence=evidence,unknowns_still_count=True))
+        return dict(assessment_workers=3,expires_at=expires_at,unknowns_still_count=True)
 
     def record_local_admission_denial(self,campaign,rid,*,batch_report,adapter_source):
         """Audit a saved local preflight denial; NEVER retry or alter its outcome/cost.
@@ -382,6 +407,10 @@ class Ledger:
             config = parse_campaign(db.execute('SELECT config FROM campaigns WHERE id=?',(row['campaign'],)).fetchone()[0])
             lane = "images>0" if row['images'] else "images=0 AND subsystem='api'" if row['subsystem']=='api' else "subsystem='modal'"
             limit = config.limits.generation_workers if row['images'] else config.limits.assessment_workers if row['subsystem']=='api' else config.limits.modal_workers
+            if not row['images'] and row['subsystem']=='api':
+                capacity=db.execute('SELECT assessment_workers FROM resource_authorizations WHERE campaign=? AND expires>?',
+                    (row['campaign'],time.time())).fetchone()
+                if capacity:limit=max(limit,capacity[0])
             if db.execute(f"SELECT COUNT(*) FROM requests WHERE (state IN ('wire_started','provider_pending') OR (state='unknown_provider_outcome' AND NOT EXISTS (SELECT 1 FROM local_admission_denials d WHERE d.request_id=requests.id))) AND {lane}").fetchone()[0]>=limit:
                 raise Stopped('configured concurrency ceiling')
             db.execute("UPDATE requests SET state='wire_started', permit=NULL WHERE id=?", (rid,))

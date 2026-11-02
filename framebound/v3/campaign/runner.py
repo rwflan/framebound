@@ -729,12 +729,35 @@ class Runner:
         self._save('comparisons',key+'.json',canonical(dict(rows=rows,assignment=assignment,comparison=comparison.model_dump(mode='json'))))
         return dict(rows=rows,comparison_id=key)
 
-    def run(self,*,max_cases=None,case_ids=None):
+    def run(self,*,max_cases=None,case_ids=None,isolated_continuation=False):
+        self._isolated_resumed=False
+        try:
+            return self._run(max_cases=max_cases,case_ids=case_ids,isolated_continuation=isolated_continuation)
+        finally:
+            if self._isolated_resumed:self.ledger.stop(self.campaign)
+
+    def _run(self,*,max_cases=None,case_ids=None,isolated_continuation=False):
         if max_cases is not None and (type(max_cases) is not int or not 1<=max_cases<=80):
             raise ValueError('bounded batch size must be 1..80')
         results={};deferred={};processed=0
         self._save('comparisons','allocation.json',canonical(controls(self.config)))
         with FileLock(str(self.folder/'coordinator.lock'),timeout=0):
+            quarantined=set()
+            if isolated_continuation:
+                if case_ids is None:raise ValueError('isolated continuation requires the exact frozen cohort')
+                with self.ledger.db() as db:
+                    unknowns=list(db.execute("SELECT r.id,r.case_id,i.request_id isolated FROM requests r LEFT JOIN unknown_isolations i ON i.request_id=r.id WHERE r.campaign=? AND r.state IN ('wire_started','provider_pending','unknown_provider_outcome')",(self.campaign,)))
+                if not unknowns or any(not r['isolated'] for r in unknowns):
+                    raise ValueError('every unresolved request must already be permanently isolated')
+                blocked_families=self.ledger.isolated_families()
+                with self.ledger.db() as db:
+                    for unknown_case,raw_config in db.execute('SELECT r.case_id,c.config FROM unknown_isolations i JOIN requests r ON r.id=i.request_id JOIN campaigns c ON c.id=r.campaign'):
+                        original=next(c for c in json.loads(raw_config)['cases'] if c['id']==unknown_case)
+                        blocked_families.update(original.get('ancestry',[]))
+                for candidate in self.config.cases:
+                    if blocked_families.intersection([candidate.family,*candidate.ancestry]):quarantined.add(candidate.id)
+                # Only unaffected already-admitted work resumes. No stage is
+                # released and the original unknown case is never submitted.
             from .progression import admitted
             allowed=admitted(self.ledger,self.config)
             if case_ids is not None:
@@ -749,9 +772,15 @@ class Runner:
             if self.config.schema_version=='2.0' and rejected_intakes>len(selected)*.25:
                 self.ledger.stop(self.campaign)
                 return dict(results=results,deferred={cid:'Selected cohort acquisition failures already exceed25%' for cid in selected if not known[cid]},status=self.ledger.status(self.campaign))
+            if isolated_continuation:
+                self.ledger.resume(self.campaign)
+                self._isolated_resumed=True
             for case in self.config.cases:
                 if case.id not in selected:continue
                 if self.ledger.is_stopped(self.campaign):break
+                if case.id in quarantined:
+                    deferred[case.id]='Permanently isolated unknown family; no provider retry or terminal outcome inferred'
+                    continue
                 if max_cases is not None:
                     if self.ledger.progress(self.campaign,case.id)['result']:continue
                     if processed>=max_cases:break
@@ -784,6 +813,7 @@ class Runner:
                     deferred[case.id]=type(exc).__name__
                     self._save('reports','failure-'+digest([case.id,type(exc).__name__])+'.json',canonical(dict(case_id=case.id,error=type(exc).__name__,detail=str(exc))))
                     break
+            if isolated_continuation:self.ledger.stop(self.campaign)
         return dict(results=results,deferred=deferred,status=self.ledger.status(self.campaign))
 
 
