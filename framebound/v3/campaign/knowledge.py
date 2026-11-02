@@ -1,5 +1,6 @@
 """Evidence-linked local advisory retrieval. It never grants repair authority."""
 import json
+import hashlib
 from pathlib import Path
 
 from .assessment import Assessment, CATEGORIES
@@ -15,7 +16,7 @@ def build(root, campaign, *, version, dataset_version=None):
     dataset = local_path(root, f'campaigns/{campaign}/training/{dataset_version}')
     entries = []
     examples=load(dataset)
-    from .leakage import exclusions
+    from .leakage import exclusions,POLICY
     excluded=exclusions(examples,dataset)
     from .ledger import Ledger
     isolated=Ledger(root).isolated_families()
@@ -65,7 +66,7 @@ def build(root, campaign, *, version, dataset_version=None):
     # IDs bind the complete entry, including observed outcomes.
     entries=[dict(e,id=digest({k:v for k,v in e.items() if k!='id'})) for e in entries]
     value=dict(schema_version='animation-knowledge-2.0',campaign=campaign,dataset_version=dataset_version,
-               entries=entries,authority='advisory_only',excluded_splits=['validation','test'])
+               entries=entries,authority='advisory_only',split_quarantine_policy=POLICY,split_quarantine_source_sha256=hashlib.sha256(Path(__file__).with_name('leakage.py').read_bytes()).hexdigest(),excluded_splits=['validation','test'])
     path=local_path(root,f'campaigns/{campaign}/knowledge/{version}.json')
     path.parent.mkdir(parents=True,exist_ok=True)
     raw=canonical(value)

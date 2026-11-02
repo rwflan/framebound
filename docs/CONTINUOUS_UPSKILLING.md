@@ -295,3 +295,15 @@ request and retained in derivation provenance. Mask IDs must map back to their
 own cells. The original strict extraction/alpha, scene exclusion, scoped assessment,
 corroboration, receipt, budget and release gates remain unchanged. A prior received
 no-match is not re-requested or turned into an accepted specimen.
+
+Split quarantine uses the 64-bit luminance hash only to find near-duplicate
+candidates. Common placement layouts can collide despite different drawings.
+`confirmed-visual-quarantine-v2` confirms candidates using detailed visible pixels
+on black/white composites, measured over content rather than empty backing, with
+small translation tolerance. Detailed occupancy/edge agreement also retains
+recolored copies. Family/ancestry, exact shared-input and exact-file exclusions
+remain absolute. Historical one-stage reports remain reproducible with
+`legacy_exclusions`; immutable old exports, reports and libraries are not rewritten.
+New feature source manifests record the quarantine policy and source hash; new
+knowledge versions record the policy. A corrected learning projection must use
+new version names over its original frozen dataset, never new labels or media.
