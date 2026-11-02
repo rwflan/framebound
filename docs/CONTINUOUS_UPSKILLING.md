@@ -105,7 +105,7 @@ silently reinterpret prior closed rejections after a decoder correction.
 `native-layout-key-v4` is a separate opt-in acquisition experiment. It derives
 an explicitly recorded six-cell placement template from the family's isolated
 identity anchor; the repeated reference poses guide size/position and never enter
-sequence labels or training examples. Native cell extraction precedes resizing,
+sequence labels or supervised output frames. Native cell extraction precedes resizing,
 so downsampling cannot destroy separator evidence. The native rule allowance is
 scaled to the same eight canonical pixels, and the resulting256-square alpha
 frames still pass the unchanged isolation gate. Earlier policies retain their
