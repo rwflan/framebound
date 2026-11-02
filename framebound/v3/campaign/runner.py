@@ -115,7 +115,7 @@ class Runner:
     def _segment(self,case,source,parent,operation,*,attempt=0,sheet=0,columns=1,rows=1):
         """One frozen paid mask request; received failures never buy a replacement."""
         from ...v2.providers.sam import build_request
-        from .segmentation import isolate
+        from .segmentation import isolate,concept_for
         if hasattr(self,'_case_started') and time.monotonic()-self._case_started+self._case_initial_active>=self.config.limits.active_seconds:
             raise Stopped('case active processing ceiling')
         op='segment_'+operation
@@ -125,9 +125,9 @@ class Runner:
         if existing:row=dict(existing)
         else:
             if self.config.prices.segmentation_microdollars!=2500:raise Stopped('verified still-image segmentation rate required')
-            request_wire=build_request(base64.b64encode(source).decode(),{'animal':'animal','character':'person','figure':'figure','object':'object'}[case.subject],stream=True)
+            request_wire=build_request(base64.b64encode(source).decode(),concept_for(case),stream=True)
             request_wire.update(model='sam-3.1',store=True,metadata=dict(mask_encoding='one_bit',framebound_binding=digest([self.campaign,case.id,op,attempt,sheet])))
-            payload=dict(provider='meta',requested_model='sam-3.1',wire=request_wire,source_sha256=hashlib.sha256(source).hexdigest())
+            payload=dict(provider='meta',requested_model='sam-3.1',wire=request_wire,source_sha256=hashlib.sha256(source).hexdigest(),concept_recipe='frozen-design-noun-v1')
             if hasattr(self.specialist,'preflight'):self.specialist.preflight(dict(payload=payload))
             row=self.ledger.reserve(self.campaign,case.id,op,payload,quote=2500,images=0,attempt=attempt,sheet=sheet,parents=[parent])
         if row['state'] in {'reserved','provider_pending'} or (row['state']=='wire_started' and row.get('acceptance')):

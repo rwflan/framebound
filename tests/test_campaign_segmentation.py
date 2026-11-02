@@ -37,7 +37,7 @@ def test_official_codec_maps_half_open_bounds_and_preserves_source():
 
 
 @pytest.mark.parametrize('text,color,reason',[
-    ('','white','dimensions'),
+    ('','white','no matches'),
     (TEXT.replace('w=320','w=321'),'white','dimensions'),
     (TEXT+','+TEXT.removeprefix('<0f>').replace('0<|box','1<|box',1),'white','exactly one'),
     (TEXT,'green','nontechnical background'),
@@ -58,7 +58,7 @@ def test_new_contract_is_disjoint_explicitly_priced_and_old_bytes_stay_default()
 
 def test_received_segmentation_replays_without_paid_retry_even_on_rejection(tmp_path):
     pytest.importorskip('meta_sam_parser')
-    config=curriculum('sam-engineering');case=config.cases[0].model_copy(update={'subject':'animal'})
+    config=curriculum('sam-engineering');case=config.cases[0].model_copy(update={'subject':'animal','request':'Original isolated 2D animal: one rounded heron, distinctive teal and gold palette.'})
     config=config.model_copy(update={'cases':[case],'prices':Prices(verified_at='engineering',source='fixture',segmentation_microdollars=2500)})
     ledger=Ledger(tmp_path);ledger.plan(config);ledger.fund(config.id,'api',10000,evidence='engineering')
     class SamFixture:
@@ -101,3 +101,12 @@ def test_mask_rescaling_is_explicit_and_cross_cell_results_fail_closed():
     assert sorted(m['slot'] for m in recipe['masks'])==list(range(6))
     crossed=text.replace('x1=100;y1=100;x2=159','x1=300;y1=100;x2=359',1)
     with pytest.raises(ValueError,match='crosses cell'):isolate(out.getvalue(),response(crossed),columns=3,rows=2)
+
+
+def test_concrete_concept_comes_only_from_frozen_design():
+    from framebound.v3.campaign.segmentation import concept_for
+    config=upskill_curriculum('concepts',source_policy='sam-isolation-v5')
+    concepts={concept_for(case) for case in config.cases}
+    assert {'folding umbrella','chef','wooden mannequin','heron'}<=concepts
+    assert not concepts&{'object','person','animal','figure'}
+    with pytest.raises(ValueError,match='concrete frozen'):concept_for(config.cases[0].model_copy(update={'request':'Guess a subject'}))

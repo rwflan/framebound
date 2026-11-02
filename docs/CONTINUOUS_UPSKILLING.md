@@ -280,3 +280,7 @@ surroundings. This predeclared policy does not rehabilitate earlier failed media
 The original strict alpha intake, scoped semantic assessment, corroboration,
 75% usable scope and 25% acquisition-failure gates still apply. A model mask is
 structural evidence, never artistic acceptance or automatic training readiness.
+SAM concepts use the concrete design noun already frozen in the source brief
+(for example, `folding umbrella`), rather than the curriculum's broad `object`
+category. Completed empty output is a retained no-match acquisition failure;
+changing the selector cannot purchase a replacement mask for a received request.
