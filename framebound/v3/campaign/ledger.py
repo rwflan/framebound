@@ -48,6 +48,13 @@ class Ledger:
                 CREATE TABLE IF NOT EXISTS api_budget_authorizations(id INTEGER PRIMARY KEY, campaign TEXT NOT NULL,
                     ceiling INTEGER NOT NULL, evidence TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS unknown_isolations(request_id TEXT PRIMARY KEY, evidence TEXT NOT NULL);
+                -- Wire payloads contain large inline images. Cover control-plane
+                -- queries so budget/replay checks never scan their overflow pages.
+                CREATE INDEX IF NOT EXISTS requests_campaign_attempt ON requests(campaign,case_id,operation,state);
+                CREATE INDEX IF NOT EXISTS requests_budget_totals ON requests(subsystem,campaign,incurred,reserved);
+                CREATE INDEX IF NOT EXISTS requests_resource_state ON requests(state,images,receipt,subsystem,campaign,case_id,operation);
+                CREATE INDEX IF NOT EXISTS cases_family_lookup ON cases(family,campaign,id);
+
             ''')
             if 'progress' not in {r[1] for r in db.execute('PRAGMA table_info(cases)')}:
                 db.execute("ALTER TABLE cases ADD COLUMN progress TEXT NOT NULL DEFAULT '{}'")
