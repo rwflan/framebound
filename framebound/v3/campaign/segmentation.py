@@ -21,6 +21,46 @@ def concept_for(case):
     return match[1]
 
 
+def spatial_prompt(raw, *, columns=1, rows=1):
+    """SAM object prompts grounded in observed ink and declared cell layout.
+
+    Positive points are actual nontechnical source pixels, not guessed cell
+    centers or semantic labels. Background corners are checked before use.
+    Neither these proposals nor the model mask establishes artistic acceptance.
+    """
+    from meta_sam_parser import FramePrompt,PromptBox,PromptObject,PromptPoint,build_object_prompt
+    if (columns,rows) not in {(1,1),(3,2)}:raise ValueError('only anchor or six-cell spatial layout supported')
+    with Image.open(io.BytesIO(raw)) as source:
+        if source.width*source.height>16777216 or max(source.size)>8192:raise ValueError('spatial source bound')
+        displayed=ImageOps.exif_transpose(source).convert('RGB');width,height=displayed.size
+    if width%columns or height%rows or (columns>1 and width//columns!=height//rows):raise ValueError('spatial source layout mismatch')
+    rgb=np.asarray(displayed).astype(np.int16)
+    technical=(np.min(rgb,axis=2)>=235)|((rgb[:,:,0]>=185)&(rgb[:,:,1]<=70)&(rgb[:,:,2]>=185))
+    cellw,cellh=width//columns,height//rows;objects=[];boxes=[]
+    for slot in range(columns*rows):
+        x=slot%columns*cellw;y=slot//columns*cellh
+        dx,dy=max(1,cellw//20),max(1,cellh//20)
+        negative=[(x+dx,y+dy),(x+cellw-dx-1,y+dy),(x+dx,y+cellh-dy-1),(x+cellw-dx-1,y+cellh-dy-1)]
+        if any(not technical[py,px] for px,py in negative):raise ValueError('spatial negative corner is not declared technical backing')
+        ys,xs=np.nonzero(~technical[y+dy:y+cellh-dy,x+dx:x+cellw-dx]);xs=xs+x+dx;ys=ys+y+dy
+        if len(xs)<max(4,cellw*cellh//10000):raise ValueError('no bounded nontechnical ink for spatial prompt')
+        pad=max(2,min(cellw,cellh)//128)
+        box=PromptBox(max(x+dx,int(xs.min())-pad),max(y+dy,int(ys.min())-pad),min(x+cellw-dx,int(xs.max())+pad+1),min(y+cellh-dy,int(ys.max())+pad+1))
+        # Center and occupied quadrants spread actual-ink guidance across parts
+        # and held props; no point is placed on an empty center/pose gap.
+        mx,my=float(xs.mean()),float(ys.mean());positive=[]
+        groups=[np.ones(len(xs),dtype=bool),*(hx&hy for hx in (xs<=mx,xs>mx) for hy in (ys<=my,ys>my))]
+        for group in groups:
+            if not group.any():continue
+            gx,gy=xs[group],ys[group];chosen=int(np.argmin((gx-gx.mean())**2+(gy-gy.mean())**2));point=(int(gx[chosen]),int(gy[chosen]))
+            if point not in positive:positive.append(point)
+        points=[PromptPoint(px,py,'positive') for px,py in positive]+[PromptPoint(px,py,'negative') for px,py in negative]
+        objects.append(PromptObject(slot,[FramePrompt(box=box,points=points)]))
+        boxes.append(dict(object_id=str(slot),slot=slot,bounds=[box.left,box.top,box.right,box.bottom],positive_ink=[list(p) for p in positive],negative_corners=[list(p) for p in negative],observed_ink_pixels=len(xs)))
+    return build_object_prompt(objects=objects,size=(width,height)),dict(operator='observed-ink-object-prompts-v2',source_size=[width,height],layout=[columns,rows],boxes=boxes,
+        basis='Frozen one-subject-per-cell layout; positive points are observed nontechnical pixels, negative points verified technical backing. Acquisition guidance only, never semantic labels')
+
+
 def isolate(raw, response, *, columns=1, rows=1):
     from meta_sam_parser import CompletedOutcome, image_segmentation_format, decode_mask_to_raster
     with Image.open(io.BytesIO(raw)) as source:

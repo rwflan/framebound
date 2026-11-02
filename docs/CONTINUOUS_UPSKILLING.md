@@ -284,3 +284,14 @@ SAM concepts use the concrete design noun already frozen in the source brief
 (for example, `folding umbrella`), rather than the curriculum's broad `object`
 category. Completed empty output is a retained no-match acquisition failure;
 changing the selector cannot purchase a replacement mask for a received request.
+
+`sam-spatial-v6` is a separate source experiment when class-conditioned masks
+miss clearly drawn subjects. Its sole SAM request uses the documented object-prompt
+mode: one native box around observed drawing pixels in each declared cell, positive
+points on actual nontechnical ink, and negative points on verified technical
+surroundings. It never combines a noun prompt with object tokens or assumes an
+empty cell center is foreground. These proposals do not confer semantic labels. Boxes, coordinates, source size and object IDs are frozen in the
+request and retained in derivation provenance. Mask IDs must map back to their
+own cells. The original strict extraction/alpha, scene exclusion, scoped assessment,
+corroboration, receipt, budget and release gates remain unchanged. A prior received
+no-match is not re-requested or turned into an accepted specimen.

@@ -112,13 +112,14 @@ def test_concrete_concept_comes_only_from_frozen_design():
     with pytest.raises(ValueError,match='concrete frozen'):concept_for(config.cases[0].model_copy(update={'request':'Guess a subject'}))
 
 
-def test_segmented_sheet_reaches_strict_revision_submission(tmp_path,monkeypatch):
+@pytest.mark.parametrize('source_policy',['sam-isolation-v5','sam-spatial-v6'])
+def test_segmented_sheet_reaches_strict_revision_submission(tmp_path,monkeypatch,source_policy):
     import base64,hashlib
     from PIL import ImageDraw
     from framebound.v3.campaign.curriculum import protocol
     from framebound.v3.services import loop
     from framebound.v3.provenance import RevisionProvenance
-    config=upskill_curriculum('segmented-submission',source_policy='sam-isolation-v5')
+    config=upskill_curriculum('segmented-submission',source_policy=source_policy)
     ledger=Ledger(tmp_path);ledger.plan(config)
     ledger.fund(config.id,'api',100000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),source='engineering',account_access='fixture',image_microdollars=10000,segmentation_microdollars=2500))
     case=next(c for c in config.cases if c.id==protocol(config)['rehearsal'][0])
@@ -146,3 +147,64 @@ def test_segmented_sheet_reaches_strict_revision_submission(tmp_path,monkeypatch
     # Replaying materialization preserves its revision and paid request count.
     assert runner._materialize(case,anchor)[1]==revision
     assert len(ledger.status(config.id)['requests'])==2
+
+
+def test_spatial_prompts_use_actual_ink_and_declared_native_cells_without_class_labels():
+    pytest.importorskip('meta_sam_parser')
+    from framebound.v3.campaign.segmentation import spatial_prompt
+    image=Image.new('RGB',(1920,1280),'white')
+    from PIL import ImageDraw
+    draw=ImageDraw.Draw(image)
+    for slot in range(6):
+        x=slot%3*640;y=slot//3*640;draw.rectangle((x+200,y+200,x+439,y+439),fill='navy')
+    out=io.BytesIO();image.save(out,format='PNG')
+    text,recipe=spatial_prompt(out.getvalue(),columns=3,rows=2)
+    assert text.startswith('<0f>0<|box;') and text.count('<|box;')==6
+    assert text.count('-<|point;')==24 and text.count('<|point;')>24
+    assert 'w=1920;h=1280' in text
+    assert recipe['boxes'][0]['bounds']==[195,195,445,445]
+    assert recipe['boxes'][5]['bounds']==[1475,835,1725,1085]
+    assert all(image.getpixel(tuple(point))==(0,0,128) for box in recipe['boxes'] for point in box['positive_ink'])
+    assert all(b['object_id']==str(b['slot']) for b in recipe['boxes'])
+    with pytest.raises(ValueError,match='only anchor or six-cell'):spatial_prompt(out.getvalue(),columns=2,rows=1)
+    with pytest.raises(ValueError,match='layout mismatch'):spatial_prompt(pixels(),columns=3,rows=2)
+
+
+def test_spatial_policy_changes_method_and_families_without_changing_old_recipe():
+    old=upskill_curriculum('same-name',source_policy='sam-isolation-v5')
+    new=upskill_curriculum('same-name',source_policy='sam-spatial-v6')
+    assert old.source_policy=='sam-isolation-v5' and new.prices.segmentation_microdollars==2500
+    assert not {c.family for c in old.cases}&{c.family for c in new.cases}
+    assert all('SOURCE CONTRACT sam-spatial-v6.' in c.request for c in new.cases)
+
+
+def test_spatial_wire_and_receipt_replay_keep_one_paid_attempt(tmp_path):
+    pytest.importorskip('meta_sam_parser')
+    config=upskill_curriculum('spatial-wire',source_policy='sam-spatial-v6')
+    from framebound.v3.campaign.curriculum import protocol
+    case=next(c for c in config.cases if c.id==protocol(config)['rehearsal'][0])
+    ledger=Ledger(tmp_path);ledger.plan(config)
+    ledger.fund(config.id,'api',10000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),source='engineering',account_access='fixture',image_microdollars=10000,segmentation_microdollars=2500))
+    class SamFixture:
+        sends=[]
+        def execute_stream(self,request,**kwargs):
+            self.sends.append(request)
+            return Response(response(),2500,0,dict(response_id='engineering',observed_model='sam-3.1'))
+    fixture=SamFixture();runner=Runner(tmp_path,config.id,fixture)
+    source=Image.new('RGB',(320,334),'white')
+    from PIL import ImageDraw
+    ImageDraw.Draw(source).rectangle((211,228,270,254),fill='navy');out=io.BytesIO();source.save(out,format='PNG');source=out.getvalue()
+    _,recipe=runner._segment(case,source,'engineering','anchor')
+    assert recipe['operator']=='sam-spatial-v6'
+    payload=fixture.sends[0]['payload'];text=payload['wire']['input'][0]['content'][0]['text']
+    assert payload['concept_recipe']=='observed-ink-object-prompts-v2'
+    assert text.startswith('<0f>0<|box;') and 'person' not in text
+    assert 'spatial_recipe' in payload
+    assert runner._segment(case,source,'engineering','anchor')[1]==recipe
+    assert len(fixture.sends)==1
+
+
+def test_spatial_negative_clicks_require_actual_technical_corner_pixels():
+    pytest.importorskip('meta_sam_parser')
+    from framebound.v3.campaign.segmentation import spatial_prompt
+    with pytest.raises(ValueError,match='negative corner'):spatial_prompt(pixels('green'))
