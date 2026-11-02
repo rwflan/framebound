@@ -25,7 +25,7 @@ class MVPCampaign(Campaign):
     schema_version: Literal['2.0'] = '2.0'
     dataset_version: Literal['mvp-2'] = 'mvp-2'
     cases: list[MVPCase] = Field(min_length=1, max_length=800)
-    transport: Literal['synchronous-v1', 'background-images-v1', 'stream-images-v1'] = Field(
+    transport: Literal['synchronous-v1', 'background-images-v1', 'stream-images-v1', 'stream-all-v2'] = Field(
         default='synchronous-v1', exclude_if=lambda value: value == 'synchronous-v1')
     assessment_policy: Literal['legacy-v1', 'independent-coverage-v2'] = Field(
         default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
@@ -106,7 +106,7 @@ def protocol(config):
                 knowledge_mode='advisory; no automatic repair or acceptance authority')
 
 
-def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
+def upskill_curriculum(campaign_id, *, source_policy='legacy-v1', transport='stream-images-v1'):
     """Independent breadth/depth study, never a replacement for unknown attempts.
 
     New family designs, transport and assessment recipe are frozen together.
@@ -179,6 +179,6 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
         if source_policy=='sam-native-cell-v7':
             case['request']=case['request'].replace('SOURCE CONTRACT sam-spatial-v6.', 'SOURCE CONTRACT sam-native-cell-v7. Each native cell receives its own predeclared SAM input; no replacement masks. Layout references alone set scale, and raw connected drawing must clear cell edges before segmentation.')
     if source_policy in {'sam-isolation-v5','sam-spatial-v6','sam-native-cell-v7'}:base['prices']['segmentation_microdollars']=2500
-    base.update(transport='stream-images-v1',assessment_policy='independent-coverage-v2',api_ceiling=50000000)
+    base.update(transport=transport,assessment_policy='independent-coverage-v2',api_ceiling=50000000)
     if source_policy!='legacy-v1':base['source_policy']=source_policy
     return MVPCampaign.model_validate(base)

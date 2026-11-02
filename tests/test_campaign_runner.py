@@ -456,3 +456,32 @@ def test_capability_selection_skips_semantically_rejected_terminal_case(tmp_path
     assert enabled and all(ids==[cases[0].id,cases[2].id] for ids in enabled)
     assert ledger.progress(config.id,cases[1].id)['result']['outcome']=='rejected'
     assert not result['status']['requests']
+
+
+def test_stream_all_teacher_acceptance_resumes_only_saved_get(tmp_path):
+    from datetime import datetime,timezone
+    from framebound.v3.campaign.curriculum import upskill_curriculum,protocol
+    from framebound.v3.campaign.ledger import ProviderPending
+    config=upskill_curriculum('teacher-stream-fixture',source_policy='sam-native-cell-v7',transport='stream-all-v2')
+    ledger=Ledger(tmp_path);ledger.plan(config)
+    ledger.fund(config.id,'api',500000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),source='engineering',account_access='fixture',image_microdollars=10000,segmentation_microdollars=2500))
+    case=next(c for c in config.cases if c.id==protocol(config)['rehearsal'][0])
+    class Interrupted:
+        posts=0;gets=0
+        def execute_stream(self,request,*,timeout,on_acceptance,on_observation):
+            self.posts+=1;self.saved=request
+            wire=request['payload']['wire'];assert wire['stream'] and wire['store'] and wire['metadata']['framebound_binding']
+            on_acceptance(dict(id='resp_saved_teacher_id',status='in_progress',model='muse-spark-1.3',metadata=wire['metadata']))
+            raise OSError('synthetic disconnect after durable acceptance')
+        def retrieve(self,request,acceptance,*,timeout):
+            self.gets+=1;assert request==self.saved and acceptance['id']=='resp_saved_teacher_id'
+            return Response(canonical(dict(id='resp_saved_teacher_id',status='completed',output=[])),100,0,dict(response_id='resp_saved_teacher_id',observed_model='muse-spark-1.3'))
+    fixture=Interrupted();runner=Runner(tmp_path,config.id,fixture)
+    with pytest.raises(ProviderPending):runner._call(case,'diagnose','Frozen original brief')
+    row=next(r for r in ledger.status(config.id)['requests']);assert row['state']=='provider_pending'
+    first=runner._call(case,'diagnose','New advice must not replace frozen paid brief')
+    assert runner._call(case,'diagnose','Another replay')[0]==first[0]
+    assert (fixture.posts,fixture.gets)==(1,1)
+    assert ledger.status(config.id)['api_budget']['lifetime_committed']==100
+    legacy=upskill_curriculum('legacy-default')
+    assert legacy.transport=='stream-images-v1'
