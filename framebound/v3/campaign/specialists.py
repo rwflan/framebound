@@ -34,8 +34,14 @@ class MuseResponses:
 
     def preflight(self, request):
         wire=request['payload']['wire']
-        if wire['model'] not in {'muse-image-1.0','muse-spark-1.3'}:
+        if wire['model'] not in {'muse-image-1.0','muse-spark-1.3','sam-3.1'}:
             raise ValueError('only explicitly priced Muse models are supported')
+        if wire['model']=='sam-3.1':
+            content=[p for item in wire.get('input',[]) for p in item.get('content',[])]
+            if (len([p for p in content if p.get('type')=='input_image'])!=1 or any(p.get('type') not in {'input_text','input_image'} for p in content)
+                    or wire.get('stream') is not True or wire.get('store') is not True or wire.get('tools') or wire.get('background')
+                    or wire.get('metadata',{}).get('mask_encoding')!='one_bit'):
+                raise ValueError('SAM supports only one stored streamed still image and explicit one-bit masks')
         if wire.get('background') and (wire.get('stream') or len(canonical(wire))>1048576):
             raise ValueError('background body must fit 1 MiB without streaming; no paid send performed')
         if len(canonical(wire))>50*1024**2:raise ValueError('provider request body exceeds bounded inline-media limit')
@@ -49,7 +55,7 @@ class MuseResponses:
     def _open_post(self, request, *, timeout):
         payload=request['payload']
         wire=payload['wire']
-        if wire['model'] not in {'muse-image-1.0','muse-spark-1.3'}:
+        if wire['model'] not in {'muse-image-1.0','muse-spark-1.3','sam-3.1'}:
             raise ValueError('only explicitly priced Muse models are supported')
         req=urllib.request.Request('https://api.meta.ai/v1/responses',data=canonical(wire),
             headers={'Authorization':'Bearer '+self.key,'Content-Type':'application/json'},method='POST')
@@ -155,7 +161,9 @@ class MuseResponses:
         images=sum(item.get('type')=='image_generation_call' and bool(item.get('result')) for item in body.get('output',[]) if isinstance(item,dict))
         usage=body.get('usage') or {}
         exact=wire['model']=='muse-image-1.0' or ('input_tokens' in usage and 'output_tokens' in usage)
-        if wire['model']=='muse-image-1.0': incurred=images*10000
+        if wire['model']=='sam-3.1':
+            incurred=request['quote'];exact=False
+        elif wire['model']=='muse-image-1.0': incurred=images*10000
         elif exact:
             cached=(usage.get('input_tokens_details') or {}).get('cached_tokens',0)
             incurred=math.ceil((usage['input_tokens']-cached)*1.25+cached*.15+usage['output_tokens']*4.25)

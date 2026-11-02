@@ -121,6 +121,8 @@ class Ledger:
             if subsystem=='api':
                 if evidence.get('image_microdollars')!=config.prices.image_microdollars:
                     raise ValueError('verified image price differs from frozen quote; create a new campaign version')
+                if config.prices.segmentation_microdollars is not None and evidence.get('segmentation_microdollars')!=config.prices.segmentation_microdollars:
+                    raise ValueError('verified segmentation price differs from frozen quote')
             else:
                 from .compute_gate import CreditEvidence
                 credit=CreditEvidence.model_validate(evidence['credit'])
@@ -205,7 +207,7 @@ class Ledger:
     def reserve(self, campaign, case_id, operation, payload, *, quote, images=0, subsystem='api', attempt=0, parents=(), sheet=0):
         if type(quote) is not int or quote < 0 or type(images) is not int or images < 0 or subsystem not in {'api','modal'}:
             raise ValueError('nonnegative integer resource quote required')
-        if operation not in {'anchor','generate','diagnose','recheck','repair','blind_rerun','compare','train','evaluate'}:
+        if operation not in {'anchor','generate','diagnose','recheck','repair','blind_rerun','compare','train','evaluate','segment_anchor','segment_generate','segment_repair','segment_blind_rerun'}:
             raise ValueError('unsupported operation')
         config = self.config(campaign)
         spec = next((c for c in config.cases if c.id == case_id), None)
@@ -216,6 +218,12 @@ class Ledger:
             raise Stopped('case is not in this release; final-test cases remain sealed')
         if type(attempt) is not int or type(sheet) is not int or not 0 <= sheet < config.limits.sheets:
             raise ValueError('bounded integer attempt and sheet required')
+        if operation.startswith('segment_'):
+            if config.prices.segmentation_microdollars is None or quote!=config.prices.segmentation_microdollars or images or subsystem!='api':raise ValueError('explicit segmentation rate and one-image quote required')
+            if payload.get('requested_model')!='sam-3.1' or payload.get('wire',{}).get('model')!='sam-3.1':raise ValueError('segmentation requires frozen SAM model')
+            if operation=='segment_generate' and attempt!=0:raise Stopped('segmentation generation attempt cannot be replenished')
+            if operation=='segment_repair' and not 0<=attempt<config.limits.repairs:raise Stopped('segmentation repair attempt limit')
+            if operation in {'segment_anchor','segment_blind_rerun'} and attempt!=0:raise Stopped('segmentation attempt cannot be replenished')
         if operation in {'anchor','generate','repair','blind_rerun'} and images<1:
             raise ValueError('image operations require quoted output images')
         if operation in {'anchor','blind_rerun','recheck'} and attempt != 0:
