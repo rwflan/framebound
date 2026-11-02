@@ -313,10 +313,33 @@ def test_whole_sheet_contract_preflights_then_masks_once(tmp_path,monkeypatch):
     assert not calls
 
 
-def test_reduced_template_scale_is_frozen_opt_in_without_legacy_byte_changes():
-    old=upskill_curriculum('old-scale',source_policy='sam-sheet-v8')
-    assert old.conditioning_subject_max==256 and 'conditioning_subject_max' not in old.model_dump(mode='json')
-    new=upskill_curriculum('smaller-scale',source_policy='sam-sheet-v8',conditioning_subject_max=192)
-    assert new.model_dump(mode='json')['conditioning_subject_max']==192
-    with pytest.raises(ValueError,match='whole-sheet'):upskill_curriculum('wrong-policy',source_policy='sam-native-cell-v7',conditioning_subject_max=192)
-    with pytest.raises(ValueError):upskill_curriculum('unfrozen-scale',source_policy='sam-sheet-v8',conditioning_subject_max=160)
+def test_observed_whitespace_reflow_retains_wide_pose_pixels_and_common_camera():
+    from PIL import ImageDraw
+    from framebound.v3.campaign.segmentation import whitespace_reflow,validate_reflow_masks
+    import numpy as np
+    image=Image.new('RGB',(960,640),'white');draw=ImageDraw.Draw(image)
+    for i in range(6):draw.rectangle((i%3*320+100,i//3*320+100,i%3*320+220,i//3*320+220),fill='navy')
+    draw.rectangle((200,465,330,475),fill='navy') # stretches past imaginary x320, remains fully drawn and separate
+    out=io.BytesIO();image.save(out,format='PNG');raw=out.getvalue()
+    reflow,recipe=whitespace_reflow(raw);new=Image.open(io.BytesIO(reflow)).convert('RGB')
+    assert int((np.asarray(new).min(axis=2)<235).sum())==int((np.asarray(image).min(axis=2)<235).sum())
+    assert len(recipe['cells'])==6 and recipe['cells'][3]['source_bounds'][2]>330
+    assert recipe['cell_size']==480 # frozen scale across differently spaced sheets, not per-pose zoom
+    rgba=new.convert('RGBA');rgba.putalpha(Image.fromarray(((np.asarray(new).min(axis=2)<235)*255).astype('uint8')))
+    proof=validate_reflow_masks(rgba,recipe);assert len(proof)==6 and all(p['technical_background_fraction']==1 for p in proof)
+    damaged=rgba.copy();damaged.putalpha(0)
+    with pytest.raises(ValueError):validate_reflow_masks(damaged,recipe) # extra padding cannot hide missed foreground
+    rgba.putalpha(255)
+    with pytest.raises(ValueError):validate_reflow_masks(rgba,recipe) # synthetic padding cannot make paper pass
+
+
+def test_whitespace_reflow_cannot_rescue_canvas_clipping_or_overlapping_poses():
+    from PIL import ImageDraw
+    from framebound.v3.campaign.segmentation import whitespace_reflow
+    image=Image.new('RGB',(960,640),'white');draw=ImageDraw.Draw(image)
+    for i in range(6):draw.rectangle((i%3*320+100,i//3*320+100,i%3*320+220,i//3*320+220),fill='navy')
+    draw.rectangle((0,150,110,155),fill='navy')
+    out=io.BytesIO();image.save(out,format='PNG')
+    with pytest.raises(ValueError):whitespace_reflow(out.getvalue())
+    out=io.BytesIO();Image.new('RGB',(960,640),'green').save(out,format='PNG')
+    with pytest.raises(ValueError,match='whitespace'):whitespace_reflow(out.getvalue())
