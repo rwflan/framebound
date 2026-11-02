@@ -485,3 +485,19 @@ def test_stream_all_teacher_acceptance_resumes_only_saved_get(tmp_path):
     assert ledger.status(config.id)['api_budget']['lifetime_committed']==100
     legacy=upskill_curriculum('legacy-default')
     assert legacy.transport=='stream-images-v1'
+
+
+def test_sheet_policy_anchor_does_not_inherit_six_pose_generation_instruction(tmp_path):
+    from datetime import datetime,timezone
+    from framebound.v3.campaign.curriculum import upskill_curriculum,protocol
+    config=upskill_curriculum('sheet-anchor-fixture',source_policy='sam-sheet-v8',transport='stream-all-v2')
+    ledger=Ledger(tmp_path);ledger.plan(config);ledger.fund(config.id,'api',100000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),source='engineering',account_access='fixture',image_microdollars=10000,segmentation_microdollars=2500))
+    case=next(c for c in config.cases if c.id==protocol(config)['rehearsal'][0])
+    class Fixture(EngineeringSpecialist):
+        def execute_stream(self,request,**kwargs):return self.execute(request,timeout=180)
+    fixture=Fixture();runner=Runner(tmp_path,config.id,fixture);runner._anchor(case)
+    brief=fixture.sends[0]['payload']['wire']['input'][0]['content'][0]['text']
+    assert 'Single neutral identity anchor only' in brief
+    assert 'Generate a complete six-pose sheet' not in brief
+    assert 'One batched six-object SAM request' not in brief
+    assert 'Generate a complete six-pose sheet' in case.request
