@@ -76,7 +76,7 @@ class Runner:
             quote=self.config.prices.image_microdollars if image else math.ceil(tokens*1.25+output*4.25)
             payload=dict(provider='meta',requested_model=model,wire=request_wire,
                 input_token_ceiling=None if image else tokens,output_token_ceiling=None if image else output)
-            if image and getattr(self.config,'transport','synchronous-v1') in {'background-images-v1','stream-images-v1'}:
+            if image and getattr(self.config,'transport','synchronous-v1') in {'background-images-v1','stream-images-v1','stream-all-v2'}:
                 previews=[];derivations=[]
                 for original in images:
                     with Image.open(io.BytesIO(original)) as source:
@@ -98,11 +98,13 @@ class Runner:
                 request_wire=wire(model,text,previews)
                 request_wire.update(tools=payload['wire']['tools'],background=True,store=True,
                     metadata=dict(framebound_binding=digest([self.campaign,case.id,operation,attempt,sheet])))
-                if self.config.transport=='stream-images-v1':
+                if self.config.transport in {'stream-images-v1','stream-all-v2'}:
                     request_wire.pop('background');request_wire['stream']=True
                 payload.update(wire=request_wire,conditioning_derivations=derivations)
                 if request_wire.get('background') and len(canonical(request_wire))>1048576:
                     raise ValueError('background conditioning exceeds 1 MiB; no request reserved or sent')
+            if not image and getattr(self.config,'transport','synchronous-v1')=='stream-all-v2':
+                request_wire.update(stream=True,store=True,metadata=dict(framebound_binding=digest([self.campaign,case.id,operation,attempt,sheet])))
             if hasattr(self.specialist,'preflight'):
                 self.specialist.preflight(dict(payload=payload))
             row=self.ledger.reserve(self.campaign,case.id,operation,payload,quote=quote,images=int(image),attempt=attempt,sheet=sheet,parents=parents)

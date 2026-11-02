@@ -329,3 +329,11 @@ only. Older source policies retain their original request bindings and previews.
 Fixed-cohort acquisition stopping uses the selected cohort as its denominator,
 including persisted failures before any next dispatch. The full pilot gate,
 independent semantic support and training/promotion gates remain unchanged.
+
+`transport: stream-all-v2` extends durable native streaming to teacher and
+comparison requests as well as images. Their frozen request includes storage and
+a binding tag; a retained creation event enables GET-only continuation after a
+disconnect. Received answers keep the same typed scope/corroboration rules. Older
+transport defaults and all saved requests remain unchanged. A connection lost
+before acknowledgement can still be unknown: preserve its full reservation and
+exclude its family/ancestry rather than send another POST.
