@@ -110,3 +110,39 @@ def test_concrete_concept_comes_only_from_frozen_design():
     assert {'folding umbrella','chef','wooden mannequin','heron'}<=concepts
     assert not concepts&{'object','person','animal','figure'}
     with pytest.raises(ValueError,match='concrete frozen'):concept_for(config.cases[0].model_copy(update={'request':'Guess a subject'}))
+
+
+def test_segmented_sheet_reaches_strict_revision_submission(tmp_path,monkeypatch):
+    import base64,hashlib
+    from PIL import ImageDraw
+    from framebound.v3.campaign.curriculum import protocol
+    from framebound.v3.services import loop
+    from framebound.v3.provenance import RevisionProvenance
+    config=upskill_curriculum('segmented-submission',source_policy='sam-isolation-v5')
+    ledger=Ledger(tmp_path);ledger.plan(config)
+    ledger.fund(config.id,'api',100000,evidence=dict(verified_at=datetime.now(timezone.utc).isoformat(),source='engineering',account_access='fixture',image_microdollars=10000,segmentation_microdollars=2500))
+    case=next(c for c in config.cases if c.id==protocol(config)['rehearsal'][0])
+    class GenerationFixture:
+        def execute_stream(self,request,**kwargs):
+            size=(96,64) if request['operation']!='anchor' else (64,64)
+            im=Image.new('RGBA',size);draw=ImageDraw.Draw(im)
+            for slot in range(6 if request['operation']!='anchor' else 1):
+                x=slot%3*32;y=slot//3*32
+                draw.rectangle((x+8,y+8,x+23,y+23),fill=(40,80,120,255))
+            out=io.BytesIO();im.save(out,format='PNG')
+            return Response(canonical(dict(status='completed',output=[dict(type='image_generation_call',result=base64.b64encode(out.getvalue()).decode())])),10000,1,dict(response_id='engineering',observed_model='muse-image-1.0'))
+    runner=Runner(tmp_path,config.id,GenerationFixture())
+    # Protocol codec has independent tests; this fixture isolates the complete
+    # materialization/asset-derivation/strict-provenance integration boundary.
+    def segmented(case,raw,parent,operation,**kwargs):
+        return Image.open(io.BytesIO(raw)).convert('RGBA'),dict(operator='engineering-segmentation',request_id='engineering-mask',source_sha256=hashlib.sha256(raw).hexdigest())
+    monkeypatch.setattr(runner,'_segment',segmented)
+    _,anchor=runner._anchor(case)
+    _,revision=runner._materialize(case,anchor)
+    saved=loop.revision_get(runner.project,revision)['revision']
+    provenance=RevisionProvenance.model_validate(saved['generation_metadata']['provenance'])
+    assert len(saved['frame_asset_ids'])==6
+    assert 'engineering-mask' in provenance.generations[0].transformations[0].operation
+    # Replaying materialization preserves its revision and paid request count.
+    assert runner._materialize(case,anchor)[1]==revision
+    assert len(ledger.status(config.id)['requests'])==2
