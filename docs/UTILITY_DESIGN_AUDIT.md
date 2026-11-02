@@ -5,6 +5,7 @@ The live desk was reviewed against `web/public/designs/posthog/DESIGN.md` and `d
 | Surface | Finding | Decision |
 | --- | --- | --- |
 | Shell, Interventions, Timeline, film and frame windows | The tan stock, blue grey chrome, compact controls, fixed queue and contextual inspector follow the PostHog adaptation. | Keep these shared surfaces. No second navigation or review workflow. |
+| Empty Interventions landing | Timeline omitted runs that had revisions but no studio case, leaving the review surface blank even though source history existed. | Include those runs in Timeline → Animations and open the latest timeline entry when Interventions has no actionable item. Keep the queue badge at zero and label submitted sources without implying intake or quality approval. |
 | Intake failure in the film window | A long centered block exposed every intake rule and raw failure reason at once. | Lead with the withheld decision and replacement action; put the exact intake evidence in a disclosure inside the existing film window. |
 | ⋯ menu | Training and legacy reference tools appeared as peers of everyday utilities. | Keep training as a direct menu action. Group reference approvals with legacy tools. |
 | Utility window | Every destination rendered every utility as a tab, including the training journey. | Retain compact Settings, Export and Status tabs. Training and reference approvals use the same window without tabs. |
