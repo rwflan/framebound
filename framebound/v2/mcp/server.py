@@ -8,6 +8,31 @@ from mcp.server.mcpserver import MCPServer
 def build_server(project_dir: str) -> MCPServer:
     server = MCPServer(name="framebound-v2", version="2.0.0a1")
 
+    @server.tool(name='create_animation', description='Start knowledge-guided 2D animation with your harness; no model training or Framebound provider keys required. Returns a frozen brief for one full pose screen.')
+    def create_animation(request: dict) -> dict:
+        from ...v3.services import consumer
+        return consumer.create(project_dir, request)
+
+    @server.tool(name='submit_animation_sheet', description='Cut one real-alpha PNG pose screen into native frames, evaluate and return scoped feedback. Retains originals; no background guessing or provider dispatch. Bind current parent/feedback for corrections.')
+    def submit_animation_sheet(run_id: str, revision_id: str, sheet_path: str,
+                               columns: int = 3, rows: int = 2,
+                               parent_revision_id: str | None = None,
+                               feedback_id: str | None = None,
+                               original_sheet_path: str | None = None) -> dict:
+        from ...v3.services import consumer
+        return consumer.submit_sheet(project_dir, run_id, revision_id, sheet_path,
+                                     columns, rows, parent_revision_id, feedback_id, original_sheet_path)
+
+    @server.tool(name='get_generated_animation', description='Read durable animation progress, knowledge-guided brief, saved feedback and current output eligibility; no training prerequisite.')
+    def get_generated_animation(run_id: str) -> dict:
+        from ...v3.services import consumer
+        return consumer.get(project_dir, run_id)
+
+    @server.tool(name='export_generated_animation', description='Export eligible native PNG frames, full sprite strip and authored holds; structural verification remains separate from artistic acceptance.')
+    def export_generated_animation(run_id: str) -> dict:
+        from ...v3.services import consumer
+        return consumer.export(project_dir, run_id)
+
     @server.tool(name='campaign_control', description='Local campaign plan/resume/status/stop/report/reserve; no implicit provider dispatch or funding')
     def campaign_control(root: str, action: str, campaign: str = 'animation-v1', config: dict | None = None, request: dict | None = None) -> dict:
         from ...v3.campaign.service import operate

@@ -50,6 +50,9 @@ class ModalTransport:
     Long training is disabled until a durable checkpoint/resume transport is
     configured. Current small jobs return a complete checkpoint within ten minutes.
     """
+    def __init__(self,*,client=None):
+        self.client=client
+
     def __call__(self,payload,job_data):
         import time
         from .transfer import inspect_payload
@@ -58,7 +61,7 @@ class ModalTransport:
         if job.seconds>600:raise ValueError('jobs over ten minutes require a configured durable checkpoint transport')
         app,worker=build(job)
         start=time.monotonic();call=None
-        with app.run():
+        with app.run(client=self.client):
             remaining=job.seconds+job.startup_seconds+job.replay_seconds-(time.monotonic()-start)
             if remaining<=0:raise TimeoutError('image/startup exceeded reserved wall allowance')
             try:

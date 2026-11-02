@@ -1,6 +1,6 @@
 # Model-facing tools
 
-The external orchestrator uses the v2 CLI or MCP stdio server. Humans use the persistent review desk for references, comparisons and decisions. There is no internal general-purpose adviser or critic.
+The external orchestrator uses the CLI or MCP stdio server. Humans use the persistent review desk for exceptional feedback, comparisons and decisions. Built-in animation guidance is compiled into generation inputs; it is not a general-purpose critic or a claim of artistic acceptance.
 
 ```sh
 framebound v2-mcp --project PROJECT
@@ -9,7 +9,58 @@ framebound capabilities --project PROJECT
 
 The MCP server uses the official SDK handshake and actual tool discovery. Enumerate its tools rather than copying a historical catalogue. All transports call the same application services; current capability and pending-evidence states are available at `/api/capabilities`.
 
-## Public creation
+## Generate with your harness — no training required
+
+Most users should start here. Connect the stdio server to your harness:
+
+```json
+{"mcpServers":{"framebound":{"command":"framebound","args":["v2-mcp","--project","/absolute/path/to/animation-project"]}}}
+```
+
+1. Call `create_animation` with `request` containing a stable `id`, `intent` and
+   `subjects`. Optional settings are `appearance`, `canvas`, `holds`,
+   `ticks_per_second`, `loop` and existing immutable reference `inputs`. Defaults
+   are six 256×256 frames, two ticks per frame at 12 ticks/second, looping.
+2. Use the returned compiled guidance, original references and declared shared
+   camera to generate **one complete pose screen** with your harness's image tool.
+   Generate distinct ordered poses, keeping every subject inside its declared cell.
+   Framebound does not issue a hidden provider request or require you to train a model.
+3. Call `submit_animation_sheet` with the returned `run_id`, a stable unique
+   `revision_id`, an absolute `sheet_path`, and `columns`/`rows` whose product equals
+   the frozen hold count. Six, twelve and twenty-four pose screens use the same
+   path. The sheet must be a non-oriented PNG with real alpha and dimensions at
+   most 2048×2048. Every cell shares the frozen canvas aspect ratio. Cutting is
+   row-major; an explicitly recorded common scale applies to all cells, never a
+   separate fit or zoom per pose. Originals and transformation hashes are retained.
+4. If the generator returns opaque backing, use your harness to segment **the
+   whole screen once**, retain its raw output and receipt, and submit the resulting
+   alpha sheet with `original_sheet_path` identifying the original PNG. Framebound
+   never guesses that white subject pixels are scenery. Clipped, scenic and
+   unsuitable alpha remains an intake failure rather than a quality verdict.
+5. Read `get_generated_animation`. Follow its saved feedback and returned
+   `next_action` for a correction; bind the exact current `parent_revision_id` and
+   `feedback_id`. Use original identity references rather than accumulating edits
+   as the sole reference. A retry with the same revision and unchanged submission
+   is a read-only replay; changed bindings are rejected. Report an unknown external
+   provider outcome with `agent_run_report_failure` and never blindly send it again.
+6. Call `export_generated_animation` when eligible. It publishes hashed native PNG
+   frames, a sprite strip and the authored clock in `manifest.json`. Structural
+   completion does not certify animation semantics or grant human approval. Stronger
+   measured requirements can be declared with the existing task observations/profile.
+
+Example initial call:
+
+```json
+{"request":{"id":"fox-walk","intent":"A fox walks in place through a complete cycle","subjects":"One original isolated 2D fox","appearance":"Flat warm orange coat and dark paws","holds":[2,2,2,2,2,2],"ticks_per_second":12}}
+```
+
+Meta/Modal credentials and custom model training are optional advanced product
+features, separate from this external-harness generation path. Provider receipts
+and attribution reported by a harness remain external assertions unless locally
+verified; guidance, technical checks, creative satisfaction and human approval have
+separate authority.
+
+## Legacy reviewed-contract creation
 
 ```sh
 framebound project-create --project PROJECT --project-id PROJECT_ID --name NAME

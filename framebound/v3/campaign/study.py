@@ -122,6 +122,8 @@ def execution_sources():
 
 
 def final_evidence(root,campaign,request):
+    from .advisory import require_own_final_knowledge
+    require_own_final_knowledge(root,campaign,request)
     from .experiment import freeze_final,promotion
     from .ledger import Ledger,Stopped
     from .report import build

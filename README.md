@@ -6,6 +6,26 @@ Framebound is the checking, feedback and evidence layer for an external animatio
 
 Built for the Meta Global AI Developer Hackathon (Indie track, Build for Your World). See [docs/HACKATHON.md](docs/HACKATHON.md).
 
+## Generate with your harness
+
+Most users do not need to train a model. Connect `framebound v2-mcp --project
+/absolute/path/to/project` to your harness and call `create_animation` with an
+intent and subject. Framebound compiles built-in guidance covering identity,
+parts, props, contacts, motion, action order and clean extraction. Your harness
+generates a complete pose screen; `submit_animation_sheet` cuts and checks it,
+returns bounded correction feedback, and `export_generated_animation` delivers
+native frames, a sprite strip and timing. See [the MCP quick start](docs/MODEL_TOOLS.md#generate-with-your-harness--no-training-required).
+
+The desk's **Settings** stores Meta and Modal credentials separately. **Train a
+model** guides advanced users through connections, a spending ceiling and an
+explicit start, then shows durable collection and model-support progress in the
+same desktop. This trains consistency models from numeric animation features;
+it does not fine-tune an image generator. See [the training journey](docs/TRAINING_JOURNEY.md).
+
+Packaged guidance works without private research data or custom checkpoints.
+Guidance is advisory; technical validity, creative quality, human approval and
+measured model improvement remain separate claims.
+
 Product direction: [agent-led animation workflow plan](docs/AGENT_ANIMATION_WORKFLOW_PLAN.md) — reference-optional generation and correction, actionable agent feedback, exceptional human intervention and training-data export. The reference-free agent loop, live workspace and portable trajectory exporter are implemented. Known-good enhancement/interpolation is optional. The tracked-scene milestone is provisional; independently reviewed generated-art validation remains pending. See [the implementation audit](docs/AGENT_WORKFLOW_IMPLEMENTATION_AUDIT.md).
 
 ## Agent-led workflow

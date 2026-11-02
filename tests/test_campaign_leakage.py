@@ -63,3 +63,18 @@ def test_all_collision_owners_are_checked_not_only_last_hash_owner(tmp_path):
     assert _signature(str(a))[0]==_signature(str(b))[0]==_signature(str(copy))[0]
     rows=[example(a,'a','train'),example(b,'b','train'),example(copy,'copy','validation')]
     assert set(exclusions(rows,tmp_path))=={'a','copy'}
+
+
+def test_repeated_blob_pairs_reuse_exact_comparison_within_one_scan(tmp_path, monkeypatch):
+    import framebound.v3.campaign.leakage as leakage
+    a=picture(tmp_path/'a.png','circle','red');b=picture(tmp_path/'b.png','square','purple')
+    rows=[example(a,'a','train'),example(b,'b','validation'),example(b,'b2','validation')]
+    original=leakage.confirm_near_duplicate;calls=[]
+    def counted(left,right):
+        calls.append((left,right));return original(left,right)
+    monkeypatch.setattr(leakage,'confirm_near_duplicate',counted)
+    assert leakage.exclusions(rows,tmp_path)=={}
+    assert calls.count((str(b),str(a)))==1
+    # Cache is local to one immutable scan, never a persistent stale verdict.
+    assert leakage.exclusions(rows,tmp_path)=={}
+    assert calls.count((str(b),str(a)))==2
