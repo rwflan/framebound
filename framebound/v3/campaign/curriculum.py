@@ -29,7 +29,7 @@ class MVPCampaign(Campaign):
         default='synchronous-v1', exclude_if=lambda value: value == 'synchronous-v1')
     assessment_policy: Literal['legacy-v1', 'independent-coverage-v2'] = Field(
         default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
-    source_policy: Literal['legacy-v1', 'single-anchor-keyed-v2', 'declared-sheet-rules-v3', 'native-layout-key-v4', 'sam-isolation-v5'] = Field(
+    source_policy: Literal['legacy-v1', 'single-anchor-keyed-v2', 'declared-sheet-rules-v3', 'native-layout-key-v4', 'sam-isolation-v5', 'sam-spatial-v6'] = Field(
         default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
 
     @model_validator(mode='after')
@@ -112,12 +112,12 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
     New family designs, transport and assessment recipe are frozen together.
     Historical v1/v2 defaults retain identical serialized bytes.
     """
-    if source_policy not in {'legacy-v1','single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5'}:
+    if source_policy not in {'legacy-v1','single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:
         raise ValueError('unknown frozen source policy')
     base=mvp_curriculum(campaign_id).model_dump(mode='json')
     namespace='u4-'+digest(['independent-upskilling-v4',campaign_id])[:10]
     if source_policy!='legacy-v1':namespace='u5-'+digest(['single-anchor-keyed-v2',campaign_id])[:10]
-    if source_policy in {'declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5'}:namespace='u6-'+digest([source_policy,campaign_id])[:10]
+    if source_policy in {'declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:namespace='u6-'+digest([source_policy,campaign_id])[:10]
     designs={
         'character':('gardener','astronaut','chef','sailor','mountaineer','mechanic','courier','musician'),
         'animal':('otter','fox','badger','heron','tortoise','rabbit','gecko','puffin'),
@@ -142,7 +142,7 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
             'No floor, shadow, paper, scenery, checkerboard, simulated transparency, second actor, caption, border, grid rule or gutter. '
             'Neighboring cell backgrounds merge seamlessly. Local extraction creates the final alpha. '
             'Preserve the original identity, authored timing, fixed camera and topology across ordered poses.')
-        if source_policy in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5'}:
+        if source_policy in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:
             case['request']=(f'Original isolated 2D {case["subject"]}: one {silhouette} {design}, '
                 f'distinctive {palette} palette. '
                 'SOURCE CONTRACT single-anchor-keyed-v2. DECLARED EXTRACTION KEY: opaque pure RGB(255,0,255) #FF00FF. '
@@ -154,7 +154,7 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
                 f'ANIMATION EXERCISE: {case["exercise"]} Complexity C{case["level"]}. '
                 f'Legitimate counterexample: {case["legitimate_counterexample"]} '
                 'Preserve identity, fixed camera, topology and authored timing across ordered poses.')
-        if source_policy in {'declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5'}:
+        if source_policy in {'declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:
             case['request']=case['request'].replace('SOURCE CONTRACT single-anchor-keyed-v2.',
                 'SOURCE CONTRACT declared-sheet-rules-v3.').replace(
                 'No floor, shadow, paper, scenery, checkerboard, caption, border, grid or gutter.',
@@ -165,7 +165,7 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
                 'Do not draw interior boxes, textured separators or a white matte.')
         if source_policy=='native-layout-key-v4':
             case['request']=case['request'].replace('SOURCE CONTRACT declared-sheet-rules-v3.','SOURCE CONTRACT native-layout-key-v4. Follow the supplied placement template: subject size and cell centers are fixed; change poses without zooming, adding borders or changing the background.')
-        if source_policy=='sam-isolation-v5':
+        if source_policy in {'sam-isolation-v5','sam-spatial-v6'}:
             case['request']=(f'Original isolated 2D {case["subject"]}: one {silhouette} {design}, distinctive {palette} palette. '
                 'SOURCE CONTRACT sam-isolation-v5. Flat opaque technical WHITE (or pure #FF00FF magenta) backing; model segmentation creates real alpha before assessment. '
                 'No paper texture, scene, floor, shadows, checkerboard, caption, labels, grid, border or simulated transparency. '
@@ -173,7 +173,10 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1'):
                 'Follow the supplied placement template; keep subject scale and cell centers. '
                 f'ANIMATION EXERCISE: {case["exercise"]} Complexity C{case["level"]}. '
                 f'Legitimate counterexample: {case["legitimate_counterexample"]} Preserve identity, topology, authored timing and fixed camera.')
-    if source_policy=='sam-isolation-v5':base['prices']['segmentation_microdollars']=2500
+        if source_policy=='sam-spatial-v6':
+            case['request']=case['request'].replace('SOURCE CONTRACT sam-isolation-v5.',
+                'SOURCE CONTRACT sam-spatial-v6. Spatial SAM prompts use declared cells, observed nontechnical drawing pixels and verified technical backing; these are acquisition proposals, not semantic labels.')
+    if source_policy in {'sam-isolation-v5','sam-spatial-v6'}:base['prices']['segmentation_microdollars']=2500
     base.update(transport='stream-images-v1',assessment_policy='independent-coverage-v2',api_ceiling=50000000)
     if source_policy!='legacy-v1':base['source_policy']=source_policy
     return MVPCampaign.model_validate(base)

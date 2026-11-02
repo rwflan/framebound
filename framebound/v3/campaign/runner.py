@@ -115,7 +115,7 @@ class Runner:
     def _segment(self,case,source,parent,operation,*,attempt=0,sheet=0,columns=1,rows=1):
         """One frozen paid mask request; received failures never buy a replacement."""
         from ...v2.providers.sam import build_request
-        from .segmentation import isolate,concept_for
+        from .segmentation import isolate,concept_for,spatial_prompt
         if hasattr(self,'_case_started') and time.monotonic()-self._case_started+self._case_initial_active>=self.config.limits.active_seconds:
             raise Stopped('case active processing ceiling')
         op='segment_'+operation
@@ -125,9 +125,15 @@ class Runner:
         if existing:row=dict(existing)
         else:
             if self.config.prices.segmentation_microdollars!=2500:raise Stopped('verified still-image segmentation rate required')
-            request_wire=build_request(base64.b64encode(source).decode(),concept_for(case),stream=True)
+            spatial=None
+            if getattr(self.config,'source_policy','legacy-v1')=='sam-spatial-v6':
+                try:prompt,spatial=spatial_prompt(source,columns=columns,rows=rows)
+                except ValueError as exc:raise AcquisitionRejected(str(exc)) from exc
+                request_wire=wire('sam-3.1',prompt,[source]);request_wire['stream']=True
+            else:request_wire=build_request(base64.b64encode(source).decode(),concept_for(case),stream=True)
             request_wire.update(model='sam-3.1',store=True,metadata=dict(mask_encoding='one_bit',framebound_binding=digest([self.campaign,case.id,op,attempt,sheet])))
-            payload=dict(provider='meta',requested_model='sam-3.1',wire=request_wire,source_sha256=hashlib.sha256(source).hexdigest(),concept_recipe='frozen-design-noun-v1')
+            payload=dict(provider='meta',requested_model='sam-3.1',wire=request_wire,source_sha256=hashlib.sha256(source).hexdigest(),concept_recipe='observed-ink-object-prompts-v2' if spatial else 'frozen-design-noun-v1')
+            if spatial:payload['spatial_recipe']=spatial
             if hasattr(self.specialist,'preflight'):self.specialist.preflight(dict(payload=payload))
             row=self.ledger.reserve(self.campaign,case.id,op,payload,quote=2500,images=0,attempt=attempt,sheet=sheet,parents=[parent])
         if row['state'] in {'reserved','provider_pending'} or (row['state']=='wire_started' and row.get('acceptance')):
@@ -138,6 +144,9 @@ class Runner:
         try:image,recipe=isolate(source,raw,columns=columns,rows=rows)
         except ValueError as exc:raise AcquisitionRejected(str(exc)) from exc
         recipe.update(request_id=row['id'],response_id=receipt['provider'].get('response_id'))
+        if 'spatial_recipe' in frozen['payload']:
+            if any(m['object_id']!=str(m['slot']) for m in recipe['masks']):raise AcquisitionRejected('spatial object identity differs from declared cell')
+            recipe.update(operator='sam-spatial-v6',spatial_prompt=frozen['payload']['spatial_recipe'])
         self._save('segmentation',row['id']+'.json',canonical(recipe))
         return image,recipe
 
@@ -167,16 +176,16 @@ class Runner:
             path.write_bytes(canonical(dict(request_id=existing['id'],sha256=hashlib.sha256(image).hexdigest())))
             return existing['id'],image
         text='Create one original isolated design anchor for the declared entity graph; do not invent an actor for an effect-only graph. No existing character or source reference. '+case.request
-        if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5'}:
+        if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:
             text=('Draw exactly ONE original subject in ONE neutral pose, centered in ONE square canvas. '
                 'This is a single design reference: no animation, pose sequence, turnaround, contact sheet or duplicate subject. '
                 +case.request.split('ANIMATION EXERCISE:')[0])
             if self.config.source_policy in {'declared-sheet-rules-v3','native-layout-key-v4'}:
                 text+=' The single anchor canvas has NO separator, rule or border; the technical sheet-rule declaration applies only to later animation sheets.'
         text+=' Style treatment: '+self.config.treatments[case.treatment]+' Graph: '+canonical(case.complexity).decode()
-        if getattr(self.config,'source_policy','legacy-v1')=='sam-isolation-v5':
+        if getattr(self.config,'source_policy','legacy-v1') in {'sam-isolation-v5','sam-spatial-v6'}:
             text=text.replace('Follow the supplied placement template; keep subject scale and cell centers.','Single neutral anchor only; no placement sheet is requested for this image.')
-        if getattr(self.config,'source_policy','legacy-v1') in {'native-layout-key-v4','sam-isolation-v5'}:
+        if getattr(self.config,'source_policy','legacy-v1') in {'native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:
             text=text.replace('Follow the supplied placement template: subject size and cell centers are fixed; change poses without zooming, adding borders or changing the background.',
                 'Single anchor only; no placement sheet is requested for this image.')
         rid,raw,receipt=self._call(case,'anchor',text,image=True)
@@ -234,7 +243,7 @@ class Runner:
         except InvalidInput:pass
         anchor_id=tid+'-anchor'
         segmentation=None
-        if getattr(self.config,'source_policy','legacy-v1')=='sam-isolation-v5':
+        if getattr(self.config,'source_policy','legacy-v1') in {'sam-isolation-v5','sam-spatial-v6'}:
             anchor_record=json.loads(local_path(self.root,f'campaigns/anchors/{digest(case.family)}.json').read_text())
             segmentation=self._segment(case,anchor,anchor_record['request_id'],'anchor')
         anchor_asset,_=self._import_muse_media(anchor,anchor_id,declared_key='DECLARED EXTRACTION KEY:' in case.request,segmentation=segmentation)
@@ -256,12 +265,12 @@ class Runner:
         for sheet in range(math.ceil(len(case.holds)/6)):
             start=sheet*6;count=min(6,len(case.holds)-start)
             refs=[anchor];conditioning=[spec['inputs'][0]['asset_id']]
-            if getattr(self.config,'source_policy','legacy-v1') in {'native-layout-key-v4','sam-isolation-v5'}:
+            if getattr(self.config,'source_policy','legacy-v1') in {'native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:
                 identity=self._frames([spec['inputs'][0]['asset_id']])[0]
                 bounds=identity.getbbox()
                 if not bounds:raise AcquisitionRejected('Empty identity cannot form a placement template')
                 subject=identity.crop(bounds);subject.thumbnail((256,256),Image.Resampling.LANCZOS)
-                template=Image.new('RGBA',(1536,1024),(255,255,255,255) if self.config.source_policy=='sam-isolation-v5' else (255,0,255,255))
+                template=Image.new('RGBA',(1536,1024),(255,255,255,255) if self.config.source_policy in {'sam-isolation-v5','sam-spatial-v6'} else (255,0,255,255))
                 for pos in range(6):
                     template.alpha_composite(subject,(pos%3*512+(512-subject.width)//2,pos//3*512+(512-subject.height)//2))
                 template_id=spec['inputs'][0]['asset_id']+'-layout'
@@ -278,9 +287,9 @@ class Runner:
             instruction=case.request+'\nStyle treatment: '+self.config.treatments[case.treatment]+' Detail: '+case.detail+'\n'+canonical(dict(holds=case.holds,loop=case.loop,complexity=case.complexity.model_dump(),sheet=sheet,
                 native_slots=list(range(start,start+count)))).decode()
             instruction+='\nReturn a row-major 3-by-2 sheet of six distinct square poses. Preserve original anchor identity; the last input boundary pose fixes continuity.'
-            if getattr(self.config,'source_policy','legacy-v1') in {'native-layout-key-v4','sam-isolation-v5'}:
+            if getattr(self.config,'source_policy','legacy-v1') in {'native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:
                 instruction+='\nThe second input is a placement template, not animation evidence. Keep its cell centers, subject scale and uninterrupted magenta surround. Replace every repeated reference with the appropriate distinct ordered pose. Visible separators are unnecessary; do not zoom or add a matte.'
-                if self.config.source_policy=='sam-isolation-v5':instruction=instruction.replace('uninterrupted magenta surround','uninterrupted flat white surround')
+                if self.config.source_policy in {'sam-isolation-v5','sam-spatial-v6'}:instruction=instruction.replace('uninterrupted magenta surround','uninterrupted flat white surround')
             if self.config.schema_version=='2.0':
                 instruction+='\nLAYOUT: exactly THREE COLUMNS and TWO ROWS of equal square cells. Top row: poses 0,1,2. Bottom row: poses 3,4,5. No gutters, grid rules or labels. Keep the complete subject and generous magenta margins inside every cell.'
             if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4'}:
@@ -290,7 +299,7 @@ class Runner:
                     'Only the explicitly declared uniform white technical cell-edge rules are allowed; no labels or interior boxes.').replace(
                     'All pixels outside those central bounds must be pure #FF00FF.',
                     'All pixels outside those central bounds must be pure #FF00FF except optional declared white technical cell-edge rules.')
-            if getattr(self.config,'source_policy','legacy-v1')=='sam-isolation-v5':
+            if getattr(self.config,'source_policy','legacy-v1') in {'sam-isolation-v5','sam-spatial-v6'}:
                 instruction=instruction.replace('generous magenta margins','generous flat white margins')
             if authority:
                 instruction+='\n'+authority['instruction']
@@ -308,7 +317,7 @@ class Runner:
             raw=extract_image(response);sha=S.store_blob(self.project,raw)
             source_id='sheet-'+rid[:32]
             segmentation=None
-            if getattr(self.config,'source_policy','legacy-v1')=='sam-isolation-v5':
+            if getattr(self.config,'source_policy','legacy-v1') in {'sam-isolation-v5','sam-spatial-v6'}:
                 segmentation=self._segment(case,raw,rid,operation,attempt=attempt,sheet=sheet,columns=3,rows=2)
             source_asset,normalization=self._import_muse_media(raw,source_id,segmentation=segmentation)
             receipt_sha=S.store_blob(self.project,response)
@@ -326,7 +335,7 @@ class Runner:
             extractions=[]
             if 'DECLARED EXTRACTION KEY:' in case.request:
                 from ..intake import cell
-                native_first=getattr(self.config,'source_policy','legacy-v1') in {'native-layout-key-v4','sam-isolation-v5'}
+                native_first=getattr(self.config,'source_policy','legacy-v1') in {'native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}
                 try:extracted=[cell(frame,declared_white_rules=getattr(self.config,'source_policy','legacy-v1') in {'declared-sheet-rules-v3','native-layout-key-v4'},
                     rule_pixels=max(1,8*w//256) if native_first else 8) for frame in (native_crops if native_first else crops)]
                 except ValueError as exc:raise AcquisitionRejected(str(exc)) from exc
@@ -393,11 +402,11 @@ class Runner:
         rubric=DIAGNOSIS_RUBRIC+(' Independent preservation audit: inspect each subject, legitimate deformation and event order without seeing another assessment.' if ordinal%2 else '')
         if getattr(self.config,'assessment_policy','legacy-v1')=='independent-coverage-v2':
             rubric+='\nUse the stable subject label primary actor for the sole original actor, and held prop for its prop. Inspect all nine categories; prioritize temporal and artifacts when applicable. Independently assess every supplied native frame. Negative coverage must list every actually assessed slot; abstain on unobserved scope. Do not invent a defect to balance classes. Do not invent an ROI or part when evidence only supports a whole actor or canvas observation. Preserve actual affected slots and tick ranges for positive findings; legitimate holds and smears remain counterexamples.'
-        if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5'}:
+        if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:
             context['tick_bounds']=dict(start=0,end_exclusive=sum(case.holds),
                 slots=[dict(slot=i,start=sum(case.holds[:i]),end_exclusive=sum(case.holds[:i+1])) for i in range(len(case.holds))])
             rubric+='\nEvery coverage entry requires a nonempty limitations string describing actual observed scope. Tick ranges are authored ticks, not frame numbers or milliseconds: 0 <= start < end <= '+str(sum(case.holds))+'. Loop windows may wrap slots, but never extend a finding tick_range beyond this bound. If unsupported, abstain; do not clamp invented ranges.'
-        if getattr(self.config,'source_policy','legacy-v1') in {'declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5'}:
+        if getattr(self.config,'source_policy','legacy-v1') in {'declared-sheet-rules-v3','native-layout-key-v4','sam-isolation-v5','sam-spatial-v6'}:
             rubric+='\nFor EACH finding, every reported slot interval in tick_bounds must overlap its tick_range. Use the actual tick interval of the listed slots, never the slot number as a tick. For a loop-boundary finding spanning the last and first slots, its range envelope may be [0, end_exclusive]; list only the actually affected native slots. Required finding fields: id, category, slots, tick_range, subject, severity (minor/material/critical), observed, expected, counterexamples, visibility. If any field or timing cannot be supported, omit that finding and mark its category not_assessed; never invent or repair evidence.'
         text=rubric+'\nFor any assessed category, list actual native slots (0 to '+str(len(frames)-1)+'). No props or no extraction means not_assessed, not an empty-scope negative label. Include a visibility field in every finding.\nCoverage present means a DEFECT exists in that category, never that an entity or property exists. Every present category MUST have a corresponding localized finding. Explicitly include visibility=supported only when the pose and observations support a defect. Opaque backdrops do not establish extraction defects unless extraction was actually performed.\nReturn only {"coverage": [...], "findings": [...]}; provenance and binding are attached locally.\n'+canonical(context).decode()
         rid,raw,receipt=self._call(case,'diagnose',text,[anchor,*[png(f) for f in frames]],attempt=ordinal,parents=[revision_id])
