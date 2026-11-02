@@ -236,6 +236,8 @@ class Runner:
             instruction=case.request+'\nStyle treatment: '+self.config.treatments[case.treatment]+' Detail: '+case.detail+'\n'+canonical(dict(holds=case.holds,loop=case.loop,complexity=case.complexity.model_dump(),sheet=sheet,
                 native_slots=list(range(start,start+count)))).decode()
             instruction+='\nReturn a row-major 3-by-2 sheet of six distinct square poses. Preserve original anchor identity; the last input boundary pose fixes continuity.'
+            if getattr(self.config,'source_policy','legacy-v1')=='native-layout-key-v4':
+                instruction+='\nThe second input is a placement template, not animation evidence. Keep its cell centers, subject scale and uninterrupted magenta surround. Replace every repeated reference with the appropriate distinct ordered pose. Visible separators are unnecessary; do not zoom or add a matte.'
             if self.config.schema_version=='2.0':
                 instruction+='\nLAYOUT: exactly THREE COLUMNS and TWO ROWS of equal square cells. Top row: poses 0,1,2. Bottom row: poses 3,4,5. No gutters, grid rules or labels. Keep the complete subject and generous magenta margins inside every cell.'
             if getattr(self.config,'source_policy','legacy-v1') in {'single-anchor-keyed-v2','declared-sheet-rules-v3','native-layout-key-v4'}:
