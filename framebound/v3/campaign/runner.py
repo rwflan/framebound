@@ -671,10 +671,13 @@ class Runner:
                         or any(cid not in allowed for cid in case_ids)):
                     raise ValueError('unique admitted case IDs required for a frozen batch')
             selected=set(case_ids) if case_ids is not None else allowed
-            known={cid:self.ledger.progress(self.campaign,cid)['result'] for cid in allowed}
+            known={cid:self.ledger.progress(self.campaign,cid)['result'] for cid in selected}
             def acquisition_failed(result):
                 return bool(result and (result.get('candidate_acquisition_failures') or any(not i['eligible'] for i in result.get('intake',[]))))
             rejected_intakes=sum(acquisition_failed(r) for r in known.values())
+            if self.config.schema_version=='2.0' and rejected_intakes>len(selected)*.25:
+                self.ledger.stop(self.campaign)
+                return dict(results=results,deferred={cid:'Selected cohort acquisition failures already exceed25%' for cid in selected if not known[cid]},status=self.ledger.status(self.campaign))
             for case in self.config.cases:
                 if case.id not in selected:continue
                 if self.ledger.status(self.campaign)['stopped']:break
@@ -686,7 +689,7 @@ class Runner:
                     results[case.id]=self.case(case)
                     if not known.get(case.id) and acquisition_failed(results[case.id]):
                         rejected_intakes+=1
-                        if self.config.schema_version=='2.0' and rejected_intakes>len(allowed)*.25:
+                        if self.config.schema_version=='2.0' and rejected_intakes>len(selected)*.25:
                             self.ledger.stop(self.campaign);deferred[case.id]='Acquisition intake failures exceed 25% of the admitted cohort';break
                     gate=self.folder/'capabilities/long-sequences.json'
                     if not gate.exists():

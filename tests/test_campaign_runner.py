@@ -395,3 +395,43 @@ def test_changed_advice_cannot_rewrite_received_repair_provenance(tmp_path,monke
     after=loop.revision_get(runner.project,revision_id)['revision']
     assert after==before
     assert after['generation_metadata']['provenance']['generations'][0]['prompt_sha256']==expected
+
+
+def test_acquisition_stop_uses_fixed_selected_cohort_not_full_pilot(tmp_path,monkeypatch):
+    from framebound.v3.campaign.curriculum import upskill_curriculum,protocol
+    config=upskill_curriculum('selected-acquisition-fixture');ledger=Ledger(tmp_path);ledger.plan(config)
+    allowed=set(protocol(config)['pilot']);selected=[c.id for c in config.cases if c.id in allowed][:20]
+    monkeypatch.setattr('framebound.v3.campaign.progression.admitted',lambda *a,**k:allowed)
+    runner=Runner(tmp_path,config.id,EngineeringSpecialist());calls=[]
+    def rejected(case):
+        calls.append(case.id)
+        return dict(outcome='rejected',intake=[dict(eligible=False)])
+    monkeypatch.setattr(runner,'case',rejected)
+    result=runner.run(max_cases=20,case_ids=selected)
+    assert len(allowed)==80 and len(calls)==6
+    assert result['status']['stopped'] and len(result['deferred'])==1
+    assert not result['status']['requests']
+
+
+def test_already_failed_selected_cohort_stops_before_more_work(tmp_path,monkeypatch):
+    from framebound.v3.campaign.curriculum import upskill_curriculum,protocol
+    config=upskill_curriculum('failed-selected-fixture');ledger=Ledger(tmp_path);ledger.plan(config)
+    allowed=set(protocol(config)['pilot']);selected=[c.id for c in config.cases if c.id in allowed][:20]
+    monkeypatch.setattr('framebound.v3.campaign.progression.admitted',lambda *a,**k:allowed)
+    for cid in selected[:6]:ledger.finish_case(config.id,cid,'rejected',dict(intake=[dict(eligible=False)]))
+    runner=Runner(tmp_path,config.id,EngineeringSpecialist());monkeypatch.setattr(runner,'case',lambda _:pytest.fail('Irrecoverable cohort must not acquire another specimen'))
+    result=runner.run(max_cases=20,case_ids=selected)
+    assert result['status']['stopped'] and len(result['deferred'])==14
+    assert not result['status']['requests']
+
+
+def test_other_admitted_failures_do_not_consume_selected_cohort_allowance(tmp_path,monkeypatch):
+    from framebound.v3.campaign.curriculum import upskill_curriculum,protocol
+    config=upskill_curriculum('other-selected-fixture');ledger=Ledger(tmp_path);ledger.plan(config)
+    allowed=set(protocol(config)['pilot']);ordered=[c.id for c in config.cases if c.id in allowed];selected=ordered[:20]
+    monkeypatch.setattr('framebound.v3.campaign.progression.admitted',lambda *a,**k:allowed)
+    for cid in ordered[20:26]:ledger.finish_case(config.id,cid,'rejected',dict(intake=[dict(eligible=False)]))
+    runner=Runner(tmp_path,config.id,EngineeringSpecialist());calls=[]
+    monkeypatch.setattr(runner,'case',lambda case:(calls.append(case.id) or dict(outcome='ambiguous')))
+    result=runner.run(max_cases=1,case_ids=selected)
+    assert len(calls)==1 and not result['status']['stopped'] and not result['status']['requests']
