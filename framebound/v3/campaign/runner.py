@@ -311,14 +311,15 @@ class Runner:
                 identity=self._frames([spec['inputs'][0]['asset_id']])[0]
                 bounds=identity.getbbox()
                 if not bounds:raise AcquisitionRejected('Empty identity cannot form a placement template')
-                subject=identity.crop(bounds);subject.thumbnail((256,256),Image.Resampling.LANCZOS)
+                subject_max=getattr(self.config,'conditioning_subject_max',256)
+                subject=identity.crop(bounds);subject.thumbnail((subject_max,subject_max),Image.Resampling.LANCZOS)
                 template=Image.new('RGBA',(1536,1024),(255,255,255,255) if self.config.source_policy in {'sam-isolation-v5','sam-spatial-v6','sam-native-cell-v7','sam-sheet-v8'} else (255,0,255,255))
                 for pos in range(6):
                     template.alpha_composite(subject,(pos%3*512+(512-subject.width)//2,pos//3*512+(512-subject.height)//2))
                 template_id=spec['inputs'][0]['asset_id']+'-layout'
                 write_derived(self.project,template_id,template,[spec['inputs'][0]['asset_id']],dict(
                     operator='identity-placement-template-v1',purpose='Conditioning placement only; repeated reference poses are not generated or labeled sequence data',
-                    canvas=[1536,1024],cell=[512,512],subject_max=[256,256],source_bbox=list(bounds),resampling='LANCZOS'))
+                    canvas=[1536,1024],cell=[512,512],subject_max=[subject_max,subject_max],source_bbox=list(bounds),resampling='LANCZOS'))
                 if getattr(self.config,'source_policy','legacy-v1') in {'sam-native-cell-v7','sam-sheet-v8'}:refs=[];conditioning=[]
                 refs.append(png(template));conditioning.append(template_id)
             if boundary is not None and getattr(self.config,'source_policy','legacy-v1') not in {'sam-native-cell-v7','sam-sheet-v8'}:

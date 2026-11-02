@@ -311,3 +311,12 @@ def test_whole_sheet_contract_preflights_then_masks_once(tmp_path,monkeypatch):
     calls.clear();draw.rectangle((640,470,750,475),fill='navy')
     with pytest.raises(AcquisitionRejected,match='clips native cell'):runner._segment_sheet(case,encoded(),'new','generate')
     assert not calls
+
+
+def test_reduced_template_scale_is_frozen_opt_in_without_legacy_byte_changes():
+    old=upskill_curriculum('old-scale',source_policy='sam-sheet-v8')
+    assert old.conditioning_subject_max==256 and 'conditioning_subject_max' not in old.model_dump(mode='json')
+    new=upskill_curriculum('smaller-scale',source_policy='sam-sheet-v8',conditioning_subject_max=192)
+    assert new.model_dump(mode='json')['conditioning_subject_max']==192
+    with pytest.raises(ValueError,match='whole-sheet'):upskill_curriculum('wrong-policy',source_policy='sam-native-cell-v7',conditioning_subject_max=192)
+    with pytest.raises(ValueError):upskill_curriculum('unfrozen-scale',source_policy='sam-sheet-v8',conditioning_subject_max=160)

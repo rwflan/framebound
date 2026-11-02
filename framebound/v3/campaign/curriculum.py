@@ -32,8 +32,12 @@ class MVPCampaign(Campaign):
     source_policy: Literal['legacy-v1', 'single-anchor-keyed-v2', 'declared-sheet-rules-v3', 'native-layout-key-v4', 'sam-isolation-v5', 'sam-spatial-v6','sam-native-cell-v7','sam-sheet-v8'] = Field(
         default='legacy-v1', exclude_if=lambda value: value == 'legacy-v1')
 
+    conditioning_subject_max: Literal[192,256] = Field(default=256,exclude_if=lambda value:value==256)
+
     @model_validator(mode='after')
     def protocol(self):
+        if self.conditioning_subject_max!=256 and self.source_policy!='sam-sheet-v8':
+            raise ValueError('reduced placement scale requires the whole-sheet contract')
         if self.phase != 'pilot':
             raise ValueError('v2 releases advance through the ledger, never by rewriting the campaign')
         if Counter(c.split for c in self.cases) != dict(train=480, validation=160, test=160):
@@ -106,7 +110,7 @@ def protocol(config):
                 knowledge_mode='advisory; no automatic repair or acceptance authority')
 
 
-def upskill_curriculum(campaign_id, *, source_policy='legacy-v1', transport='stream-images-v1'):
+def upskill_curriculum(campaign_id, *, source_policy='legacy-v1', transport='stream-images-v1', conditioning_subject_max=256):
     """Independent breadth/depth study, never a replacement for unknown attempts.
 
     New family designs, transport and assessment recipe are frozen together.
@@ -181,6 +185,7 @@ def upskill_curriculum(campaign_id, *, source_policy='legacy-v1', transport='str
         if source_policy=='sam-sheet-v8':
             case['request']=case['request'].replace('SOURCE CONTRACT sam-spatial-v6.', 'SOURCE CONTRACT sam-sheet-v8. Generate a complete six-pose sheet, never separate pose requests. One batched six-object SAM request extracts the whole sheet. Layout references set scale; raw drawing must clear every cell edge before masking.')
     if source_policy in {'sam-isolation-v5','sam-spatial-v6','sam-native-cell-v7','sam-sheet-v8'}:base['prices']['segmentation_microdollars']=2500
+    base['conditioning_subject_max']=conditioning_subject_max
     base.update(transport=transport,assessment_policy='independent-coverage-v2',api_ceiling=50000000)
     if source_policy!='legacy-v1':base['source_policy']=source_policy
     return MVPCampaign.model_validate(base)

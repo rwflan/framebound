@@ -366,3 +366,11 @@ its unknown state, full reserved spend, stopped study or permanent family
 exclusion, and never authorizes a resend. Real unknown provider jobs still occupy
 concurrency. This narrowly separates a proven local guard from an actual network
 acceptance ambiguity.
+
+A separately frozen whole-sheet study may set `conditioning_subject_max: 192`
+(default256, omitted from historical serialized configurations). This shrinks
+only the repeated conditioning subject inside each512-square placement cell,
+providing additional room for extended tails, limbs and props. The derivation
+records the actual selected maximum. Raw cell margins and all alpha, isolation,
+semantic and cohort thresholds stay unchanged. It is not a way to reprocess a
+closed failed cohort or shrink an already received source into a pass.
