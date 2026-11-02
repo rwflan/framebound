@@ -78,3 +78,16 @@ def test_concurrent_reservations_do_not_overcommit(tmp_path):
     with ThreadPoolExecutor(2) as pool:
         rows = list(pool.map(reserve,cases))
     assert sum(x is not None for x in rows) == 1
+
+
+def test_control_plane_uses_indexes_without_scanning_inline_wire_blobs(tmp_path):
+    ledger=Ledger(tmp_path)
+    with ledger.db() as db:
+        lookup=db.execute("EXPLAIN QUERY PLAN SELECT * FROM requests WHERE campaign=? AND case_id=? AND operation=? AND json_extract(request,'$.attempt')=0 AND json_extract(request,'$.sheet')=0",('campaign','case','generate')).fetchall()
+        totals=db.execute("EXPLAIN QUERY PLAN SELECT SUM(COALESCE(incurred,reserved)) FROM requests WHERE subsystem='api'").fetchall()
+        resources=db.execute("EXPLAIN QUERY PLAN SELECT SUM(CASE WHEN receipt IS NOT NULL THEN json_extract(receipt,'$.successful_images') ELSE images END) FROM requests WHERE state!='cancelled'").fetchall()
+        assert any('SEARCH' in r[3] and 'requests_campaign_attempt' in r[3] for r in lookup)
+        assert all('COVERING INDEX' in r[3] for r in totals)
+        assert all('COVERING INDEX' in r[3] for r in resources)
+    # Schema installation is repeatable and does not rewrite any outbox row.
+    Ledger(tmp_path)
