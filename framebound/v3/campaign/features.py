@@ -102,7 +102,7 @@ def collect(root,campaign,*,version='1',extractor=VERSION,include_test=False,dat
     if result.get('status')=='no_generated_examples':return result
     rows=[]
     examples=load(result['path'])
-    from .leakage import exclusions
+    from .leakage import exclusions,POLICY
     excluded=exclusions(examples,Path(result['path']))
     from .ledger import Ledger
     isolated=Ledger(root).isolated_families()
@@ -136,7 +136,7 @@ def collect(root,campaign,*,version='1',extractor=VERSION,include_test=False,dat
     artifacts={'features.json':raw,'preupload-manifest.json':canonical(manifest),
         'source-manifest.json':canonical(dict(dataset_version=dataset_version,
             dataset_sha256=digest(__import__('json').loads((dataset/'manifest.json').read_text())),
-            extractor=extractor,source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()))}
+            extractor=extractor,split_quarantine_policy=POLICY,split_quarantine_source_sha256=hashlib.sha256(Path(__file__).with_name('leakage.py').read_bytes()).hexdigest(),source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()))}
     for name,content in artifacts.items():
         path=folder/name
         if path.exists() and path.read_bytes()!=content:raise ValueError('feature version is immutable')
