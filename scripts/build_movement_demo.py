@@ -81,7 +81,11 @@ def metrics(images):
     heights = [b[3] - b[1] for b in boxes]
     bottoms = [b[3] for b in boxes]
     native = extract(images, [6] * len(images), loop=False, extractor="native-geometry-v2")
-    clipped = [i for i, im in enumerate(images) if max(np.count_nonzero(np.asarray(im)[32:-32, 32, 3]), np.count_nonzero(np.asarray(im)[32:-32, -33, 3])) > 6]
+    clipped = []
+    for i, im in enumerate(images):
+        alpha = np.asarray(im)[:, :, 3]
+        if max(np.count_nonzero(edge) for edge in (alpha[32:-32, 32], alpha[32:-32, -33], alpha[32, 32:-32], alpha[-33, 32:-32])) > 6:
+            clipped.append(i)
     return dict(clipped_slots=clipped, native_features=native["features"].tolist(), feature_names=native["feature_names"], proposals=native["proposals"], height_spread=float((max(heights)-min(heights))/np.median(heights)), baseline_spread=float((max(bottoms)-min(bottoms))/images[0].height))
 
 
@@ -123,13 +127,21 @@ def main():
             repaired = send(root, batch['id'] + f'-repair-{attempt}', 'muse-image-1.0', prompt + '\nFramebound repair constraints:\n' + '\n'.join(text for _, text in PRINCIPLES) + '\nCorrect these observed defects while preserving all other requirements: ' + str(review['repair']), [*refs, extract_image(raw)])
             try:
                 candidate = frames(repaired)
-                checked = assess(root, batch['id'] + f'-recheck-{attempt}', prompt, refs, repaired, metrics(candidate))
+                candidate_metrics = metrics(candidate)
+                checked = assess(root, batch['id'] + f'-recheck-{attempt}', prompt, refs, repaired, candidate_metrics)
             except ValueError as error:
                 report.setdefault('rejected', []).append(str(error))
                 continue
-            report.setdefault('attempts', []).append(dict(review=checked, geometry=metrics(candidate)))
+            report.setdefault('attempts', []).append(dict(review=checked, geometry=candidate_metrics))
             # Geometry regressions cannot be hidden by a semantic score increase.
-            if (float(checked['score']) > best or (len(metrics(candidate)['clipped_slots']) < len(metrics(chosen)['clipped_slots']) and float(checked['score']) >= best - 5)) and metrics(candidate)['height_spread'] <= metrics(chosen)['height_spread'] + .03 and metrics(candidate)['baseline_spread'] <= metrics(chosen)['baseline_spread'] + .03:
+            previous_metrics = metrics(chosen)
+            clip_count = len(candidate_metrics['clipped_slots'])
+            old_clip_count = len(previous_metrics['clipped_slots'])
+            improves = float(checked['score']) > best or (clip_count < old_clip_count and float(checked['score']) >= best - 5)
+            safe = (clip_count <= old_clip_count
+                    and candidate_metrics['height_spread'] <= previous_metrics['height_spread'] + .03
+                    and candidate_metrics['baseline_spread'] <= previous_metrics['baseline_spread'] + .03)
+            if improves and safe:
                 chosen, best, raw, review = candidate, float(checked['score']), repaired, checked
                 report['selected'] = f'repair-{attempt}'
         start = len(direct)
@@ -138,14 +150,17 @@ def main():
         for state, indices in batch['states'].items():
             spec = states.setdefault(state, dict(frames=[], duration_ticks=[], loop=state in ('idle','run')))
             spec['frames'].extend(start+i for i in indices)
-            spec['duration_ticks'].extend([6]*len(indices))
+            spec['duration_ticks'].extend([30 if state == 'idle' else 6]*len(indices))
         reports.append(report)
         save(root / 'private' / 'assessment-summary.json', reports)
         print(batch['id'], report['selected'], flush=True)
     # One shared canvas and scale for every frame in both lanes; no per-frame fitting.
     width = max(im.width for im in direct + refined)
     height = max(im.height for im in direct + refined)
-    revision = hashlib.sha256(json.dumps(reports,sort_keys=True).encode()).hexdigest()[:16]
+    revision_hash = hashlib.sha256(json.dumps(reports,sort_keys=True).encode())
+    for image in direct + refined:
+        revision_hash.update(image.tobytes())
+    revision = revision_hash.hexdigest()[:16]
     output = public / revision
     output.mkdir(exist_ok=True)
     for lane, images in [('direct', direct), ('framework', refined)]:

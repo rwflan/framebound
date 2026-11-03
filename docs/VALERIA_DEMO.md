@@ -35,7 +35,8 @@ Expose `PRIVATE_OUTPUT/published` at `web/public/demo/valeria-live` using a loca
 symlink (ignored by Git). The builder publishes immutable revision directories
 and replaces the manifest last. The browser checks that manifest every ten
 seconds and loads both complete lanes before swapping them. Generated builds
-in `web/dist` include the published assets for a standalone submission; neither
+in `web/dist` include the published assets for the submission build; the desk API is still
+required. Neither
 private prompts nor provider receipts are copied there.
 
 The previous opaque-sheet/legacy-atlas comparison has been replaced. Evidence

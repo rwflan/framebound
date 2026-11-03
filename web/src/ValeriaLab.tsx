@@ -62,24 +62,20 @@ function drawArena(
   context.fillStyle = sky;
   context.fillRect(0, 0, width, height);
 
-  context.strokeStyle = "#738a8750";
+  context.strokeStyle = "#738a8730";
   context.lineWidth = 1;
-  for (let x = 24; x < width; x += 38) {
+  for (let x = 24; x < width; x += 96) {
     context.beginPath();
     context.moveTo(x + 0.5, 0);
     context.lineTo(x + 0.5, height);
     context.stroke();
   }
-  for (let y = 28; y < height; y += 38) {
+  for (let y = 28; y < height; y += 96) {
     context.beginPath();
     context.moveTo(0, y + 0.5);
     context.lineTo(width, y + 0.5);
     context.stroke();
   }
-
-  context.fillStyle = "#8d9b8a42";
-  context.fillRect(0, 94, width, 4);
-  context.fillRect(0, 142, width, 2);
 
   const floor = height - 44;
   context.fillStyle = "#cdbf9f";
@@ -251,7 +247,7 @@ export function ValeriaLab() {
           engine.current.facing = 1;
           engine.current.x += 224 * delta;
         }
-        engine.current.x = Math.max(92, Math.min(868, engine.current.x));
+        engine.current.x = Math.max(180, Math.min(780, engine.current.x));
         if (engine.current.offsetY < -0.01) {
           engine.current.velocityY += 980 * delta;
           engine.current.offsetY += engine.current.velocityY * delta;
