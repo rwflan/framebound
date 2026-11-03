@@ -142,6 +142,19 @@ def test_declared_rule_recipe_freezes_new_families_without_changing_v5():
     assert 'DECLARED TECHNICAL SHEET RULE:' not in old.cases[0].request
 
 
+def test_flat_material_recipe_is_opt_in_and_keeps_v9_frozen():
+    v9=upskill_curriculum('same-study',source_policy='sam-whitespace-sheet-v9')
+    v10=upskill_curriculum('same-study',source_policy='sam-whitespace-flat-v10')
+    assert v10.source_policy=='sam-whitespace-flat-v10'
+    assert not {c.family for c in v10.cases}&{c.family for c in v9.cases}
+    assert 'sam-whitespace-flat-v10' in v10.cases[0].request
+    assert 'flat two-dimensional digital artwork' in v10.cases[0].request
+    assert 'Layered cut-paper shapes with stable material texture' in v9.treatments['t07']
+    assert 'purely flat TWO-DIMENSIONAL digital drawing' in v10.treatments['t07']
+    assert 'No photographed or physical material' in v10.treatments['t07']
+    assert canonical(parse_campaign(canonical(v10)))==canonical(v10)
+
+
 def test_candidate_failures_share_source_acquisition_allowance():
     from types import SimpleNamespace
     from framebound.v3.campaign.progression import cohort_evidence

@@ -487,7 +487,7 @@ def test_stream_all_teacher_acceptance_resumes_only_saved_get(tmp_path):
     assert legacy.transport=='stream-images-v1'
 
 
-@pytest.mark.parametrize('source_policy',['sam-sheet-v8','sam-whitespace-sheet-v9'])
+@pytest.mark.parametrize('source_policy',['sam-sheet-v8','sam-whitespace-sheet-v9','sam-whitespace-flat-v10'])
 def test_sheet_policy_anchor_does_not_inherit_six_pose_generation_instruction(tmp_path,source_policy):
     from datetime import datetime,timezone
     from framebound.v3.campaign.curriculum import upskill_curriculum,protocol
