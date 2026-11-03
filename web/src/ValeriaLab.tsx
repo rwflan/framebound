@@ -11,6 +11,10 @@ type StateSpec = {
 type DemoManifest = {
   schema: number;
   canvas: [number, number];
+  ground_y?: number;
+  actor_bounds?: [number, number, number, number];
+  source_dimensions?: [number, number][];
+  source_pixel_scales?: { direct: number[]; framework: number[] };
   states: Record<string, StateSpec>;
   frame_count: number;
   revision: string;
@@ -113,11 +117,14 @@ function drawCharacter(
   x: number,
   yOffset: number,
   facing: number,
+  pixelScales?: number[],
 ) {
   const context = drawArena(canvas, "#a99d87");
   if (!context) return;
   const spec = manifest.states[state];
-  const image = images[frameAt(spec, elapsed)];
+  const index = frameAt(spec, elapsed);
+  const image = images[index];
+  const density = pixelScales?.[index] ?? 1;
   if (!image) return;
   // Shared world camera and native-resolution sources in both lanes.
   const scale = 640 / manifest.canvas[1];
@@ -125,8 +132,8 @@ function drawCharacter(
   context.imageSmoothingQuality = "high";
   context.save();
   context.translate(x, canvas.height - 44 + yOffset);
-  context.scale(facing, 1);
-  context.drawImage(image, -manifest.canvas[0] * scale / 2, -manifest.canvas[1] * scale * .90,
+  context.scale(facing * density, density);
+  context.drawImage(image, -manifest.canvas[0] * scale / 2, -(manifest.ground_y ?? manifest.canvas[1] * .90) * scale,
     manifest.canvas[0] * scale, manifest.canvas[1] * scale);
   context.restore();
 }
@@ -247,7 +254,11 @@ export function ValeriaLab() {
           engine.current.facing = 1;
           engine.current.x += 224 * delta;
         }
-        engine.current.x = Math.max(180, Math.min(780, engine.current.x));
+        const bounds = assets.manifest.actor_bounds;
+        const halfWidth = assets.manifest.canvas[0] / 2;
+        const padding = bounds ? Math.ceil(Math.max(halfWidth - bounds[0], bounds[2] - halfWidth)
+          * 640 / assets.manifest.canvas[1]) + 12 : 180;
+        engine.current.x = Math.max(padding, Math.min(960 - padding, engine.current.x));
         if (engine.current.offsetY < -0.01) {
           engine.current.velocityY += 980 * delta;
           engine.current.offsetY += engine.current.velocityY * delta;
@@ -275,11 +286,12 @@ export function ValeriaLab() {
       }
       const elapsed = now - engine.current.stateStarted;
       if (frameworkCanvas.current) drawCharacter(frameworkCanvas.current, assets.framework, assets.manifest,
-        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing);
+        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing, assets.manifest.source_pixel_scales?.framework);
       if (directCanvas.current) drawCharacter(directCanvas.current, assets.direct, assets.manifest,
-        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing);
+        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing, assets.manifest.source_pixel_scales?.direct);
       if (singleCanvas.current) drawCharacter(singleCanvas.current, mode === "direct" ? assets.direct : assets.framework,
-        assets.manifest, engine.current.state, elapsed, engine.current.x * 2, engine.current.offsetY, engine.current.facing);
+        assets.manifest, engine.current.state, elapsed, engine.current.x * 2, engine.current.offsetY, engine.current.facing,
+        mode === "direct" ? assets.manifest.source_pixel_scales?.direct : assets.manifest.source_pixel_scales?.framework);
       request = requestAnimationFrame(paint);
     };
     request = requestAnimationFrame(paint);
@@ -373,7 +385,8 @@ export function ValeriaLab() {
           <div>
             <p>Both versions share the initial Muse generation, character references, transparent extraction, canvas and playback timing. Framebound alone assesses and requests repairs.</p>
             {assets && <dl>
-              <dt>Native canvas</dt><dd>{assets.manifest.canvas.join(" × ")} px</dd>
+              <dt>Frame canvas</dt><dd>{assets.manifest.canvas.join(" × ")} px</dd>
+              {assets.manifest.source_dimensions && <><dt>Source images</dt><dd>{assets.manifest.source_dimensions.map(size => size.join(" × ")).join(" / ")} px</dd></>}
               <dt>Frames per version</dt><dd>{assets.manifest.frame_count}</dd>
               <dt>Selected repairs</dt><dd>{assets.manifest.repairs_selected}</dd>
               <dt>Assessment</dt><dd>Automated; visual preference remains unproven.</dd>

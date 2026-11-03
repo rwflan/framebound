@@ -245,3 +245,28 @@ def test_unknown_feedback_acceptance_stays_actionable_and_reserved(tmp_path):
     before=studio.snapshot(p)['budget'];fake=Fake();studio.drain(p,fake)
     assert not fake.calls and studio.snapshot(p)['budget']==before
     assert before['reserved']==10000
+
+
+def test_clipped_generated_tip_keeps_receipt_and_previous_take(tmp_path):
+    p,c=prepared(tmp_path)
+    studio.submit(p,REVIEWER,c,dict(id='clipped-cape',version_id='base',text='Repair cape'))
+    class Clipped(Fake):
+        def execute(self,request,*,timeout):
+            self.calls+=1
+            im=Image.new('RGBA',(96,64));draw=ImageDraw.Draw(im)
+            for i in range(6):draw.rectangle((i%3*32+8,i//3*32+8,i%3*32+24,i//3*32+24),fill='blue')
+            im.putpixel((0,16),(160,20,20,255))
+            out=io.BytesIO();im.save(out,format='PNG')
+            return Response(canonical(dict(status='completed',output=[dict(type='image_generation_call',result=base64.b64encode(out.getvalue()).decode())])),10000,1,{'id':'TEST-ONLY'})
+    fake=Clipped();studio.drain(p,fake)
+    view=studio.snapshot(p,c)
+    assert view['case']['current']=='base'
+    assert view['feedback'][0]['state']=='failed'
+    assert 'framing' in view['feedback'][0]['error']
+    with studio.db(p) as con:
+        receipt=json.loads(con.execute('SELECT data FROM sends').fetchone()[0])
+        assert receipt['state']=='received'
+        assert S.blob_path(p,receipt['response_sha256']).is_file()
+    assert studio.snapshot(p)['budget']['spent']==10000
+    studio.drain(p,fake)
+    assert fake.calls==1

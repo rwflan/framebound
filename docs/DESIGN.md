@@ -123,3 +123,14 @@ See [DATASET.md](DATASET.md). Formats: COCO, Hugging Face imagefolder, preferenc
 - Not a pixel editor. Pen and highlighter marks are non-destructive feedback overlays; they never alter source art or imply edit permission.
 - Not a skeleton/rig system. No joints are inferred from raster colour.
 - No automatic art approval, anywhere, under any score.
+
+## Original-source framing (2026-11-03)
+
+Generated silhouettes require at least 2% clear margin inside every original
+image/cell edge, including small cape, braid, finger, sole and prop tips. The
+framing check runs after extraction and before padding or resampling; an
+otherwise transparent border cannot conceal a clipped extremity. Preserve the
+source and receipts on failure and require a new bounded generation. Native
+subject detail is measured before letterboxing; a larger padded canvas is not
+higher-resolution artwork. Framing and isolation remain technical observations,
+never semantic acceptance or human approval.

@@ -20,7 +20,7 @@ from ..campaign.contracts import canonical,digest
 from ..campaign.specialists import MuseResponses,wire,extract_image
 from . import desk
 from .attention import evaluation_needs_intervention
-from ..intake import inspect as inspect_sprite, cell, PRINCIPLE
+from ..intake import inspect as inspect_sprite, cell, framing, PRINCIPLE
 
 class Stroke(Strict):
     slot: StrictInt=Field(ge=0,le=511)
@@ -299,7 +299,7 @@ def _generate(project,feedback,specialist):
                 if feedback['request'].get('issues'):
                     text+='\nBundled corrections (zero-based native frame slots; apply every issue together in this take, preserving unmentioned details): '+canonical(feedback['request']['issues']).decode()
                 if replacement:text=replacement['prompt']
-                text+='\nMVP REQUIREMENT: '+PRINCIPLE+' Render clean flat 2D sprite artwork on perfectly uniform pure RGB(255,0,255) magenta in every cell, including enclosed gaps. No magenta in the subject. No texture, grid lines, captions, cast shadows or scenery. Leave generous clear margins in every cell. Local extraction of this explicitly declared key will create alpha. Exactly 3 columns by 2 rows, equally sized square cells, six distinct consecutive poses, no gutters.'
+                text+='\nMVP REQUIREMENT: '+PRINCIPLE+' Render clean flat 2D sprite artwork on perfectly uniform pure RGB(255,0,255) magenta in every cell, including enclosed gaps. No magenta in the subject. No texture, grid lines, captions, cast shadows or scenery. Keep at least 2% clear margin around the entire silhouette in every cell, including tiny cape, hair, finger, boot and prop tips. A clipped tip fails even if most of the border is empty. Never fix missing artwork by padding or cropping. Local extraction of this explicitly declared key will create alpha. Exactly 3 columns by 2 rows, equally sized square cells, six distinct consecutive poses, no gutters.'
                 w=wire('muse-image-1.0',text,images);w['tools']=[dict(type='image_generation',size='1536x1024',output_format='png',enable_image_search=False,enable_web_search=False)]
                 send.update(state='wire_started',request=dict(payload=dict(wire=w),quote=10000,images=1));put(con,'sends',send,True)
         if send['state']=='wire_started':
@@ -321,6 +321,9 @@ def _generate(project,feedback,specialist):
             for i in range(min(6,len(frames)-sheet*6)):
                 im=source.crop((i%3*w,i//3*h,i%3*w+w,i//3*h+h)).convert('RGBA')
                 im,extraction=cell(im)
+                source_framing=framing(im)
+                if not source_framing['eligible']:raise InvalidInput('Generated pose framing failed before resize: '+'; '.join(source_framing['reasons']))
+                extraction['source_framing']=source_framing
                 im=im.resize((case['canvas']['width'],case['canvas']['height']),Image.Resampling.LANCZOS)
                 native_intake=inspect_sprite(im)
                 if not native_intake['eligible']:raise InvalidInput('Native resampling failed intake: '+'; '.join(native_intake['reasons']))

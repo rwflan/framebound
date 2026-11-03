@@ -4,41 +4,59 @@ Open `http://127.0.0.1:5173/#/valeria-demo`, or **••• → Valeria movement
 Arrow keys move; Space jumps; S slides; J attacks. Compare drives both lanes
 with the same camera, controls and authored clock. Pause freezes that clock.
 
-Both lanes start from the **same high-resolution Muse generations**, with
-identical base instructions, references and layout guide. Both receive the same
-declared-magenta extraction, edge unmatting, fixed canvas, padding and timing.
-No individual pose fitting or low-resolution Castlevania atlas is used.
+The current generator uses **one full-native Muse image per pose**, rather than
+splitting a three-pose sheet. Portrait requests return 1280 × 1920 sources;
+wide actions use 1920 × 1280 sources. A shared 2048 × 2048 delivery canvas adds
+transparent letterboxing only: stored pixels are never upscaled or fitted per
+pose. Playback uses one fixed pixel-density factor per source format in both
+lanes, so a wider composition does not shrink the character.
+Original source resolution and the delivery canvas are reported separately in
+Evidence. Runtime bounds include the entire delivered artwork in both lanes,
+so moving or turning cannot cut a long cape or whip against the playfield edge.
 
-Direct Muse stops after this shared preparation. Framebound measures native
-geometry using `native-geometry-v2`, assesses the generated sheet against the
-original references with Muse Spark, and can request up to two bounded repairs
-per batch using the packaged framework principles. It keeps a replacement only
-when the automated score increases without materially worsening measured size
-or baseline spread. A rejected repair never replaces the control or best take.
-Automated assessments do not establish human preference or artistic approval.
-Clipping in a generated sheet remains a visible defect; padding never restores
-missing artwork. The same extraction and registration apply to replacements.
+Both lanes start from exactly the same base generation, references and brief.
+The reference is the later tailored-skirt Valeria without the hanging white
+waist panel. Both lanes receive identical declared-magenta extraction, edge
+unmatting, letterboxing and timing. Direct Muse then stops. Framebound checks
+original image framing and native subject span, reviews the pose and costume
+with Muse Spark, and can request bounded regenerations under the framework's
+packaged principles. A narrow canvas with side collisions triggers a wider
+composition. Original source pixels are checked again before publication.
+
+A missing or clipped cape, braid, finger, sole or prop tip fails even when more
+than 90% of the border remains clear. Padding cannot clear a failed source
+check. The framework lane must pass framing, complete-silhouette and wardrobe
+checks before a revision is published. Failed attempts and spend receipts are
+retained; a failed build leaves the current demo untouched. Automated reviews
+and framing passes do not establish human artistic preference or approval.
 
 ## Local build
 
 `python scripts/build_movement_demo.py --config PRIVATE_BRIEF.json --root PRIVATE_OUTPUT`
 
-The private brief supplies `references`, `brief` and `batches`; each batch has
-an `id`, `instruction` and `states` mapping state names to its three pose slots.
-The current demo uses two run batches followed by idle, jump and action batches.
-The six run keys play at 10 drawings per second. Source images, requests,
-responses, assessments and spend receipts stay under `PRIVATE_OUTPUT/private`.
-An exclusive pre-send marker prevents retrying a possibly accepted paid POST.
-Completed responses can be replayed locally without another charge.
+For individual poses, the private brief supplies `mode: individual`,
+`references`, `brief`, `native_canvas` and `poses`. Each pose has an `id`,
+`instruction`, `image_size` and `states` mapping. `max_repairs` bounds attempts;
+`minimum_subject_span` bounds native detail. `publish_root` optionally selects
+an existing published-assets directory for atomic live updates. The legacy
+`batches` mode remains available and now also withholds clipped framework cells.
 
-Expose `PRIVATE_OUTPUT/published` at `web/public/demo/valeria-live` using a local
-symlink (ignored by Git). The builder publishes immutable revision directories
-and replaces the manifest last. The browser checks that manifest every ten
-seconds and loads both complete lanes before swapping them. Generated builds
-in `web/dist` include the published assets for the submission build; the desk API is still
-required. Neither
-private prompts nor provider receipts are copied there.
+All source images, prompts, responses, assessments and receipts stay under
+`PRIVATE_OUTPUT/private`. An exclusive pre-send marker prevents retrying a
+possibly accepted paid POST. Completed responses can be replayed locally.
 
-The previous opaque-sheet/legacy-atlas comparison has been replaced. Evidence
-inside the demo reports native resolution, frame count and selected repair
-batches, without claiming delivery readiness or a measured aesthetic win.
+Expose the published directory at `web/public/demo/valeria-live` using a local
+symlink (ignored by Git). Publication writes immutable revision directories
+before replacing the manifest. The browser polls every ten seconds and loads
+both complete lanes before swapping them. The dev server supports new revision
+files without restart. `web/dist` includes published artwork for the submission
+build; the desk API is still required. Prompts and receipts are not copied.
+
+## Framework integration
+
+`framebound.v3.intake.framing` measures safety margins and subject pixel span
+against original image/cell bounds. The generation service checks immediately
+after extraction, before resampling. The public sheet-consumer path checks
+before its shared canvas transform. Existing padded derivations must supply
+`source_box` to validate their retained original bounds. Raster isolation and
+framing are separate checks; neither grants semantic quality or approval.

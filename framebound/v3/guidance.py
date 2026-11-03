@@ -15,7 +15,7 @@ PRINCIPLES = (
     ('temporal', 'Use a fixed camera, common canvas, common scale and stable registration. Do not independently crop or fit each pose. Preserve authored holds and verify the last-to-first transition when looping.'),
     ('action_order', 'Arrange distinct consecutive poses in the requested reading order. Preserve anticipation, action and recovery where requested; do not substitute repeated reference poses for newly generated motion.'),
     ('artifacts', 'Keep line weight, fill, palette and edge treatment consistent. Avoid muddy edit accumulation, stray marks and texture flicker. Repair from original references rather than using an edited take as the sole identity source.'),
-    ('extraction', 'Keep every subject fully inside its frame with real empty surroundings and generous margins. Use genuine alpha for delivery. Technical backing needs explicit segmentation or a declared extraction recipe; never erase white subject pixels by guessing.'),
+    ('extraction', 'Keep the complete silhouette inside its original frame with at least 2% clear margin at every edge, including cape, hair, fingers, soles and props. A tiny clipped extremity fails framing even if the rest of the border is clear. Do not hide clipping with padding or independent per-pose fitting. Use an individual full-resolution pose image when a sheet would sacrifice required subject detail. Use genuine alpha for delivery. Technical backing needs explicit segmentation or a declared extraction recipe; never erase white subject pixels by guessing.'),
 )
 
 

@@ -55,7 +55,14 @@ def test_builder_preserves_control_and_publishes_complete_revision(tmp_path, mon
         return name.encode()
     monkeypatch.setattr(demo, 'send', fake_send)
     monkeypatch.setattr(demo, 'extract_image', lambda raw: raw)
-    monkeypatch.setattr(demo, 'frames', lambda raw: [Image.new('RGBA', (100,100), (0,200 if b'repair' in raw else 50,0,255)) for _ in range(3)])
+    def native_frames(raw):
+        images=[]
+        for _ in range(3):
+            image=Image.new('RGBA',(100,100))
+            image.paste((0,200 if b'repair' in raw else 50,0,255),(40,40,60,60))
+            images.append(image)
+        return images
+    monkeypatch.setattr(demo, 'frames', native_frames)
     monkeypatch.setattr(demo, 'metrics', lambda images: dict(clipped_slots=[], height_spread=0, baseline_spread=0))
     monkeypatch.setattr(demo, 'assess', lambda root,name,*args: dict(score=95 if 'recheck' in name else 60, issues=[] if 'recheck' in name else ['motion'], repair='fix motion'))
     monkeypatch.setattr(demo.sys, 'argv', ['build', '--config', str(config), '--root', str(tmp_path)])
