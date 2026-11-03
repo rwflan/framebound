@@ -2,8 +2,9 @@ import {useEffect,useRef} from 'react';
 import type {ReactNode} from 'react';
 import {Icon} from './shared';
 import './utilities.css';
-export type Utility='export'|'status'|'reviewed-guides'|'training'|'settings';
-const utilities:{id:Utility;title:string;description:string;icon:'folder'|'history'|'frame'|'film'|'settings'}[]=[
+export type Utility='export'|'status'|'reviewed-guides'|'training'|'settings'|'valeria-demo';
+const utilities:{id:Utility;title:string;description:string;icon:'folder'|'history'|'frame'|'film'|'settings'|'play'}[]=[
+ {id:'valeria-demo',title:'Valeria movement',description:'Direct Muse versus framework output',icon:'play'},
  {id:'training',title:'Train a model',description:'Build a model with your own evidence',icon:'film'},
  {id:'settings',title:'Settings',description:'Meta and Modal connections',icon:'settings'},
  {id:'export',title:'Export',description:'Preview and save a local snapshot',icon:'folder'},

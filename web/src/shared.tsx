@@ -11,7 +11,8 @@ export type View =
         | "status"
         | "references"
         | "training"
-        | "settings";
+        | "settings"
+        | "valeria-demo";
     }
   | { name: "packet"; id: string }
   | { name: "compare"; base: string; other: string }
@@ -28,7 +29,16 @@ export function parseHash(): View {
   if (path === "issues")
     return { name: "issues", revision: q.get("revision") || undefined };
   if (
-    ["corrections", "export", "activity", "status", "references", "training", "settings"].includes(path)
+    [
+      "corrections",
+      "export",
+      "activity",
+      "status",
+      "references",
+      "training",
+      "settings",
+      "valeria-demo",
+    ].includes(path)
   )
     return { name: path as "export" };
   return { name: "inbox" };

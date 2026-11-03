@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "title": "Valeria movement proof",
+  "direct_muse": {
+    "model": "muse-image-1.0",
+    "poses": 9,
+    "grid": [
+      3,
+      3
+    ],
+    "dimensions": [
+      1920,
+      1280
+    ],
+    "alpha": false,
+    "incurred_usd": 0.01,
+    "sha256": "9f3c107262a6e109da3d32497dabb7d4c229133f01fc85254f8f33f04705dc3f",
+    "receipt_location": "outside checkout: framebound-local/valeria-demo/raw-muse-receipt.json"
+  },
+  "framework": {
+    "registered_poses": 139,
+    "run_keys": 9,
+    "run_holds_ticks": [
+      3,
+      3,
+      2,
+      4,
+      4,
+      3,
+      5,
+      4,
+      4
+    ],
+    "run_clock_ticks": 32,
+    "alpha": true,
+    "canvas": [
+      192,
+      112
+    ],
+    "design": "standing-master-standardised-2026-10-24",
+    "source_repository": "rwflan/castlevania-saeculum-obscurum",
+    "source_commit": "20e23a9a07ff3f03a0c570b5527fcc87826a97a8"
+  }
+}
