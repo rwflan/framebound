@@ -52,6 +52,7 @@ function frameAt(spec: StateSpec, elapsedSeconds: number): number {
 function drawArena(
   canvas: HTMLCanvasElement,
   accent: string,
+  cameraOffset = 0,
 ): CanvasRenderingContext2D | null {
   const context = canvas.getContext("2d");
   if (!context) return null;
@@ -68,7 +69,7 @@ function drawArena(
 
   context.strokeStyle = "#738a8730";
   context.lineWidth = 1;
-  for (let x = 24; x < width; x += 96) {
+  for (let x = 24 - ((cameraOffset % 96 + 96) % 96); x < width; x += 96) {
     context.beginPath();
     context.moveTo(x + 0.5, 0);
     context.lineTo(x + 0.5, height);
@@ -91,7 +92,7 @@ function drawArena(
   context.lineTo(width, floor + 1);
   context.stroke();
   context.fillStyle = "#917e6040";
-  for (let x = -24; x < width + 40; x += 48) {
+  for (let x = -24 - ((cameraOffset % 48 + 48) % 48); x < width + 40; x += 48) {
     context.beginPath();
     context.moveTo(x, floor + 1);
     context.lineTo(x + 25, height);
@@ -119,7 +120,12 @@ function drawCharacter(
   facing: number,
   pixelScales?: number[],
 ) {
-  const context = drawArena(canvas, "#a99d87");
+  const bounds = manifest.actor_bounds;
+  const halfWidth = manifest.canvas[0] / 2;
+  const padding = bounds ? Math.ceil(Math.max(halfWidth - bounds[0], bounds[2] - halfWidth)
+    * 640 / manifest.canvas[1]) + 12 : 180;
+  const projectedX = Math.max(padding, Math.min(canvas.width - padding, x));
+  const context = drawArena(canvas, "#a99d87", x - projectedX);
   if (!context) return;
   const spec = manifest.states[state];
   const index = frameAt(spec, elapsed);
@@ -131,7 +137,7 @@ function drawCharacter(
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.save();
-  context.translate(x, canvas.height - 44 + yOffset);
+  context.translate(projectedX, canvas.height - 44 + yOffset);
   context.scale(facing * density, density);
   context.drawImage(image, -manifest.canvas[0] * scale / 2, -(manifest.ground_y ?? manifest.canvas[1] * .90) * scale,
     manifest.canvas[0] * scale, manifest.canvas[1] * scale);
@@ -254,11 +260,9 @@ export function ValeriaLab() {
           engine.current.facing = 1;
           engine.current.x += 224 * delta;
         }
-        const bounds = assets.manifest.actor_bounds;
-        const halfWidth = assets.manifest.canvas[0] / 2;
-        const padding = bounds ? Math.ceil(Math.max(halfWidth - bounds[0], bounds[2] - halfWidth)
-          * 640 / assets.manifest.canvas[1]) + 12 : 180;
-        engine.current.x = Math.max(padding, Math.min(960 - padding, engine.current.x));
+        // The camera follows past the safe projection bounds; long capes and
+        // weapons must not reduce how far the character can travel.
+        engine.current.x = Math.max(180, Math.min(780, engine.current.x));
         if (engine.current.offsetY < -0.01) {
           engine.current.velocityY += 980 * delta;
           engine.current.offsetY += engine.current.velocityY * delta;

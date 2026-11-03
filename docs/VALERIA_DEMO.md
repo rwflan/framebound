@@ -13,6 +13,8 @@ lanes, so a wider composition does not shrink the character.
 Original source resolution and the delivery canvas are reported separately in
 Evidence. Runtime bounds include the entire delivered artwork in both lanes,
 so moving or turning cannot cut a long cape or whip against the playfield edge.
+The camera follows at the edge of the safe projection, retaining the full
+movement range even for a wide whip pose.
 
 Both lanes start from exactly the same base generation, references and brief.
 The reference is the later tailored-skirt Valeria without the hanging white
