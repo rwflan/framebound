@@ -33,6 +33,7 @@ import type { Bundle, DeskEvent } from "./review-model";
 import { Err, Icon, nav, parseHash, stamp, words } from "./shared";
 import { Modal } from "./Modal";
 import { useAutomaticUpdates } from "./useAutomaticUpdates";
+import { ValeriaLab } from "./ValeriaLab";
 import "./desk.css";
 import { AgentDesk, useAgentDesk } from "./AgentDesk";
 type DeskData = {
@@ -580,11 +581,12 @@ function LegacyApp() {
                 {view.name === "status" && <UtilityWindow view="status"><StatusView /></UtilityWindow>}
                 {view.name === "training" && <UtilityWindow view="training"><TrainingJourney/></UtilityWindow>}
                 {view.name === "settings" && <UtilityWindow view="settings"><ProviderSettings/></UtilityWindow>}
+                {view.name === "valeria-demo" && <UtilityWindow view="valeria-demo"><ValeriaLab/></UtilityWindow>}
               </div>
             )}
           </main>
         </div>
-        <KeyboardGuide/>
+        {view.name!=="valeria-demo" && <KeyboardGuide/>}
         {searching && (
           <Modal title="Find sequence" onClose={() => setSearching(false)}>
             <div className="command-palette">
