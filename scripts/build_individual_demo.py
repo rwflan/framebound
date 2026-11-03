@@ -148,3 +148,54 @@ def build(config, root):
             spec['duration_ticks'].append(90 if state=='idle' else 6)
         print(pose['id'],report['selected'],'native',list(chosen.size),'framing passed',flush=True)
     publish(config,root,direct,refined,reports,states)
+
+
+def publish_received(config, root):
+    """Rebuild playback from uniquely matched, retained selected responses only.
+
+    No provider calls. A legacy selected-iteration label is resolved only when
+    its decoded original geometry/extraction exactly matches the saved gate.
+    Ambiguous or missing provenance fails closed instead of guessing.
+    """
+    root = Path(root)
+    reports = json.loads((root/'private'/'assessment-summary.json').read_text())
+    if len(reports) != len(config['poses']):
+        raise ValueError('Received pose set is incomplete')
+    direct, refined, states, bindings = [], [], {}, []
+    for slot,(pose,report) in enumerate(zip(config['poses'],reports)):
+        if report['pose'] != pose['id']:
+            raise ValueError('Received pose order differs from frozen configuration')
+        initial_path = root/'private'/(pose['id']+'-initial')/'response.json'
+        initial, _ = decode(initial_path.read_bytes(),config.get('minimum_subject_span',1100))
+        selected = report['selected']
+        if selected == 'initial':
+            paths = [initial_path]
+        else:
+            import re
+            match = re.fullmatch(r'repair-(\d+)',selected)
+            if not match:
+                raise ValueError('Unknown selected iteration')
+            attempt = int(match[1])
+            paths = [root/'private'/(pose['id']+suffix)/'response.json' for suffix in
+                     (f'-repair-{attempt}',f'-repair-wide-{attempt}')]
+        matches = []
+        for path in paths:
+            if not path.exists():
+                continue
+            image, gate = decode(path.read_bytes(),config.get('minimum_subject_span',1100))
+            if gate == report['selected_gate']:
+                matches.append((path,image,gate))
+        if len(matches) != 1:
+            raise ValueError('Selected response provenance is missing or ambiguous: '+pose['id'])
+        path,image,gate = matches[0]
+        if not acceptable(report['selected_review'],gate):
+            raise ValueError('Selected pose still fails framing or costume: '+pose['id'])
+        bindings.append(dict(pose=pose['id'],response=str(path),response_sha256=hashlib.sha256(path.read_bytes()).hexdigest()))
+        direct.append(initial)
+        refined.append(image)
+        for state in pose['states']:
+            spec=states.setdefault(state,dict(frames=[],duration_ticks=[],loop=state in ('idle','run')))
+            spec['frames'].append(slot)
+            spec['duration_ticks'].append(90 if state=='idle' else 6)
+    save(root/'private'/'publication-bindings.json',bindings)
+    publish(config,root,direct,refined,reports,states)

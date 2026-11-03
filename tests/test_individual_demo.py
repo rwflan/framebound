@@ -102,3 +102,29 @@ def test_playback_contract_change_publishes_new_immutable_revision(tmp_path):
     second=json.loads((tmp_path/'published/manifest.json').read_text())
     assert first['revision']!=second['revision']
     assert (tmp_path/'published'/first['revision']/'framework-0.png').read_bytes()==old_image
+
+
+def test_receipt_publication_never_dispatches_or_guesses_ambiguous_sources(tmp_path,monkeypatch):
+    cfg=config(tmp_path)
+    pose=cfg['poses'][0]
+    private=tmp_path/'private'
+    initial=private/'run-initial'
+    repair=private/'run-repair-wide-0'
+    initial.mkdir(parents=True);repair.mkdir()
+    (initial/'response.json').write_bytes(b'initial')
+    (repair/'response.json').write_bytes(b'repair')
+    image=Image.new('RGBA',(100,120))
+    image.paste((20,40,60,255),(10,10,90,110))
+    selected_gate=gate(True)
+    report=dict(pose=pose['id'],selected='repair-0',selected_gate=selected_gate,selected_review=judgement())
+    (private/'assessment-summary.json').write_text(json.dumps([report]))
+    monkeypatch.setattr(demo,'send',lambda *a,**kw:pytest.fail('must never dispatch'))
+    monkeypatch.setattr(demo,'decode',lambda raw,_:(image,gate(raw==b'repair')))
+    demo.publish_received(cfg,tmp_path)
+    assert (private/'publication-bindings.json').exists()
+    alternate=private/'run-repair-0';alternate.mkdir()
+    (alternate/'response.json').write_bytes(b'repair')
+    before=(tmp_path/'published/manifest.json').read_bytes()
+    with pytest.raises(ValueError,match='ambiguous'):
+        demo.publish_received(cfg,tmp_path)
+    assert (tmp_path/'published/manifest.json').read_bytes()==before

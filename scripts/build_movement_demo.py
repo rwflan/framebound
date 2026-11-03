@@ -105,12 +105,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--root', type=Path, required=True)
+    parser.add_argument('--publish-received', action='store_true', help='Rebuild individual-pose playback from retained selected responses without sending')
     args = parser.parse_args()
     config = json.loads(args.config.read_text())
     root = args.root
     if config.get('mode') == 'individual':
-        from scripts.build_individual_demo import build
-        return build(config, root)
+        from scripts.build_individual_demo import build, publish_received
+        return publish_received(config, root) if args.publish_received else build(config, root)
+    if args.publish_received:
+        raise ValueError('Receipt-only publication requires individual mode')
     public = root / 'published'
     public.mkdir(parents=True, exist_ok=True)
     refs = [Path(p).read_bytes() for p in config['references']]

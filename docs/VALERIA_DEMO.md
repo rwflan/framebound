@@ -43,7 +43,10 @@ an existing published-assets directory for atomic live updates. The legacy
 
 All source images, prompts, responses, assessments and receipts stay under
 `PRIVATE_OUTPUT/private`. An exclusive pre-send marker prevents retrying a
-possibly accepted paid POST. Completed responses can be replayed locally.
+possibly accepted paid POST. Completed responses can be replayed locally. `--publish-received` rebuilds
+individual-pose playback without any provider calls. It requires the complete
+pose set and uniquely matches each selected response to its retained original
+framing/extraction report; missing or ambiguous provenance blocks publication.
 
 Expose the published directory at `web/public/demo/valeria-live` using a local
 symlink (ignored by Git). Publication writes immutable revision directories
