@@ -70,3 +70,23 @@ The generated `benchmark.json` and `reference-score-benchmark.json` preserve
 the actual counts, thresholds, false positives, recall, and limitations. Neither
 benchmark establishes arbitrary artistic quality, anatomy, human acceptance,
 training readiness, or provider-model fine-tuning.
+
+## Existing generation A/B
+
+`scripts/benchmark_direct_vs_guided.py` audits the seven existing paired Muse
+control cases. It decodes the paid raw sheets, loads the framework-guided native
+frames for the same case IDs, normalizes both arms by their visible subject
+bounds, and asks an independently hosted Apache-2.0 vision model to score each
+six-pose strip without knowing which arm it is.
+
+```sh
+modal run scripts/benchmark_direct_vs_guided.py \
+  --root /absolute/private/root \
+  --output /absolute/private/benchmarks/direct-vs-guided.json
+```
+
+This benchmark does not create image-generation work. It persists model ID,
+pinned revision, output text, per-case scores, technical frame eligibility, and
+explicit limitations outside Git. A positive result requires more than this
+seven-case pilot and human-reviewed pairs; a tie is evidence that the framework
+has not demonstrated superior visual quality for that sample.
