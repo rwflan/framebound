@@ -8,6 +8,7 @@ import uuid
 from ...v2 import storage as S
 from ...v2.services.errors import InvalidInput
 from ..domain import NegotiatedRequirement, TaskRecord, TaskSpec
+from .. import visual_score
 
 TABLE = 'agent_task_specs'
 
@@ -74,9 +75,11 @@ def _negotiate(spec):
         correspondence.validate(spec)
         from .. import scene
         scene.validate(spec)
+        visual_score.validate(spec)
     except ValueError as exc:
         raise InvalidInput(str(exc)) from exc
     families = supported_families(spec)
+    families.update(item.kind for item in spec.visual_observations if item.visibility == 'visible')
     if spec.profile=='tracked-scene-v1':
         from .. import scene
         families.update(scene.supported(spec))
@@ -87,6 +90,8 @@ def _negotiate(spec):
     if spec.source_correspondence:
         requested.append(('source-fidelity','source_fidelity',True))
         families.add('source_fidelity')
+    for family in sorted({item.kind for item in spec.visual_observations if item.visibility == 'visible'}):
+        requested.append((f'visual-{family}', family, True))
     if spec.profile == 'fixed-subject-v1':
         requested += [(f'profile-{family}', family, True)
                       for family in ('feature', 'appearance', 'contact', 'continuity', 'moving')]
@@ -98,8 +103,8 @@ def _negotiate(spec):
         out.append(NegotiatedRequirement(
             id=rid, check=check, required=required,
             applicability='supported' if supported else 'unsupported',
-            method={'media': 'declared-regions-v2:media', 'timing': 'declared-regions-v2:timing','source_fidelity':'source-correspondence-v1','scene_track':'declared-color-camera-tracks-v1','scene_temporal':'declared-color-camera-tracks-v1','scene_event':'declared-color-camera-tracks-v1'}.get(check, 'declared-regions-v2' if check in families else 'none'),
-            limitation=(spec.scene.limitation if check.startswith('scene_') and spec.scene else spec.source_correspondence.limitation if check=='source_fidelity' and spec.source_correspondence else 'Establishes structural validity only; animation quality is not verified.'
+            method={'media': 'declared-regions-v2:media', 'timing': 'declared-regions-v2:timing','source_fidelity':'source-correspondence-v1','scene_track':'declared-color-camera-tracks-v1','scene_temporal':'declared-color-camera-tracks-v1','scene_event':'declared-color-camera-tracks-v1', 'phase':'declared-visual-score-v1', 'contact_span':'declared-visual-score-v1', 'same_pose_shape':'declared-visual-score-v1'}.get(check, 'declared-regions-v2' if check in families else 'none'),
+            limitation=('Only declared visible phase, support span or same-pose region pixels are measured; semantic action and art approval remain unverified.' if check in {'phase','contact_span','same_pose_shape'} else spec.scene.limitation if check.startswith('scene_') and spec.scene else spec.source_correspondence.limitation if check=='source_fidelity' and spec.source_correspondence else 'Establishes structural validity only; animation quality is not verified.'
                         if check in {'media', 'timing'} else 'Only task-authored regions, colors and event bounds are measured; arbitrary anatomy and prose action correctness are not established.' if supported else 'No usable task-authored measurement is available for this requirement.'),
             ways_forward=[] if supported else ['Obtain independently reviewed annotations and a validated evaluator.',
                         'Create a new specification revision with a recorded scope change.']))
@@ -110,6 +115,7 @@ def _negotiate(spec):
 
 def create(project_dir: str, payload: dict) -> dict:
     spec = TaskSpec.model_validate(payload)
+    visual_references = set(visual_score.reference_ids(spec))
     con = _connect(project_dir)
     try:
         with S.atomic(con):
@@ -122,6 +128,8 @@ def create(project_dir: str, payload: dict) -> dict:
                 blob = S.blob_path(project_dir, asset['byte_sha256'])
                 if not blob.is_file() or S.sha256_bytes(blob.read_bytes()) != asset['byte_sha256']:
                     raise InvalidInput(f'input asset {binding.asset_id} is unavailable or corrupt')
+                if binding.asset_id in visual_references and (asset['width'], asset['height']) != (spec.canvas.width, spec.canvas.height):
+                    raise InvalidInput('visual reference must use the declared native canvas')
             if spec.source_correspondence:
                 source=spec.source_correspondence
                 for aid in source.frame_asset_ids:
