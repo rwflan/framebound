@@ -37,3 +37,6 @@ checkpoints/
 
 # Editable installation metadata
 *.egg-info/
+
+# Locally published demo art is served from private storage.
+web/public/demo/valeria-live
