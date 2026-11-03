@@ -220,7 +220,7 @@ def run(project,identifier):
             ledger=Ledger(root);ceiling=int(Decimal(str(row['budget_dollars']))*1000000)
             try:ledger.config(campaign)
             except ValueError:
-                config=upskill_curriculum(campaign,source_policy='sam-whitespace-sheet-v9',transport='stream-all-v2')
+                config=upskill_curriculum(campaign,source_policy='sam-whitespace-flat-v10',transport='stream-all-v2')
                 config=config.model_copy(update={'api_ceiling':ceiling})
                 with FileLock(str(home(project)/'budget.lock')):
                     with ledger.db() as db:

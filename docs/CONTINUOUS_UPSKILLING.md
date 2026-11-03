@@ -412,3 +412,10 @@ Clipped canvas edges, overlaps, ambiguous/absent gutters and extra/scenic conten
 still reject. No earlier fixed-grid failure is reprocessed as an accepted result.
 The neutral anchor brief uses only the frozen identity design and an independent
 single-pose contract, never the shared animation/extraction instructions.
+
+`sam-whitespace-flat-v10` keeps that full-screen whitespace extraction and one-mask
+transport, and adds an explicit rendering constraint: every treatment is flat
+two-dimensional digital artwork. Material cues are painted inside the subject;
+physical paper, relief, embossing, bevels, lighting gradients, cast shadows,
+floors and craft scenery are excluded. This opt-in corrects the diagnosed
+cut-paper treatment without relabeling v9 outputs or changing any intake gate.
