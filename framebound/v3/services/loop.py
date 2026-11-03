@@ -142,9 +142,12 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
             from ..campaign import repair as automatic
             if parent_revision_id and spec.repair_scope == 'declared_regions' and not any(m['authorize_edit_scope'] for m in I.open_in(con, run_id)) and not automatic.active_in(con, run_id):
                 raise InvalidInput('declared-region edit permissions need a saved intervention grant; full-clip permission cannot be inferred')
-            if spec.canvas.width * spec.canvas.height * (len(frame_asset_ids)+(len(spec.source_correspondence.frame_asset_ids) if spec.source_correspondence else 0)) > run['limits'].get('max_evaluation_pixels', 16777216):
+            from .. import visual_score
+            visual_reference_ids=visual_score.reference_ids(spec)
+            if spec.canvas.width * spec.canvas.height * (len(frame_asset_ids)+(len(spec.source_correspondence.frame_asset_ids) if spec.source_correspondence else 0)+len(visual_reference_ids)) > run['limits'].get('max_evaluation_pixels', 16777216):
                 raise InvalidInput('frozen evaluation pixel budget exceeded; negotiate a new task before allocating frames')
             measurement_pixels=sum((r.roi.right-r.roi.left)*(r.roi.bottom-r.roi.top) for r in spec.region_observations)
+            measurement_pixels+=sum((r.roi.right-r.roi.left)*(r.roi.bottom-r.roi.top)*(2+len(r.competing_asset_ids)) for r in spec.visual_observations)
             if spec.scene:measurement_pixels+=sum((f.roi.right-f.roi.left)*(f.roi.bottom-f.roi.top) for f in spec.scene.features)
             if measurement_pixels>run['limits'].get('max_measurement_pixels',67108864):
                 raise InvalidInput('frozen measurement pixel budget exceeded; reduce/partition declared measurements in a new task')
@@ -175,6 +178,19 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 fids.append(fid)
             results, evidence, evidence_digest = E.evaluate(spec, images, manifest, holds)
             intake_passed=all(r['outcome']=='pass' for r in results if r['id'].startswith('intake-'))
+            if spec.visual_observations and intake_passed:
+                references={};reference_assets=[]
+                for aid in visual_reference_ids:
+                    asset,_=S.get(con,'assets',aid);blob=S.blob_path(project,asset['byte_sha256']);image=None
+                    if blob.is_file() and S.sha256_bytes(blob.read_bytes())==asset['byte_sha256']:
+                        try:image=load_native_image(blob)
+                        except (OSError,ValueError):pass
+                    references[aid]=image
+                    reference_assets.append(dict(id=aid,byte_sha256=asset['byte_sha256'],pixel_sha256=asset.get('pixel_sha256'),
+                                                 blob_path=str(blob.relative_to(Path(project))),http_path=f'/api/asset/{aid}'))
+                results.extend(visual_score.evaluate(spec,images,references))
+                evidence['visual_score']=dict(version=visual_score.VERSION, implementation_sha256=S.sha256_bytes(Path(visual_score.__file__).read_bytes()),
+                                              assets=reference_assets, limitation='Declared pixel checks do not establish semantic action or human art approval.')
             if spec.source_correspondence and intake_passed:
                 from .. import correspondence as C
                 source_images=[];source_assets=[]
@@ -204,7 +220,7 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
             required_by_check = {check: any(r.required for r in task.requirements if r.check == check)
                                  for check in {r.check for r in task.requirements}}
             for result in results:
-                result['required'] = (True if result['family'] in {'media', 'timing', 'edit_preservation','source_fidelity'}
+                result['required'] = (True if result['family'] in {'media', 'timing', 'edit_preservation','source_fidelity','phase','contact_span','same_pose_shape'}
                                       else result.get('required',True) and required_by_check.get(result['family'], True))
             for requirement in task.requirements:
                 if requirement.applicability != 'supported':
@@ -352,7 +368,9 @@ def eligibility(project, run_id):
             return dict(eligible=False, reasons=['No evaluated revision.'], creative_status=run['creative_status'])
         evaluation = get_in(con, 'agent_evaluations', f'evaluation:{rid}')
         spec = tasks._get(con, run['task_id']).spec
-        media=list(evaluation['evidence']['assets'])+list(evaluation['evidence'].get('source_correspondence',{}).get('assets',[]))
+        media=(list(evaluation['evidence']['assets'])+
+               list(evaluation['evidence'].get('source_correspondence',{}).get('assets',[]))+
+               list(evaluation['evidence'].get('visual_score',{}).get('assets',[])))
         for binding in spec.inputs:
             try:
                 asset,_=S.get(con,'assets',binding.asset_id)

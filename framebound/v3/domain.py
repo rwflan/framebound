@@ -69,6 +69,7 @@ class TaskSpec(Strict):
     profile: Literal['structural-v1', 'fixed-subject-v1', 'tracked-scene-v1'] = 'structural-v1'
     region_observations: list['RegionObservation'] = Field(default_factory=list, max_length=4096)
     temporal_observations: list['TemporalObservation'] = Field(default_factory=list, max_length=4096)
+    visual_observations: list['VisualObservation'] = Field(default_factory=list, max_length=1024)
     source_correspondence: 'SourceCorrespondence | None' = None
     scene: 'SceneSpec | None' = None
     requirements: list[Requirement] = Field(default_factory=list, max_length=128)
@@ -141,6 +142,34 @@ class TemporalObservation(Strict):
     max_distance_px: float = Field(default=0, ge=0, allow_inf_nan=False)
     provenance: str = Field(min_length=1, max_length=2000)
     source: Literal['user_declared', 'agent_proposed', 'model_proposed', 'procedural']
+
+
+class VisualObservation(Strict):
+    """Frozen, localized pixel contract; its declaration does not imply art approval."""
+    id: str = Field(min_length=1, max_length=128)
+    kind: Literal['phase', 'contact_span', 'same_pose_shape']
+    slot: StrictInt = Field(ge=0)
+    roi: 'Roi'
+    reference_asset_id: str | None = None
+    competing_asset_ids: list[str] = Field(default_factory=list, max_length=32)
+    minimum_similarity: float = Field(default=0.75, ge=0, le=1, allow_inf_nan=False)
+    minimum_margin: float = Field(default=0.05, ge=0, le=1, allow_inf_nan=False)
+    minimum_span_px: StrictInt = Field(default=1, ge=1)
+    minimum_area_ratio: float = Field(default=0.8, gt=0, le=1, allow_inf_nan=False)
+    maximum_area_ratio: float = Field(default=1.25, ge=1, allow_inf_nan=False)
+    visibility: Literal['visible', 'occluded'] = 'visible'
+    provenance: str = Field(min_length=1, max_length=2000)
+    source: Literal['user_declared', 'procedural']
+
+    @model_validator(mode='after')
+    def valid_visual(self):
+        if self.kind in {'phase', 'same_pose_shape'} and not self.reference_asset_id:
+            raise ValueError('phase and same-pose shape checks need a frozen reference asset')
+        if self.kind == 'phase' and not self.competing_asset_ids:
+            raise ValueError('phase check needs at least one competing phase reference')
+        if self.reference_asset_id in self.competing_asset_ids or len(set(self.competing_asset_ids)) != len(self.competing_asset_ids):
+            raise ValueError('phase references must be distinct')
+        return self
 
 
 class TimeAnchor(Strict):
