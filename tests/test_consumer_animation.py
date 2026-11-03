@@ -111,3 +111,17 @@ def test_actual_mcp_tool_calls_complete_public_journey(tmp_path):
         return exported
     result = asyncio.run(journey())
     assert json.loads(result.content[0].text)['manifest']['timing']['holds'] == [2]*6
+
+
+def test_small_clipped_extremity_blocks_sheet_before_common_resize(tmp_path):
+    create(tmp_path)
+    source = sheet(tmp_path,scale=2)
+    image = Image.open(source).convert('RGBA')
+    # One opaque cape-tip pixel would pass the old >90% clear-border average.
+    image.putpixel((0,32),(160,20,20,255))
+    image.save(source)
+    result = consumer.submit_sheet(str(tmp_path),'animation:walk','clipped-tip',str(source))
+    assert result['status']=='intake_blocked'
+    assert not result['frames'][0]['source_framing']['eligible']
+    assert result['frames'][0]['source_framing']['unsafe_edges']==['left']
+    assert loop.get(str(tmp_path),'animation:walk')['submission_ids']==[]

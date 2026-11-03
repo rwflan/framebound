@@ -17,7 +17,7 @@ from ...v2.media.canonical import load_native_image
 from ...v2.services.assets import import_asset
 from ...v2.services.errors import InvalidInput
 from ...v2.services.projects import create_project
-from ..intake import inspect
+from ..intake import inspect, framing
 from . import loop, tasks
 
 
@@ -108,7 +108,13 @@ def submit_sheet(project, run_id, revision_id, sheet_path, columns=3, rows=2,
     crops = [image.crop(((i % columns) * cw, (i // columns) * ch,
                          (i % columns + 1) * cw, (i // columns + 1) * ch))
              for i in range(columns * rows)]
-    checks = [inspect(crop) for crop in crops]
+    checks = []
+    for crop in crops:
+        check = inspect(crop)
+        check['source_framing'] = framing(crop)
+        check['eligible'] = check['eligible'] and check['source_framing']['eligible']
+        check['reasons'].extend(check['source_framing']['reasons'])
+        checks.append(check)
     if not all(check['eligible'] for check in checks):
         return dict(status='intake_blocked', source_sha256=source_sha, frames=checks,
                     submitted=False, provider_dispatch=False,
@@ -130,7 +136,7 @@ def submit_sheet(project, run_id, revision_id, sheet_path, columns=3, rows=2,
     metadata = {'sheet_derivation': dict(
         policy='declared-alpha-grid-v1', source_sha256=source_sha,
         original_output_sha256=list(dict.fromkeys(originals)), output_asset_ids=ids,
-        columns=columns, rows=rows, transformations=transformations,
+        columns=columns, rows=rows, transformations=transformations, source_framing=[c["source_framing"] for c in checks],
         provider_execution_verified=False, generation_attribution='unknown')}
     feedback = loop.submit(project, run_id, revision_id, ids,
                            parent_revision_id=parent_revision_id, feedback_id=feedback_id,

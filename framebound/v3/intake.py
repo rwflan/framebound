@@ -140,3 +140,40 @@ def cell(image, *, declared_white_rules=False, rule_pixels=8):
         if rule_pixels!=8:recipe['native_rule_pixel_limit']=rule_pixels
         recipe['white_rule_edge_recipe']='observed-white-then-key-segment-v2; existing 8px maximum'
     return result,recipe
+
+
+def framing(image, *, source_box=None, margin_pixels=None, minimum_subject_span=0):
+    """Check the delivered silhouette against ORIGINAL image/cell bounds.
+
+    Padding and resizing must happen after this check. For existing padded
+    derivatives, callers must supply the retained original source_box. A tiny
+    cape tip or weapon crossing an edge fails even when average border coverage
+    passes isolation. This measures framing and density, never anatomy or taste.
+    """
+    if image is None:
+        return dict(eligible=False, reasons=['Unreadable source frame'])
+    rgba = image.convert('RGBA')
+    box = tuple(source_box or (0, 0, rgba.width, rgba.height))
+    left, top, right, bottom = box
+    if not (0 <= left < right <= rgba.width and 0 <= top < bottom <= rgba.height):
+        raise ValueError('Original source box must lie inside the decoded image')
+    width, height = right-left, bottom-top
+    margin = max(2, int(np.ceil(min(width, height)*.02))) if margin_pixels is None else margin_pixels
+    if type(margin) is not int or not 0 <= margin < min(width, height)/2:
+        raise ValueError('Invalid source margin')
+    alpha = np.asarray(rgba)[top:bottom, left:right, 3]
+    ys, xs = np.nonzero(alpha > 32)
+    if not len(xs):
+        return dict(eligible=False, reasons=['No visible subject'], source_box=list(box))
+    bounds = [int(xs.min()), int(ys.min()), int(xs.max()+1), int(ys.max()+1)]
+    clearances = dict(left=bounds[0], top=bounds[1], right=width-bounds[2], bottom=height-bounds[3])
+    unsafe = [edge for edge, pixels in clearances.items() if pixels < margin]
+    reasons = ['Silhouette enters original '+edge+' safety margin' for edge in unsafe]
+    span = max(bounds[2]-bounds[0], bounds[3]-bounds[1])
+    if span < minimum_subject_span:
+        reasons.append('Insufficient native subject resolution')
+    return dict(eligible=not reasons, reasons=reasons, policy='source-framing-v1',
+                source_box=list(box), silhouette_box=bounds, clearance_pixels=clearances,
+                required_margin_pixels=margin, unsafe_edges=unsafe, native_subject_span=span,
+                minimum_subject_span=minimum_subject_span,
+                scope='Source framing and native pixel density only; padding does not repair missing artwork')

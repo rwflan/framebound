@@ -17,7 +17,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from framebound.v3.campaign.specialists import MuseResponses, extract_image, extract_text, wire
-from framebound.v3.intake import keyed
+from framebound.v3.intake import keyed, framing
 from framebound.v3.guidance import PRINCIPLES
 from framebound.v3.campaign.features import extract
 
@@ -28,7 +28,7 @@ def save(path, value):
     temporary.replace(path)
 
 
-def send(root, name, model, prompt, images):
+def send(root, name, model, prompt, images, *, image_size="1536x1024"):
     folder = root / 'private' / name
     folder.mkdir(parents=True, exist_ok=True)
     response = folder / 'response.json'
@@ -39,13 +39,13 @@ def send(root, name, model, prompt, images):
             # Known terminal failure, retained separately; never retry an unknown send.
             if name.endswith('-expanded'):
                 raise ValueError('Expanded assessment also exhausted its output bound')
-            return send(root, name + '-expanded', model, prompt, images)
+            return send(root, name + '-expanded', model, prompt, images, image_size=image_size)
         return retained
     body = wire(model, prompt, images, max_output_tokens=8192 if model == 'muse-spark-1.3' else None)
     if model == 'muse-spark-1.3':
         body['reasoning'] = dict(effort='low')
     if model == 'muse-image-1.0':
-        body['tools'] = [dict(type='image_generation', size='1536x1024', output_format='png', enable_image_search=False, enable_web_search=False)]
+        body['tools'] = [dict(type='image_generation', size=image_size, output_format='png', enable_image_search=False, enable_web_search=False)]
     marker = folder / 'request.json'
     # Exclusive creation makes restarts fail closed after possible acceptance.
     with marker.open('x') as stream:
@@ -105,9 +105,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--root', type=Path, required=True)
+    parser.add_argument('--publish-received', action='store_true', help='Rebuild individual-pose playback from retained selected responses without sending')
     args = parser.parse_args()
     config = json.loads(args.config.read_text())
     root = args.root
+    if config.get('mode') == 'individual':
+        from scripts.build_individual_demo import build, publish_received
+        return publish_received(config, root) if args.publish_received else build(config, root)
+    if args.publish_received:
+        raise ValueError('Receipt-only publication requires individual mode')
     public = root / 'published'
     public.mkdir(parents=True, exist_ok=True)
     refs = [Path(p).read_bytes() for p in config['references']]
@@ -154,6 +160,10 @@ def main():
         reports.append(report)
         save(root / 'private' / 'assessment-summary.json', reports)
         print(batch['id'], report['selected'], flush=True)
+    for image in refined:
+        gate = framing(image, source_box=(32,32,image.width-32,image.height-32))
+        if not gate['eligible']:
+            raise ValueError('Framework publication withheld: original cell framing failed: '+'; '.join(gate['reasons']))
     # One shared canvas and scale for every frame in both lanes; no per-frame fitting.
     width = max(im.width for im in direct + refined)
     height = max(im.height for im in direct + refined)

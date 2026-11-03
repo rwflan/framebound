@@ -11,6 +11,10 @@ type StateSpec = {
 type DemoManifest = {
   schema: number;
   canvas: [number, number];
+  ground_y?: number;
+  actor_bounds?: [number, number, number, number];
+  source_dimensions?: [number, number][];
+  source_pixel_scales?: { direct: number[]; framework: number[] };
   states: Record<string, StateSpec>;
   frame_count: number;
   revision: string;
@@ -48,6 +52,7 @@ function frameAt(spec: StateSpec, elapsedSeconds: number): number {
 function drawArena(
   canvas: HTMLCanvasElement,
   accent: string,
+  cameraOffset = 0,
 ): CanvasRenderingContext2D | null {
   const context = canvas.getContext("2d");
   if (!context) return null;
@@ -64,7 +69,7 @@ function drawArena(
 
   context.strokeStyle = "#738a8730";
   context.lineWidth = 1;
-  for (let x = 24; x < width; x += 96) {
+  for (let x = 24 - ((cameraOffset % 96 + 96) % 96); x < width; x += 96) {
     context.beginPath();
     context.moveTo(x + 0.5, 0);
     context.lineTo(x + 0.5, height);
@@ -87,7 +92,7 @@ function drawArena(
   context.lineTo(width, floor + 1);
   context.stroke();
   context.fillStyle = "#917e6040";
-  for (let x = -24; x < width + 40; x += 48) {
+  for (let x = -24 - ((cameraOffset % 48 + 48) % 48); x < width + 40; x += 48) {
     context.beginPath();
     context.moveTo(x, floor + 1);
     context.lineTo(x + 25, height);
@@ -113,20 +118,28 @@ function drawCharacter(
   x: number,
   yOffset: number,
   facing: number,
+  pixelScales?: number[],
 ) {
-  const context = drawArena(canvas, "#a99d87");
+  const bounds = manifest.actor_bounds;
+  const halfWidth = manifest.canvas[0] / 2;
+  const padding = bounds ? Math.ceil(Math.max(halfWidth - bounds[0], bounds[2] - halfWidth)
+    * 640 / manifest.canvas[1]) + 12 : 180;
+  const projectedX = Math.max(padding, Math.min(canvas.width - padding, x));
+  const context = drawArena(canvas, "#a99d87", x - projectedX);
   if (!context) return;
   const spec = manifest.states[state];
-  const image = images[frameAt(spec, elapsed)];
+  const index = frameAt(spec, elapsed);
+  const image = images[index];
+  const density = pixelScales?.[index] ?? 1;
   if (!image) return;
   // Shared world camera and native-resolution sources in both lanes.
   const scale = 640 / manifest.canvas[1];
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.save();
-  context.translate(x, canvas.height - 44 + yOffset);
-  context.scale(facing, 1);
-  context.drawImage(image, -manifest.canvas[0] * scale / 2, -manifest.canvas[1] * scale * .90,
+  context.translate(projectedX, canvas.height - 44 + yOffset);
+  context.scale(facing * density, density);
+  context.drawImage(image, -manifest.canvas[0] * scale / 2, -(manifest.ground_y ?? manifest.canvas[1] * .90) * scale,
     manifest.canvas[0] * scale, manifest.canvas[1] * scale);
   context.restore();
 }
@@ -247,6 +260,8 @@ export function ValeriaLab() {
           engine.current.facing = 1;
           engine.current.x += 224 * delta;
         }
+        // The camera follows past the safe projection bounds; long capes and
+        // weapons must not reduce how far the character can travel.
         engine.current.x = Math.max(180, Math.min(780, engine.current.x));
         if (engine.current.offsetY < -0.01) {
           engine.current.velocityY += 980 * delta;
@@ -275,11 +290,12 @@ export function ValeriaLab() {
       }
       const elapsed = now - engine.current.stateStarted;
       if (frameworkCanvas.current) drawCharacter(frameworkCanvas.current, assets.framework, assets.manifest,
-        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing);
+        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing, assets.manifest.source_pixel_scales?.framework);
       if (directCanvas.current) drawCharacter(directCanvas.current, assets.direct, assets.manifest,
-        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing);
+        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing, assets.manifest.source_pixel_scales?.direct);
       if (singleCanvas.current) drawCharacter(singleCanvas.current, mode === "direct" ? assets.direct : assets.framework,
-        assets.manifest, engine.current.state, elapsed, engine.current.x * 2, engine.current.offsetY, engine.current.facing);
+        assets.manifest, engine.current.state, elapsed, engine.current.x * 2, engine.current.offsetY, engine.current.facing,
+        mode === "direct" ? assets.manifest.source_pixel_scales?.direct : assets.manifest.source_pixel_scales?.framework);
       request = requestAnimationFrame(paint);
     };
     request = requestAnimationFrame(paint);
@@ -373,7 +389,8 @@ export function ValeriaLab() {
           <div>
             <p>Both versions share the initial Muse generation, character references, transparent extraction, canvas and playback timing. Framebound alone assesses and requests repairs.</p>
             {assets && <dl>
-              <dt>Native canvas</dt><dd>{assets.manifest.canvas.join(" × ")} px</dd>
+              <dt>Frame canvas</dt><dd>{assets.manifest.canvas.join(" × ")} px</dd>
+              {assets.manifest.source_dimensions && <><dt>Source images</dt><dd>{assets.manifest.source_dimensions.map(size => size.join(" × ")).join(" / ")} px</dd></>}
               <dt>Frames per version</dt><dd>{assets.manifest.frame_count}</dd>
               <dt>Selected repairs</dt><dd>{assets.manifest.repairs_selected}</dd>
               <dt>Assessment</dt><dd>Automated; visual preference remains unproven.</dd>
