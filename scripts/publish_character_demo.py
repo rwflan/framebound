@@ -48,11 +48,14 @@ def publish(root,state,*,preview=False):
     config,brief,manifest,public=load_config(root);policy=initialize(root)
     rows=[state['frames'][p['id']] for p in brief['poses']]
     report=evaluate_sequence(policy,[r['observation'] for r in rows],[r['image_sha256'] for r in rows],[p['id'] for p in brief['poses']],
-        [r['pixel_scale'] for r in rows],pairs_for(manifest))
+        [r['pixel_scale'] for r in rows],pairs_for(manifest),images=[Image.open(r['image']).convert('RGBA') for r in rows],transition_review=state.get('transitions'))
     blocked=set(config.get('preview_blocking_features',[]))
     blocked_ids=set(config.get('preview_blocking_frame_ids',[p['id'] for p in brief['poses']]))
     blocked_codes=set(config.get('preview_blocking_codes',[]))|{'stale_cohort_context'}
     violations=[issue for frame in report['frames'] for issue in frame['issues'] if (issue['feature'] in blocked or issue['code'] in blocked_codes) and issue.get('frame_id') in blocked_ids]
+    transition_issues=[r for r in report.get('transition_results',[]) if r['status']!='pass']
+    profile_issues=report.get('torso_profile_issues',[])
+    if transition_issues or profile_issues:raise ValueError('Publication withheld: declared transition or torso-shape continuity gates remain')
     if violations:raise ValueError('Preview withheld by visible body/item findings: '+str(sorted({i['feature'] for i in violations})))
     if not report['passed'] and not preview:raise ValueError('Delivery withheld: character/temporal gates remain')
     report_sha=digest(report);save(root/('playable-audit-'+report_sha[:16]+'.json'),report)

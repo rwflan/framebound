@@ -231,8 +231,8 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                     pairs=list(zip(range(len(images)-1),range(1,len(images))))
                     if spec.loop and len(images)>1:pairs.append((len(images)-1,0))
                     report=CC.evaluate_sequence(spec.character_consistency,observations,
-                        [CC.image_digest(im) for im in images],frame_ids,pairs=pairs)
-                    outcome='pass' if report['passed'] else 'unmeasured' if any(i['status']=='unmeasured' for f in report['frames'] for i in f['issues']) else 'fail'
+                        [CC.image_digest(im) for im in images],frame_ids,pairs=pairs,images=images,transition_review=supplied.get('transitions'))
+                    outcome='pass' if report['passed'] else 'unmeasured' if (any(i['status']=='unmeasured' for f in report['frames'] for i in f['issues']) or any(i['status']=='unmeasured' for i in report.get('transition_results',[])+report.get('torso_profile_issues',[]))) else 'fail'
                 except (ValueError,KeyError,TypeError) as exc:
                     report=dict(passed=False,error=str(exc),human_approval=False)
                     outcome='unmeasured'
@@ -254,6 +254,12 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                         for j,issue in enumerate(frame['issues']):
                             character_result('character-'+str(slot)+'-'+str(j),[slot],issue['status'],issue['observed'],issue['expected'],
                                 issue['code']+': '+issue['feature']+'. '+('Recover measurement evidence before redrawing.' if issue['status']=='unmeasured' else 'Regenerate only this failing pose under the original character/item contract.'))
+                    for j,issue in enumerate(report.get('transition_results',[])):
+                        slots=[frame_ids.index(fid) for fid in issue['frames'] if fid in frame_ids]
+                        character_result('character-transition-'+str(j),slots or list(range(len(images))),issue['status'],issue['observed'],issue['expected'],issue['reason']+': '+issue['feature'])
+                    for j,issue in enumerate(report.get('torso_profile_issues',[])):
+                        slots=[frame_ids.index(fid) for fid in issue['frames'] if fid in frame_ids]
+                        character_result('character-torso-profile-'+str(j),slots or list(range(len(images))),issue['status'],issue['observed'],issue['expected'],issue['code']+': visible garment shape between frames')
                     for j,issue in enumerate(report['temporal_issues']):
                         character_result('character-temporal-'+str(j),[int(x) for x in issue['frames']],'fail',issue['observed'],issue['expected'],
                             issue['code']+': '+issue['feature']+' between the bound authored frames.')

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./shared";
+import { startJump, advanceVertical } from "./valeria-motion";
 import "./valeria-lab.css";
 
 type StateSpec = {
@@ -147,6 +148,9 @@ function drawCharacter(
   if (!context) return;
   const spec = manifest.states[state];
   const index = frameAt(spec, elapsed);
+  canvas.dataset.animationState = state;
+  canvas.dataset.frameIndex = String(index);
+  canvas.dataset.worldY = yOffset.toFixed(2);
   const image = images[index];
   const density = pixelScales?.[index] ?? 1;
   if (!image) return;
@@ -200,15 +204,15 @@ export function ValeriaLab() {
     attackUntil: 0,
   });
   const jump = () => {
-    if (engine.current.offsetY < -0.01) return;
-    engine.current.velocityY = -390;
-    engine.current.offsetY = -0.01;
+    if (startJump(engine.current)) setPaused(false);
   };
   const slide = () => {
+    setPaused(false);
     if (engine.current.offsetY < -0.01) return;
     engine.current.slideUntil = engine.current.clock + 0.46;
   };
   const attack = () => {
+    setPaused(false);
     engine.current.attackUntil = engine.current.clock + 0.42;
   };
 
@@ -293,14 +297,7 @@ export function ValeriaLab() {
         // The camera follows past the safe projection bounds; long capes and
         // weapons must not reduce how far the character can travel.
         engine.current.x = Math.max(180, Math.min(780, engine.current.x));
-        if (engine.current.offsetY < -0.01) {
-          engine.current.velocityY += 980 * delta;
-          engine.current.offsetY += engine.current.velocityY * delta;
-        }
-        if (engine.current.offsetY >= 0) {
-          engine.current.offsetY = 0;
-          engine.current.velocityY = 0;
-        }
+        advanceVertical(engine.current, delta);
         let nextState: EngineState = "idle";
         if (engine.current.attackUntil > now) nextState = "whip";
         else if (engine.current.slideUntil > now) nextState = "slide";

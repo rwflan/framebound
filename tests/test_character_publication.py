@@ -87,3 +87,60 @@ def test_publication_recipe_changes_get_a_new_immutable_revision(tmp_path,monkey
     assert first['revision']!=second['revision']
     assert first['publication_recipe_sha256']!=second['publication_recipe_sha256']
     assert (public/first['revision']/'direct-0.png').read_bytes()==(public/second['revision']/'direct-0.png').read_bytes()
+
+
+def test_required_transition_evidence_blocks_preview(tmp_path):
+    root,public,before,state=fixture(tmp_path)
+    path=root/'policy-test.json';p=json.loads(path.read_text())
+    p['transitions']=[dict(id='grip',left='idle',right='run',feature='item.orientation',item_id='item')]
+    path.write_text(json.dumps(p))
+    with pytest.raises(ValueError,match='transition'):publish(root,state,preview=True)
+    assert json.loads((public/'manifest.json').read_text())==before
+
+
+def test_transition_runner_retains_negative_and_rechecks_changed_pixels(tmp_path,monkeypatch):
+    import scripts.review_character_transitions as runner
+    root,public,before,state=fixture(tmp_path)
+    path=root/'policy-test.json';p=json.loads(path.read_text());p['transitions']=[dict(id='grip',left='idle',right='run',feature='item.orientation',item_id='item')];path.write_text(json.dumps(p))
+    calls=[]
+    def assess(work,reference,frames,rules,description,**kwargs):
+        calls.append([fid for fid,_ in frames])
+        return dict(reference_sha256=image_digest(reference),image_sha256s={fid:image_digest(im) for fid,im in frames},rules_sha256=digest([r.model_dump(mode='json') for r in rules]),checks=[dict(id='grip',**feature('mismatch'))])
+    monkeypatch.setattr(runner,'assess',assess)
+    config=root/'config.json';data=json.loads(config.read_text());data['description']='same tool, conventional grip';config.write_text(json.dumps(data))
+    assert runner.review(root,state)[0]['status']=='fail'
+    assert runner.review(root,state)[0]['status']=='fail'
+    assert len(calls)==1
+    image=Image.open(state['frames']['run']['image']);image.putpixel((600,600),(0,0,255,255));image.save(root/'new.png');state['frames']['run']['image']=str(root/'new.png')
+    assert runner.review(root,state)[0]['status']=='fail'
+    assert len(calls)==2
+
+
+def test_repair_reviews_the_replacement_observation_with_replacement_pixels(tmp_path,monkeypatch):
+    import scripts.refine_character_demo as driver
+    import scripts.review_character_transitions as reviewer
+    from framebound.v3.character_consistency import Policy
+    root,public,before,state=fixture(tmp_path)
+    config_path=root/'config.json';config=json.loads(config_path.read_text());config.update(items=[i.model_dump(mode='json') for i in policy().items],description='Preserve one tool and its grip',max_rounds=1);config_path.write_text(json.dumps(config))
+    brief_path=public.parent/'source'/'brief.json';brief=json.loads(brief_path.read_text())
+    for pose in brief['poses']:pose['instruction']='Same character, articulated pose'
+    brief_path.write_text(json.dumps(brief))
+    policy_path=root/'policy-test.json';p=json.loads(policy_path.read_text());p['transitions']=[dict(id='grip',left='idle',right='run',feature='item.orientation',item_id='item')];policy_path.write_text(json.dumps(p));p=Policy.model_validate(p)
+    state['policy_sha256']=digest(p.model_dump(mode='json'));(root/'repair-state-run.json').write_text(json.dumps(state))
+    replacement=Image.open(state['frames']['run']['image']).convert('RGBA');replacement.putpixel((510,510),(0,0,255,255));new_sha=image_digest(replacement)
+    def observe(work,fid,image,reference,config,**kwargs):
+        obs=copy.deepcopy(state['frames'][fid]['observation']);obs['image_sha256']=image_digest(image)
+        if image_digest(image)==new_sha:obs['items']['item']['features']['design']=feature('match')
+        from framebound.v3.character_consistency import Observation
+        return Observation.model_validate(obs)
+    def review(work,current,**kwargs):
+        row=current['frames']['run'];im=Image.open(row['image']).convert('RGBA')
+        assert row['observation']['image_sha256']==image_digest(im)
+        return [dict(id='grip',feature='item.orientation',item_id='item',frames=['idle','run'],status='pass' if image_digest(im)==new_sha else 'fail',observed='Reversed handle',expected='Active end at index side')]
+    monkeypatch.setattr(driver,'safe_observe',observe);monkeypatch.setattr(reviewer,'review',review)
+    monkeypatch.setattr(driver,'send',lambda *a,**k:b'test retained provider response')
+    monkeypatch.setattr(driver,'decode',lambda *a,**k:(replacement,dict(framing=dict(eligible=True),source_dimensions=[1000,1000])))
+    result=driver.repair(root,only='run',max_new_attempts=1)
+    row=result['frames']['run']
+    assert row['observation']['image_sha256']==new_sha
+    assert all(r['status']=='pass' for r in row['transition_results'])
