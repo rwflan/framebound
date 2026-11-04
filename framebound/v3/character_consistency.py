@@ -94,6 +94,20 @@ class Allowance(Strict):
     request_sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
 
 
+class TransitionRule(Strict):
+    id: str = Field(min_length=1,max_length=128)
+    left: str = Field(min_length=1,max_length=128)
+    right: str = Field(min_length=1,max_length=128)
+    feature: Literal['body.shape','item.shape','item.palette','item.texture','item.grip','item.owner','item.orientation','item.topology']
+    item_id: str | None = None
+
+    @model_validator(mode='after')
+    def complete(self):
+        if self.left==self.right:raise ValueError('Transition needs distinct frames')
+        if self.feature.startswith('item.')!=bool(self.item_id):raise ValueError('Item transitions need an explicit inventory ID')
+        return self
+
+
 class Policy(Strict):
     schema_version: Literal['1.0'] = '1.0'
     request_sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
@@ -104,6 +118,10 @@ class Policy(Strict):
     allowances: list[Allowance] = Field(default_factory=list)
     scale_reference: tuple[str,str] = ('head_top','chin')
     expected_geometry_recipe: str | None = None
+    transitions: list[TransitionRule] = Field(default_factory=list,max_length=512)
+    torso_profile_pairs: list[tuple[str,str]] = Field(default_factory=list,max_length=512)
+    max_torso_profile_drift: float = Field(default=.12,gt=0,le=.3)
+    minimum_scale_reference_pixels: int = Field(default=0,ge=0,le=2048)
     max_part_drift: float = Field(default=.18,gt=0,le=.35)
     max_adjacent_part_drift: float = Field(default=.12,gt=0,le=.3)
     max_head_scale_drift: float = Field(default=.08,gt=0,le=.2)
@@ -112,6 +130,9 @@ class Policy(Strict):
 
     @model_validator(mode='after')
     def unique_rules(self):
+        if len({r.id for r in self.transitions})!=len(self.transitions):raise ValueError('Duplicate transition IDs')
+        if any(r.item_id and r.item_id not in {i.id for i in self.items} for r in self.transitions):raise ValueError('Transition references undeclared inventory')
+        if any(a==b for a,b in self.torso_profile_pairs):raise ValueError('Torso profile pair needs distinct frames')
         if len({i.id for i in self.items})!=len(self.items):raise ValueError('duplicate item rules')
         if len(set(self.required_features))!=len(self.required_features):raise ValueError('duplicate feature rules')
         for a in self.allowances:
@@ -174,6 +195,8 @@ def evaluate_frame(policy, observation, *, image_sha256, frame_id, pixel_scale=1
     if not head or not actual:
         add('head_unmeasured','head_scale',actual,head,'unmeasured')
     else:
+        if actual<policy.minimum_scale_reference_pixels:
+            add('insufficient_native_character_detail','native_head_span',actual,policy.minimum_scale_reference_pixels)
         ratio=actual*pixel_scale/(head*master_pixel_scale)
         if abs(ratio-1)>policy.max_head_scale_drift:add('scale_drift','head_scale',ratio,[1-policy.max_head_scale_drift,1+policy.max_head_scale_drift])
         coverage.append(dict(feature='head_scale',status='measured',ratio=ratio))
@@ -258,7 +281,7 @@ def evaluate_frame(policy, observation, *, image_sha256, frame_id, pixel_scale=1
                 evidence_source='model_proposed_landmarks_and_semantics; deterministic distances and bounds',human_approval=False)
 
 
-def evaluate_sequence(policy, observations, image_sha256s, frame_ids, pixel_scales=None, pairs=()):
+def evaluate_sequence(policy, observations, image_sha256s, frame_ids, pixel_scales=None, pairs=(), images=None, transition_review=None):
     policy=Policy.model_validate(policy)
     if not (len(observations)==len(image_sha256s)==len(frame_ids)) or not observations:raise ValueError('One exact observation per actual frame is required')
     if len(set(frame_ids))!=len(frame_ids):raise ValueError('Duplicate frame IDs')
@@ -292,8 +315,29 @@ def evaluate_sequence(policy, observations, image_sha256s, frame_ids, pixel_scal
             aa,bb=relative_span(left_obs),relative_span(right_obs)
             if aa and bb and abs(bb/aa-1)>policy.max_adjacent_part_drift:
                 temporal.append(dict(code='item_size_pulse',feature=rule.id,frames=[frame_ids[left],frame_ids[right]],observed=bb/aa,expected=[1-policy.max_adjacent_part_drift,1+policy.max_adjacent_part_drift]))
-    return dict(version=VERSION,passed=all(f['passed'] for f in frames) and not temporal,
-                frames=frames,temporal_issues=temporal,policy_sha256=digest(policy.model_dump(mode='json')),
+    transition_results=[]
+    if policy.transitions:
+        from .transition_consistency import evaluate as evaluate_transitions
+        transition_results=evaluate_transitions(policy,transition_review,dict(zip(frame_ids,image_sha256s)))
+    profile_results=[]
+    profiles={}
+    if policy.torso_profile_pairs:
+        from .torso_profile import measure as measure_profile
+        if images is not None:
+            if len(images)!=len(observations):raise ValueError('Torso profiles require exact source image coverage')
+            for fid,im,obs,sha in zip(frame_ids,images,observations,image_sha256s):
+                if image_digest(im)!=sha:raise ValueError('Torso profile pixels differ from source binding')
+                profiles[fid]=measure_profile(im,obs,policy.scale_reference)
+        for left,right in policy.torso_profile_pairs:
+            a,b=profiles.get(left),profiles.get(right)
+            if not a or not b or not a['measured'] or not b['measured']:
+                profile_results.append(dict(code='torso_profile_unmeasured',frames=[left,right],status='unmeasured',observed=None,expected='Visible source-bound torso material profile in both frames'))
+            else:
+                ratios=[bb/aa for aa,bb in zip(a['profile'],b['profile'])]
+                if any(abs(v-1)>policy.max_torso_profile_drift for v in ratios):
+                    profile_results.append(dict(code='torso_shape_pulse',frames=[left,right],status='fail',observed=ratios,expected=[1-policy.max_torso_profile_drift,1+policy.max_torso_profile_drift]))
+    return dict(version=VERSION,passed=all(f['passed'] for f in frames) and not temporal and not profile_results and all(r['status']=='pass' for r in transition_results),
+                frames=frames,temporal_issues=temporal,transition_results=transition_results,transition_evidence_sha256=digest(transition_review) if transition_review is not None else None,torso_profile_issues=profile_results,torso_profiles=profiles,policy_sha256=digest(policy.model_dump(mode='json')),
                 image_sha256s=image_sha256s,pixel_scales=scales,human_approval=False)
 
 

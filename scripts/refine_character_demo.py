@@ -48,7 +48,7 @@ def initialize(root):
             observation=enrich_geometry(root,anchor,observation,config)
         else:
             observation=observe(root,'master',anchor,anchor,config['features'],config['items'],config['description'],phase='anchor-'+config.get('policy_version','v1'))
-        policy=Policy(request_sha256=digest(config['description']),master=observation,required_features=config['features'],items=config['items'],scale_reference=('face_top','face_chin') if config.get('pose_runtime') else ('head_top','chin'),expected_geometry_recipe=observation.measurement_sources.get('geometry_recipe_sha256'))
+        policy=Policy(request_sha256=digest(config['description']),master=observation,required_features=config['features'],items=config['items'],scale_reference=('face_top','face_chin') if config.get('pose_runtime') else ('head_top','chin'),expected_geometry_recipe=observation.measurement_sources.get('geometry_recipe_sha256'), transitions=config.get('transitions',[]), torso_profile_pairs=config.get('torso_profile_pairs',[]), minimum_scale_reference_pixels=config.get('minimum_scale_reference_pixels',0))
         save(policy_path,policy.model_dump(mode='json'))
     return Policy.model_validate_json(policy_path.read_text())
 
@@ -88,7 +88,7 @@ def audit(root, *, round_id='initial', candidates=None, calibrate=False):
                 if .6<=correction<=1.6:value*=correction
         images.append(image);observations.append(observation);ids.append(pose['id']);scales.append(value)
         print(round_id,pose['id'],'observed',flush=True)
-    report=evaluate_sequence(policy,observations,[image_digest(im) for im in images],ids,scales,pairs_for(manifest))
+    report=evaluate_sequence(policy,observations,[image_digest(im) for im in images],ids,scales,pairs_for(manifest),images=images,transition_review=json.loads((root/'transition-evidence.json').read_text()) if (root/'transition-evidence.json').exists() else None)
     save(root/(round_id+'-audit.json'),report)
     save(root/(round_id+'-observations.json'),[o.model_dump(mode='json') for o in observations])
     print(round_id,'passed',report['passed'],'frame failures',sum(not f['passed'] for f in report['frames']),'temporal',len(report['temporal_issues']),flush=True)
@@ -259,6 +259,7 @@ def repair(root, *, only=None, max_new_attempts=None):
         fid=pose['id']
         if only and fid!=only:continue
         record=state['frames'].setdefault(fid,dict(image=str(public/config['source_revision']/f'framework-{slot}.png'),attempts=[]))
+        record.setdefault('attempts',[])
         image=Image.open(record['image']).convert('RGBA')
         if image_digest(image)==policy.master.image_sha256:observation=policy.master.model_copy(update={'frame_id':fid})
         else:observation=safe_observe(root,fid,image,reference,config,phase='measurement-'+config.get('policy_version','v1'))
@@ -290,7 +291,11 @@ def repair(root, *, only=None, max_new_attempts=None):
         stop=config.get('max_rounds',8)
         if max_new_attempts is not None:stop=min(stop,len(record['attempts'])+max_new_attempts)
         for attempt in range(len(record['attempts']),stop):
-            if report['passed']:break
+            from scripts.review_character_transitions import review as review_transitions
+            from framebound.v3.transition_consistency import repair_tasks
+            transition_results=review_transitions(root,state,only=fid) if policy.transitions else []
+            transition_tasks=repair_tasks(transition_results,fid)
+            if report['passed'] and not transition_tasks:break
             target=copy.deepcopy(report['issues'])
             constraints=dict(measured=measurements(observation,policy.scale_reference),reference=measurements(policy.master,policy.scale_reference),failures=target)
             plan=repair_plan(policy,observation,report)
@@ -299,7 +304,7 @@ def repair(root, *, only=None, max_new_attempts=None):
             measured=[task for task,issue in zip(plan['tasks'],report['issues']) if issue['status']!='unmeasured']
             semantic=[task for task in measured if task['code'] in {'item_owner_changed','item_design_changed','item_detached','unexpected_item','feature_changed'}]
             item_repairs=[task for task in measured if task['code'].startswith('item_')]
-            plan['tasks']=semantic or item_repairs or measured[:1]
+            plan['tasks']=transition_tasks or semantic or item_repairs or measured[:1]
             if not plan['tasks']:
                 print(fid,'WITHHELD: measurement recovery required; no speculative redraw',flush=True)
                 break
@@ -336,6 +341,10 @@ def repair(root, *, only=None, max_new_attempts=None):
                 generation_images=[generation_png(reference),generation_png(edit_target),generation_png(annotated)]
             else:
                 generation_images=[generation_png(im) for im in (reference,face,item_reference,edit_target,annotated)]
+            if transition_tasks:
+                context_ids=sorted({other for task in transition_tasks for other in task['frames'] if other!=fid})
+                prompt+=' Transition comparison images follow the existing inputs in this exact order: '+json.dumps(context_ids)+'. Match their physical item and anatomy while preserving the target action. Correct explicit pair findings; never copy the other pose.'
+                generation_images.extend(generation_png(Image.open(state['frames'][other]['image']).convert('RGBA')) for other in context_ids)
             if record['attempts']:
                 previous=record['attempts'][-1]
                 prior=previous.get('report',{}).get('issues',[])
@@ -363,17 +372,30 @@ def repair(root, *, only=None, max_new_attempts=None):
             proposed_format=max(max(size) for size in manifest['source_dimensions'])/candidate.height
             proposed_scale=calibrated_scale(policy,proposed,proposed_format)
             checked=evaluate_frame(policy,proposed,image_sha256=image_digest(canvas),frame_id=fid,pixel_scale=proposed_scale)
+            proposed_transition_results=[]
+            if policy.transitions:
+                proposed_state=copy.deepcopy(state)
+                proposed_state['frames'][fid].update(image=str(path),image_sha256=image_digest(canvas),observation=proposed.model_dump(mode='json'))
+                proposed_transition_results=review_transitions(root,proposed_state,only=fid)
+                row['transition_results']=proposed_transition_results
             row.update(image=str(path),report=checked,pixel_scale=proposed_scale)
             record['attempts'].append(row)
             # No aggregate aesthetic score can waive a failed gate. Keep the
             # best bounded candidate for continued repair, publish only all-pass.
-            if rank_report(checked)<rank_report(report):
+            def transition_rank(rows):
+                relevant=[r for r in rows if fid in r['frames']]
+                return (sum(r['status']=='fail' for r in relevant),sum(r['status']=='unmeasured' for r in relevant))
+            if (transition_rank(proposed_transition_results),rank_report(checked))<(transition_rank(transition_results),rank_report(report)):
                 image,observation,report,scale=canvas,proposed,checked,proposed_scale
                 format_scale=proposed_format
                 record.update(image=str(path),format_scale=format_scale,pixel_scale=scale,report=report,observation=observation.model_dump(mode='json'),source_framing=gate)
             save(state_path,state)
             print(fid,'attempt',attempt,'remaining gates',len(report['issues']),flush=True)
-        if not report['passed']:print(fid,'WITHHELD',len(report['issues']),'gates remain',flush=True)
+        if policy.transitions:
+            final_transitions=review_transitions(root,state,only=fid)
+            record['transition_results']=[r for r in final_transitions if fid in r['frames']]
+            save(state_path,state)
+        if not report['passed'] or any(r['status']!='pass' for r in record.get('transition_results',[])):print(fid,'WITHHELD',len(report['issues']),'gates remain',flush=True)
         else:print(fid,'ALL FRAME GATES PASSED',flush=True)
     return state
 
