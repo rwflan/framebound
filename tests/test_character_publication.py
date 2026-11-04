@@ -59,3 +59,10 @@ def test_jump_state_boundaries_are_assessed_as_temporal_neighbours():
     from scripts.refine_character_demo import pairs_for
     manifest={'states':{'jump':{'frames':[1]},'apex':{'frames':[2]},'fall':{'frames':[3]},'run':{'frames':[4,5],'loop':True}}}
     assert set(pairs_for(manifest))=={(1,2),(2,3),(4,5),(5,4)}
+
+
+def test_known_visible_design_failure_blocks_even_preview(tmp_path):
+    root,public,before,state=fixture(tmp_path)
+    path=root/'config.json';config=json.loads(path.read_text());config['preview_blocking_features']=['item:design'];path.write_text(json.dumps(config))
+    with pytest.raises(ValueError,match='visible body/item'):publish(root,state,preview=True)
+    assert json.loads((public/'manifest.json').read_text())==before

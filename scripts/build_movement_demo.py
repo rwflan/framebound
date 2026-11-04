@@ -47,10 +47,15 @@ def send(root, name, model, prompt, images, *, image_size="1536x1024"):
     if model == 'muse-image-1.0':
         body['tools'] = [dict(type='image_generation', size=image_size, output_format='png', enable_image_search=False, enable_web_search=False)]
     marker = folder / 'request.json'
+    if marker.exists():raise FileExistsError('Unresolved provider operation; reconcile without resending')
+    adapter = MuseResponses()
+    quoted = 10000 if model == 'muse-image-1.0' else 100000
+    request = dict(payload=dict(wire=body, quote=quoted, images=1 if model == 'muse-image-1.0' else 0), quote=quoted)
+    adapter.preflight(request)
     # Exclusive creation makes restarts fail closed after possible acceptance.
     with marker.open('x') as stream:
-        json.dump(dict(wire=body, committed_microdollars=10000 if model == 'muse-image-1.0' else 100000), stream)
-    result = MuseResponses().execute(dict(payload=dict(wire=body, quote=10000 if model == 'muse-image-1.0' else 100000, images=1 if model == 'muse-image-1.0' else 0)), timeout=300)
+        json.dump(dict(wire=body, committed_microdollars=quoted), stream)
+    result = adapter.execute(request, timeout=300)
     response.write_bytes(result.raw)
     save(folder / 'receipt.json', dict(incurred_microdollars=result.incurred, receipt=result.receipt, response_sha256=hashlib.sha256(result.raw).hexdigest()))
     print(name, 'received', flush=True)

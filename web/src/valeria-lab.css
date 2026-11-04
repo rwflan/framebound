@@ -55,3 +55,7 @@
 .proof-controls{margin:0;padding:0;border:0}.proof-controls:disabled{opacity:.5}
 
 .proof-view-switch{margin-left:0}.proof-pause{margin-left:auto}
+
+.proof-cost{margin-left:auto;align-self:center;font-size:10px;color:#76684f;font-variant-numeric:tabular-nums}.proof-cost+.proof-evidence{margin-left:0}
+
+.proof-footer{flex-wrap:wrap}
