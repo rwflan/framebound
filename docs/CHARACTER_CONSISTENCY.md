@@ -89,3 +89,22 @@ finding on unchanged source pixels. Keep the earlier evidence and repair the
 source. Completed malformed cohort outputs may be split into smaller focused
 reviews with the same visual context; transport failures and unknown acceptance
 are never treated as a format problem or retried by that recovery path.
+
+Rigid-component endpoints need their own visibility evidence. The optional
+`item_measurement` observer sees both the complete source and a native close-up,
+then maps crop coordinates back through an exact retained transform. A handle
+end hidden by a hand or coil stays occluded. Never compare a cropped visible
+fragment to a supposed full handle, or redraw artwork from that unsupported
+ratio. Recovering reference visibility creates a new frozen policy; old source
+observations and receipts remain retained. Known or unresolved detail operations
+can be reused across lineage roots without creating a new paid send.
+
+Visible body/item review and numeric/coverage results are separate in the demo.
+A visible-review label requires actual source-bound matches for every named body
+and item feature in the checked state. Unmeasured dimensions remain open. The
+publication recipe is hash-bound into each immutable revision so publication registration or
+summary changes cannot silently reuse a stale live build.
+
+Cost sidecars also refresh after each paid operation or unresolved dispatch in
+configured experiments. A shared file lock serializes cumulative publication;
+accounting failures retain the provider receipt/commitment and never cause a resend.

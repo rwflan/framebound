@@ -98,15 +98,20 @@ def audit(root, *, round_id='initial', candidates=None, calibrate=False):
 
 def safe_observe(root,frame_id,image,reference,config,*,phase):
     observation=_individual_observe(root,frame_id,image,reference,config,phase=phase)
-    context=config.get('cohort_context')
-    if not context:return observation
-    from framebound.v3.character_cohort import assess,overlay
-    state=json.loads(Path(context).read_text())
-    ids=config.get('cohort_frame_ids',[])
-    if frame_id not in ids:return observation
-    frames=[(fid,image if fid==frame_id else Image.open(state['frames'][fid]['image']).convert('RGBA')) for fid in ids]
-    result=assess(root,reference,frames,['body.upper_arm_bulk','body.forearm_bulk','body.thigh_bulk'],config['items'],config['description'],dispatch=send,persist=save,focus_ids=[frame_id])
-    observation=overlay(observation,result,image_digest(reference))
+    context=config.get('cohort_context');ids=config.get('cohort_frame_ids',[])
+    if context and frame_id in ids:
+        from framebound.v3.character_cohort import assess,overlay
+        state=json.loads(Path(context).read_text())
+        frames=[(fid,image if fid==frame_id else Image.open(state['frames'][fid]['image']).convert('RGBA')) for fid in ids]
+        result=assess(root,reference,frames,['body.upper_arm_bulk','body.forearm_bulk','body.thigh_bulk'],config['items'],config['description'],dispatch=send,persist=save,focus_ids=[frame_id])
+        observation=overlay(observation,result,image_digest(reference))
+    if config.get('item_detail_measurement'):
+        from framebound.v3.item_measurement import measure
+        for rule in config['items']:
+            item=observation.items.get(rule['id'])
+            if rule.get('rigid_measurement') and item and item.visibility=='visible':
+                observation=measure(root,image,observation,rule,('face_top','face_chin') if config.get('pose_runtime') else ('head_top','chin'),
+                    dispatch=send,persist=save,cache_roots=config.get('item_detail_cache_roots',[]))
     save(Path(root)/'private'/('registered-observation-'+frame_id+'-'+image_digest(image)[:16]+'.json'),observation.model_dump(mode='json'))
     return observation
 

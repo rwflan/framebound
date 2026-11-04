@@ -51,12 +51,13 @@ def publish(root,state,*,preview=False):
         [r['pixel_scale'] for r in rows],pairs_for(manifest))
     blocked=set(config.get('preview_blocking_features',[]))
     blocked_ids=set(config.get('preview_blocking_frame_ids',[p['id'] for p in brief['poses']]))
-    blocked_codes=set(config.get('preview_blocking_codes',[]))
+    blocked_codes=set(config.get('preview_blocking_codes',[]))|{'stale_cohort_context'}
     violations=[issue for frame in report['frames'] for issue in frame['issues'] if (issue['feature'] in blocked or issue['code'] in blocked_codes) and issue.get('frame_id') in blocked_ids]
     if violations:raise ValueError('Preview withheld by visible body/item findings: '+str(sorted({i['feature'] for i in violations})))
     if not report['passed'] and not preview:raise ValueError('Delivery withheld: character/temporal gates remain')
     report_sha=digest(report);save(root/('playable-audit-'+report_sha[:16]+'.json'),report)
-    revision=digest([report_sha,[r['image_sha256'] for r in rows]])[:16]
+    publication_recipe=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    revision=digest([report_sha,[r['image_sha256'] for r in rows],publication_recipe])[:16]
     output=public/revision;output.mkdir(exist_ok=True)
     old=public/config['source_revision'];bounds=[];offsets=[];changed=0
     for slot,row in enumerate(rows):
@@ -83,11 +84,19 @@ def publish(root,state,*,preview=False):
     actor=[min(b[0] for b in bounds),min(b[1] for b in bounds),max(b[2] for b in bounds),max(b[3] for b in bounds)]
     half=max(manifest['canvas'][0]/2-actor[0],actor[2]-manifest['canvas'][0]/2)
     render_height=min(640.,632*manifest['canvas'][1]/max(1,manifest['ground_y']-actor[1]),468*manifest['canvas'][1]/max(1,half))
+    def visible_pass(fid):
+        obs=Observation.model_validate(state['frames'][fid]['observation'])
+        body=('body.upper_arm_bulk','body.forearm_bulk','body.thigh_bulk')
+        item_checks=('design','palette','scale','attachment','material','topology','proportions','configuration')
+        return bool(obs.measurement_sources.get('cohort_review')) and all(name in obs.features and obs.features[name].status=='match' for name in body) and all(rule.id in obs.items and all(name in obs.items[rule.id].features and obs.items[rule.id].features[name].status=='match' for name in item_checks) for rule in policy.items)
     manifest=copy.deepcopy(manifest)
     manifest.update(revision=revision,source_pixel_scales=dict(direct=manifest['source_pixel_scales']['direct'],framework=[r['pixel_scale'] for r in rows]),
-        source_offsets=dict(framework=offsets),actor_bounds=actor,render_height=render_height,
+        source_offsets=dict(framework=offsets),actor_bounds=actor,render_height=render_height,publication_recipe_sha256=publication_recipe,
         quality=dict(status='checks_passed' if report['passed'] else 'refining',failed_frames=sum(not f['passed'] for f in report['frames']),temporal_findings=len(report['temporal_issues']),
-                     report_sha256=report_sha,human_approval=False,regenerated_frames=changed),
+                     report_sha256=report_sha,human_approval=False,regenerated_frames=changed,
+                     frames_with_failures=sum(any(i['status']=='fail' for i in f['issues']) for f in report['frames']),
+                     unmeasured_frames=sum(any(i['status']=='unmeasured' for i in f['issues']) for f in report['frames']),
+                     visible_review=dict(status='passed',states=config.get('cohort_review_states',[]),frames=len(blocked_ids)) if blocked and blocked_ids and all(visible_pass(fid) for fid in blocked_ids) else None),
         comparison='Frozen Direct Muse control; source-bound Framebound repairs with recorded scale and baseline registration. Automated findings remain separate from approval.')
     previous=public/'manifest.json'
     if previous.exists():save(root/'previous-live-manifest.json',json.loads(previous.read_text()))

@@ -28,6 +28,23 @@ def save(path, value):
     temporary.replace(path)
 
 
+_COST_CACHE = {}
+
+
+def refresh_costs(root):
+    config=Path(root)/'config.json'
+    try:
+        if not config.exists() or not json.loads(config.read_text()).get('cost_lineage_roots'):return
+        from scripts.update_demo_costs import update
+        update(Path(root),cache=_COST_CACHE)
+    except Exception as error:
+        # A receipt/commitment remains durable even if the optional live sidecar
+        # cannot refresh. Do not hide a provider error or resend its operation.
+        try:save(Path(root)/'private'/'cost-refresh-error.json',dict(error=type(error).__name__,detail=str(error)))
+        except OSError:pass
+        print('Cost sidecar requires reconciliation:',type(error).__name__,flush=True)
+
+
 def send(root, name, model, prompt, images, *, image_size="1536x1024"):
     folder = root / 'private' / name
     folder.mkdir(parents=True, exist_ok=True)
@@ -55,9 +72,12 @@ def send(root, name, model, prompt, images, *, image_size="1536x1024"):
     # Exclusive creation makes restarts fail closed after possible acceptance.
     with marker.open('x') as stream:
         json.dump(dict(wire=body, committed_microdollars=quoted), stream)
-    result = adapter.execute(request, timeout=300)
-    response.write_bytes(result.raw)
-    save(folder / 'receipt.json', dict(incurred_microdollars=result.incurred, receipt=result.receipt, response_sha256=hashlib.sha256(result.raw).hexdigest()))
+    try:
+        result = adapter.execute(request, timeout=300)
+        response.write_bytes(result.raw)
+        save(folder / 'receipt.json', dict(incurred_microdollars=result.incurred, receipt=result.receipt, response_sha256=hashlib.sha256(result.raw).hexdigest()))
+    finally:
+        refresh_costs(root)
     print(name, 'received', flush=True)
     return result.raw
 
