@@ -93,6 +93,12 @@ def audit(root, *, round_id='initial', candidates=None, calibrate=False):
 
 
 def safe_observe(root,frame_id,image,reference,config,*,phase):
+    # Reuse completed, source-bound semantic observations before dispatch.
+    # Recompute geometry using the current pinned recipe independently.
+    for path in Path(root).glob('private/registered-observation-'+frame_id+'-*.json'):
+        cached=Observation.model_validate_json(path.read_text())
+        if cached.image_sha256==image_digest(image) and all(f in cached.features for f in config['features']):
+            return enrich_geometry(root,image,cached,config)
     cached_root=config.get('observation_cache_root')
     if cached_root:
         cached_config=json.loads((Path(cached_root)/'config.json').read_text())
@@ -266,7 +272,8 @@ def repair(root, *, only=None, max_new_attempts=None):
             # change a valid pose merely to expose deliberately hidden anatomy.
             measured=[task for task,issue in zip(plan['tasks'],report['issues']) if issue['status']!='unmeasured']
             semantic=[task for task in measured if task['code'] in {'item_owner_changed','item_design_changed','item_detached','unexpected_item','feature_changed'}]
-            plan['tasks']=semantic or measured[:1]
+            item_repairs=[task for task in measured if task['code'].startswith('item_')]
+            plan['tasks']=semantic or item_repairs or measured[:1]
             if not plan['tasks']:
                 print(fid,'WITHHELD: measurement recovery required; no speculative redraw',flush=True)
                 break
