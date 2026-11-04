@@ -17,6 +17,14 @@ from framebound.v3.character_observations import ObservationInvalid
 from framebound.v3.intake import framing
 
 
+def generation_png(image):
+    # The provider sees the declared technical matte, never an implicit black
+    # rendering of transparent source pixels. Originals remain unchanged.
+    backing=Image.new('RGBA',image.size,(255,0,255,255))
+    backing.alpha_composite(image.convert('RGBA'))
+    return png(backing.convert('RGB'))
+
+
 def load_config(root):
     config=json.loads((root/'config.json').read_text())
     source=Path(config['source_root'])
@@ -85,14 +93,17 @@ def audit(root, *, round_id='initial', candidates=None, calibrate=False):
 
 
 def safe_observe(root,frame_id,image,reference,config,*,phase):
-    if config.get('registered_semantic_views'):
-        return registered_observe(root,frame_id,image,reference,config,phase)
     cached_root=config.get('observation_cache_root')
     if cached_root:
-        for path in Path(cached_root).glob('private/*-observation.json'):
+        cached_config=json.loads((Path(cached_root)/'config.json').read_text())
+        if image_digest(Image.open(cached_config['master_image']))!=image_digest(reference):
+            raise ValueError('Observation cache uses another identity reference')
+        for path in Path(cached_root).glob('private/registered-observation-*.json'):
             cached=Observation.model_validate_json(path.read_text())
             if cached.image_sha256==image_digest(image) and cached.frame_id==frame_id and all(f in cached.features for f in config['features']):
                 return enrich_geometry(root,image,cached,config)
+    if config.get('registered_semantic_views'):
+        return registered_observe(root,frame_id,image,reference,config,phase)
     for attempt in range(3):
         suffix='' if attempt==0 else '-format-recovery-'+str(attempt)
         try:
@@ -160,12 +171,17 @@ def enrich_geometry(root,image,observation,config):
     from framebound.v3.pose_measurement import JOINTS
     key=image_digest(image)
     implementation=hashlib.sha256((Path(__file__).parents[1]/'framebound/v3/pose_measurement.py').read_bytes()).hexdigest()
+    backend=config.get('geometry_backend','v1')
+    if backend in ('material-v2','torso-v3'):
+        implementation=hashlib.sha256((implementation+(Path(__file__).parents[1]/'framebound/v3/material_geometry.py').read_text()).encode()).hexdigest()
+    if backend=='torso-v3':
+        implementation=hashlib.sha256((implementation+(Path(__file__).parents[1]/'framebound/v3/torso_geometry.py').read_text()).encode()).hexdigest()
     geometry_key=key+'-'+implementation[:12]
     path=root/'private'/('geometry-'+geometry_key+'.json')
     artifact=root/'private'/('geometry-'+geometry_key+'.png')
     if not path.exists():
         image.save(artifact)
-        subprocess.run([config['pose_runtime'],str(Path(__file__).with_name('measure_character_geometry.py')),'--image',str(artifact),'--models',config['pose_models'],'--output',str(path)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        subprocess.run([config['pose_runtime'],str(Path(__file__).with_name('measure_character_geometry.py')),'--image',str(artifact),'--models',config['pose_models'],'--output',str(path),'--backend',backend],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     result=json.loads(path.read_text())
     data=observation.model_dump(mode='json')
     for name,point in result['points'].items():data['points'][name]=point
@@ -190,7 +206,7 @@ def rank_report(report):
     numeric=sum(abs(i['observed']-1) for i in report['issues'] if isinstance(i['observed'],(float,int)) and isinstance(i['expected'],list))
     return (critical,unknown,len(report['issues']),numeric)
 
-def repair(root, *, only=None):
+def repair(root, *, only=None, max_new_attempts=None):
     config,brief,manifest,public=load_config(root)
     policy=initialize(root);policy_sha=digest(policy.model_dump(mode='json'))
     reference=Image.open(config['master_image']).convert('RGBA')
@@ -239,11 +255,21 @@ def repair(root, *, only=None):
                 print(fid,'rechecked retained candidate',path.stem,'remaining gates',len(report['issues']),flush=True)
                 if report['passed']:break
             record['pool_checked']=True;save(state_path,state)
-        for attempt in range(len(record['attempts']),config.get('max_rounds',8)):
+        stop=config.get('max_rounds',8)
+        if max_new_attempts is not None:stop=min(stop,len(record['attempts'])+max_new_attempts)
+        for attempt in range(len(record['attempts']),stop):
             if report['passed']:break
             target=copy.deepcopy(report['issues'])
             constraints=dict(measured=measurements(observation,policy.scale_reference),reference=measurements(policy.master,policy.scale_reference),failures=target)
             plan=repair_plan(policy,observation,report)
+            # Recover missing measurements independently; redrawing must not
+            # change a valid pose merely to expose deliberately hidden anatomy.
+            measured=[task for task,issue in zip(plan['tasks'],report['issues']) if issue['status']!='unmeasured']
+            semantic=[task for task in measured if task['code'] in {'item_owner_changed','item_design_changed','item_detached','unexpected_item','feature_changed'}]
+            plan['tasks']=semantic or measured[:1]
+            if not plan['tasks']:
+                print(fid,'WITHHELD: measurement recovery required; no speculative redraw',flush=True)
+                break
             from PIL import ImageDraw
             dimensions=record.get('source_framing',{}).get('source_dimensions')
             if not dimensions:
@@ -261,12 +287,17 @@ def repair(root, *, only=None):
                 +'\nMake ONLY these measured corrections, treating percentages as changes to the CURRENT drawing: '+json.dumps(plan['tasks'])
                 +'\nPreserve every declared item and its frame-specific anatomical owner or mount: '+json.dumps(config['items'])+'. No duplicate, redesign or undeclared transfer. Keep limb segment lengths and widths consistent with the reference while articulating naturally. Do not shrink the whole body to fix a single part. Keep generous uniform magenta margins, no floor/shadow/labels/guide marks. Return the same image orientation and same pose.')
             size=record.get('next_size','1536x1024' if dimensions[0]>dimensions[1] else '1024x1536')
-            op='edit-'+fid+'-'+str(attempt)+'-'+digest([policy_sha,image_digest(image),size,prompt])[:12]
+            if config.get('focused_item_edit') and any(task['code'].startswith('item_') for task in plan['tasks']):
+                prompt=('Edit the SECOND image. The FIRST image defines the exact character and item design. Keep the second image action pose, face, body, costume, canvas, cape and hair. Correct the visible item ONLY: '+json.dumps(config['items'])+' The item must have the same construction, thickness, rigid component and proportions as image one. Show one item, firmly connected to its declared anatomical hand or mount. For this pose: '+pose['instruction']+' '+config.get('item_pose_constraints',{}).get(fid,'')+' No second grip, duplicate item, loose trailing loop, additional handle, guide marks, text, floor or shadows. Full silhouette inside the canvas with at least 8 percent magenta margin. Uniform RGB(255,0,255) backing everywhere outside the artwork. Return one full-resolution complete character in the same pose. The compact coil can rotate with the hand but cannot turn into a different weapon.')
+                generation_images=[generation_png(reference),generation_png(edit_target)]
+            else:
+                generation_images=[generation_png(im) for im in (reference,face,item_reference,edit_target,annotated)]
+            op='edit-'+fid+'-'+str(attempt)+'-'+digest([policy_sha,image_digest(image),size,prompt,[hashlib.sha256(b).hexdigest() for b in generation_images]])[:12]
             pending=record.get('pending_operation')
             if pending and pending!=op and not (root/'private'/pending/'response.json').exists():
                 raise RuntimeError('Unresolved provider acceptance for '+pending+'; reconciliation required before a different request')
             record['pending_operation']=op;save(state_path,state)
-            raw=send(root,op,'muse-image-1.0',prompt,[png(reference),png(face),png(item_reference),png(edit_target),png(annotated)],image_size=size)
+            raw=send(root,op,'muse-image-1.0',prompt,generation_images,image_size=size)
             record.pop('pending_operation',None);save(state_path,state)
             try:
                 candidate,gate=decode(raw,brief.get('minimum_subject_span',1100))
@@ -299,9 +330,10 @@ def repair(root, *, only=None):
     return state
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);parser.add_argument('--calibrate',action='store_true');parser.add_argument('--round',default='initial');parser.add_argument('--repair',action='store_true');parser.add_argument('--only')
+    parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);parser.add_argument('--calibrate',action='store_true');parser.add_argument('--round',default='initial');parser.add_argument('--repair',action='store_true');parser.add_argument('--only');parser.add_argument('--max-new-attempts',type=int)
     args=parser.parse_args()
-    if args.repair:repair(args.root,only=args.only)
+    if args.max_new_attempts is not None and args.max_new_attempts<1:parser.error('Positive new-attempt bound required')
+    if args.repair:repair(args.root,only=args.only,max_new_attempts=args.max_new_attempts)
     else:audit(args.root,round_id=args.round,calibrate=args.calibrate)
 
 
