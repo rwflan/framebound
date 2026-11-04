@@ -20,6 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+character-pose = ["mediapipe==1.2.2"]
 campaign-acquisition = ["meta-sam-parser @ git+https://github.com/meta-models/meta-sam.git@9348a8a791d3e5b6417232227e32e10464cdf49f#subdirectory=python"]
 campaign-learning = ["torch==2.9.0", "modal==1.6.3"]
 export-validation = ["datasets>=3,<6", "pycocotools>=2.0.8"]

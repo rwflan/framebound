@@ -210,6 +210,53 @@ def submit(project, run_id, revision_id, frame_asset_ids, *, parent_revision_id=
                 from .. import scene
                 scene_results,scene_evidence=scene.evaluate(spec,images)
                 results.extend(scene_results);evidence['scene']=scene_evidence
+            if spec.character_consistency and intake_passed:
+                from .. import character_consistency as CC
+                supplied=(generation_metadata or {}).get('character_consistency',{})
+                try:
+                    anchor,_=S.get(con,'assets',spec.character_consistency.master_asset_id)
+                    anchor_blob=S.blob_path(project,anchor['byte_sha256'])
+                    if S.sha256_bytes(anchor_blob.read_bytes())!=anchor['byte_sha256']:
+                        raise ValueError('Character reference blob integrity failed')
+                    anchor_image=load_native_image(anchor_blob)
+                    if CC.image_digest(anchor_image)!=spec.character_consistency.master.image_sha256:
+                        raise ValueError('Character reference pixels differ from frozen observation')
+                    if not isinstance(supplied,dict):raise ValueError('Character evidence must be an object')
+                    observations=[CC.Observation.model_validate(o) for o in supplied.get('observations',[])]
+                    if len(observations)!=len(images) or any((o.width,o.height)!=im.size for o,im in zip(observations,images)):
+                        raise ValueError('Character observations do not match actual source dimensions/count')
+                    if (spec.character_consistency.master.width,spec.character_consistency.master.height)!=anchor_image.size:
+                        raise ValueError('Master observation dimensions differ from reference pixels')
+                    frame_ids=[str(i) for i in range(len(images))]
+                    pairs=list(zip(range(len(images)-1),range(1,len(images))))
+                    if spec.loop and len(images)>1:pairs.append((len(images)-1,0))
+                    report=CC.evaluate_sequence(spec.character_consistency,observations,
+                        [CC.image_digest(im) for im in images],frame_ids,pairs=pairs)
+                    outcome='pass' if report['passed'] else 'unmeasured' if any(i['status']=='unmeasured' for f in report['frames'] for i in f['issues']) else 'fail'
+                except (ValueError,KeyError,TypeError) as exc:
+                    report=dict(passed=False,error=str(exc),human_approval=False)
+                    outcome='unmeasured'
+                report['implementation_sha256']=S.sha256_bytes(Path(CC.__file__).read_bytes())
+                evidence['character_consistency']=report
+                def character_result(rid,slots,outcome,observed,expected,reason):
+                    results.append(dict(id=rid,family='character_consistency',required=True,
+                        slots=slots,tick_range=[sum(holds[:min(slots)]),sum(holds[:max(slots)+1])],outcome=outcome,
+                        observed=observed,expected=expected,roi=None,source='model_proposed_observations',
+                        evidence_method=CC.VERSION,confidence=None,reason=reason))
+                if 'frames' not in report:
+                    character_result('character-evidence',list(range(len(images))),'unmeasured',report,
+                        'One source-bound observation per actual frame','Recover observation evidence; do not redraw based on a tool/measurement failure.')
+                else:
+                    for slot,frame in enumerate(report['frames']):
+                        if frame['passed']:
+                            character_result('character-frame-'+str(slot),[slot],'pass',frame,
+                                'Frozen character/item invariants','Scoped geometry and appearance checks satisfied; no human approval is inferred.')
+                        for j,issue in enumerate(frame['issues']):
+                            character_result('character-'+str(slot)+'-'+str(j),[slot],issue['status'],issue['observed'],issue['expected'],
+                                issue['code']+': '+issue['feature']+'. '+('Recover measurement evidence before redrawing.' if issue['status']=='unmeasured' else 'Regenerate only this failing pose under the original character/item contract.'))
+                    for j,issue in enumerate(report['temporal_issues']):
+                        character_result('character-temporal-'+str(j),[int(x) for x in issue['frames']],'fail',issue['observed'],issue['expected'],
+                            issue['code']+': '+issue['feature']+' between the bound authored frames.')
             # Edit-scope safety is checked even for an inadmissible candidate;
             # intake never hides a protected-pixel violation.
             preservation = I.preservation_in(con, project, run, images, spec)
