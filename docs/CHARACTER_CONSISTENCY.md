@@ -46,3 +46,46 @@ unmeasured. The lower-torso band measures visible garment contours rather than
 mistaking the pose model's hip/skirt centre for a waist. Changing a measurement
 recipe requires a new frozen policy and reassessment of retained source pixels;
 old failures and evidence are preserved.
+
+## Visible volume and whole-sequence item review
+
+An arm length is not evidence of arm thickness. Missing comparable arm-width
+measurements now require an explicit `body.upper_arm_bulk` observation; otherwise
+arm-volume coverage remains unmeasured. Targeted `body.forearm_bulk` and
+`body.thigh_bulk` checks compare the actual referenced build, not stereotypes or
+the word "athletic". Flexion does not permit a different muscular build.
+
+The independent cohort observer sees the canonical source and all ordered frames
+together. Focused outputs retain neighbouring images as context and bind the
+review to every source hash. Item policies can require `material`, `topology`,
+`proportions` and `configuration` alongside design, palette, scale and attachment.
+These cover changing rigid handles, flexible-strand thickness, extra strands,
+fittings and the required folded/coiled/extended state for any declared object.
+Rigid-component size is also checked between adjacent frames, including loops.
+
+A cohort review never overwrites original evidence. It adds retained source-bound
+findings; neither a general appearance score nor individual-frame plausibility
+can waive them. The demo can name body/item blockers that forbid publication even
+as a refinement preview. Publication performs the configured whole-state reviews
+again after selecting replacements. Unknown provider outcomes are not retried.
+
+## Cumulative provider cost
+
+`experiment_costs.summarize` scans explicitly declared lineage roots. It counts
+shared initial generation separately from framework generation, assessment and
+repair work, including failed and superseded experiments. Copied receipts with
+the same provider response ID are deduplicated; distinct paid responses are not.
+Conflicting receipts or response hashes fail the accounting check.
+
+Observed usage/rate receipts and unreconciled commitments remain separate. A
+missing response or cost receipt is not zero spend. No campaign restart or new
+selection resets historical work. The private ledger retains operation-level
+provenance; the public `costs.json` sidecar exposes only totals, counts and an
+evidence digest. It refreshes independently from animation revisions. Local CPU
+and external services without linked receipts are explicitly unpriced.
+
+A later positive judge response cannot clear a retained negative body/item
+finding on unchanged source pixels. Keep the earlier evidence and repair the
+source. Completed malformed cohort outputs may be split into smaller focused
+reviews with the same visual context; transport failures and unknown acceptance
+are never treated as a format problem or retried by that recovery path.

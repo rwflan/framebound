@@ -76,3 +76,12 @@ def test_builder_preserves_control_and_publishes_complete_revision(tmp_path, mon
     assert Image.open(output / 'direct-0.png').getpixel((50,50))[1] == 50
     assert Image.open(output / 'framework-0.png').getpixel((50,50))[1] == 200
     assert len([name for name,_ in sent if name.endswith('-initial')]) == 2
+
+
+def test_local_preflight_failure_does_not_create_a_committed_send(tmp_path,monkeypatch):
+    class Adapter:
+        def preflight(self,request):raise ValueError('TEST-ONLY rejected before transport')
+        def execute(self,*a,**kw):pytest.fail('must not send failed preflight')
+    monkeypatch.setattr(demo,'MuseResponses',Adapter)
+    with pytest.raises(ValueError,match='before transport'):demo.send(tmp_path,'local-rejected','muse-image-1.0','TEST-ONLY',[])
+    assert not (tmp_path/'private/local-rejected/request.json').exists()

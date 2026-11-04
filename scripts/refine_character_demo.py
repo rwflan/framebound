@@ -97,11 +97,28 @@ def audit(root, *, round_id='initial', candidates=None, calibrate=False):
 
 
 def safe_observe(root,frame_id,image,reference,config,*,phase):
+    observation=_individual_observe(root,frame_id,image,reference,config,phase=phase)
+    context=config.get('cohort_context')
+    if not context:return observation
+    from framebound.v3.character_cohort import assess,overlay
+    state=json.loads(Path(context).read_text())
+    ids=config.get('cohort_frame_ids',[])
+    if frame_id not in ids:return observation
+    frames=[(fid,image if fid==frame_id else Image.open(state['frames'][fid]['image']).convert('RGBA')) for fid in ids]
+    result=assess(root,reference,frames,['body.upper_arm_bulk','body.forearm_bulk','body.thigh_bulk'],config['items'],config['description'],dispatch=send,persist=save,focus_ids=[frame_id])
+    observation=overlay(observation,result,image_digest(reference))
+    save(Path(root)/'private'/('registered-observation-'+frame_id+'-'+image_digest(image)[:16]+'.json'),observation.model_dump(mode='json'))
+    return observation
+
+
+def _individual_observe(root,frame_id,image,reference,config,*,phase):
     # Reuse completed, source-bound semantic observations before dispatch.
     # Recompute geometry using the current pinned recipe independently.
+    def complete(cached):
+        return all(f in cached.features for f in config['features']) and all(item['id'] in cached.items and all(feature in cached.items[item['id']].features for feature in item.get('required_features',['design','palette','scale','attachment'])) for item in config['items'])
     for path in Path(root).glob('private/registered-observation-'+frame_id+'-*.json'):
         cached=Observation.model_validate_json(path.read_text())
-        if cached.image_sha256==image_digest(image) and all(f in cached.features for f in config['features']):
+        if cached.image_sha256==image_digest(image) and complete(cached):
             return enrich_geometry(root,image,cached,config)
     cached_root=config.get('observation_cache_root')
     if cached_root:
@@ -110,7 +127,7 @@ def safe_observe(root,frame_id,image,reference,config,*,phase):
             raise ValueError('Observation cache uses another identity reference')
         for path in Path(cached_root).glob('private/registered-observation-*.json'):
             cached=Observation.model_validate_json(path.read_text())
-            if cached.image_sha256==image_digest(image) and cached.frame_id==frame_id and all(f in cached.features for f in config['features']):
+            if cached.image_sha256==image_digest(image) and cached.frame_id==frame_id and complete(cached):
                 return enrich_geometry(root,image,cached,config)
     if config.get('registered_semantic_views'):
         return registered_observe(root,frame_id,image,reference,config,phase)
@@ -211,7 +228,7 @@ def calibrated_scale(policy,observation,format_scale):
 
 
 def rank_report(report):
-    critical=sum(i['code'] in {'item_owner_changed','item_design_changed','item_detached','unexpected_item'} or (i['code']=='feature_changed' and i['feature']=='face.identity') for i in report['issues'])
+    critical=sum(i['code'] in {'item_owner_changed','item_design_changed','item_detached','unexpected_item'} or i['code']=='feature_changed' for i in report['issues'])
     unknown=sum(i['status']=='unmeasured' for i in report['issues'])
     numeric=sum(abs(i['observed']-1) for i in report['issues'] if isinstance(i['observed'],(float,int)) and isinstance(i['expected'],list))
     return (critical,unknown,len(report['issues']),numeric)
@@ -298,7 +315,7 @@ def repair(root, *, only=None, max_new_attempts=None):
                 +'\nMake ONLY these measured corrections, treating percentages as changes to the CURRENT drawing: '+json.dumps(plan['tasks'])
                 +'\nPreserve every declared item and its frame-specific anatomical owner or mount: '+json.dumps(config['items'])+'. No duplicate, redesign or undeclared transfer. Keep limb segment lengths and widths consistent with the reference while articulating naturally. Do not shrink the whole body to fix a single part. Keep generous uniform magenta margins, no floor/shadow/labels/guide marks. Return the same image orientation and same pose.')
             size=record.get('next_size','1536x1024' if dimensions[0]>dimensions[1] else '1024x1536')
-            if config.get('focused_item_edit') and any(task['code'].startswith('item_') for task in plan['tasks']):
+            if config.get('focused_item_edit') and plan['tasks'] and all(task['code'].startswith('item_') for task in plan['tasks']):
                 prompt=('Edit the SECOND image. The FIRST image defines the exact character and item design. Keep the second image action pose, face, body, costume, canvas, cape and hair. Correct the visible item ONLY: '+json.dumps(config['items'])+' The item must have the same construction, thickness, rigid component and proportions as image one. Show one item, firmly connected to its declared anatomical hand or mount. For this pose: '+pose['instruction']+' '+config.get('item_pose_constraints',{}).get(fid,'')+' No second grip, duplicate item, loose trailing loop, additional handle, guide marks, text, floor or shadows. Full silhouette inside the canvas with at least 8 percent magenta margin. Uniform RGB(255,0,255) backing everywhere outside the artwork. Return one full-resolution complete character in the same pose. The compact coil can rotate with the hand but cannot turn into a different weapon.')
                 prompt+=' Specific measured corrections to this current drawing: '+json.dumps(plan['tasks'])+' Keep flexible coil thickness and rigid component size locked independently; do not scale the whole figure to change the item.'
                 mounts=[]

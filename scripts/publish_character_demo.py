@@ -49,6 +49,11 @@ def publish(root,state,*,preview=False):
     rows=[state['frames'][p['id']] for p in brief['poses']]
     report=evaluate_sequence(policy,[r['observation'] for r in rows],[r['image_sha256'] for r in rows],[p['id'] for p in brief['poses']],
         [r['pixel_scale'] for r in rows],pairs_for(manifest))
+    blocked=set(config.get('preview_blocking_features',[]))
+    blocked_ids=set(config.get('preview_blocking_frame_ids',[p['id'] for p in brief['poses']]))
+    blocked_codes=set(config.get('preview_blocking_codes',[]))
+    violations=[issue for frame in report['frames'] for issue in frame['issues'] if (issue['feature'] in blocked or issue['code'] in blocked_codes) and issue.get('frame_id') in blocked_ids]
+    if violations:raise ValueError('Preview withheld by visible body/item findings: '+str(sorted({i['feature'] for i in violations})))
     if not report['passed'] and not preview:raise ValueError('Delivery withheld: character/temporal gates remain')
     report_sha=digest(report);save(root/('playable-audit-'+report_sha[:16]+'.json'),report)
     revision=digest([report_sha,[r['image_sha256'] for r in rows]])[:16]
@@ -101,7 +106,12 @@ def main():
     for cycle in range(args.cycles if args.watch else 1):
         snapshot=digest([(str(file),file.stat().st_mtime_ns) for pool in args.pool for file in sorted(pool.glob('repair-state*.json'))])
         if snapshot!=previous:
-            state=collect(args.root,args.pool);publish(args.root,state,preview=args.preview);previous=snapshot
+            state=collect(args.root,args.pool)
+            config,brief,manifest,public=load_config(args.root)
+            for name in config.get('cohort_review_states',[]):
+                from scripts.review_character_sequence import review
+                state,_=review(args.root,state,manifest['states'][name]['frames'])
+            publish(args.root,state,preview=args.preview);previous=snapshot
         if args.watch and cycle+1<args.cycles:time.sleep(args.interval)
 
 if __name__=='__main__':main()

@@ -163,3 +163,35 @@ def test_external_geometry_requests_generic_mounts_and_does_not_retry_unknown(tm
     landmarks=calls[0].split('Landmarks: ')[1].split('\n')[0]
     assert 'back_mount' in landmarks and 'hip_mount' in landmarks
     assert 'right_hand' not in landmarks
+
+
+def test_arm_length_cannot_substitute_for_missing_volume_measurement():
+    o=observation().model_dump(mode='json');p=policy().model_dump(mode='json')
+    for v in [o,p['master']]:
+        for side in ('left','right'):
+            for edge in ('inner','outer'):v['points'][side+'_arm_'+edge]=dict(xy=None,visibility='uncertain',evidence='TEST-ONLY ambiguous width')
+    assert 'coverage_gap' in codes(evaluate(o,p))
+    p['required_features'].append('body.upper_arm_bulk');o['features']['body.upper_arm_bulk']=feature('mismatch')
+    assert 'feature_changed' in codes(evaluate(o,p))
+    assert not evaluate(o,p)['passed']
+    o['features']['body.upper_arm_bulk']=feature('match')
+    assert evaluate(o,p)['passed']
+
+
+def test_rigid_item_can_pass_master_bounds_but_fail_adjacent_size_pulse():
+    p=policy();a=observation('0');b=observation('1').model_dump(mode='json')
+    a=a.model_dump(mode='json');a['items']['item']['rigid_span'][1]=point(600,504)
+    b['items']['item']['rigid_span'][1]=point(600,516)
+    result=evaluate_sequence(p,[a,b],['1'*64]*2,['0','1'],pairs=[(0,1)])
+    assert all(f['passed'] for f in result['frames'])
+    assert any(i['code']=='item_size_pulse' for i in result['temporal_issues'])
+
+
+def test_neighbour_change_invalidates_retained_whole_sequence_review():
+    p=policy();a=observation('0').model_dump(mode='json');b=observation('1').model_dump(mode='json')
+    a['measurement_sources']['cohort_review']=dict(reference_sha256=p.master.image_sha256,context_sha256s={'0':'1'*64,'1':'1'*64})
+    assert evaluate_sequence(p,[a,b],['1'*64]*2,['0','1'])['passed']
+    b['image_sha256']='3'*64
+    result=evaluate_sequence(p,[a,b],['1'*64,'3'*64],['0','1'])
+    assert not result['passed']
+    assert any(i['code']=='stale_cohort_context' for i in result['frames'][0]['issues'])

@@ -188,6 +188,12 @@ def evaluate_frame(policy, observation, *, image_sha256, frame_id, pixel_scale=1
             width_pairs=[(s+'_arm_width',s+'_forearm') if family=='arm' else (s+'_thigh_width',s+'_calf_width') for s in ('left','right')]
             if not any(all(current.get(k) is not None for k in pair) for pair in pairs+width_pairs):
                 add('coverage_gap',family,'No usable visible limb evidence','At least one visible '+family+' chain or paired visible part dimensions','unmeasured')
+    if policy.require_visible_arm_and_leg:
+        numeric_bulk=any(current.get(side+'_arm_width') is not None and
+            (base.get(side+'_arm_width') is not None or base.get(('left' if side=='right' else 'right')+'_arm_width') is not None) for side in ('left','right'))
+        targeted_bulk=obs.features.get('body.upper_arm_bulk') if 'body.upper_arm_bulk' in policy.required_features else None
+        if not numeric_bulk and (targeted_bulk is None or targeted_bulk.status in ('uncertain','occluded')):
+            add('coverage_gap','arm_volume',None,'Comparable visible arm width or explicit source-bound upper-arm bulk assessment; length alone is insufficient','unmeasured')
     # Compare the same anatomical side when visible. A hidden far side cannot
     # become a fabricated measurement or be called a pass.
     for name in sorted(names):
@@ -259,6 +265,13 @@ def evaluate_sequence(policy, observations, image_sha256s, frame_ids, pixel_scal
     scales=pixel_scales or [1.]*len(observations)
     if len(scales)!=len(observations) or any(not math.isfinite(s) or s<=0 for s in scales):raise ValueError('Invalid render calibration')
     frames=[evaluate_frame(policy,o,image_sha256=sha,frame_id=fid,pixel_scale=s) for o,sha,fid,s in zip(observations,image_sha256s,frame_ids,scales)]
+    source_map=dict(zip(frame_ids,image_sha256s))
+    for index,raw in enumerate(observations):
+        obs=Observation.model_validate(raw);cohort=obs.measurement_sources.get('cohort_review')
+        if cohort and (cohort.get('reference_sha256')!=policy.master.image_sha256 or
+                not cohort.get('context_sha256s') or any(source_map.get(fid)!=sha for fid,sha in cohort.get('context_sha256s',{}).items())):
+            frames[index]['issues'].append(dict(code='stale_cohort_context',feature='cohort_binding',frame_id=frame_ids[index],status='unmeasured',observed=None,expected='Exact current reference and neighbour source hashes'))
+            frames[index]['passed']=False
     temporal=[]
     for left,right in pairs:
         if left==right or min(left,right)<0 or max(left,right)>=len(frames):raise ValueError('Invalid temporal pair')
@@ -268,6 +281,17 @@ def evaluate_sequence(policy, observations, image_sha256s, frame_ids, pixel_scal
             ratio=b[feature]/a[feature]
             if abs(ratio-1)>policy.max_adjacent_part_drift:
                 temporal.append(dict(code='part_pulse',feature=feature,frames=[frame_ids[left],frame_ids[right]],observed=ratio,expected=[1-policy.max_adjacent_part_drift,1+policy.max_adjacent_part_drift]))
+        left_obs=Observation.model_validate(observations[left]);right_obs=Observation.model_validate(observations[right])
+        for rule in policy.items:
+            if not rule.rigid_measurement:continue
+            def relative_span(observation):
+                item=observation.items.get(rule.id);head=measurements(observation,policy.scale_reference).get('head_px')
+                if not item or item.visibility!='visible' or not item.rigid_span or not head or any(p.visibility!='visible' for p in item.rigid_span):return None
+                ends=[(p.xy[0]*observation.width/1000,p.xy[1]*observation.height/1000) for p in item.rigid_span]
+                return math.dist(*ends)/head
+            aa,bb=relative_span(left_obs),relative_span(right_obs)
+            if aa and bb and abs(bb/aa-1)>policy.max_adjacent_part_drift:
+                temporal.append(dict(code='item_size_pulse',feature=rule.id,frames=[frame_ids[left],frame_ids[right]],observed=bb/aa,expected=[1-policy.max_adjacent_part_drift,1+policy.max_adjacent_part_drift]))
     return dict(version=VERSION,passed=all(f['passed'] for f in frames) and not temporal,
                 frames=frames,temporal_issues=temporal,policy_sha256=digest(policy.model_dump(mode='json')),
                 image_sha256s=image_sha256s,pixel_scales=scales,human_approval=False)
@@ -282,6 +306,10 @@ def repair_plan(policy,observation,report):
         name=issue['feature'];code=issue['code'];points=[]
         if name in SEGMENTS:
             points=[point(obs,k) for k in SEGMENTS[name]]
+        elif name in {'body.upper_arm_bulk','body.forearm_bulk','body.thigh_bulk'}:
+            suffixes={'body.upper_arm_bulk':('shoulder','elbow'),'body.forearm_bulk':('elbow','wrist'),'body.thigh_bulk':('hip','knee')}[name]
+            points=[point(obs,side+'_'+suffix) for side in ('left','right') for suffix in suffixes]
+            points=[p for p in points if p is not None]
         elif code=='item_scale_drift' and name in obs.items and obs.items[name].rigid_span:
             points=[(p.xy[0]*obs.width/1000,p.xy[1]*obs.height/1000) for p in obs.items[name].rigid_span if p.visibility=='visible']
         message=code+': restore '+name+' to the immutable reference.'
@@ -293,12 +321,14 @@ def repair_plan(policy,observation,report):
                 target=bounds[0]+.03 if issue['observed']<bounds[0] else bounds[1]-.03
             change=(target/issue['observed']-1)*100
             message=('Increase' if change>0 else 'Reduce')+' the current rendered '+name+' span by '+str(round(abs(change),1))+'%. Preserve joint angles, neighbouring part lengths, colour, volume, attachment and all unmentioned pixels.'
+        elif code=='feature_changed' and name in {'body.upper_arm_bulk','body.forearm_bulk','body.thigh_bulk'}:
+            message='Reduce the exaggerated visible '+name+' volume and muscle bulges by approximately 20 percent in the CURRENT drawing, matching the canonical lean athletic contour. Preserve the joint centres, action, costume and face. Do not add bodybuilding lobes or vascularity; recheck all proportions after the edit.'
         elif code=='item_owner_changed':
             message='Move this SAME item to '+str(issue['expected'])+'; the other hand/mount must not retain a copy. Preserve the identical design and pose.'
         elif issue['status']=='unmeasured':
             message='Expose '+name+' clearly enough to verify its source pixels; do not invent hidden measurements or alter unrelated anatomy.'
         roi=None
-        if len(points)==2 and all(p is not None for p in points):
+        if len(points)>=2 and all(p is not None for p in points):
             roi=[max(0,int(min(p[0] for p in points)-head*.4)),max(0,int(min(p[1] for p in points)-head*.4)),
                  min(obs.width,int(max(p[0] for p in points)+head*.4+1)),min(obs.height,int(max(p[1] for p in points)+head*.4+1))]
         tasks.append(dict(code=code,feature=name,frame_id=obs.frame_id,instruction=message,source_roi=roi,

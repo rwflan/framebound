@@ -8,6 +8,16 @@ type StateSpec = {
   loop?: boolean;
 };
 
+type CostSummary = {
+  observed_microdollars: number;
+  unreconciled_reserve_microdollars: number;
+  unreconciled_operations: number;
+  operations: number;
+  missing_lineage_roots: number;
+  groups: Record<string, { observed_microdollars: number }>;
+};
+const usd = (amount: number) => new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 3}).format(amount / 1_000_000);
+
 type DemoManifest = {
   schema: number;
   canvas: [number, number];
@@ -153,6 +163,18 @@ function drawCharacter(
 }
 
 export function ValeriaLab() {
+  const [costs, setCosts] = useState<CostSummary | null>(null);
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`${ASSET_ROOT}/costs.json?t=${Date.now()}`, {cache: "no-store"});
+        if (response.ok) { const value = await response.json() as CostSummary; if (active) setCosts(value); }
+      } catch { /* Retain the last recorded amount; never invent a zero. */ }
+    };
+    void refresh(); const timer = setInterval(() => void refresh(), 10000);
+    return () => { active = false; clearInterval(timer); };
+  }, []);
   const [mode, setMode] = useState<CompareMode>("compare");
   const [paused, setPaused] = useState(false);
   const [assets, setAssets] = useState<{
@@ -394,6 +416,7 @@ export function ValeriaLab() {
           <span><button onClick={slide}>Slide</button><kbd>S</kbd></span>
           <span><button onClick={attack}>Attack</button><kbd>J</kbd></span>
         </fieldset>
+        <span className="proof-cost" title="Provider spend across all retained framework experiments, including failed and superseded attempts. Shared initial generation included; local CPU and external services without receipts are not priced.">{costs ? `Work cost ${usd(costs.observed_microdollars)}${costs.unreconciled_operations ? ` + ${usd(costs.unreconciled_reserve_microdollars)} unreconciled` : ""}${costs.missing_lineage_roots ? " · ledger incomplete" : ""}` : "Cost unavailable"}</span>
         <details className="proof-evidence">
           <summary>Evidence</summary>
           <div>
@@ -404,6 +427,8 @@ export function ValeriaLab() {
               <dt>Frames per version</dt><dd>{assets.manifest.frame_count}</dd>
               <dt>Selected repairs</dt><dd>{assets.manifest.quality?.regenerated_frames ?? assets.manifest.repairs_selected}</dd>
               {assets.manifest.quality && <><dt>Quality gates</dt><dd>{assets.manifest.quality.status === "checks_passed" ? "Checks passed; human approval separate" : `${assets.manifest.quality.failed_frames} frames and ${assets.manifest.quality.temporal_findings} transitions need correction`}</dd></>}
+              <dt>Provider cost recorded</dt><dd>{costs ? usd(costs.observed_microdollars) : "Unavailable"}</dd>
+              {costs && <><dt>Framework work</dt><dd>{usd(costs.groups.framework_work?.observed_microdollars ?? 0)}</dd><dt>Shared initial work</dt><dd>{usd(costs.groups.shared_initial?.observed_microdollars ?? 0)}</dd><dt>Unreconciled reserve</dt><dd>{usd(costs.unreconciled_reserve_microdollars)} · {costs.unreconciled_operations} calls</dd><dt>Scope</dt><dd>All retained provider calls, including failures and superseded attempts. Local CPU and unrecorded external services are not priced.</dd></>}
               <dt>Assessment</dt><dd>Automated; visual preference remains unproven.</dd>
             </dl>}
 
