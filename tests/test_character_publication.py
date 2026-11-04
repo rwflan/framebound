@@ -116,7 +116,8 @@ def test_transition_runner_retains_negative_and_rechecks_changed_pixels(tmp_path
     assert len(calls)==2
 
 
-def test_repair_reviews_the_replacement_observation_with_replacement_pixels(tmp_path,monkeypatch):
+@pytest.mark.parametrize('muddied',[False,True])
+def test_repair_reviews_the_replacement_observation_with_replacement_pixels(tmp_path,monkeypatch,muddied):
     import scripts.refine_character_demo as driver
     import scripts.review_character_transitions as reviewer
     from framebound.v3.character_consistency import Policy
@@ -125,12 +126,20 @@ def test_repair_reviews_the_replacement_observation_with_replacement_pixels(tmp_
     brief_path=public.parent/'source'/'brief.json';brief=json.loads(brief_path.read_text())
     for pose in brief['poses']:pose['instruction']='Same character, articulated pose'
     brief_path.write_text(json.dumps(brief))
-    policy_path=root/'policy-test.json';p=json.loads(policy_path.read_text());p['transitions']=[dict(id='grip',left='idle',right='run',feature='item.orientation',item_id='item')];policy_path.write_text(json.dumps(p));p=Policy.model_validate(p)
+    policy_path=root/'policy-test.json';p=json.loads(policy_path.read_text());p['transitions']=[dict(id='grip',left='idle',right='run',feature='item.orientation',item_id='item')];policy_path.write_text(json.dumps(p))
+    if muddied:
+        p['required_features'].append('rendering.clarity');p['pristine_render_sha256']=p['master']['image_sha256'];policy_path.write_text(json.dumps(p))
+        for row in state['frames'].values():
+            o=row['observation'];o['features']['rendering.clarity']=feature('match');o['measurement_sources']['render_fidelity']=dict(pristine_sha256=p['pristine_render_sha256'],candidate_sha256=o['image_sha256'],checks=dict(linework=feature('match'),colour_separation=feature('match'),material_detail=feature('match'),limitation='Automated fixture'))
+    p=Policy.model_validate(p)
     state['policy_sha256']=digest(p.model_dump(mode='json'));(root/'repair-state-run.json').write_text(json.dumps(state))
     replacement=Image.open(state['frames']['run']['image']).convert('RGBA');replacement.putpixel((510,510),(0,0,255,255));new_sha=image_digest(replacement)
     def observe(work,fid,image,reference,config,**kwargs):
         obs=copy.deepcopy(state['frames'][fid]['observation']);obs['image_sha256']=image_digest(image)
-        if image_digest(image)==new_sha:obs['items']['item']['features']['design']=feature('match')
+        if image_digest(image)==new_sha:
+            obs['items']['item']['features']['design']=feature('match')
+            if muddied:
+                obs['features']['rendering.clarity']=feature('mismatch');obs['measurement_sources']['render_fidelity']['candidate_sha256']=new_sha;obs['measurement_sources']['render_fidelity']['checks']['linework']=feature('mismatch')
         from framebound.v3.character_consistency import Observation
         return Observation.model_validate(obs)
     def review(work,current,**kwargs):
@@ -138,9 +147,59 @@ def test_repair_reviews_the_replacement_observation_with_replacement_pixels(tmp_
         assert row['observation']['image_sha256']==image_digest(im)
         return [dict(id='grip',feature='item.orientation',item_id='item',frames=['idle','run'],status='pass' if image_digest(im)==new_sha else 'fail',observed='Reversed handle',expected='Active end at index side')]
     monkeypatch.setattr(driver,'safe_observe',observe);monkeypatch.setattr(reviewer,'review',review)
-    monkeypatch.setattr(driver,'send',lambda *a,**k:b'test retained provider response')
+    def dispatch(work,key,model,prompt,images,**kwargs):
+        import io
+        assert 'immutable clean rendering/design authority' in prompt
+        guide=Image.open(io.BytesIO(images[1])).convert('RGB')
+        assert all(r==g==b for r,g,b in guide.getdata())
+        return b'test retained provider response'
+    monkeypatch.setattr(driver,'send',dispatch)
     monkeypatch.setattr(driver,'decode',lambda *a,**k:(replacement,dict(framing=dict(eligible=True),source_dimensions=[1000,1000])))
     result=driver.repair(root,only='run',max_new_attempts=1)
     row=result['frames']['run']
+    if muddied:
+        assert row['image_sha256']!=new_sha and row['force_pristine_next']
+        assert 'never promote' in row['attempts'][0]['rejected']
+        return
     assert row['observation']['image_sha256']==new_sha
+    assert row['image_sha256']==new_sha
     assert all(r['status']=='pass' for r in row['transition_results'])
+    assert row['render_lineage']['recursive_depth']==0
+    assert row['attempts'][0]['render_strategy']['action']=='regenerate_from_pristine'
+
+
+def test_rendering_degradation_cannot_be_published_as_preview(tmp_path):
+    root,public,before,state=fixture(tmp_path)
+    path=root/'policy-test.json';p=json.loads(path.read_text());p['required_features'].append('rendering.clarity');p['pristine_render_sha256']='a'*64;p['master']['features']['rendering.clarity']=feature('match');path.write_text(json.dumps(p))
+    for row in state['frames'].values():
+        o=row['observation'];o['features']['rendering.clarity']=feature('match');o['measurement_sources']['render_fidelity']=dict(pristine_sha256='a'*64,candidate_sha256=o['image_sha256'],checks=dict(linework=feature('match'),colour_separation=feature('match'),material_detail=feature('match'),limitation='Automated source review'))
+    state['frames']['run']['observation']['measurement_sources']['render_fidelity']['checks']['linework']=feature('mismatch')
+    with pytest.raises(ValueError,match='rendering fidelity'):publish(root,state,preview=True)
+    assert json.loads((public/'manifest.json').read_text())==before
+
+
+def test_unresolved_logical_generation_stays_blocked_without_new_send(tmp_path,monkeypatch):
+    import scripts.refine_character_demo as driver
+    from framebound.v3.character_consistency import Policy
+    root,public,before,state=fixture(tmp_path);cp=root/'config.json';c=json.loads(cp.read_text());c.update(items=[i.model_dump(mode='json') for i in policy().items],description='one item');cp.write_text(json.dumps(c))
+    p=Policy.model_validate_json((root/'policy-test.json').read_text());state['policy_sha256']=digest(p.model_dump(mode='json'));state['frames']['run']['blocked_generation_operation']='unknown-original-send';(root/'repair-state-run.json').write_text(json.dumps(state))
+    folder=root/'private'/'unknown-original-send';folder.mkdir();(folder/'request.json').write_text('{}')
+    def never_send(*args,**kwargs):raise AssertionError('Unknown acceptance must not be resent')
+    monkeypatch.setattr(driver,'send',never_send)
+    result=driver.repair(root,only='run',max_new_attempts=1)
+    assert result['frames']['run']['provider_acceptance']=='unknown'
+
+
+def test_safe_observe_without_cohort_retains_distinct_annotation_versions(tmp_path,monkeypatch):
+    import scripts.refine_character_demo as driver
+    from framebound.v3.character_consistency import Observation
+    image=Image.new('RGBA',(1000,1000),'red');o=observation().model_dump(mode='json');o['image_sha256']=image_digest(image)
+    current=Observation.model_validate(o)
+    monkeypatch.setattr(driver,'_individual_observe',lambda *a,**k:current)
+    root=tmp_path/'work';(root/'private').mkdir(parents=True)
+    driver.safe_observe(root,'0',image,image,{},phase='first')
+    o['features']['style.rendering']=feature('mismatch');current=Observation.model_validate(o)
+    result=driver.safe_observe(root,'0',image,image,{},phase='second')
+    assert result.features['style.rendering'].status=='mismatch'
+    paths=list((root/'private').glob('registered-observation-0-*.json'))
+    assert len(paths)==2

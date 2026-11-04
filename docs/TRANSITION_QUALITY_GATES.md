@@ -61,3 +61,41 @@ item owner to satisfy a contract, and other pose-joint estimates remain estimate
 candidates within the frozen drift bounds and an explicit search budget. It
 filters unknown profiles and never marks its selection accepted. Fresh source,
 semantic and transition checks still decide whether selected art can be used.
+
+A held-item correction also restores the original torso polygon when its visible
+landmarks are available and the held component does not overlap it. Protected
+source pixels and composition identity are recorded; older compositions remain
+retained. A model estimate can be carried forward only when its native pixel
+neighbourhood is byte-identical, with the original observation and neighbourhood
+hashes attached. Edited hands still require fresh localization. This prevents a
+local item fix from producing false body drift merely because the whole-image
+pose model changed its estimates; it does not promote an estimate to anatomical
+truth or resolve an existing unknown.
+
+## Accumulating rendering degradation
+
+`rendering.clarity` compares a candidate against an independently frozen ORIGINAL
+clean reference, never its most recent edited parent. It separately reviews native
+linework, colour/shadow separation and intentional material detail, including face
+and repaired hand/item crops. Smearing, fused fingers, waxy faces, lost braid/seam
+detail and washed-out colour can fail independently of identity or item geometry.
+A required clarity gate also requires `pristine_render_sha256`; mismatched sources,
+missing checks and uncertain comparisons fail closed. Raster contrast, gradients,
+chroma and fine-detail descriptors support investigation; they are not aesthetic
+scores and cannot independently accept a drawing. Sharpening halos, extra noise
+and oversaturation do not count as recovered detail.
+
+The live refinement config binds `pristine_render_reference` and its source-bound
+`pristine_render_observation`. It records accepted edit ancestry separately from
+provider spend. A default budget of two recursive edits is a prevention rule, not
+an empirical quality threshold. At that limit, on observed degradation, or with
+unknown historical depth, generation rebases on the frozen clean authority and an
+untextured pose guide. The previously edited appearance is omitted from the
+request. The complete pose/design/item contract remains in the fresh request,
+and all output gates still run; rebasing is not acceptance.
+
+Patch ancestry has `scope: repair_region`, its exact rectangle, and separate depth
+for untouched source artwork. Regenerating a hand patch cannot reset the rest of
+the character's unknown or deeper history. Whole-frame repair of such a partially
+known lineage also returns to the original authority. All earlier attempts and
+cost commitments remain retained. Unknown provider acceptance is never retried.

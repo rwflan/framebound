@@ -55,6 +55,7 @@ def publish(root,state,*,preview=False):
     violations=[issue for frame in report['frames'] for issue in frame['issues'] if (issue['feature'] in blocked or issue['code'] in blocked_codes) and issue.get('frame_id') in blocked_ids]
     transition_issues=[r for r in report.get('transition_results',[]) if r['status']!='pass']
     profile_issues=report.get('torso_profile_issues',[])
+    if policy.pristine_render_sha256 and any(issue['feature']=='rendering.clarity' for frame in report['frames'] for issue in frame['issues']):raise ValueError('Publication withheld: original rendering fidelity is failed or unmeasured')
     if transition_issues or profile_issues:raise ValueError('Publication withheld: declared transition or torso-shape continuity gates remain')
     if violations:raise ValueError('Preview withheld by visible body/item findings: '+str(sorted({i['feature'] for i in violations})))
     if not report['passed'] and not preview:raise ValueError('Delivery withheld: character/temporal gates remain')
@@ -95,7 +96,7 @@ def publish(root,state,*,preview=False):
     manifest=copy.deepcopy(manifest)
     manifest.update(revision=revision,source_pixel_scales=dict(direct=manifest['source_pixel_scales']['direct'],framework=[r['pixel_scale'] for r in rows]),
         source_offsets=dict(framework=offsets),actor_bounds=actor,render_height=render_height,publication_recipe_sha256=publication_recipe,
-        quality=dict(status='checks_passed' if report['passed'] else 'refining',failed_frames=sum(not f['passed'] for f in report['frames']),temporal_findings=len(report['temporal_issues']),
+        quality=dict(render_fidelity=dict(total=len(rows) if policy.pristine_render_sha256 else 0,passed=sum(Observation.model_validate(r['observation']).features.get('rendering.clarity').status=='match' for r in rows if Observation.model_validate(r['observation']).features.get('rendering.clarity'))),transition_checks=dict(total=len(report.get('transition_results',[])),passed=sum(r['status']=='pass' for r in report.get('transition_results',[]))),torso_pairs=dict(total=len(policy.torso_profile_pairs),passed=len(policy.torso_profile_pairs)-len(report.get('torso_profile_issues',[]))),status='checks_passed' if report['passed'] else 'refining',failed_frames=sum(not f['passed'] for f in report['frames']),temporal_findings=len(report['temporal_issues']),
                      report_sha256=report_sha,human_approval=False,regenerated_frames=changed,
                      frames_with_failures=sum(any(i['status']=='fail' for i in f['issues']) for f in report['frames']),
                      unmeasured_frames=sum(any(i['status']=='unmeasured' for i in f['issues']) for f in report['frames']),

@@ -47,8 +47,8 @@ def initialize(root):
             observation=Observation.model_validate_json(Path(config['master_observation']).read_text())
             observation=enrich_geometry(root,anchor,observation,config)
         else:
-            observation=observe(root,'master',anchor,anchor,config['features'],config['items'],config['description'],phase='anchor-'+config.get('policy_version','v1'))
-        policy=Policy(request_sha256=digest(config['description']),master=observation,required_features=config['features'],items=config['items'],scale_reference=('face_top','face_chin') if config.get('pose_runtime') else ('head_top','chin'),expected_geometry_recipe=observation.measurement_sources.get('geometry_recipe_sha256'), transitions=config.get('transitions',[]), torso_profile_pairs=config.get('torso_profile_pairs',[]), minimum_scale_reference_pixels=config.get('minimum_scale_reference_pixels',0))
+            observation=observe(root,'master',anchor,anchor,[f for f in config['features'] if f!='rendering.clarity'],config['items'],config['description'],phase='anchor-'+config.get('policy_version','v1'))
+        policy=Policy(request_sha256=digest(config['description']),master=observation,required_features=config['features'],items=config['items'],scale_reference=('face_top','face_chin') if config.get('pose_runtime') else ('head_top','chin'),expected_geometry_recipe=observation.measurement_sources.get('geometry_recipe_sha256'), transitions=config.get('transitions',[]), torso_profile_pairs=config.get('torso_profile_pairs',[]), minimum_scale_reference_pixels=config.get('minimum_scale_reference_pixels',0),pristine_render_sha256=config.get('pristine_render_sha256'))
         save(policy_path,policy.model_dump(mode='json'))
     return Policy.model_validate_json(policy_path.read_text())
 
@@ -112,7 +112,7 @@ def safe_observe(root,frame_id,image,reference,config,*,phase):
             if rule.get('rigid_measurement') and item and item.visibility=='visible':
                 observation=measure(root,image,observation,rule,('face_top','face_chin') if config.get('pose_runtime') else ('head_top','chin'),
                     dispatch=send,persist=save,cache_roots=config.get('item_detail_cache_roots',[]))
-    save(Path(root)/'private'/('registered-observation-'+frame_id+'-'+image_digest(image)[:16]+'.json'),observation.model_dump(mode='json'))
+    save(Path(root)/'private'/('registered-observation-'+frame_id+'-'+image_digest(image)[:16]+'-'+digest(observation.model_dump(mode='json'))[:16]+'.json'),observation.model_dump(mode='json'))
     return observation
 
 
@@ -139,7 +139,7 @@ def _individual_observe(root,frame_id,image,reference,config,*,phase):
     for attempt in range(3):
         suffix='' if attempt==0 else '-format-recovery-'+str(attempt)
         try:
-            observed=observe(root,frame_id,image,reference,config['features'],config['items'],config['description'],phase=phase+suffix,geometry_external=bool(config.get('pose_runtime')))
+            observed=observe(root,frame_id,image,reference,[f for f in config['features'] if f!='rendering.clarity'],config['items'],config['description'],phase=phase+suffix,geometry_external=bool(config.get('pose_runtime')))
             return enrich_geometry(root,image,observed,config)
         except ObservationInvalid:
             if attempt==2:raise
@@ -175,7 +175,7 @@ def registered_observe(root,frame_id,image,reference,config,phase):
     description=config['description']+' The two comparison images have been uniformly registered to the same face size. Judge INTRINSIC proportions and visible design, not the original source pixel density. Articulation may change projected silhouette height, never body volume or segment lengths.'
     for attempt in range(3):
         try:
-            obs=observe(root,frame_id,current_view,master_view,config['features'],config['items'],description,
+            obs=observe(root,frame_id,current_view,master_view,[f for f in config['features'] if f!='rendering.clarity'],config['items'],description,
                 phase=phase+'-registered'+('' if attempt==0 else '-format-recovery-'+str(attempt)),geometry_external=True)
             break
         except ObservationInvalid:
@@ -192,9 +192,42 @@ def registered_observe(root,frame_id,image,reference,config,phase):
         if item.get('rigid_span'):item['rigid_span']=[source_point(p) for p in item['rigid_span']]
     data.update(image_sha256=image_digest(image),width=image.width,height=image.height,points={**{k:source_point(v) for k,v in data['points'].items()},**{k:v.model_dump(mode='json') for k,v in geometry.points.items()}},
         measurement_sources=dict(geometry.measurement_sources,semantic_view=dict(scale=factor,crop=list(box),offset=list(offset),view_dimensions=[width,height],view_sha256=obs.image_sha256)))
-    result=Observation.model_validate(data)
-    save(root/'private'/('registered-observation-'+frame_id+'-'+image_digest(image)[:16]+'.json'),result.model_dump(mode='json'))
+    result=enrich_geometry(root,image,Observation.model_validate(data),config)
+    save(root/'private'/('registered-observation-'+frame_id+'-'+image_digest(image)[:16]+'-'+digest(result.model_dump(mode='json'))[:16]+'.json'),result.model_dump(mode='json'))
     return result
+
+def render_observation(root,image,observation,config):
+    authority=config.get('pristine_render_reference')
+    if not authority:return observation
+    from framebound.v3.render_fidelity import assess
+    pristine=Image.open(authority).convert('RGBA')
+    if config.get('pristine_render_sha256') and image_digest(pristine)!=config['pristine_render_sha256']:raise ValueError('Frozen pristine rendering authority changed')
+    clean=Observation.model_validate_json(Path(config['pristine_render_observation']).read_text()) if config.get('pristine_render_observation') else None
+    if clean and clean.image_sha256!=image_digest(pristine):raise ValueError('Pristine rendering observation is stale')
+    regions={}
+    def region(obs,hand=False):
+        head=measurements(obs,('face_top','face_chin')).get('head_px')
+        if not head:return None
+        if hand:
+            item=next(iter(obs.items.values()),None)
+            if not item or not item.grip or item.grip.visibility!='visible':return None
+            x,y=item.grip.xy[0]*obs.width/1000,item.grip.xy[1]*obs.height/1000
+            radius=head*1.5
+        else:
+            top,chin=obs.points.get('face_top'),obs.points.get('face_chin')
+            if not top or not chin or top.visibility!='visible' or chin.visibility!='visible':return None
+            x=(top.xy[0]+chin.xy[0])*obs.width/2000;y=(top.xy[1]+chin.xy[1])*obs.height/2000;radius=head*.8
+        return [max(0,int(x-radius)),max(0,int(y-radius)),min(obs.width,int(x+radius)),min(obs.height,int(y+radius))]
+    if clean:
+        for name,hand in [('face',False),('held item and hand',True)]:
+            a,b=region(clean,hand),region(observation,hand)
+            if a and b:regions[name]=(a,b)
+    evidence=assess(root,pristine,image,config['description'],dispatch=send,persist=save,regions=regions)
+    data=observation.model_dump(mode='json');status={'pass':'match','fail':'mismatch','unmeasured':'uncertain'}[evidence['status']]
+    data['features']['rendering.clarity']=dict(status=status,observed='; '.join(evidence['checks'][name]['observed'] for name in ('linework','colour_separation','material_detail')),expected='Preserve native linework, colour separation and material detail of the immutable clean art authority; no cumulative edit muddiness')
+    data['measurement_sources']['render_fidelity']=evidence
+    return Observation.model_validate(data)
+
 
 def enrich_geometry(root,image,observation,config):
     if not config.get('pose_runtime'):return observation
@@ -218,10 +251,10 @@ def enrich_geometry(root,image,observation,config):
     data=observation.model_dump(mode='json')
     for name,point in result['points'].items():data['points'][name]=point
     for name in ('head_left','head_right'):data['points'][name]=dict(xy=None,visibility='uncertain',evidence='Skull width behind hair/profile is not a supported numeric measurement')
-    data['measurement_sources']=dict(geometry_recipe_sha256=result['recipe_sha256'],geometry_artifact_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),recipe=result['recipe'],semantic_raw_sha256=observation.raw_sha256)
+    data['measurement_sources']=dict(observation.measurement_sources,geometry_recipe_sha256=result['recipe_sha256'],geometry_artifact_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),recipe=result['recipe'],semantic_raw_sha256=observation.raw_sha256)
     data['limitation']+=' Numeric landmarks are image-space pose estimates and rendered-material cross-sections; never hidden anatomy or physical 3D truth.'
     enriched=Observation.model_validate(data)
-    if config.get('recover_hand_conflicts'):
+    if observation.features and config.get('recover_hand_conflicts'):
         from framebound.v3.hand_landmarks import conflict,recover
         if conflict(enriched,('face_top','face_chin')):
             palms,evidence=recover(root,image,enriched,dispatch=send,persist=save)
@@ -229,7 +262,8 @@ def enrich_geometry(root,image,observation,config):
             data['measurement_sources']['hand_recovery']=evidence
             data['limitation']+=' Anatomical palms independently reviewed after pose/attachment disagreement; joint lengths still use the pinned pose estimates.'
             enriched=Observation.model_validate(data)
-    save(root/'private'/('enriched-'+observation.frame_id+'-'+key[:16]+'-'+result['recipe_sha256'][:12]+'.json'),enriched.model_dump(mode='json'))
+    if observation.features:enriched=render_observation(root,image,enriched,config)
+    save(root/'private'/('enriched-'+observation.frame_id+'-'+key[:16]+'-'+result['recipe_sha256'][:12]+'-'+digest(enriched.model_dump(mode='json'))[:16]+'.json'),enriched.model_dump(mode='json'))
     return enriched
 
 def calibrated_scale(policy,observation,format_scale):
@@ -268,6 +302,11 @@ def repair(root, *, only=None, max_new_attempts=None):
         if only and fid!=only:continue
         record=state['frames'].setdefault(fid,dict(image=str(public/config['source_revision']/f'framework-{slot}.png'),attempts=[]))
         record.setdefault('attempts',[])
+        blocked=record.get('blocked_generation_operation')
+        if blocked and (root/'private'/blocked/'request.json').exists() and not (root/'private'/blocked/'response.json').exists():
+            record['provider_acceptance']='unknown';save(state_path,state)
+            print(fid,'WITHHELD: reconcile existing provider acceptance; never resend under another operation key',flush=True)
+            continue
         image=Image.open(record['image']).convert('RGBA')
         if image_digest(image)==policy.master.image_sha256:observation=policy.master.model_copy(update={'frame_id':fid})
         else:observation=safe_observe(root,fid,image,reference,config,phase='measurement-'+config.get('policy_version','v1'))
@@ -288,10 +327,13 @@ def repair(root, *, only=None, max_new_attempts=None):
                 proposed_format=max(max(size) for size in manifest['source_dimensions'])/source.height
                 proposed_scale=calibrated_scale(policy,proposed,proposed_format)
                 checked=evaluate_frame(policy,proposed,image_sha256=image_digest(proposed_image),frame_id=fid,pixel_scale=proposed_scale)
+                if policy.pristine_render_sha256 and any(issue['feature']=='rendering.clarity' for issue in checked['issues']):
+                    print(fid,'retained candidate rejected by pristine rendering gate',flush=True)
+                    continue
                 if rank_report(checked)<rank_report(report):
                     image,observation,report,scale=proposed_image,proposed,checked,proposed_scale
                     format_scale=proposed_format
-                    record.update(image=str(path),format_scale=format_scale,pixel_scale=scale,report=report,observation=observation.model_dump(mode='json'),source_framing=source_gate,prior_policy_candidate=True)
+                    record.update(image=str(path),image_sha256=image_digest(image),format_scale=format_scale,pixel_scale=scale,report=report,observation=observation.model_dump(mode='json'),source_framing=source_gate,prior_policy_candidate=True)
                     save(state_path,state)
                 print(fid,'rechecked retained candidate',path.stem,'remaining gates',len(report['issues']),flush=True)
                 if report['passed']:break
@@ -349,10 +391,31 @@ def repair(root, *, only=None, max_new_attempts=None):
                 generation_images=[generation_png(reference),generation_png(edit_target),generation_png(annotated)]
             else:
                 generation_images=[generation_png(im) for im in (reference,face,item_reference,edit_target,annotated)]
+            if config.get('pristine_render_reference'):
+                clean_authority=Image.open(config['pristine_render_reference']).convert('RGBA')
+                generation_images=[generation_png(clean_authority),generation_png(edit_target),generation_png(annotated)]
+                prompt='EDIT IMAGE TWO with ONLY the measured corrections below. Image ONE is the frozen ORIGINAL CLEAN rendering authority, never an edited parent. Image THREE is a diagnostic overlay for exact target locations; never draw its marks. Preserve this target pose, native detail, anatomy, framing and already-correct features. Character/item contract: '+config['description']+' Action: '+pose['instruction']+' Corrections: '+json.dumps(plan['tasks'])+' Keep crisp original linework, colour separation and material texture. No sharpening halos/noise. Whole silhouette inside generous uniform magenta margins, no floor/shadow/text.'
             if transition_tasks:
                 context_ids=sorted({other for task in transition_tasks for other in task['frames'] if other!=fid})
                 prompt+=' Transition comparison images follow the existing inputs in this exact order: '+json.dumps(context_ids)+'. Match their physical item and anatomy while preserving the target action. Correct explicit pair findings; never copy the other pose.'
-                generation_images.extend(generation_png(Image.open(state['frames'][other]['image']).convert('RGBA')) for other in context_ids)
+                for other in context_ids:
+                    context=Image.open(state['frames'][other]['image']).convert('RGBA')
+                    if config.get('pristine_render_reference'):
+                        guide=Image.new('RGBA',context.size,'white');guide.paste((0,0,0,255),(0,0),context.getchannel('A'));context=guide
+                    generation_images.append(generation_png(context))
+                if config.get('pristine_render_reference'):prompt+=' Comparison context images are UNTEXTURED geometry only, not appearance or material references. Use the original clean authority for all rendering.'
+            from framebound.v3.render_fidelity import next_source,Lineage
+            pristine=Image.open(config.get('pristine_render_reference',config['master_image'])).convert('RGBA')
+            if config.get('pristine_render_sha256') and image_digest(pristine)!=config['pristine_render_sha256']:raise ValueError('Frozen pristine rendering authority changed')
+            lineage=record.get('render_lineage') or dict(pristine_sha256=image_digest(pristine),current_sha256=image_digest(image),recursive_depth=0 if image_digest(image)==image_digest(pristine) else None,parent_sha256s=[])
+            if lineage.get('scope','whole_frame')!='whole_frame':lineage=dict(pristine_sha256=lineage['pristine_sha256'],current_sha256=image_digest(image),recursive_depth=None,parent_sha256s=lineage.get('parent_sha256s',[]))
+            if lineage['current_sha256']!=image_digest(image):lineage=dict(pristine_sha256=image_digest(pristine),current_sha256=image_digest(image),recursive_depth=None,parent_sha256s=lineage.get('parent_sha256s',[]))
+            clarity=observation.features.get('rendering.clarity')
+            strategy=next_source(lineage,clarity='fail' if record.get('force_pristine_next') or (clarity and clarity.status=='mismatch') else 'pass' if clarity and clarity.status=='match' else 'unmeasured',max_recursive_edits=config.get('max_recursive_edits',2))
+            if strategy['action']=='regenerate_from_pristine':
+                silhouette=Image.new('RGBA',edit_target.size,(255,255,255,255));silhouette.paste((0,0,0,255),(0,0),edit_target.getchannel('A'))
+                generation_images=[generation_png(pristine),generation_png(silhouette)]
+                prompt='Generate a FRESH native-resolution complete character from image ONE, the immutable clean rendering/design authority. Image TWO is an untextured pose silhouette only, NOT an appearance reference. No recursively edited artwork is supplied. Preserve crisp original linework, face, colour separation and intentional material detail. Match the requested action: '+pose['instruction']+' Contract and allowed design changes: '+config['description']+' Correct these observed defects: '+json.dumps(plan['tasks'])+' Same source orientation. Entire silhouette including cape and item tips inside generous eight percent uniform magenta margins. No floor/shadow/text/sheet. Never restore clarity by halos, oversaturation or invented noise.'
             if record['attempts']:
                 previous=record['attempts'][-1]
                 prior=previous.get('report',{}).get('issues',[])
@@ -369,7 +432,7 @@ def repair(root, *, only=None, max_new_attempts=None):
             except ValueError as error:
                 record['attempts'].append(dict(operation=op,response_sha256=hashlib.sha256(raw).hexdigest(),rejected=str(error)))
                 save(state_path,state);continue
-            row=dict(operation=op,response_sha256=hashlib.sha256(raw).hexdigest(),source_framing=gate)
+            row=dict(operation=op,response_sha256=hashlib.sha256(raw).hexdigest(),source_framing=gate,render_strategy=strategy)
             if not gate['framing']['eligible']:
                 if size=='1024x1536' and set(gate['framing']['unsafe_edges'])&{'left','right'}:record['next_size']='1536x1024'
                 row['rejected']='original framing failed';record['attempts'].append(row);save(state_path,state);continue
@@ -393,12 +456,19 @@ def repair(root, *, only=None, max_new_attempts=None):
             def transition_rank(rows):
                 relevant=[r for r in rows if fid in r['frames']]
                 return (sum(r['status']=='fail' for r in relevant),sum(r['status']=='unmeasured' for r in relevant))
-            if (transition_rank(proposed_transition_results),rank_report(checked))<(transition_rank(transition_results),rank_report(report)):
+            fidelity_ok=not policy.pristine_render_sha256 or not any(issue['feature']=='rendering.clarity' for issue in checked['issues'])
+            if not fidelity_ok:
+                row['rejected']='Rendering fidelity failed or is unmeasured; never promote degraded artwork as an edit parent'
+                if proposed.features.get('rendering.clarity') and proposed.features['rendering.clarity'].status=='mismatch':record['force_pristine_next']=True
+            if fidelity_ok and (transition_rank(proposed_transition_results),rank_report(checked))<(transition_rank(transition_results),rank_report(report)):
+                record.pop('force_pristine_next',None)
                 image,observation,report,scale=canvas,proposed,checked,proposed_scale
                 format_scale=proposed_format
-                record.update(image=str(path),format_scale=format_scale,pixel_scale=scale,report=report,observation=observation.model_dump(mode='json'),source_framing=gate)
+                record['render_lineage']=dict(pristine_sha256=lineage['pristine_sha256'],current_sha256=image_digest(canvas),recursive_depth=0 if strategy['action']=='regenerate_from_pristine' else lineage['recursive_depth']+1,parent_sha256s=[*lineage['parent_sha256s'],lineage['current_sha256']])
+                record.update(image=str(path),image_sha256=image_digest(image),format_scale=format_scale,pixel_scale=scale,report=report,observation=observation.model_dump(mode='json'),source_framing=gate)
             save(state_path,state)
             print(fid,'attempt',attempt,'remaining gates',len(report['issues']),flush=True)
+            if not fidelity_ok and not record.get('force_pristine_next'):break
         if policy.transitions:
             final_transitions=review_transitions(root,state,only=fid)
             record['transition_results']=[r for r in final_transitions if fid in r['frames']]

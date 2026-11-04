@@ -8,7 +8,7 @@ from .character_consistency import Feature,Policy,image_digest,digest
 from .character_observations import png,ObservationInvalid
 from .campaign.specialists import extract_text
 
-VERSION='declared-transition-review-v3'
+VERSION='declared-transition-review-v4'
 
 
 class Check(Feature):
@@ -51,8 +51,10 @@ Judge the explicit request and actual pixels. Do not infer continuity from repea
                 if not item or not item.grip or item.grip.visibility!='visible':continue
                 x,y=item.grip.xy[0]*im.width/1000,item.grip.xy[1]*im.height/1000
                 box=(max(0,int(x-head*2)),max(0,int(y-head*2)),min(im.width,int(x+head*2)),min(im.height,int(y+head*2)))
-                details.append(png(im.crop(box)));detail_labels.append(dict(frame=fid,item=item_id,source_box=box))
-    prompt+=' Native grip-detail crops after the full images, in this exact order: '+json.dumps(detail_labels)+'. Crops supplement full sources; never treat cropped-out tips as absent.'
+                details.append(png(im.crop(box)));detail_labels.append(dict(frame=fid,item=item_id,kind='item context',source_box=box))
+                tight=(max(0,int(x-head*.7)),max(0,int(y-head*.7)),min(im.width,int(x+head*.7)),min(im.height,int(y+head*.7)))
+                details.append(png(im.crop(tight)));detail_labels.append(dict(frame=fid,item=item_id,kind='palm anatomy only, endpoints may be outside this crop',source_box=tight))
+    prompt+=' Native grip-detail crops after the full images, in this exact order: '+json.dumps(detail_labels)+'. Crops supplement full sources; never treat cropped-out tips as absent. Use the tight palm crops to resolve thumb/index versus little finger; use the wider item context and full source to trace collar, pommel and strand attachments.'
     key='transitions-'+digest([VERSION,hashes,ref,rules,prompt])[:20]
     raw=dispatch(Path(root),key,'muse-spark-1.3',prompt,[png(reference),*[png(im) for _,im in frames],*details])
     try:
