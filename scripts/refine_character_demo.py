@@ -300,6 +300,7 @@ def repair(root, *, only=None, max_new_attempts=None):
             size=record.get('next_size','1536x1024' if dimensions[0]>dimensions[1] else '1024x1536')
             if config.get('focused_item_edit') and any(task['code'].startswith('item_') for task in plan['tasks']):
                 prompt=('Edit the SECOND image. The FIRST image defines the exact character and item design. Keep the second image action pose, face, body, costume, canvas, cape and hair. Correct the visible item ONLY: '+json.dumps(config['items'])+' The item must have the same construction, thickness, rigid component and proportions as image one. Show one item, firmly connected to its declared anatomical hand or mount. For this pose: '+pose['instruction']+' '+config.get('item_pose_constraints',{}).get(fid,'')+' No second grip, duplicate item, loose trailing loop, additional handle, guide marks, text, floor or shadows. Full silhouette inside the canvas with at least 8 percent magenta margin. Uniform RGB(255,0,255) backing everywhere outside the artwork. Return one full-resolution complete character in the same pose. The compact coil can rotate with the hand but cannot turn into a different weapon.')
+                prompt+=' Specific measured corrections to this current drawing: '+json.dumps(plan['tasks'])+' Keep flexible coil thickness and rigid component size locked independently; do not scale the whole figure to change the item.'
                 mounts=[]
                 for rule in policy.items:
                     anchor=rule.anchor_by_frame.get(fid,rule.anchor)
