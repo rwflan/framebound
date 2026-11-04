@@ -313,6 +313,10 @@ def repair(root, *, only=None, max_new_attempts=None):
                 generation_images=[generation_png(reference),generation_png(edit_target),generation_png(annotated)]
             else:
                 generation_images=[generation_png(im) for im in (reference,face,item_reference,edit_target,annotated)]
+            if record['attempts']:
+                previous=record['attempts'][-1]
+                prior=previous.get('report',{}).get('issues',[])
+                prompt+=' Previous completed repair was rejected for these observed defects. Correct them rather than repeating the same proposal: '+json.dumps(prior if prior else previous.get('rejected','No strict improvement in the frozen gates.'))
             op='edit-'+fid+'-'+str(attempt)+'-'+digest([policy_sha,image_digest(image),size,prompt,[hashlib.sha256(b).hexdigest() for b in generation_images]])[:12]
             pending=record.get('pending_operation')
             if pending and pending!=op and not (root/'private'/pending/'response.json').exists():
