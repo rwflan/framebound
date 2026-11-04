@@ -39,3 +39,25 @@ check. Choose every relevant pair to prevent gradual drift around a cycle.
 rendering a small character larger cannot satisfy that threshold. Original source
 framing remains independently checked before padding or background removal is
 published. All artwork, prompts, observations and receipts stay outside Git.
+
+For a measured rigid-component size failure, `repair_item_patch.py` edits a native
+crop and restores every pixel outside its declared rectangle from the retained
+source. Generated crops are only downsampled, never enlarged. Intentional arm or
+lash crossings at crop edges are not standalone isolation candidates: key
+extraction is scoped to an internal crop, and framing is checked on the complete
+reconstructed native source window. The patch receipt records its source hash,
+rectangle, native dimensions and extraction recipe. The resulting image receives
+fresh observations and pair reviews; generating or assembling a patch does not
+select or accept it automatically.
+
+The live refinement driver can opt into `recover_hand_conflicts`. Missing or
+contradictory pose-model palms trigger an independent source/overlay review.
+That reviewer receives no requested item owner: it traces actual anatomical arm
+chains and can leave a palm unknown. Its coordinates and receipt are retained
+separately from the original pose artifact. Recovery never relabels the observed
+item owner to satisfy a contract, and other pose-joint estimates remain estimates.
+
+`cohort_selection.select_profiles` retrieves a complete set from retained
+candidates within the frozen drift bounds and an explicit search budget. It
+filters unknown profiles and never marks its selection accepted. Fresh source,
+semantic and transition checks still decide whether selected art can be used.

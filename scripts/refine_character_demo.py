@@ -221,6 +221,14 @@ def enrich_geometry(root,image,observation,config):
     data['measurement_sources']=dict(geometry_recipe_sha256=result['recipe_sha256'],geometry_artifact_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),recipe=result['recipe'],semantic_raw_sha256=observation.raw_sha256)
     data['limitation']+=' Numeric landmarks are image-space pose estimates and rendered-material cross-sections; never hidden anatomy or physical 3D truth.'
     enriched=Observation.model_validate(data)
+    if config.get('recover_hand_conflicts'):
+        from framebound.v3.hand_landmarks import conflict,recover
+        if conflict(enriched,('face_top','face_chin')):
+            palms,evidence=recover(root,image,enriched,dispatch=send,persist=save)
+            data['points'].update(left_hand=palms.left_hand.model_dump(mode='json'),right_hand=palms.right_hand.model_dump(mode='json'))
+            data['measurement_sources']['hand_recovery']=evidence
+            data['limitation']+=' Anatomical palms independently reviewed after pose/attachment disagreement; joint lengths still use the pinned pose estimates.'
+            enriched=Observation.model_validate(data)
     save(root/'private'/('enriched-'+observation.frame_id+'-'+key[:16]+'-'+result['recipe_sha256'][:12]+'.json'),enriched.model_dump(mode='json'))
     return enriched
 

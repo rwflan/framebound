@@ -1,5 +1,6 @@
 """Review declared transition pairs against retained sources; never waive negatives."""
 import argparse
+import fcntl
 import json
 from pathlib import Path
 from PIL import Image
@@ -10,6 +11,13 @@ from scripts.refine_character_demo import initialize,load_config
 
 
 def review(root,state,*,only=None):
+    root=Path(root);(root/'private').mkdir(parents=True,exist_ok=True)
+    with (root/'private'/'transition-review.lock').open('a+b') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        return _review(root,state,only=only)
+
+
+def _review(root,state,*,only=None):
     config,*_=load_config(root);policy=initialize(root)
     reference=Image.open(config['master_image']).convert('RGBA')
     path=root/'transition-evidence.json'
