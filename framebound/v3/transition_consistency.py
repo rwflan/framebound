@@ -8,7 +8,7 @@ from .character_consistency import Feature,Policy,image_digest,digest
 from .character_observations import png,ObservationInvalid
 from .campaign.specialists import extract_text
 
-VERSION='declared-transition-review-v3'
+VERSION='declared-transition-review-v4'
 
 
 class Check(Feature):
@@ -30,7 +30,7 @@ body.shape: compare torso, waist, shoulder and limb cross-sections RELATIVE TO T
 item.shape: compare the SAME physical object across both poses: rigid handle length, thickness, fittings and strand thickness/taper remain consistent relative to the body. A flexible lash may uncoil, bend or extend for attack, but may not turn into a differently sized/designed whip, add handles or extra strands, or change material. Do not compare coiled silhouette length with extended lash reach as though flexibility were a defect.
 item.topology: trace EVERY strand from its attachment to its free tip in both drawings. Exactly one rigid handle and one continuous lash are allowed for this whip. A tiny leftover coil or strand dangling from the pommel while another lash extends from the active collar is an EXTRA strand and FAILS, even when brown and braided. Count active and butt-end attachments independently; uncertain hidden connections cannot pass. Generalize counts to the declared item.
 item.palette: compare actual item colour in both source drawings, separating normal shading from brown leather becoming grey, red, silver or another palette. item.texture: compare braid spacing, wrapped-handle construction, surface finish and line/shading style; leather must not become a smooth rod, chain, flat painted line or differently detailed weapon.
-item.owner: trace the shoulder-elbow-wrist chain of the hand holding the object in BOTH frames. Anatomical RIGHT must stay RIGHT, never switch to LEFT during attack. In this right-facing reference view the near-side right shoulder is on screen-left of the torso; the right fist may move across the front of the chest to screen-right. Screen position of the fist alone is not handedness. An ambiguous/hidden arm chain is uncertain, never match.
+item.owner: trace the shoulder-elbow-wrist chain of the hand holding the object in BOTH frames. Follow the declared anatomical owner or mount in the request: a RIGHT-held item must stay RIGHT, a LEFT-held item must stay LEFT, and a mounted object must retain its declared mount, unless a transfer is expressly requested. Trace from the declared-view shoulder, not a guessed screen side. A fist can cross the front of the chest without changing arms. Screen position of the fist alone is not handedness. An ambiguous/hidden arm chain is uncertain, never match.
 item.orientation: check the functional direction relative to the GRIP, not absolute screen up/down. For a conventional handle grip, the active/lash/blade end emerges from the thumb-index side; the butt/pommel points toward the little-finger/palm-heel side. A reversed handle or lash attachment exiting the butt end fails. The wrist may rotate during a swing, but active and butt ends must not exchange roles in the hand. The request defines exceptions for other objects.
 item.grip: verify the declared grip/mount component is actually held in both frames and stays connected throughout the transition. If a handle is declared, the hand must grasp the rigid handle, not the loose lash or coil; the coil may hang beneath the grip. An empty hand or transferred/duplicated grip fails unless the request explicitly authorizes it. The final attack frame must still show the same held handle. Pose-to-pose arm movement is allowed.
 Judge the explicit request and actual pixels. Do not infer continuity from repeated labels, similar colour, or presence of a weapon. A visible mismatch must identify what changes between the named drawings; ambiguous evidence is uncertain. Each observed/expected field must be below 30 words.'''
@@ -51,8 +51,10 @@ Judge the explicit request and actual pixels. Do not infer continuity from repea
                 if not item or not item.grip or item.grip.visibility!='visible':continue
                 x,y=item.grip.xy[0]*im.width/1000,item.grip.xy[1]*im.height/1000
                 box=(max(0,int(x-head*2)),max(0,int(y-head*2)),min(im.width,int(x+head*2)),min(im.height,int(y+head*2)))
-                details.append(png(im.crop(box)));detail_labels.append(dict(frame=fid,item=item_id,source_box=box))
-    prompt+=' Native grip-detail crops after the full images, in this exact order: '+json.dumps(detail_labels)+'. Crops supplement full sources; never treat cropped-out tips as absent.'
+                details.append(png(im.crop(box)));detail_labels.append(dict(frame=fid,item=item_id,kind='item context',source_box=box))
+                tight=(max(0,int(x-head*.7)),max(0,int(y-head*.7)),min(im.width,int(x+head*.7)),min(im.height,int(y+head*.7)))
+                details.append(png(im.crop(tight)));detail_labels.append(dict(frame=fid,item=item_id,kind='palm anatomy only, endpoints may be outside this crop',source_box=tight))
+    prompt+=' Native grip-detail crops after the full images, in this exact order: '+json.dumps(detail_labels)+'. Crops supplement full sources; never treat cropped-out tips as absent. Use the tight palm crops to resolve thumb/index versus little finger; use the wider item context and full source to trace collar, pommel and strand attachments.'
     key='transitions-'+digest([VERSION,hashes,ref,rules,prompt])[:20]
     raw=dispatch(Path(root),key,'muse-spark-1.3',prompt,[png(reference),*[png(im) for _,im in frames],*details])
     try:

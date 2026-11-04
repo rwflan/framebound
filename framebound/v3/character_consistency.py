@@ -122,6 +122,7 @@ class Policy(Strict):
     torso_profile_pairs: list[tuple[str,str]] = Field(default_factory=list,max_length=512)
     max_torso_profile_drift: float = Field(default=.12,gt=0,le=.3)
     minimum_scale_reference_pixels: int = Field(default=0,ge=0,le=2048)
+    pristine_render_sha256: str | None = Field(default=None,pattern=r'^[0-9a-f]{64}$')
     max_part_drift: float = Field(default=.18,gt=0,le=.35)
     max_adjacent_part_drift: float = Field(default=.12,gt=0,le=.3)
     max_head_scale_drift: float = Field(default=.08,gt=0,le=.2)
@@ -130,6 +131,7 @@ class Policy(Strict):
 
     @model_validator(mode='after')
     def unique_rules(self):
+        if 'rendering.clarity' in self.required_features and not self.pristine_render_sha256:raise ValueError('Rendering clarity requires a frozen pristine authority')
         if len({r.id for r in self.transitions})!=len(self.transitions):raise ValueError('Duplicate transition IDs')
         if any(r.item_id and r.item_id not in {i.id for i in self.items} for r in self.transitions):raise ValueError('Transition references undeclared inventory')
         if any(a==b for a,b in self.torso_profile_pairs):raise ValueError('Torso profile pair needs distinct frames')
@@ -192,6 +194,18 @@ def evaluate_frame(policy, observation, *, image_sha256, frame_id, pixel_scale=1
         add('measurement_method_changed','geometry',obs.measurement_sources.get('geometry_recipe_sha256'),policy.expected_geometry_recipe,'unmeasured')
     base,current=measurements(policy.master,policy.scale_reference),measurements(obs,policy.scale_reference)
     head=base.get('head_px');actual=current.get('head_px')
+    if policy.pristine_render_sha256:
+        fidelity=obs.measurement_sources.get('render_fidelity',{})
+        if fidelity.get('pristine_sha256')!=policy.pristine_render_sha256 or fidelity.get('candidate_sha256')!=image_sha256:
+            add('render_fidelity_unmeasured','rendering.clarity',None,'Current candidate compared against the frozen original clean authority','unmeasured')
+        else:
+            from .render_fidelity import Review as RenderReview
+            try:
+                verdict=RenderReview.model_validate(fidelity.get('checks',{}))
+                statuses=[getattr(verdict,k).status for k in ('linework','colour_separation','material_detail')]
+                if 'mismatch' in statuses:add('render_fidelity_changed','rendering.clarity',fidelity['checks'],'Original clean linework, colour separation and material detail')
+                elif not all(v=='match' for v in statuses):add('render_fidelity_unmeasured','rendering.clarity',None,'Complete native rendering evidence','unmeasured')
+            except (ValueError,TypeError):add('render_fidelity_unmeasured','rendering.clarity',None,'Complete native rendering evidence','unmeasured')
     if not head or not actual:
         add('head_unmeasured','head_scale',actual,head,'unmeasured')
     else:
