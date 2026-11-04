@@ -12,6 +12,9 @@ type DemoManifest = {
   schema: number;
   canvas: [number, number];
   ground_y?: number;
+  render_height?: number;
+  source_offsets?: { direct?: [number, number][]; framework?: [number, number][] };
+  quality?: { status: string; failed_frames: number; temporal_findings: number; regenerated_frames: number };
   actor_bounds?: [number, number, number, number];
   source_dimensions?: [number, number][];
   source_pixel_scales?: { direct: number[]; framework: number[] };
@@ -53,6 +56,7 @@ function drawArena(
   canvas: HTMLCanvasElement,
   accent: string,
   cameraOffset = 0,
+  cameraY = 0,
 ): CanvasRenderingContext2D | null {
   const context = canvas.getContext("2d");
   if (!context) return null;
@@ -75,14 +79,14 @@ function drawArena(
     context.lineTo(x + 0.5, height);
     context.stroke();
   }
-  for (let y = 28; y < height; y += 96) {
+  for (let y = 28 + (cameraY % 96); y < height; y += 96) {
     context.beginPath();
     context.moveTo(0, y + 0.5);
     context.lineTo(width, y + 0.5);
     context.stroke();
   }
 
-  const floor = height - 44;
+  const floor = height - 44 + cameraY;
   context.fillStyle = "#cdbf9f";
   context.fillRect(0, floor, width, height - floor);
   context.strokeStyle = "#9d8a69";
@@ -119,13 +123,17 @@ function drawCharacter(
   yOffset: number,
   facing: number,
   pixelScales?: number[],
+  offsets?: [number, number][],
 ) {
   const bounds = manifest.actor_bounds;
   const halfWidth = manifest.canvas[0] / 2;
   const padding = bounds ? Math.ceil(Math.max(halfWidth - bounds[0], bounds[2] - halfWidth)
-    * 640 / manifest.canvas[1]) + 12 : 180;
+    * (manifest.render_height ?? 640) / manifest.canvas[1]) + 12 : 180;
   const projectedX = Math.max(padding, Math.min(canvas.width - padding, x));
-  const context = drawArena(canvas, "#a99d87", x - projectedX);
+  const scale = (manifest.render_height ?? 640) / manifest.canvas[1];
+  const cameraY = bounds ? Math.max(0, 12 - (canvas.height - 44 + yOffset
+    + (bounds[1] - (manifest.ground_y ?? manifest.canvas[1] * .90)) * scale)) : 0;
+  const context = drawArena(canvas, "#a99d87", x - projectedX, cameraY);
   if (!context) return;
   const spec = manifest.states[state];
   const index = frameAt(spec, elapsed);
@@ -133,13 +141,13 @@ function drawCharacter(
   const density = pixelScales?.[index] ?? 1;
   if (!image) return;
   // Shared world camera and native-resolution sources in both lanes.
-  const scale = 640 / manifest.canvas[1];
+  const [offsetX, offsetY] = offsets?.[index] ?? [0, 0];
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.save();
-  context.translate(projectedX, canvas.height - 44 + yOffset);
+  context.translate(projectedX, canvas.height - 44 + yOffset + cameraY);
   context.scale(facing * density, density);
-  context.drawImage(image, -manifest.canvas[0] * scale / 2, -(manifest.ground_y ?? manifest.canvas[1] * .90) * scale,
+  context.drawImage(image, (-manifest.canvas[0] / 2 + offsetX) * scale, (-(manifest.ground_y ?? manifest.canvas[1] * .90) + offsetY) * scale,
     manifest.canvas[0] * scale, manifest.canvas[1] * scale);
   context.restore();
 }
@@ -290,12 +298,13 @@ export function ValeriaLab() {
       }
       const elapsed = now - engine.current.stateStarted;
       if (frameworkCanvas.current) drawCharacter(frameworkCanvas.current, assets.framework, assets.manifest,
-        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing, assets.manifest.source_pixel_scales?.framework);
+        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing, assets.manifest.source_pixel_scales?.framework, assets.manifest.source_offsets?.framework);
       if (directCanvas.current) drawCharacter(directCanvas.current, assets.direct, assets.manifest,
-        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing, assets.manifest.source_pixel_scales?.direct);
+        engine.current.state, elapsed, engine.current.x, engine.current.offsetY, engine.current.facing, assets.manifest.source_pixel_scales?.direct, assets.manifest.source_offsets?.direct);
       if (singleCanvas.current) drawCharacter(singleCanvas.current, mode === "direct" ? assets.direct : assets.framework,
         assets.manifest, engine.current.state, elapsed, engine.current.x * 2, engine.current.offsetY, engine.current.facing,
-        mode === "direct" ? assets.manifest.source_pixel_scales?.direct : assets.manifest.source_pixel_scales?.framework);
+        mode === "direct" ? assets.manifest.source_pixel_scales?.direct : assets.manifest.source_pixel_scales?.framework,
+        mode === "direct" ? assets.manifest.source_offsets?.direct : assets.manifest.source_offsets?.framework);
       request = requestAnimationFrame(paint);
     };
     request = requestAnimationFrame(paint);
@@ -339,6 +348,7 @@ export function ValeriaLab() {
             <article className="proof-lane" data-output="framework">
               <header>
                 <span>Framebound</span>
+                {assets?.manifest.quality?.status === "refining" && <small>Refining</small>}
 
               </header>
               <canvas ref={frameworkCanvas} width={960} height={720} aria-label="Framebound Valeria playfield" />
@@ -392,7 +402,8 @@ export function ValeriaLab() {
               <dt>Frame canvas</dt><dd>{assets.manifest.canvas.join(" × ")} px</dd>
               {assets.manifest.source_dimensions && <><dt>Source images</dt><dd>{assets.manifest.source_dimensions.map(size => size.join(" × ")).join(" / ")} px</dd></>}
               <dt>Frames per version</dt><dd>{assets.manifest.frame_count}</dd>
-              <dt>Selected repairs</dt><dd>{assets.manifest.repairs_selected}</dd>
+              <dt>Selected repairs</dt><dd>{assets.manifest.quality?.regenerated_frames ?? assets.manifest.repairs_selected}</dd>
+              {assets.manifest.quality && <><dt>Quality gates</dt><dd>{assets.manifest.quality.status === "checks_passed" ? "Checks passed; human approval separate" : `${assets.manifest.quality.failed_frames} frames and ${assets.manifest.quality.temporal_findings} transitions need correction`}</dd></>}
               <dt>Assessment</dt><dd>Automated; visual preference remains unproven.</dd>
             </dl>}
 

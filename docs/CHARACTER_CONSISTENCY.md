@@ -31,3 +31,18 @@ local edits. Unknown provider acceptance blocks resending; changing a prompt is
 not a recovery mechanism. Direct Muse control assets remain frozen. Repair
 attempts and automated evaluations do not themselves establish an improvement:
 publication requires every declared gate and transition to pass.
+
+A playable refinement preview is distinct from delivery. The publication tool
+refuses failed delivery by default; `--preview` records outstanding findings and
+marks the live lane **Refining**. Control image bytes and authored timing remain
+frozen. Runtime registration records per-frame scale and translation without
+rewriting native source artwork. A shared camera uses aggregate silhouette bounds
+so registration cannot push a cape or item outside the viewport. The browser
+loads a complete immutable revision before switching playback to it.
+
+Material geometry recipes are versioned separately. A garment seam cannot stand
+in for its outer width; tiny stripes and inconsistent lower-torso sections remain
+unmeasured. The lower-torso band measures visible garment contours rather than
+mistaking the pose model's hip/skirt centre for a waist. Changing a measurement
+recipe requires a new frozen policy and reassessment of retained source pixels;
+old failures and evidence are preserved.
