@@ -83,3 +83,9 @@ selection resets historical work. The private ledger retains operation-level
 provenance; the public `costs.json` sidecar exposes only totals, counts and an
 evidence digest. It refreshes independently from animation revisions. Local CPU
 and external services without linked receipts are explicitly unpriced.
+
+A later positive judge response cannot clear a retained negative body/item
+finding on unchanged source pixels. Keep the earlier evidence and repair the
+source. Completed malformed cohort outputs may be split into smaller focused
+reviews with the same visual context; transport failures and unknown acceptance
+are never treated as a format problem or retried by that recovery path.

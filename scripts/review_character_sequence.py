@@ -6,6 +6,7 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from PIL import Image
 from framebound.v3.character_cohort import assess,overlay
+from framebound.v3.character_observations import ObservationInvalid
 from framebound.v3.character_consistency import image_digest,digest,evaluate_frame
 from scripts.build_movement_demo import send,save
 from scripts.refine_character_demo import initialize,load_config
@@ -19,7 +20,14 @@ def review(root,state,slots):
     features=['body.upper_arm_bulk','body.forearm_bulk','body.thigh_bulk']
     results=[]
     for start in range(0,len(selected),3):
-        results.append(assess(root,reference,frames,features,config['items'],config['description'],dispatch=send,persist=save,focus_ids=selected[start:start+3]))
+        focus=selected[start:start+3]
+        try:
+            results.append(assess(root,reference,frames,features,config['items'],config['description'],dispatch=send,persist=save,focus_ids=focus))
+        except ObservationInvalid:
+            # Only a retained, completed but unusable review reaches this path.
+            # Smaller focused outputs retain the same complete visual context.
+            for fid in focus:
+                results.append(assess(root,reference,frames,features,config['items'],config['description'],dispatch=send,persist=save,focus_ids=[fid]))
     for fid,image in frames:
         result=next(e for e in results if any(row['frame_id']==fid for row in e['review']['frames']))
         row=state['frames'][fid];obs=overlay(row['observation'],result,image_digest(reference))

@@ -321,6 +321,8 @@ def repair_plan(policy,observation,report):
                 target=bounds[0]+.03 if issue['observed']<bounds[0] else bounds[1]-.03
             change=(target/issue['observed']-1)*100
             message=('Increase' if change>0 else 'Reduce')+' the current rendered '+name+' span by '+str(round(abs(change),1))+'%. Preserve joint angles, neighbouring part lengths, colour, volume, attachment and all unmentioned pixels.'
+        elif code=='feature_changed' and name in {'body.upper_arm_bulk','body.forearm_bulk','body.thigh_bulk'}:
+            message='Reduce the exaggerated visible '+name+' volume and muscle bulges by approximately 20 percent in the CURRENT drawing, matching the canonical lean athletic contour. Preserve the joint centres, action, costume and face. Do not add bodybuilding lobes or vascularity; recheck all proportions after the edit.'
         elif code=='item_owner_changed':
             message='Move this SAME item to '+str(issue['expected'])+'; the other hand/mount must not retain a copy. Preserve the identical design and pose.'
         elif issue['status']=='unmeasured':

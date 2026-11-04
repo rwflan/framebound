@@ -63,9 +63,16 @@ def overlay(observation,evidence,reference_sha256):
     rows=[row for row in evidence['review']['frames'] if row['frame_id']==observation.frame_id]
     if len(rows)!=1:raise ValueError('Missing/duplicate cohort frame')
     row=rows[0];data=observation.model_dump(mode='json')
-    data['features'].update(row['features'])
+    def retain_negative(existing,proposed):
+        return existing if existing and existing.get('status')=='mismatch' and proposed.get('status')!='mismatch' else proposed
+    for name,feature in row['features'].items():
+        data['features'][name]=retain_negative(data['features'].get(name),feature)
     for item,features in row['items'].items():
         if item not in data['items']:raise ValueError('Cohort does not fabricate missing inventory observations')
-        data['items'][item]['features'].update(features)
+        for name,feature in features.items():
+            data['items'][item]['features'][name]=retain_negative(data['items'][item]['features'].get(name),feature)
+    history=data['measurement_sources'].setdefault('cohort_reviews',[])
+    previous=data['measurement_sources'].get('cohort_review')
+    if previous and previous not in history:history.append(previous)
     data['measurement_sources']['cohort_review']=dict(version=evidence['version'],execution_id=evidence['execution_id'],raw_sha256=evidence['raw_sha256'],reference_sha256=reference_sha256,image_sha256=observation.image_sha256,context_sha256s=evidence['image_sha256s'])
     return Observation.model_validate(data)

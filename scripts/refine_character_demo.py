@@ -228,7 +228,7 @@ def calibrated_scale(policy,observation,format_scale):
 
 
 def rank_report(report):
-    critical=sum(i['code'] in {'item_owner_changed','item_design_changed','item_detached','unexpected_item'} or (i['code']=='feature_changed' and i['feature'] in {'face.identity','body.upper_arm_bulk','body.forearm_bulk','body.thigh_bulk'}) for i in report['issues'])
+    critical=sum(i['code'] in {'item_owner_changed','item_design_changed','item_detached','unexpected_item'} or i['code']=='feature_changed' for i in report['issues'])
     unknown=sum(i['status']=='unmeasured' for i in report['issues'])
     numeric=sum(abs(i['observed']-1) for i in report['issues'] if isinstance(i['observed'],(float,int)) and isinstance(i['expected'],list))
     return (critical,unknown,len(report['issues']),numeric)
