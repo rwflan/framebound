@@ -46,7 +46,7 @@ def create(project, request):
     """Freeze a task, start its existing bounded run and compile generation inputs."""
     allowed = {'id', 'project_id', 'intent', 'subjects', 'appearance', 'canvas', 'holds',
                'ticks_per_second', 'loop', 'inputs', 'preserve', 'requirements',
-               'region_observations', 'temporal_observations', 'profile'}
+               'region_observations', 'temporal_observations', 'profile', 'character_consistency'}
     if set(request) - allowed:
         raise InvalidInput('Unknown animation settings: ' + ', '.join(sorted(set(request) - allowed)))
     aid = request.get('id')
@@ -66,6 +66,7 @@ def create(project, request):
                 requirements=request.get('requirements', []),
                 region_observations=request.get('region_observations', []),
                 temporal_observations=request.get('temporal_observations', []))
+    if request.get('character_consistency') is not None:spec['character_consistency']=request['character_consistency']
     tasks.create(project, spec)
     loop.start(project, spec['id'], 'animation:' + aid)
     run = loop.get(project, 'animation:' + aid)

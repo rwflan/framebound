@@ -6,6 +6,7 @@ from pydantic import Field, StrictInt, model_validator
 from ..v2.domain import Canvas, Timing, Strict, utcnow
 from .provenance import StyleBoard
 from .campaign.repair_policy import AutomaticRepairPolicy
+from .character_consistency import Policy as CharacterConsistencyPolicy
 
 
 class InputBinding(Strict):
@@ -65,6 +66,7 @@ class TaskSpec(Strict):
     preserve: list[str] = Field(default_factory=list, max_length=128)
     allowed_changes: list[str] = Field(default_factory=list, max_length=128)
     automatic_repair: AutomaticRepairPolicy | None = None
+    character_consistency: CharacterConsistencyPolicy | None = None
     repair_scope: Literal['full_clip', 'declared_regions'] = 'full_clip'
     profile: Literal['structural-v1', 'fixed-subject-v1', 'tracked-scene-v1'] = 'structural-v1'
     region_observations: list['RegionObservation'] = Field(default_factory=list, max_length=4096)
@@ -84,6 +86,10 @@ class TaskSpec(Strict):
     def valid_spec(self):
         if bool(self.supersedes) != bool(self.change_reason):
             raise ValueError('superseding a specification requires a recorded reason')
+        if self.character_consistency:
+            anchor=self.character_consistency.master_asset_id
+            if not anchor or not any(i.asset_id==anchor and i.role=='identity' for i in self.inputs):
+                raise ValueError('Character policy must bind an immutable identity input')
         ids = [r.id for r in self.requirements]
         if len(ids) != len(set(ids)):
             raise ValueError('requirement IDs must be unique')

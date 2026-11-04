@@ -9,7 +9,7 @@ VERSION = 'animation-principles-v1'
 PRINCIPLES = (
     ('identity', 'Keep the same silhouette, proportions, facial features, palette and costume details across all poses. Preserve original identity references throughout repairs.'),
     ('parts', 'Keep anatomy and object topology consistent: no missing, duplicated or detached parts. Allow intentional articulation and declared occlusion without changing body volume.'),
-    ('prop', 'Keep each held prop identical in shape and scale, attached to the intended hand or support. Preserve its trajectory through occlusion; never invent an extra prop.'),
+    ('prop', 'Preserve EVERY visible item: weapons, tools, shields, bags and mounted accessories. Lock construction, material, colours, rigid dimensions relative to the body, attachment and anatomical ownership. Flexible items may coil or bend without changing design. A different hand or mount requires an explicitly requested transfer; occlusion never authorizes a redesign or duplicate.'),
     ('entities', 'Draw only the declared subjects. One complete instance of each intended subject per pose; no ghost copies, labels, scenery or effects-only substitutes.'),
     ('contact', 'Show weight and support coherently. Hold planted contacts through their authored interval; keep grips and interactions continuous. Do not infer contact annotations from color.'),
     ('temporal', 'Use a fixed camera, common canvas, common scale and stable registration. Do not independently crop or fit each pose. Preserve authored holds and verify the last-to-first transition when looping.'),
@@ -26,6 +26,13 @@ def compile_guidance(spec: dict) -> dict:
     count = len(spec['timing']['holds'])
     columns = next((n for n in (3, 4, 6, 2, 1) if count % n == 0 and count // n <= 24), 1)
     layout = dict(columns=columns, rows=count // columns, reading_order='row_major')
+    contract = spec.get('character_consistency')
+    consistency = []
+    if contract:
+        consistency = ['Character invariants: '+ '; '.join(contract.get('required_features', [])),
+                       'Visible item inventory: '+str([{k:item.get(k) for k in ('id','description','anchor','anchor_by_frame','occluded_frames','rigid_measurement')} for item in contract.get('items', [])]),
+                       'Explicit appearance exceptions: '+str([{k:entry.get(k) for k in ('feature','frames','reason')} for entry in contract.get('allowances', [])]),
+                       'Measure each original delivered frame against the immutable identity source. Submit source-bound observations for every required feature and visible item. Repair localized failures, then recheck every invariant and adjacent playback transition. Missing or uncertain evidence blocks completion; never waive failed gates with an aggregate score.']
     prompt = '\n'.join([
         'Create an isolated 2D animation of '+spec['subjects']+'.',
         'Action: '+spec['intent'],
@@ -37,10 +44,12 @@ def compile_guidance(spec: dict) -> dict:
         'Preserve: '+ '; '.join(spec.get('preserve', [])),
         'Allowed changes: '+ '; '.join(spec.get('allowed_changes', [])),
         *[r['instruction'] for r in rules],
+        'Facial identity is invariant independently of expression. Dirt, sweat, wetness, damage or torn clothing may change only the exact requested features and frames; they never silently waive body or item invariants.',
+        *consistency,
         'The task, timing, original references and declared edit scope take precedence. Guidance does not grant additional edit permission.',
     ])
     result = dict(version=VERSION, authority='advisory_only', source='packaged_principles',
-                  training_required=False, private_evidence_included=False,
+                  training_required=False, private_evidence_included=bool(contract),
                   model_improvement_established=False, rules=rules, prompt=prompt, sheet_layout=layout,
                   identity_anchor_prompt='Create one neutral isolated 2D identity pose of '+spec['subjects']+'. '+spec.get('appearance','')+' One complete subject; no animation sheet, labels or scenery.',
                   review=['Check original identity and all delivered native frames.',
