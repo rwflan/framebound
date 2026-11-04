@@ -53,3 +53,9 @@ def test_generator_receives_explicit_matte_without_changing_artwork():
     assert received.getpixel((0,0))==(255,0,255,255)
     assert received.getpixel((10,10))==(240,240,240,255)
     assert source.tobytes()==before
+
+
+def test_jump_state_boundaries_are_assessed_as_temporal_neighbours():
+    from scripts.refine_character_demo import pairs_for
+    manifest={'states':{'jump':{'frames':[1]},'apex':{'frames':[2]},'fall':{'frames':[3]},'run':{'frames':[4,5],'loop':True}}}
+    assert set(pairs_for(manifest))=={(1,2),(2,3),(4,5),(5,4)}

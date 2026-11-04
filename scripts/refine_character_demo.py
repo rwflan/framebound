@@ -59,6 +59,10 @@ def pairs_for(manifest):
         slots=spec['frames']
         pairs.extend(zip(slots,slots[1:]))
         if spec.get('loop') and len(slots)>1:pairs.append((slots[-1],slots[0]))
+    # The movement engine advances these separate states in one authored jump.
+    for left,right in [('jump','apex'),('apex','fall')]:
+        if left in manifest['states'] and right in manifest['states']:
+            pairs.append((manifest['states'][left]['frames'][-1],manifest['states'][right]['frames'][0]))
     return list(dict.fromkeys(pairs))
 
 
@@ -296,7 +300,17 @@ def repair(root, *, only=None, max_new_attempts=None):
             size=record.get('next_size','1536x1024' if dimensions[0]>dimensions[1] else '1024x1536')
             if config.get('focused_item_edit') and any(task['code'].startswith('item_') for task in plan['tasks']):
                 prompt=('Edit the SECOND image. The FIRST image defines the exact character and item design. Keep the second image action pose, face, body, costume, canvas, cape and hair. Correct the visible item ONLY: '+json.dumps(config['items'])+' The item must have the same construction, thickness, rigid component and proportions as image one. Show one item, firmly connected to its declared anatomical hand or mount. For this pose: '+pose['instruction']+' '+config.get('item_pose_constraints',{}).get(fid,'')+' No second grip, duplicate item, loose trailing loop, additional handle, guide marks, text, floor or shadows. Full silhouette inside the canvas with at least 8 percent magenta margin. Uniform RGB(255,0,255) backing everywhere outside the artwork. Return one full-resolution complete character in the same pose. The compact coil can rotate with the hand but cannot turn into a different weapon.')
-                generation_images=[generation_png(reference),generation_png(edit_target)]
+                mounts=[]
+                for rule in policy.items:
+                    anchor=rule.anchor_by_frame.get(fid,rule.anchor)
+                    landmark=observation.points.get(anchor)
+                    if landmark and landmark.visibility=='visible':
+                        px=landmark.xy[0]*image.width/1000-source_offset[0];py=landmark.xy[1]*image.height/1000-source_offset[1]
+                        mounts.append(dict(item=rule.id,anchor=anchor,target_pixel=[round(px),round(py)],canvas=list(edit_target.size)))
+                        drawing.ellipse((px-18,py-18,px+18,py+18),outline='#00bfff',width=5)
+                        drawing.text((max(0,px-90),max(0,py-40)),'ITEM GRIP HERE',fill='#00bfff')
+                prompt+=' The THIRD image is a diagnostic only: the blue ring identifies the actual required grip or mount. Transfer the item to that location and leave the other hand EMPTY. Never draw the ring or labels. Target coordinates on image TWO: '+json.dumps(mounts)
+                generation_images=[generation_png(reference),generation_png(edit_target),generation_png(annotated)]
             else:
                 generation_images=[generation_png(im) for im in (reference,face,item_reference,edit_target,annotated)]
             op='edit-'+fid+'-'+str(attempt)+'-'+digest([policy_sha,image_digest(image),size,prompt,[hashlib.sha256(b).hexdigest() for b in generation_images]])[:12]
