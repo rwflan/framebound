@@ -46,7 +46,11 @@ def test_cached_receipts_refresh_and_missing_lineage_cannot_reset_recorded_spend
     root=tmp_path/'experiment';public=tmp_path/'public';root.mkdir();public.mkdir()
     p=operation(root,'repair',10000,'a');cache={}
     (root/'config.json').write_text(json.dumps({'cost_lineage_roots':[str(root)],'publish_root':str(public)}))
+    (public/'manifest.json').write_text('TEST-ONLY immutable live revision')
+    (public/'framework.png').write_bytes(b'TEST-ONLY native artwork bytes')
     before=update(root,cache=cache)
+    assert (public/'manifest.json').read_text()=='TEST-ONLY immutable live revision'
+    assert (public/'framework.png').read_bytes()==b'TEST-ONLY native artwork bytes'
     assert summarize([root],cache=cache)['summary']==before
     operation(root,'second',10000,'b')
     assert update(root,cache=cache)['observed_microdollars']==20000

@@ -51,7 +51,8 @@ def publish(root,state,*,preview=False):
         [r['pixel_scale'] for r in rows],pairs_for(manifest))
     blocked=set(config.get('preview_blocking_features',[]))
     blocked_ids=set(config.get('preview_blocking_frame_ids',[p['id'] for p in brief['poses']]))
-    violations=[issue for frame in report['frames'] for issue in frame['issues'] if issue['feature'] in blocked and issue.get('frame_id') in blocked_ids]
+    blocked_codes=set(config.get('preview_blocking_codes',[]))
+    violations=[issue for frame in report['frames'] for issue in frame['issues'] if (issue['feature'] in blocked or issue['code'] in blocked_codes) and issue.get('frame_id') in blocked_ids]
     if violations:raise ValueError('Preview withheld by visible body/item findings: '+str(sorted({i['feature'] for i in violations})))
     if not report['passed'] and not preview:raise ValueError('Delivery withheld: character/temporal gates remain')
     report_sha=digest(report);save(root/('playable-audit-'+report_sha[:16]+'.json'),report)

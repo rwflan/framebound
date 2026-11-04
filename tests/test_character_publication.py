@@ -66,3 +66,11 @@ def test_known_visible_design_failure_blocks_even_preview(tmp_path):
     path=root/'config.json';config=json.loads(path.read_text());config['preview_blocking_features']=['item:design'];path.write_text(json.dumps(config))
     with pytest.raises(ValueError,match='visible body/item'):publish(root,state,preview=True)
     assert json.loads((public/'manifest.json').read_text())==before
+
+
+def test_detached_item_blocks_preview_even_when_only_numeric_attachment_failed(tmp_path):
+    root,public,before,state=fixture(tmp_path)
+    path=root/'config.json';config=json.loads(path.read_text());config['preview_blocking_codes']=['item_detached'];path.write_text(json.dumps(config))
+    state['frames']['run']['observation']['items']['item']['grip']['xy']=[800,465]
+    with pytest.raises(ValueError,match='visible body/item'):publish(root,state,preview=True)
+    assert json.loads((public/'manifest.json').read_text())==before

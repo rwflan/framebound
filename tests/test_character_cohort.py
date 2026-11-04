@@ -79,3 +79,13 @@ def test_sequence_format_recovery_splits_only_completed_invalid_reviews(tmp_path
     monkeypatch.setattr(script,'assess',unknown)
     with pytest.raises(TimeoutError):script.review(root,state,[0,1])
     assert calls==[1]
+
+
+def test_flat_named_checks_keep_exact_feature_identity_and_reject_duplicates():
+    from framebound.v3.character_cohort import canonical_review
+    checks=[dict(frame_id='0',item_id=None,feature='body.upper_arm_bulk',**feature('mismatch')),
+            dict(frame_id='0',item_id='item',feature='topology',**feature('mismatch'))]
+    result=canonical_review(dict(checks=checks,limitation='TEST-ONLY'))
+    assert result.frames[0].features['body.upper_arm_bulk'].status=='mismatch'
+    assert result.frames[0].items['item']['topology'].status=='mismatch'
+    with pytest.raises(ValueError,match='Duplicate'):canonical_review(dict(checks=checks+checks[:1],limitation='TEST-ONLY'))
