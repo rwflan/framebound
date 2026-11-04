@@ -74,3 +74,16 @@ def test_detached_item_blocks_preview_even_when_only_numeric_attachment_failed(t
     state['frames']['run']['observation']['items']['item']['grip']['xy']=[800,465]
     with pytest.raises(ValueError,match='visible body/item'):publish(root,state,preview=True)
     assert json.loads((public/'manifest.json').read_text())==before
+
+
+def test_publication_recipe_changes_get_a_new_immutable_revision(tmp_path,monkeypatch):
+    import scripts.publish_character_demo as publisher
+    root,public,before,state=fixture(tmp_path)
+    recipe=tmp_path/'publisher.py';recipe.write_text('TEST-ONLY recipe one')
+    monkeypatch.setattr(publisher,'__file__',str(recipe))
+    first=publisher.publish(root,state,preview=True)
+    recipe.write_text('TEST-ONLY recipe two')
+    second=publisher.publish(root,state,preview=True)
+    assert first['revision']!=second['revision']
+    assert first['publication_recipe_sha256']!=second['publication_recipe_sha256']
+    assert (public/first['revision']/'direct-0.png').read_bytes()==(public/second['revision']/'direct-0.png').read_bytes()

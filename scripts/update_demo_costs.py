@@ -9,7 +9,7 @@ from framebound.v3.experiment_costs import summarize
 from scripts.build_movement_demo import save
 
 
-def update(root, *, cache=None):
+def _update_locked(root, *, cache=None):
     config=json.loads((root/'config.json').read_text())
     roots=config.get('cost_lineage_roots')
     if not roots:raise ValueError('Explicit experiment cost lineage is required')
@@ -19,9 +19,20 @@ def update(root, *, cache=None):
         raise ValueError('Recorded provider cost regressed; reconcile missing lineage instead of resetting spend')
     save(previous,report)
     summary=report['summary'];public=Path(config['publish_root'])
-    save(public/'costs.json',summary)
+    public_previous=public/'costs.json'
+    if public_previous.exists() and json.loads(public_previous.read_text())['observed_microdollars']>summary['observed_microdollars']:
+        raise ValueError('Public provider cost regressed; reconcile missing lineage')
+    save(public_previous,summary)
     print('Provider observed USD',summary['observed_microdollars']/1e6,'unreconciled reserve USD',summary['unreconciled_reserve_microdollars']/1e6,flush=True)
     return summary
+
+
+def update(root, *, cache=None):
+    import fcntl
+    config=json.loads((root/'config.json').read_text());public=Path(config['publish_root'])
+    with (public/'.costs.lock').open('a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        return _update_locked(root,cache=cache)
 
 
 def main():

@@ -24,7 +24,7 @@ type DemoManifest = {
   ground_y?: number;
   render_height?: number;
   source_offsets?: { direct?: [number, number][]; framework?: [number, number][] };
-  quality?: { status: string; failed_frames: number; temporal_findings: number; regenerated_frames: number };
+  quality?: { status: string; failed_frames: number; temporal_findings: number; regenerated_frames: number; frames_with_failures?: number; unmeasured_frames?: number; visible_review?: {status: string; states: string[]; frames: number} | null };
   actor_bounds?: [number, number, number, number];
   source_dimensions?: [number, number][];
   source_pixel_scales?: { direct: number[]; framework: number[] };
@@ -426,7 +426,8 @@ export function ValeriaLab() {
               {assets.manifest.source_dimensions && <><dt>Source images</dt><dd>{assets.manifest.source_dimensions.map(size => size.join(" × ")).join(" / ")} px</dd></>}
               <dt>Frames per version</dt><dd>{assets.manifest.frame_count}</dd>
               <dt>Selected repairs</dt><dd>{assets.manifest.quality?.regenerated_frames ?? assets.manifest.repairs_selected}</dd>
-              {assets.manifest.quality && <><dt>Quality gates</dt><dd>{assets.manifest.quality.status === "checks_passed" ? "Checks passed; human approval separate" : `${assets.manifest.quality.failed_frames} frames and ${assets.manifest.quality.temporal_findings} transitions need correction`}</dd></>}
+              {assets.manifest.quality && <><dt>Quality gates</dt><dd>{assets.manifest.quality.status === "checks_passed" ? "Checks passed; human approval separate" : `${assets.manifest.quality.frames_with_failures ?? assets.manifest.quality.failed_frames} frames with findings; ${assets.manifest.quality.unmeasured_frames ?? 0} with unmeasured evidence; ${assets.manifest.quality.temporal_findings} transition findings`}</dd></>}
+              {assets.manifest.quality?.visible_review?.status === "passed" && <><dt>Visible review</dt><dd>{assets.manifest.quality.visible_review.states.join(", ")} · {assets.manifest.quality.visible_review.frames} frames checked for body bulk and item construction</dd></>}
               <dt>Provider cost recorded</dt><dd>{costs ? usd(costs.observed_microdollars) : "Unavailable"}</dd>
               {costs && <><dt>Framework work</dt><dd>{usd(costs.groups.framework_work?.observed_microdollars ?? 0)}</dd><dt>Shared initial work</dt><dd>{usd(costs.groups.shared_initial?.observed_microdollars ?? 0)}</dd><dt>Unreconciled reserve</dt><dd>{usd(costs.unreconciled_reserve_microdollars)} · {costs.unreconciled_operations} calls</dd><dt>Scope</dt><dd>All retained provider calls, including failures and superseded attempts. Local CPU and unrecorded external services are not priced.</dd></>}
               <dt>Assessment</dt><dd>Automated; visual preference remains unproven.</dd>

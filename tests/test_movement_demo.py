@@ -85,3 +85,32 @@ def test_local_preflight_failure_does_not_create_a_committed_send(tmp_path,monke
     monkeypatch.setattr(demo,'MuseResponses',Adapter)
     with pytest.raises(ValueError,match='before transport'):demo.send(tmp_path,'local-rejected','muse-image-1.0','TEST-ONLY',[])
     assert not (tmp_path/'private/local-rejected/request.json').exists()
+
+
+def test_configured_send_updates_total_and_unknown_reserve_automatically(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    public=tmp_path/'public';public.mkdir()
+    (tmp_path/'config.json').write_text(json.dumps({'cost_lineage_roots':[str(tmp_path)],'publish_root':str(public)}))
+    class Adapter:
+        def preflight(self,request):pass
+        def execute(self,request,**kw):return SimpleNamespace(raw=b'{"status":"completed"}',incurred=10000,receipt={'response_id':'TEST-ONLY-one','cost_basis':'provider usage and frozen rate'})
+    monkeypatch.setattr(demo,'MuseResponses',Adapter)
+    demo.send(tmp_path,'generation','muse-image-1.0','TEST-ONLY',[])
+    assert json.loads((public/'costs.json').read_text())['observed_microdollars']==10000
+    class Unknown(Adapter):
+        def execute(self,*a,**kw):raise TimeoutError('TEST-ONLY unknown acceptance')
+    monkeypatch.setattr(demo,'MuseResponses',Unknown)
+    with pytest.raises(TimeoutError):demo.send(tmp_path,'unresolved','muse-image-1.0','TEST-ONLY',[])
+    summary=json.loads((public/'costs.json').read_text())
+    assert summary['observed_microdollars']==10000 and summary['unreconciled_reserve_microdollars']==10000
+
+
+def test_bad_accounting_config_does_not_hide_unknown_provider_outcome(tmp_path,monkeypatch):
+    (tmp_path/'config.json').write_text('{TEST-ONLY invalid JSON')
+    class Adapter:
+        def preflight(self,*a):pass
+        def execute(self,*a,**kw):raise TimeoutError('TEST-ONLY provider outcome remains unknown')
+    monkeypatch.setattr(demo,'MuseResponses',Adapter)
+    with pytest.raises(TimeoutError,match='provider outcome'):demo.send(tmp_path,'unknown','muse-image-1.0','TEST-ONLY',[])
+    assert (tmp_path/'private/unknown/request.json').exists()
+    assert (tmp_path/'private/cost-refresh-error.json').exists()

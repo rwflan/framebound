@@ -58,3 +58,16 @@ def test_cached_receipts_refresh_and_missing_lineage_cannot_reset_recorded_spend
     with pytest.raises(ValueError,match='regressed'):update(root,cache=cache)
     assert json.loads((public/'costs.json').read_text())['observed_microdollars']==20000
     assert str(root) not in json.dumps(before) and 'response_id' not in json.dumps(before)
+
+
+def test_parallel_lineage_updates_publish_one_consistent_total(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from scripts.update_demo_costs import update
+    roots=[tmp_path/'one',tmp_path/'two'];public=tmp_path/'public';public.mkdir()
+    for index,root in enumerate(roots):
+        operation(root,'work',10000,str(index))
+        (root/'config.json').write_text(json.dumps({'cost_lineage_roots':[str(r) for r in roots],'publish_root':str(public)}))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results=list(pool.map(update,roots))
+    assert all(r['observed_microdollars']==20000 for r in results)
+    assert json.loads((public/'costs.json').read_text())['observed_microdollars']==20000
