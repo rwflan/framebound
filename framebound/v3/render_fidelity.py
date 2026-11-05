@@ -14,7 +14,7 @@ from .character_consistency import Feature,image_digest,digest
 from .character_observations import png,ObservationInvalid
 from .campaign.specialists import extract_text
 
-VERSION='pristine-render-fidelity-v2'
+VERSION='pristine-render-fidelity-v3'
 
 
 class Review(Strict):
@@ -70,7 +70,7 @@ def assess(root,pristine,candidate,description,*,dispatch,persist,regions=None):
         common=(min(clean_crop.width,current_crop.width),min(clean_crop.height,current_crop.height))
         views.extend([png(clean_crop.resize(common,Image.Resampling.LANCZOS)),png(current_crop.resize(common,Image.Resampling.LANCZOS))])
         labels.append(dict(region=name,pristine_box=list(clean_box),candidate_box=list(current_box),comparison_dimensions=list(common),resampling='downsample-only to common native crop resolution'))
-    prompt='''Compare rendering fidelity against the ORIGINAL CLEAN ART AUTHORITY in image ONE. Image TWO is a candidate that may have been edited repeatedly. Later images are paired original/candidate crops, downsampled ONLY to the smaller native crop dimensions for a fair comparison; no crop is upscaled or sharpened. Native pixel-density minima are assessed separately. Do not confuse a smaller original sample with accumulated blur. Compare line definition and purposeful detail at this matched resolution, in the declared order. Do not use an already degraded parent as the quality baseline. Judge the artwork only, ignoring transparent or technical magenta surroundings. Pose, expression and expressly requested design changes can differ; do not penalize them as rendering degradation.
+    prompt='''Compare rendering fidelity against the ORIGINAL CLEAN ART AUTHORITY in image ONE. Image TWO is a candidate that may have been edited repeatedly. Later images are paired original/candidate crops, downsampled ONLY to the smaller native crop dimensions for a fair comparison; no crop is upscaled or sharpened. Native pixel-density minima are assessed separately. Do not confuse a smaller original sample with accumulated blur. Compare line definition and purposeful detail at this matched resolution, in the declared order. Do not use an already degraded parent as the quality baseline. Judge the artwork only, ignoring transparent or technical magenta surroundings. Pose, expression and expressly requested design changes can differ; do not penalize them as rendering degradation. Here match means preserved RENDERING FIDELITY, not the same pose, pixel outlines, finger arrangement or coil geometry. A revised grip or newly articulated fingers can be judged for crisp deliberate contours without identical original finger positions. Do not mark quality uncertain solely because a valid pose/grip/design changed. Judge whether the new lines and material detail are clear and purposeful at the matched native resolution. Actual fusion, smear or lost detail still fails; genuinely insufficient resolution remains uncertain.
 Return JSON only {"linework":{"status":"match|mismatch|uncertain|occluded","observed":"specific native evidence","expected":"original rendering invariant"},"colour_separation":same feature,"material_detail":same feature,"limitation":"honest limits"}.
 linework: detect accumulating mushy/muddy/muggy outlines, softened facial features or fingers, smeared edges, doubled lines, waxy simplification and lost construction. Preserve the original artist's softness where intentional; do not demand universal sharpening. colour_separation: detect washed-out/greyed colours, low local contrast, colour bleeding or flattened light/shadow separation relative to the clean source. material_detail: detect lost or melted braid, leather, fabric seams, fittings and purposeful texture replaced by generic blur/noise. Inspect repaired hands and items as well as face and torso. Artificial sharpening halos, oversaturation and invented noise do NOT restore lost detail. If resolution, pose or occlusion prevents a fair comparison, return uncertain, never match. A visible localized degradation fails even when the rest of the figure is crisp. Fields under 35 words.'''
     prompt+='\nRequested design changes: '+description+'\nPaired crop order: '+str(labels)
@@ -91,4 +91,24 @@ linework: detect accumulating mushy/muddy/muggy outlines, softened facial featur
     status='fail' if 'mismatch' in statuses else 'pass' if all(s=='match' for s in statuses) else 'unmeasured'
     evidence=dict(version=VERSION,pristine_sha256=pristine_sha,candidate_sha256=candidate_sha,execution_id=key,raw_sha256=hashlib.sha256(raw).hexdigest(),status=status,checks=checks,crops=labels,raster=dict(pristine=descriptors(pristine),candidate=descriptors(candidate)),human_approval=False)
     persist(Path(root)/'private'/(key+'-review.json'),evidence)
+    return evidence
+
+
+def assess_edit(root,pristine,source,candidate,box,source_evidence,description,*,dispatch,persist):
+    """Review changed pixels; inherit qualified regions only with exact proof."""
+    valid=(source.size==candidate.size and source_evidence.get('candidate_sha256')==image_digest(source)
+           and source_evidence.get('pristine_sha256')==image_digest(pristine) and source_evidence.get('status')=='pass')
+    try:
+        previous=Review.model_validate(source_evidence.get('checks',{}))
+        valid=valid and all(getattr(previous,k).status=='match' for k in ('linework','colour_separation','material_detail'))
+    except (ValueError,TypeError):valid=False
+    x0,y0,x1,y1=box;w,h=source.size
+    if not (0<=x0<x1<=w and 0<=y0<y1<=h):raise ValueError('Invalid fidelity edit region')
+    outside=[(0,0,w,y0),(0,y1,w,h),(0,y0,x0,y1),(x1,y0,w,y1)]
+    unchanged=all(source.crop(part).tobytes()==candidate.crop(part).tobytes() for part in outside)
+    if not valid or not unchanged:return assess(root,pristine,candidate,description,dispatch=dispatch,persist=persist)
+    patch=assess(root,pristine,candidate.crop(box),description+' The candidate image is ONLY the edited native crop. Assess all new pixels inside this crop. Other body regions are outside the supplied candidate and must not be judged or invented; they have separately verified unchanged clean pixels.',dispatch=dispatch,persist=persist)
+    evidence=dict(patch,candidate_sha256=image_digest(candidate),scope='Edited-region review plus byte-identical inheritance of previously pristine-qualified artwork',
+                  patch_review=patch,source_evidence_sha256=digest(source_evidence),source_image_sha256=image_digest(source),edit_box=list(box),unchanged_outside=True)
+    persist(Path(root)/'private'/('render-edit-fidelity-'+digest(evidence)[:20]+'.json'),evidence)
     return evidence
