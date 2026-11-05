@@ -73,6 +73,8 @@ class MuseResponses:
                      (error.code==413 and detail.get('code')=='payload_too_large'))):
                 raise ProviderRejected(Response(raw,0,0,dict(http_status=error.code,not_accepted=True,
                     requested_model=wire['model'],error=detail,cost_basis='Documented pre-inference validation rejection; no output'))) from error
+            error.provider_observation_raw=raw
+            error.provider_request_ids={name:error.headers.get(name) for name in ('x-request-id','request-id') if error.headers and error.headers.get(name)}
             raise
     def _post(self, request, *, timeout):
         with self._open_post(request,timeout=timeout) as response:raw=response.read(64*1024**2+1)

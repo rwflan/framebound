@@ -92,3 +92,24 @@ def test_partial_edit_depth_cannot_masquerade_as_whole_frame_history():
     assert Lineage.model_validate(row).untouched_source_depth is None
     row['scope']='whole_frame'
     with pytest.raises(ValueError,match='partial region'):Lineage.model_validate(row)
+
+
+def test_local_edit_inherits_only_byte_identical_previously_qualified_regions(monkeypatch,tmp_path):
+    import framebound.v3.render_fidelity as quality
+    from PIL import ImageDraw
+    pristine=Image.new('RGBA',(100,100),'white');source=Image.new('RGBA',(100,100),'red');candidate=source.copy();box=(30,40,60,70);ImageDraw.Draw(candidate).rectangle((31,41,58,68),fill='blue')
+    checks=dict(linework=feature('match'),colour_separation=feature('match'),material_detail=feature('match'),limitation='Automated review')
+    prior=dict(status='pass',pristine_sha256=image_digest(pristine),candidate_sha256=image_digest(source),checks=checks)
+    seen=[]
+    def assess(root,authority,image,*args,**kwargs):
+        seen.append(image.size);return dict(status='pass',checks=checks,pristine_sha256=image_digest(authority),candidate_sha256=image_digest(image),human_approval=False)
+    monkeypatch.setattr(quality,'assess',assess)
+    evidence=quality.assess_edit(tmp_path,pristine,source,candidate,box,prior,'same style',dispatch=None,persist=lambda *a:None)
+    assert seen==[(30,30)] and evidence['candidate_sha256']==image_digest(candidate)
+    assert evidence['unchanged_outside'] and not evidence['human_approval']
+    candidate.putpixel((1,1),(1,2,3,255));seen.clear()
+    quality.assess_edit(tmp_path,pristine,source,candidate,box,prior,'same',dispatch=None,persist=lambda *a:None)
+    assert seen==[(100,100)]
+    prior['status']='fail';seen.clear()
+    quality.assess_edit(tmp_path,pristine,source,source,box,prior,'same',dispatch=None,persist=lambda *a:None)
+    assert seen==[(100,100)]

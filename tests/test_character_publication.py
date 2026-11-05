@@ -203,3 +203,23 @@ def test_safe_observe_without_cohort_retains_distinct_annotation_versions(tmp_pa
     assert result.features['style.rendering'].status=='mismatch'
     paths=list((root/'private').glob('registered-observation-0-*.json'))
     assert len(paths)==2
+
+
+def test_parallel_pair_reviews_do_not_hold_global_lock_during_provider_calls(tmp_path,monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import scripts.review_character_transitions as runner
+    root,public,before,state=fixture(tmp_path)
+    path=root/'policy-test.json';p=json.loads(path.read_text());p['transitions']=[dict(id='grip',left='idle',right='run',feature='item.orientation',item_id='item')];path.write_text(json.dumps(p))
+    cp=root/'config.json';c=json.loads(cp.read_text());c['description']='Same declared grip';cp.write_text(json.dumps(c))
+    barrier=threading.Barrier(2);counter=[];guard=threading.Lock()
+    def assess(work,reference,frames,rules,description,**kwargs):
+        with guard:index=len(counter);counter.append(index)
+        barrier.wait(timeout=3)
+        return dict(execution_id=str(index),reference_sha256=image_digest(reference),image_sha256s={fid:image_digest(im) for fid,im in frames},rules_sha256=digest([r.model_dump(mode='json') for r in rules]),checks=[dict(id='grip',**feature('mismatch' if index==0 else 'match'))])
+    monkeypatch.setattr(runner,'assess',assess)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures=[pool.submit(runner.review,root,copy.deepcopy(state)) for _ in range(2)]
+        for future in futures:future.result(timeout=5)
+    retained=json.loads((root/'transition-evidence.json').read_text())
+    assert len(retained)==2 and any(r['checks'][0]['status']=='mismatch' for r in retained)

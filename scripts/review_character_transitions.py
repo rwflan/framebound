@@ -4,7 +4,7 @@ import fcntl
 import json
 from pathlib import Path
 from PIL import Image
-from framebound.v3.character_consistency import image_digest
+from framebound.v3.character_consistency import image_digest,digest
 from framebound.v3.transition_consistency import assess,evaluate
 from scripts.build_movement_demo import send,save
 from scripts.refine_character_demo import initialize,load_config
@@ -12,9 +12,7 @@ from scripts.refine_character_demo import initialize,load_config
 
 def review(root,state,*,only=None):
     root=Path(root);(root/'private').mkdir(parents=True,exist_ok=True)
-    with (root/'private'/'transition-review.lock').open('a+b') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX)
-        return _review(root,state,only=only)
+    return _review(root,state,only=only)
 
 
 def _review(root,state,*,only=None):
@@ -35,7 +33,14 @@ def _review(root,state,*,only=None):
         # A retained negative is actionable. Re-review unchanged artwork cannot clear it.
         if all(current[r.id]['status']!='unmeasured' for r in rules):continue
         result=assess(root,reference,[(fid,sources[fid]) for fid in pair],rules,config['description'],dispatch=send,persist=save,observations={fid:state['frames'][fid]['observation'] for fid in pair if state['frames'][fid].get('observation')})
-        evidence.append(result);save(path,evidence)
+        # Do not hold a global ledger lock across provider I/O. Merge the latest
+        # ledger atomically so independent frame repairs cannot block each other.
+        with (root/'private'/'transition-review.lock').open('a+b') as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            latest=json.loads(path.read_text()) if path.exists() else []
+            if not isinstance(latest,list):latest=[latest]
+            if digest(result) not in {digest(row) for row in latest}:latest.append(result)
+            save(path,latest);evidence=latest
         print('transition',*pair,flush=True)
     state['transitions']=evidence
     return evaluate(policy,evidence,hashes)

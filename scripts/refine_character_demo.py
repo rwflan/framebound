@@ -196,10 +196,10 @@ def registered_observe(root,frame_id,image,reference,config,phase):
     save(root/'private'/('registered-observation-'+frame_id+'-'+image_digest(image)[:16]+'-'+digest(result.model_dump(mode='json'))[:16]+'.json'),result.model_dump(mode='json'))
     return result
 
-def render_observation(root,image,observation,config):
+def render_observation(root,image,observation,config,*,edit_source=None,edit_box=None,prior_evidence=None):
     authority=config.get('pristine_render_reference')
     if not authority:return observation
-    from framebound.v3.render_fidelity import assess
+    from framebound.v3.render_fidelity import assess,assess_edit
     pristine=Image.open(authority).convert('RGBA')
     if config.get('pristine_render_sha256') and image_digest(pristine)!=config['pristine_render_sha256']:raise ValueError('Frozen pristine rendering authority changed')
     clean=Observation.model_validate_json(Path(config['pristine_render_observation']).read_text()) if config.get('pristine_render_observation') else None
@@ -222,7 +222,9 @@ def render_observation(root,image,observation,config):
         for name,hand in [('face',False),('held item and hand',True)]:
             a,b=region(clean,hand),region(observation,hand)
             if a and b:regions[name]=(a,b)
-    evidence=assess(root,pristine,image,config['description'],dispatch=send,persist=save,regions=regions)
+    if edit_source is not None and edit_box is not None:
+        evidence=assess_edit(root,pristine,edit_source,image,edit_box,prior_evidence or {},config['description'],dispatch=send,persist=save)
+    else:evidence=assess(root,pristine,image,config['description'],dispatch=send,persist=save,regions=regions)
     data=observation.model_dump(mode='json');status={'pass':'match','fail':'mismatch','unmeasured':'uncertain'}[evidence['status']]
     data['features']['rendering.clarity']=dict(status=status,observed='; '.join(evidence['checks'][name]['observed'] for name in ('linework','colour_separation','material_detail')),expected='Preserve native linework, colour separation and material detail of the immutable clean art authority; no cumulative edit muddiness')
     data['measurement_sources']['render_fidelity']=evidence
@@ -422,10 +424,14 @@ def repair(root, *, only=None, max_new_attempts=None):
                 prompt+=' Previous completed repair was rejected for these observed defects. Correct them rather than repeating the same proposal: '+json.dumps(prior if prior else previous.get('rejected','No strict improvement in the frozen gates.'))
             op='edit-'+fid+'-'+str(attempt)+'-'+digest([policy_sha,image_digest(image),size,prompt,[hashlib.sha256(b).hexdigest() for b in generation_images]])[:12]
             pending=record.get('pending_operation')
-            if pending and pending!=op and not (root/'private'/pending/'response.json').exists():
-                raise RuntimeError('Unresolved provider acceptance for '+pending+'; reconciliation required before a different request')
+            if pending and (root/'private'/pending/'request.json').exists():op=pending
+            elif pending:
+                record.setdefault('pre_dispatch_failures',[]).append(pending);pending=None
             record['pending_operation']=op;save(state_path,state)
-            raw=send(root,op,'muse-image-1.0',prompt,generation_images,image_size=size)
+            if pending and (root/'private'/pending/'request.json').exists():
+                from scripts.recover_provider_operation import resume
+                op=pending;raw=resume(root,op)
+            else:raw=send(root,op,'muse-image-1.0',prompt,generation_images,image_size=size)
             record.pop('pending_operation',None);save(state_path,state)
             try:
                 candidate,gate=decode(raw,brief.get('minimum_subject_span',1100))

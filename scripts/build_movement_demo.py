@@ -23,7 +23,8 @@ from framebound.v3.campaign.features import extract
 
 
 def save(path, value):
-    temporary = path.with_suffix(path.suffix + '.tmp')
+    import uuid
+    temporary = path.with_name(path.name+'.'+uuid.uuid4().hex+'.tmp')
     temporary.write_text(json.dumps(value, indent=2) + '\n')
     temporary.replace(path)
 
@@ -49,7 +50,18 @@ def send(root, name, model, prompt, images, *, image_size="1536x1024"):
     folder = root / 'private' / name
     folder.mkdir(parents=True, exist_ok=True)
     response = folder / 'response.json'
+    successor=folder/'successor.json'
+    if successor.exists():
+        child=json.loads(successor.read_text())['operation']
+        link=json.loads((root/'private'/child/'recovery.json').read_text())
+        if link['recovery_of']!=name:raise ValueError('Recovery successor linkage mismatch')
+        return send(root,child,model,prompt,images,image_size=image_size)
     if response.exists():
+        if not (folder/'receipt.json').exists() and (folder/'request.json').exists():
+            from scripts.provider_operation import run
+            frozen=json.loads((folder/'request.json').read_text());quote=frozen['committed_microdollars']
+            try:run(folder,dict(payload=dict(wire=frozen['wire'],quote=quote),quote=quote),MuseResponses(),timeout=300)
+            finally:refresh_costs(root)
         retained = response.read_bytes()
         body = json.loads(retained)
         if model == 'muse-spark-1.3' and body.get('status') == 'incomplete' and body.get('incomplete_details', {}).get('reason') == 'max_output_tokens':
@@ -58,11 +70,42 @@ def send(root, name, model, prompt, images, *, image_size="1536x1024"):
                 raise ValueError('Expanded assessment also exhausted its output bound')
             return send(root, name + '-expanded', model, prompt, images, image_size=image_size)
         return retained
+    config_path=root/'config.json'
+    config=json.loads(config_path.read_text()) if config_path.exists() else {}
     body = wire(model, prompt, images, max_output_tokens=8192 if model == 'muse-spark-1.3' else None)
     if model == 'muse-spark-1.3':
         body['reasoning'] = dict(effort='low')
     if model == 'muse-image-1.0':
         body['tools'] = [dict(type='image_generation', size=image_size, output_format='png', enable_image_search=False, enable_web_search=False)]
+    if config.get('durable_provider_transport')=='stream':
+        from scripts.provider_operation import run
+        # Freeze the identity on first send; resuming an accepted operation must
+        # use its original wire, even if defaults later change.
+        retained=folder/'request.json'
+        if retained.exists():
+            frozen=json.loads(retained.read_text())['wire']
+            if any(frozen.get(k)!=body.get(k) for k in ('model','input','tools','reasoning','max_output_tokens')):raise ValueError('Frozen operation input changed')
+            body=frozen
+        else:
+            body.update(stream=True,store=True,metadata=dict(framebound_operation=hashlib.sha256(name.encode()).hexdigest()))
+        adapter=MuseResponses();quoted=10000 if model=='muse-image-1.0' else 100000
+        request=dict(payload=dict(wire=body,quote=quoted,images=1 if model=='muse-image-1.0' else 0),quote=quoted)
+        adapter.preflight(request)
+        try:
+            with (folder/'job.json').open('x') as registration:json.dump(dict(active=True,operation=name,transport='retained-sse'),registration)
+        except FileExistsError:pass
+        try:return run(folder,request,adapter,timeout=300)
+        except Exception as error:
+            policy=config.get('provider_recovery_policy',{})
+            if (not policy.get('authorization') or not (folder/'request.json').exists() or
+                    (folder/'acceptance.json').exists() or response.exists() or getattr(error,'code',None) in (401,403)):
+                raise
+            from scripts.provider_operation import authorize_recovery
+            child=name+'-recovery-1'
+            authorize_recovery(root,name,child,authorization=policy['authorization'],max_recoveries=policy.get('max_successors_per_parent',2),max_recovery_microdollars=policy.get('max_recovery_microdollars',1_000_000))
+            save(successor,dict(operation=child,original_acceptance='unknown',commitment_retained=True))
+            return send(root,child,model,prompt,images,image_size=image_size)
+        finally:refresh_costs(root)
     marker = folder / 'request.json'
     if marker.exists():raise FileExistsError('Unresolved provider operation; reconcile without resending')
     adapter = MuseResponses()
